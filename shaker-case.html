@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>シャカシャカ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<style>
+  :root{
+    --bar:64px;
+    --ink:#3c352e; --mute:#8c8175;
+    --accent:#e8957a; --accent-deep:#d3704f;
+    --tint: rgba(150,196,210,0.16);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%; overflow:hidden;}
+  body{
+    font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+    color:var(--ink); background:#ece6dc;
+  }
+
+  /* full-screen shaker area */
+  #case{
+    position:fixed; top:var(--bar); left:0; right:0; bottom:0;
+    background:
+      linear-gradient(160deg, rgba(255,255,255,.35), rgba(255,255,255,0) 45%),
+      var(--tint);
+    overflow:hidden; touch-action:none;
+    border:7px solid #f4c430; border-radius:18px;
+  }
+  .charm{
+    position:absolute; top:0; left:0; z-index:1;
+    display:flex; align-items:center; justify-content:center;
+    will-change:transform; user-select:none;
+    filter:drop-shadow(0 3px 4px rgba(120,90,60,.28));
+  }
+  /* glass reflection — sits ABOVE the emoji */
+  .glass{
+    position:absolute; inset:0; z-index:5; pointer-events:none;
+    mix-blend-mode:screen;
+    background:
+      radial-gradient(150% 55% at 50% -12%, rgba(255,255,255,.34), transparent 60%),
+      linear-gradient(122deg, transparent 14%, rgba(255,255,255,.06) 19%,
+        rgba(255,255,255,.30) 23%, rgba(255,255,255,.05) 31%, transparent 41%),
+      linear-gradient(122deg, transparent 58%, rgba(255,255,255,.16) 64%,
+        rgba(255,255,255,.03) 72%, transparent 80%);
+  }
+
+  /* top horizontal control bar */
+  #bar{
+    position:fixed; top:0; left:0; right:0; height:var(--bar); z-index:20;
+    display:flex; align-items:center; gap:8px; padding:0 12px;
+    background:rgba(255,255,255,.82); backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+    box-shadow:0 2px 10px rgba(120,100,80,.12);
+    overflow-x:auto; white-space:nowrap;
+  }
+  #bar::-webkit-scrollbar{display:none;}
+  .lbl{font-size:11px; color:var(--mute); flex:0 0 auto; letter-spacing:.04em;}
+  .chip{
+    flex:0 0 auto; border:none; cursor:pointer; background:#f3ede4;
+    width:38px; height:38px; border-radius:12px; font-size:21px; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:transform .08s ease;
+  }
+  .chip:active{transform:scale(.9);}
+  .sep{flex:0 0 auto; width:1px; height:30px; background:#e0d8cc; margin:0 4px;}
+  .btn{
+    flex:0 0 auto; border:none; cursor:pointer; font-family:inherit; font-weight:700;
+    background:var(--accent); color:#fff; padding:10px 18px; border-radius:999px;
+    font-size:13px; box-shadow:0 5px 12px rgba(216,120,90,.3);
+    transition:transform .08s ease;
+  }
+  .btn:active{transform:scale(.94);}
+  .btn.ghost{background:#fff; color:#7a6e60; box-shadow:0 3px 8px rgba(120,100,80,.14);}
+</style>
+</head>
+<body>
+  <div id="bar">
+    <span class="lbl">足す</span>
+    <span class="sep"></span>
+    <button class="btn" id="shake">振る</button>
+    <button class="btn ghost" id="settle">そろえる</button>
+    <button class="btn ghost" id="clear">空に</button>
+  </div>
+
+  <div id="case"><div class="glass"></div></div>
+
+<script>
+const { Engine, World, Bodies, Body } = Matter;
+
+const PALETTE = [
+  {char:'💻', label:'PC作業'},
+  {char:'🚶', label:'移動'},
+  {char:'🚃', label:'通学'},
+  {char:'📅', label:'予定'},
+  {char:'☕', label:'休憩'},
+  {char:'🍙', label:'食事'},
+  {char:'✏️', label:'課題'},
+  {char:'😴', label:'睡眠'},
+];
+
+const caseEl = document.getElementById('case');
+const glass = caseEl.querySelector('.glass');
+const barH = 64;
+let W = window.innerWidth;
+let H = window.innerHeight - barH;
+
+const R = 26, FONT = 40;
+
+const engine = Engine.create();
+engine.gravity.y = 1;
+
+const t = 80;
+let walls = [];
+function buildWalls(){
+  walls.forEach(w=>World.remove(engine.world, w));
+  walls = [
+    Bodies.rectangle(W/2, H+t/2, W+t*2, t, {isStatic:true}),
+    Bodies.rectangle(W/2, -t/2,  W+t*2, t, {isStatic:true}),
+    Bodies.rectangle(-t/2, H/2,  t, H+t*2, {isStatic:true}),
+    Bodies.rectangle(W+t/2, H/2, t, H+t*2, {isStatic:true}),
+  ];
+  World.add(engine.world, walls);
+}
+buildWalls();
+
+const charms = [];
+function addCharm(char){
+  const x = W*0.3 + Math.random()*W*0.4;
+  const body = Bodies.circle(x, R+10, R, {
+    restitution:0.42, friction:0.04, frictionAir:0.012, density:0.001
+  });
+  World.add(engine.world, body);
+  const el = document.createElement('div');
+  el.className = 'charm';
+  el.textContent = char;
+  el.style.width = el.style.height = (2*R)+'px';
+  el.style.fontSize = FONT+'px';
+  caseEl.insertBefore(el, glass);
+  charms.push({body, el});
+}
+
+const bar = document.getElementById('bar');
+const sep = bar.querySelector('.sep');
+PALETTE.forEach(p=>{
+  const b = document.createElement('button');
+  b.className = 'chip'; b.textContent = p.char; b.title = p.label;
+  b.addEventListener('click', ()=>{ enableMotion(); addCharm(p.char); });
+  bar.insertBefore(b, sep);
+});
+
+['💻','💻','🚶','🚃','📅','☕','🍙','✏️','💻','🚶','☕','📅'].forEach(addCharm);
+
+(function render(){
+  for(const {body,el} of charms){
+    el.style.transform =
+      `translate(${body.position.x-R}px, ${body.position.y-R}px) rotate(${body.angle}rad)`;
+  }
+  requestAnimationFrame(render);
+})();
+(function step(){ Engine.update(engine, 1000/60); requestAnimationFrame(step); })();
+
+function shake(power=18){
+  for(const {body} of charms){
+    Body.setVelocity(body, {x:(Math.random()-0.5)*power*2, y:(Math.random()-0.7)*power*2});
+    Body.setAngularVelocity(body, (Math.random()-0.5)*0.6);
+  }
+}
+function settle(){ for(const {body} of charms) Body.setVelocity(body, {x:0,y:0}); }
+function clearAll(){
+  charms.forEach(({body,el})=>{ World.remove(engine.world, body); el.remove(); });
+  charms.length = 0;
+}
+
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+let lx,ly,lz,motionOn=false;
+function onMotion(e){
+  const a=e.accelerationIncludingGravity;
+  if(a && a.x!=null){
+    engine.gravity.x = clamp(a.x/9.8,-1,1);
+    engine.gravity.y = clamp(-a.y/9.8,-1,1);
+  }
+  const acc=e.acceleration||a;
+  if(acc && acc.x!=null){
+    if(lx!=null){
+      const d=Math.abs(acc.x-lx)+Math.abs(acc.y-ly)+Math.abs(acc.z-lz);
+      if(d>16) shake(12);
+    }
+    lx=acc.x; ly=acc.y; lz=acc.z;
+  }
+}
+function enableMotion(){
+  if(motionOn||typeof DeviceMotionEvent==='undefined') return;
+  if(typeof DeviceMotionEvent.requestPermission==='function'){
+    DeviceMotionEvent.requestPermission().then(s=>{
+      if(s==='granted'){window.addEventListener('devicemotion',onMotion);motionOn=true;}
+    }).catch(()=>{});
+  }else{ window.addEventListener('devicemotion',onMotion); motionOn=true; }
+}
+
+document.getElementById('shake').addEventListener('click', ()=>{enableMotion();shake();});
+document.getElementById('settle').addEventListener('click', settle);
+document.getElementById('clear').addEventListener('click', clearAll);
+
+window.addEventListener('resize', ()=>{
+  W=window.innerWidth; H=window.innerHeight-barH; buildWalls();
+});
+</script>
+</body>
+</html>
