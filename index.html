@@ -102,13 +102,15 @@ const { Engine, World, Bodies, Body } = Matter;
 
 const PALETTE = [
   {char:'💻', label:'PC作業', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Laptop/Color/laptop_color.svg'},
-  {char:'🚶', label:'移動', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Person%20walking%20facing%20right/Color/person_walking_facing_right_color_default.svg'},
-  {char:'🚃', label:'通学', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Train/Color/train_color.svg'},
+  {char:'�', label:'通学', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Train/Color/train_color.svg'},
   {char:'📅', label:'予定', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Calendar/Color/calendar_color.svg'},
-  {char:'☕', label:'休憩', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Coffee/Color/coffee_color.svg'},
   {char:'🍙', label:'食事', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Rice%20ball/Color/rice_ball_color.svg'},
   {char:'✏️', label:'課題', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Pencil/Color/pencil_color.svg'},
   {char:'😴', label:'睡眠', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Person%20in%20bed/Color/person_in_bed_color_default.svg'},
+  {char:'💬', label:'会話', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Speech%20balloon/Color/speech_balloon_color.svg'},
+  {char:'💪', label:'筋トレ', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Flexed%20biceps/Color/flexed_biceps_color_default.svg'},
+  {char:'😢', label:'悲しい', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Sad%20but%20relieved%20face/Color/sad_but_relieved_face_color.svg'},
+  {char:'😠', label:'怒ってる', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Angry%20face/Color/angry_face_color.svg'},
 ];
 
 const caseEl = document.getElementById('case');
@@ -184,7 +186,7 @@ PALETTE.forEach(p=>{
 const initialItems = [
   PALETTE[0], PALETTE[0], PALETTE[1], PALETTE[2],
   PALETTE[3], PALETTE[4], PALETTE[5], PALETTE[6],
-  PALETTE[0], PALETTE[1], PALETTE[4], PALETTE[3],
+  PALETTE[7], PALETTE[8], PALETTE[9], PALETTE[1],
 ];
 initialItems.forEach(addCharm);
 
