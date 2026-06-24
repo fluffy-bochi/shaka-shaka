@@ -111,7 +111,16 @@ const PALETTE = [
 const caseEl = document.getElementById('case');
 const glass = caseEl.querySelector('.glass');
 const noticeEl = document.getElementById('notice');
-const showNotice = msg => { if(noticeEl) noticeEl.textContent = msg; };
+let noticeTimer = null;
+const showNotice = (msg, duration=3000) => {
+  if(!noticeEl) return;
+  if(noticeTimer){ clearTimeout(noticeTimer); noticeTimer = null; }
+  noticeEl.textContent = msg;
+  noticeEl.style.display = msg ? 'block' : 'none';
+  if(msg && duration > 0){
+    noticeTimer = setTimeout(() => { noticeEl.style.display = 'none'; noticeTimer = null; }, duration);
+  }
+};
 const barH = 64;
 let W = window.innerWidth;
 let H = window.innerHeight - barH;
@@ -191,7 +200,7 @@ function onMotion(e){
   const a=e.accelerationIncludingGravity;
   if(a && a.x!=null){
     engine.gravity.x = clamp(a.x/9.8,-1,1);
-    engine.gravity.y = clamp(-a.y/9.8,-1,1);
+    engine.gravity.y = clamp(-a.y/9.8,0.8,1.2);
   }
   const acc=e.acceleration||a;
   if(acc && acc.x!=null){
@@ -211,7 +220,7 @@ function enableMotion(){
   const attach = ()=>{
     window.addEventListener('devicemotion',onMotion);
     motionOn=true;
-    showNotice('振動検知を有効にしました。スマホを振ってください。');
+    showNotice('', 0);
   };
   if(typeof DeviceMotionEvent.requestPermission==='function'){
     DeviceMotionEvent.requestPermission().then(s=>{
