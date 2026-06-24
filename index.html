@@ -73,6 +73,13 @@
   }
   .btn:active{transform:scale(.94);}
   .btn.ghost{background:#fff; color:#7a6e60; box-shadow:0 3px 8px rgba(120,100,80,.14);}
+  .notice{
+    position:fixed; top:var(--bar); left:0; right:0; padding:8px 12px;
+    font-size:12px; color:#5f5448; background:rgba(255,255,255,.85);
+    border-bottom:1px solid rgba(145,121,90,.18); z-index:20;
+    text-align:center;
+  }
+  #case{padding-top:32px;}
 </style>
 </head>
 <body>
@@ -83,6 +90,7 @@
     <button class="btn ghost" id="settle">そろえる</button>
     <button class="btn ghost" id="clear">空に</button>
   </div>
+  <div class="notice" id="notice">Android Chromeでは、先に「振る」ボタンを押してからスマホを振ってください。</div>
 
   <div id="case"><div class="glass"></div></div>
 
@@ -102,6 +110,8 @@ const PALETTE = [
 
 const caseEl = document.getElementById('case');
 const glass = caseEl.querySelector('.glass');
+const noticeEl = document.getElementById('notice');
+const showNotice = msg => { if(noticeEl) noticeEl.textContent = msg; };
 const barH = 64;
 let W = window.innerWidth;
 let H = window.innerHeight - barH;
@@ -127,8 +137,9 @@ buildWalls();
 
 const charms = [];
 function addCharm(char){
-  const x = W*0.3 + Math.random()*W*0.4;
-  const body = Bodies.circle(x, R+10, R, {
+  const x = W*0.2 + Math.random()*W*0.6;
+  const y = H - R - 16;
+  const body = Bodies.circle(x, y, R, {
     restitution:0.42, friction:0.04, frictionAir:0.012, density:0.001
   });
   World.add(engine.world, body);
@@ -186,18 +197,28 @@ function onMotion(e){
   if(acc && acc.x!=null){
     if(lx!=null){
       const d=Math.abs(acc.x-lx)+Math.abs(acc.y-ly)+Math.abs(acc.z-lz);
-      if(d>16) shake(12);
+      if(d>12) shake(12);
     }
     lx=acc.x; ly=acc.y; lz=acc.z;
   }
 }
 function enableMotion(){
-  if(motionOn||typeof DeviceMotionEvent==='undefined') return;
+  if(motionOn){ return; }
+  if(typeof DeviceMotionEvent==='undefined'){
+    showNotice('この端末では振動検知が使えません。');
+    return;
+  }
+  const attach = ()=>{
+    window.addEventListener('devicemotion',onMotion);
+    motionOn=true;
+    showNotice('振動検知を有効にしました。スマホを振ってください。');
+  };
   if(typeof DeviceMotionEvent.requestPermission==='function'){
     DeviceMotionEvent.requestPermission().then(s=>{
-      if(s==='granted'){window.addEventListener('devicemotion',onMotion);motionOn=true;}
-    }).catch(()=>{});
-  }else{ window.addEventListener('devicemotion',onMotion); motionOn=true; }
+      if(s==='granted') attach();
+      else showNotice('振動検知の許可が必要です。');
+    }).catch(()=> showNotice('振動検知の許可取得に失敗しました。'));
+  }else{ attach(); }
 }
 
 document.getElementById('shake').addEventListener('click', ()=>{enableMotion();shake();});
