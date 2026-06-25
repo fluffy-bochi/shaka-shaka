@@ -378,7 +378,10 @@ window.addEventListener('resize', ()=>{
 function shakePhysics(){
   if(!engine) return;
   physicsBodies.forEach(({body})=>{
-    Body.setVelocity(body, {x:(Math.random()-0.5)*28, y:(Math.random()-0.9)*28});
+    Body.setVelocity(body, {
+      x:(Math.random()-0.5)*18,
+      y:Math.random()*18 + 4
+    });
     Body.setAngularVelocity(body, (Math.random()-0.5)*0.6);
   });
 }
