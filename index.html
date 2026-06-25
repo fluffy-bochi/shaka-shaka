@@ -1,508 +1,257 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>疲労シャカシャカ — プロトタイプ</title>
-<link rel="stylesheet" href="design_handoff_fatigue_shaka/styles.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>シャカシャカ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 <style>
-  *{box-sizing:border-box}
-  html,body{margin:0;min-height:100%;height:100%}
-  body{font-family:var(--font-ui);background:#dcdad2;display:flex;align-items:flex-start;justify-content:center;min-height:100vh}
+  :root{
+    --bar:64px;
+    --ink:#3c352e; --mute:#8c8175;
+    --accent:#e8957a; --accent-deep:#d3704f;
+    --tint: rgba(150,196,210,0.16);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%; overflow:hidden;}
+  body{
+    font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+    color:var(--ink); background:#ece6dc;
+  }
 
-  /* phone */
-  .phone{width:100vw;height:100vh;background:transparent;border-radius:0;padding:0;box-shadow:none;position:relative}
-  .stage{position:absolute;inset:0;border-radius:0;overflow:hidden;background:var(--paper)}
+  /* full-screen shaker area */
+  #case{
+    position:fixed; top:var(--bar); left:0; right:0; bottom:0;
+    background:
+      linear-gradient(160deg, rgba(255,255,255,.35), rgba(255,255,255,0) 45%),
+      var(--tint);
+    overflow:hidden; touch-action:none;
+    border:7px solid #f4c430; border-radius:18px;
+  }
+  .charm{
+    position:absolute; top:0; left:0; z-index:1;
+    display:flex; align-items:center; justify-content:center;
+    will-change:transform; user-select:none;
+    filter:drop-shadow(0 3px 4px rgba(120,90,60,.28));
+  }
+  /* glass reflection — sits ABOVE the emoji */
+  .glass{
+    position:absolute; inset:0; z-index:5; pointer-events:none;
+    mix-blend-mode:screen;
+    background:
+      radial-gradient(150% 55% at 50% -12%, rgba(255,255,255,.34), transparent 60%),
+      linear-gradient(122deg, transparent 14%, rgba(255,255,255,.06) 19%,
+        rgba(255,255,255,.30) 23%, rgba(255,255,255,.05) 31%, transparent 41%),
+      linear-gradient(122deg, transparent 58%, rgba(255,255,255,.16) 64%,
+        rgba(255,255,255,.03) 72%, transparent 80%);
+  }
+  .charm img{
+    width:100%; height:100%; display:block; object-fit:contain;
+  }
 
-  /* stacked screens — cross-fade (front timeline ⇄ back shaka) */
-  .flip{position:absolute;inset:0}
-  .face{position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column;transition:opacity .4s ease}
-  .face.front{opacity:1;transform:none;z-index:2}
-  .face.back{opacity:0;transform:none;pointer-events:none;z-index:1}
-  .flip.flipped .face.front{opacity:0;pointer-events:none}
-  .flip.flipped .face.back{opacity:1;pointer-events:auto;z-index:3}
-
-  .statusbar{height:44px;flex:0 0 44px;display:flex;align-items:center;justify-content:space-between;padding:0 26px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--ink);position:relative;z-index:6}
-  .statusbar.light{color:#fff}
-
-  /* shaka layer */
-  .shaka{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-  .shaka span{position:absolute;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:transform .5s ease, opacity .5s ease;animation:drop .6s ease both}
-  @keyframes drop{from{transform:translateY(-36px) rotate(var(--init-rot,0deg));opacity:.2;}to{transform:translateY(0) rotate(var(--init-rot,0deg));opacity:1;}}
-
-  .caps{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
-  .tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px;border-radius:var(--r-sm)}
-  .track{height:12px;border-radius:999px;background:var(--surface-sunk);overflow:hidden}
-  .fill{height:100%;border-radius:999px;transition:width .5s ease, background .4s ease}
-
-  /* timeline */
-  .list{flex:1;overflow-y:auto;padding:2px 20px 120px;display:flex;flex-direction:column;gap:9px}
-  .list::-webkit-scrollbar{display:none}
-  .item{display:flex;background:var(--surface);border-radius:var(--r-md);box-shadow:var(--shadow-card);overflow:hidden;cursor:pointer;transition:opacity .3s, transform .12s;animation:pop .3s ease}
-  @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .item:active{transform:scale(.985)}
-  .item .tt{background:var(--ink);color:#fff;padding:9px 11px;font-family:var(--font-mono);min-width:60px;display:flex;flex-direction:column;justify-content:center}
-  .item .tt .f{font-size:12px;font-weight:700}
-  .item .tt .t{font-size:9px;color:var(--ink-3)}
-  .item .bd{flex:1;padding:9px 13px;display:flex;align-items:center;gap:9px}
-  .item .ttl{flex:1;font-size:14px;font-weight:500}
-  .item .face{font-size:22px;filter:drop-shadow(0 3px 4px rgba(27,27,24,.18))}
-  .item .d{font-family:var(--font-mono);font-size:13px;font-weight:700;min-width:34px;text-align:right}
-  .item.exp{opacity:.42}
-  .item.exp .ttl{text-decoration:line-through}
-
-  .menu{width:40px;height:40px;background:var(--ink);border-radius:10px;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;cursor:pointer}
-  .menu i{width:18px;height:2px;background:#fff;display:block}
-
-  /* buttons */
-  .btn{font-family:var(--font-ui);font-weight:700;border:none;border-radius:12px;cursor:pointer;font-size:14px}
-  .btn-mono{font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
-  .pri{background:var(--lime);color:var(--lime-ink)}
-  .ink{background:var(--ink);color:var(--lime)}
-  .sunk{background:var(--surface-sunk);color:var(--ink-2)}
-  .pink{background:var(--pink);color:#fff}
-
-  .fab{position:absolute;right:18px;bottom:22px;width:60px;height:60px;border-radius:50%;background:var(--lime);color:var(--lime-ink);font-size:30px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-pop);z-index:8;cursor:pointer;border:none;transition:transform .12s}
-  .fab:active{transform:scale(.92)}
-
-  /* flip toggle pill (bottom center, front) */
-  .flipbtn{position:absolute;left:50%;transform:translateX(-50%);bottom:30px;z-index:8;display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:#fff;border:none;border-radius:999px;padding:11px 18px;font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;box-shadow:var(--shadow-pop)}
-  .flipbtn .dot{width:18px;height:18px;border-radius:50%;background:var(--lime);color:var(--lime-ink);display:flex;align-items:center;justify-content:center;font-size:11px}
-
-  /* right-edge tool drawer (back screen) */
-  .drawer{position:absolute;top:44%;right:0;z-index:7;display:flex;align-items:stretch;transform:translateY(-50%) translateX(calc(100% - 36px));transition:transform .35s cubic-bezier(.6,.02,.2,1)}
-  .drawer.open{transform:translateY(-50%) translateX(0)}
-  .drawer-tab{width:36px;border:none;background:var(--ink);color:#fff;border-radius:16px 0 0 16px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.14em;writing-mode:vertical-rl;text-orientation:upright;padding:14px 0;cursor:pointer}
-  .drawer-body{display:flex;flex-direction:column;gap:8px;background:var(--ink);padding:10px;border-radius:0 0 0 16px}
-  .tool{display:flex;flex-direction:column;align-items:center;gap:3px;background:rgba(255,255,255,.09);border:none;color:#fff;border-radius:12px;padding:9px 14px;font-size:22px;cursor:pointer;transition:background .15s}
-  .tool span{font-family:var(--font-mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
-  .tool:active{background:rgba(255,255,255,.2)}
-
-  /* overlays / sheets */
-  .scrim{position:absolute;inset:0;background:rgba(20,20,15,.42);z-index:20;opacity:0;pointer-events:none;transition:opacity .3s}
-  .scrim.on{opacity:1;pointer-events:auto}
-  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:26px 26px 0 0;z-index:21;transform:translateY(110%);transition:transform .4s cubic-bezier(.6,.02,.2,1);padding:10px 22px 26px;box-shadow:0 -10px 30px rgba(0,0,0,.18);max-height:84%;overflow-y:auto}
-  .sheet.on{transform:translateY(0)}
-  .sheet::-webkit-scrollbar{display:none}
-  .grab{width:42px;height:4px;border-radius:2px;background:var(--line);margin:6px auto 16px}
-
-  .field{margin-bottom:16px}
-  .field > label{display:block;font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
-  .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .chip{border:2px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 13px;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;font-family:var(--font-ui)}
-  .chip.sel{border-color:var(--ink);background:var(--ink);color:#fff}
-  .moodrow{display:flex;gap:6px;justify-content:space-between}
-  .moodbtn{flex:1;aspect-ratio:1;border:2px solid var(--line);background:var(--surface);border-radius:14px;font-size:24px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center}
-  .moodbtn.sel{border-color:var(--pink);background:var(--pink-soft);transform:scale(1.05)}
-  .timeinputs{display:flex;align-items:center;gap:10px}
-  .timeinputs input{flex:1;min-width:0;font-family:var(--font-mono);font-size:15px;font-weight:700;border:2px solid var(--line);border-radius:10px;padding:10px 6px;text-align:center;color:var(--ink)}
-  .textinput{width:100%;font-family:var(--font-ui);font-size:15px;font-weight:500;border:2px solid var(--line);border-radius:10px;padding:11px 13px;color:var(--ink);background:var(--surface)}
-  .textinput:focus{outline:none;border-color:var(--ink)}
-  .deltarow{display:flex;align-items:center;gap:10px}
-  .stepbtn{width:44px;height:44px;border:2px solid var(--line);border-radius:12px;background:var(--surface);font-family:var(--font-display);font-weight:800;font-size:22px;color:var(--ink);cursor:pointer;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
-  .stepbtn:active{background:var(--surface-sunk)}
-  .numinput{width:74px;min-width:0;font-family:var(--font-display);font-weight:800;font-size:23px;border:2px solid var(--line);border-radius:10px;padding:6px 6px;text-align:center;color:var(--ink)}
-  .numinput:focus{outline:none;border-color:var(--ink)}
-  .emojiprev{margin-left:auto;display:flex;flex-direction:column;align-items:center;gap:3px}
-  .emojiprev .pe{filter:drop-shadow(0 4px 5px rgba(27,27,24,.18));transition:opacity .2s}
-  .emojiprev .pl{font-family:var(--font-mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
-  .emojigrid{display:flex;flex-wrap:wrap;gap:2px;margin-top:12px;min-height:28px;transition:opacity .2s}
-  .emojigrid span{font-size:26px;line-height:1;filter:drop-shadow(0 2px 3px rgba(27,27,24,.16))}
-
-  /* shaka-only back face — clear case on the same cream ground */
-  .backwrap{position:absolute;inset:0;background:var(--paper);display:flex;flex-direction:column}
-  .backwrap .shaka span{filter:drop-shadow(0 5px 8px rgba(27,27,24,.18))}
-  /* case outer frame + glass reflection over the emoji layer */
-  .glasscase{position:absolute;inset:0;border-radius:38px;z-index:2;pointer-events:none;
-    border:3px solid var(--lime);
-    box-shadow: inset 0 2px 1px rgba(255,255,255,.85), inset 0 0 28px rgba(255,255,255,.5), inset 0 -16px 32px rgba(27,27,24,.05), 0 0 0 1px rgba(27,27,24,.06);
-    background: linear-gradient(125deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 24%, rgba(255,255,255,0) 58%, rgba(255,255,255,.30) 74%, rgba(255,255,255,0) 88%);}
-
-  .toast{position:absolute;left:50%;bottom:104px;transform:translateX(-50%) translateY(10px);background:var(--ink);color:#fff;font-size:13px;font-weight:500;padding:10px 16px;border-radius:999px;z-index:30;opacity:0;pointer-events:none;transition:all .3s;font-family:var(--font-ui)}
-  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
-  .toast .em{margin-right:6px}
+  /* top horizontal control bar */
+  #bar{
+    position:fixed; top:0; left:0; right:0; height:var(--bar); z-index:20;
+    display:flex; align-items:center; gap:8px; padding:0 12px;
+    background:rgba(255,255,255,.82); backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+    box-shadow:0 2px 10px rgba(120,100,80,.12);
+    overflow-x:auto; white-space:nowrap;
+  }
+  #bar::-webkit-scrollbar{display:none;}
+  .lbl{font-size:11px; color:var(--mute); flex:0 0 auto; letter-spacing:.04em;}
+  .chip{
+    flex:0 0 auto; border:none; cursor:pointer; background:#f3ede4;
+    width:38px; height:38px; border-radius:12px; font-size:21px; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:transform .08s ease;
+  }
+  .chip:active{transform:scale(.9);}
+  .sep{flex:0 0 auto; width:1px; height:30px; background:#e0d8cc; margin:0 4px;}
+  .btn{
+    flex:0 0 auto; border:none; cursor:pointer; font-family:inherit; font-weight:700;
+    background:var(--accent); color:#fff; padding:10px 18px; border-radius:999px;
+    font-size:13px; box-shadow:0 5px 12px rgba(216,120,90,.3);
+    transition:transform .08s ease;
+  }
+  .btn:active{transform:scale(.94);}
+  .btn.ghost{background:#fff; color:#7a6e60; box-shadow:0 3px 8px rgba(120,100,80,.14);}
+  .notice{
+    position:fixed; top:var(--bar); left:0; right:0; padding:8px 12px;
+    font-size:12px; color:#5f5448; background:rgba(255,255,255,.85);
+    border-bottom:1px solid rgba(145,121,90,.18); z-index:20;
+    text-align:center;
+  }
+  #case{padding-top:32px;}
 </style>
 </head>
 <body>
-<div class="phone"><div class="stage">
-
-  <div class="flip" id="flip">
-
-    <!-- ════════ FRONT — TIMELINE ════════ -->
-    <div class="face front">
-      <div class="shaka" id="shakaFront"></div>
-      <div style="position:relative;z-index:2;display:flex;flex-direction:column;height:100%">
-        <div class="statusbar"><span>9:41</span><span>VoLTE ▮▮▮ 64%</span></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 20px 10px">
-          <div>
-            <div class="caps">2026 · JUL 17 · WED</div>
-            <div style="font-size:22px;font-weight:700;margin-top:2px">今日のログ</div>
-          </div>
-          <div class="menu"><i></i><i></i><i></i></div>
-        </div>
-        <div class="list" id="list" style="padding-top:8px"></div>
-      </div>
-      <button class="fab" id="addBtn">＋</button>
-      <button class="flipbtn" id="toShaka"><span class="dot">⤿</span> シャカシャカを見る</button>
-    </div>
-
-    <!-- ════════ BACK — SHAKA ONLY ════════ -->
-    <div class="face back">
-      <div class="backwrap">
-        <div class="shaka" id="shakaBack"></div>
-        <div class="glasscase"></div>
-        <div class="drawer" id="drawer">
-          <button class="drawer-tab" id="drawerTab">道具</button>
-          <div class="drawer-body">
-            <button class="tool" id="shakeBtn">🫨<span>振る</span></button>
-            <button class="tool" id="sortBtn">🧺<span>そろえる</span></button>
-          </div>
-        </div>
-        <div style="position:relative;z-index:3;display:flex;flex-direction:column;height:100%;color:var(--ink);pointer-events:none">
-          <div class="statusbar"><span>9:41</span><span>VoLTE ▮▮▮ 64%</span></div>
-          <div style="padding:18px 26px 0;text-align:center">
-            <div class="caps">ためトリップ・ケース</div>
-            <div id="backClock" style="font-family:var(--font-display);font-weight:800;font-size:76px;line-height:1.02;letter-spacing:.01em">09:41</div>
-          </div>
-          <div style="flex:1"></div>
-        </div>
-      </div>
-      <button class="flipbtn" id="toTimeline"><span class="dot">⤾</span> ログに戻る</button>
-    </div>
+  <div id="bar">
+    <span class="lbl">足す</span>
+    <span class="sep"></span>
+    <button class="btn" id="shake">振る</button>
+    <button class="btn ghost" id="settle">そろえる</button>
+    <button class="btn ghost" id="clear">空に</button>
   </div>
+  <div class="notice" id="notice">Android Chromeでは、先に「振る」ボタンを押してからスマホを振ってください。</div>
 
-  <div class="scrim" id="scrim"></div>
-  <div class="sheet" id="addSheet">
-    <div class="grab"></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <span style="font-size:19px;font-weight:700">やったことを記録</span>
-      <span class="tag ink" style="background:var(--ink);color:var(--lime)">LOG</span>
-    </div>
-
-    <div class="field">
-      <label>タイトル</label>
-      <input id="tTitle" class="textinput" placeholder="例：チームMTG、企画書づくり…" autocomplete="off">
-    </div>
-
-    <div class="field">
-      <label>何をした？</label>
-      <div class="chips" id="actChips"></div>
-    </div>
-
-    <div class="field">
-      <label>時間</label>
-      <div class="timeinputs"><input id="tFrom" type="time" value="20:00"><span class="caps">→</span><input id="tTo" type="time" value="21:00"></div>
-    </div>
-
-    <div class="field">
-      <label>気持ち</label>
-      <div class="moodrow" id="moodRow"></div>
-    </div>
-
-    <div class="field">
-      <label>疲労度の変化</label>
-      <div class="deltarow">
-        <button type="button" id="stepDown" class="stepbtn">−</button>
-        <input id="deltaNum" type="number" min="-100" max="100" value="12" class="numinput">
-        <button type="button" id="stepUp" class="stepbtn">＋</button>
-        <span class="caps">FATIGUE</span>
-      </div>
-      <div class="emojigrid" id="emojiGrid"></div>
-    </div>
-
-    <div style="display:flex;gap:10px;margin-top:8px">
-      <button class="btn sunk" style="flex:0 0 90px;padding:14px" id="cancelAdd">やめる</button>
-      <button class="btn pri" style="flex:1;padding:14px;font-size:15px" id="saveAdd">記録する</button>
-    </div>
-  </div>
-
-  <div class="sheet" id="detailSheet">
-    <div class="grab"></div>
-    <div id="detailBody"></div>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-</div></div>
+  <div id="case"><div class="glass"></div></div>
 
 <script>
-const EMOJI_MAP = {
-  "会議":"💬","通勤":"🚃","レビュー":"💻","作業":"⌨️","資料作成":"✏️","メール":"📧",
-  "勉強":"📚","運動":"🏃","散歩":"🚶","家事":"🧹","育児":"🍼","通話":"📞",
-  "睡眠":"🛌","食事":"🍙","休憩":"☕","昼寝":"😴","ゲーム":"🎮","読書":"📖","入浴":"🛁"
-};
-const ACTIONS = Object.keys(EMOJI_MAP);
-const MOODS = ["😆","🙂","😌","🥲","😩","😢"];
+const { Engine, World, Bodies, Body } = Matter;
 
-function rng(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280;};}
+const PALETTE = [
+  {char:'💻', label:'PC作業', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Laptop/Color/laptop_color.svg'},
+  {char:'🚃', label:'通学', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Train/Color/train_color.svg'},
+  {char:'📅', label:'予定', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Calendar/Color/calendar_color.svg'},
+  {char:'🍙', label:'食事', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Rice%20ball/Color/rice_ball_color.svg'},
+  {char:'✏️', label:'課題', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Pencil/Color/pencil_color.svg'},
+  {char:'💬', label:'会話', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Speech%20balloon/Color/speech_balloon_color.svg'},
+  {char:'😢', label:'悲しい', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Sad%20but%20relieved%20face/Color/sad_but_relieved_face_color.svg'},
+  {char:'😠', label:'怒ってる', src:'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Angry%20face/Color/angry_face_color.svg'},
+];
 
-let state = {
-  entries: [
-    {from:"07:30",to:"08:00",title:"通勤・満員電車",act:"通勤",mood:"😩",delta:14,exp:false},
-    {from:"09:00",to:"10:30",title:"会議3本",act:"会議",mood:"🥲",delta:18,exp:false},
-    {from:"12:30",to:"13:00",title:"ランチ",act:"食事",mood:"🙂",delta:-12,exp:true},
-    {from:"15:00",to:"17:40",title:"レビュー対応",act:"レビュー",mood:"😌",delta:16,exp:false},
-    {from:"18:30",to:"19:00",title:"散歩",act:"散歩",mood:"🙂",delta:-8,exp:false},
-  ],
-  sortMode:false,
-};
-
-function fatigue(){
-  let f = 0;
-  state.entries.forEach(e=>{ if(!e.exp) f += e.delta; });
-  return Math.max(0, Math.min(100, Math.round(f)));
-}
-
-function fillColor(v){
-  if(v<40) return "var(--fatigue-0)";
-  if(v<70) return "var(--fatigue-40)";
-  if(v<100) return "var(--fatigue-70)";
-  return "var(--fatigue-100)";
-}
-function msg(v){
-  const yohaku = Math.max(0,100-v);
-  if(v>=100) return "満杯。今日はここまで、休もう。";
-  if(v>85) return `余白 ${yohaku}% — そろそろ休もう`;
-  if(v>60) return `余白 ${yohaku}% — 詰め込みすぎ注意`;
-  if(v>30) return `余白 ${yohaku}% — いいペース`;
-  return `余白 ${yohaku}% — まだいける`;
-}
-function backMsg(v){
-  if(v>=100) return "ケースが満杯。眠って空にしよう。";
-  if(v>85) return "そろそろ振って、休む合図。";
-  if(v>50) return "ほどよく積もってきた。";
-  return "まだ余白たっぷり。";
-}
-
-function renderShaka(el, full){
-  const v = fatigue();
-  const n = Math.min(100, Math.round(v));
-  const rand = rng(7);
-  const pile = state.entries.filter(e=>e.delta>0 && !e.exp);
-  let html="";
-  for(let i=0;i<n;i++){
-    const left = state.sortMode ? ((i%10)*9.2 + 4) : (rand()*90+3);
-    const row = Math.floor(i/10);
-    const bottom = state.sortMode
-      ? (row*8.4 + 1)
-      : full
-        ? (row*7 + 2 + rand()*3)
-        : (row*4 + 2 + rand()*2);
-    const rot = state.sortMode ? 0 : (rand()-.5)*60;
-    const size = 20+rand()*12;
-    const src = pile.length ? pile[Math.floor(rand()*pile.length)].act : ACTIONS[Math.floor(rand()*ACTIONS.length)];
-    const e = EMOJI_MAP[src] || "✨";
-    const delay = (rand()*180).toFixed(0);
-    html+=`<span style="left:${left}%;bottom:${bottom}%;font-size:${size}px;transform:rotate(${rot}deg);animation-delay:${delay}ms;--init-rot:${rot}deg">${e}</span>`;
+const caseEl = document.getElementById('case');
+const glass = caseEl.querySelector('.glass');
+const noticeEl = document.getElementById('notice');
+let noticeTimer = null;
+const showNotice = (msg, duration=3000) => {
+  if(!noticeEl) return;
+  if(noticeTimer){ clearTimeout(noticeTimer); noticeTimer = null; }
+  noticeEl.textContent = msg;
+  noticeEl.style.display = msg ? 'block' : 'none';
+  if(msg && duration > 0){
+    noticeTimer = setTimeout(() => { noticeEl.style.display = 'none'; noticeTimer = null; }, duration);
   }
-  el.innerHTML=html;
-}
+};
+const barH = 64;
+let W = window.innerWidth;
+let H = window.innerHeight - barH;
 
-function renderList(){
-  const list = document.getElementById("list");
-  list.innerHTML="";
-  state.entries.forEach((e,i)=>{
-    const d=document.createElement("div");
-    d.className="item"+(e.exp?" exp":"");
-    const sign=e.delta>=0?"+":"−";
-    const col=e.delta>=0?"var(--ink-2)":"var(--lime-ink)";
-    d.innerHTML=`<div class="tt"><span class="f">${e.from}</span><span class="t">${e.to}</span></div>
-      <div class="bd"><span class="ttl">${EMOJI_MAP[e.act]||""} ${e.title||e.act}</span><span class="face">${e.mood}</span>
-      <span class="d" style="color:${col}">${sign}${Math.abs(e.delta)}</span></div>`;
-    d.onclick=()=>openDetail(i);
-    list.appendChild(d);
+const R = 26, FONT = 40;
+
+const engine = Engine.create();
+engine.gravity.y = 1;
+
+const t = 80;
+let walls = [];
+function buildWalls(){
+  walls.forEach(w=>World.remove(engine.world, w));
+  walls = [
+    Bodies.rectangle(W/2, H+t/2, W+t*2, t, {isStatic:true}),
+    Bodies.rectangle(W/2, -t/2,  W+t*2, t, {isStatic:true}),
+    Bodies.rectangle(-t/2, H/2,  t, H+t*2, {isStatic:true}),
+    Bodies.rectangle(W+t/2, H/2, t, H+t*2, {isStatic:true}),
+  ];
+  World.add(engine.world, walls);
+}
+buildWalls();
+
+const charms = [];
+function addCharm(item){
+  const x = W*0.3 + Math.random()*W*0.4;
+  const y = H - R - 16;
+  const body = Bodies.circle(x, y, R, {
+    restitution:0.42, friction:0.04, frictionAir:0.012, density:0.001
   });
+  World.add(engine.world, body);
+  const el = document.createElement('div');
+  el.className = 'charm';
+  el.style.width = el.style.height = (2*R)+'px';
+  if(item && item.src){
+    const img = document.createElement('img');
+    img.src = item.src;
+    img.alt = item.label || item.char || '';
+    img.draggable = false;
+    el.appendChild(img);
+  } else {
+    el.textContent = item && item.char ? item.char : item;
+    el.style.fontSize = FONT+'px';
+  }
+  caseEl.insertBefore(el, glass);
+  charms.push({body, el});
 }
 
-function tickClock(){
-  const d=new Date();
-  const hh=String(d.getHours()).padStart(2,"0");
-  const mm=String(d.getMinutes()).padStart(2,"0");
-  const bc=document.getElementById("backClock");
-  if(bc) bc.textContent=hh+":"+mm;
-  document.querySelectorAll(".statusbar span:first-child").forEach(s=>s.textContent=d.getHours()+":"+mm);
+const bar = document.getElementById('bar');
+const sep = bar.querySelector('.sep');
+PALETTE.forEach(p=>{
+  const b = document.createElement('button');
+  b.className = 'chip'; b.textContent = p.char; b.title = p.label;
+  b.addEventListener('click', ()=>{ enableMotion(); addCharm(p); });
+  bar.insertBefore(b, sep);
+});
+
+const initialItems = [
+  PALETTE[0], PALETTE[0], PALETTE[1], PALETTE[2],
+  PALETTE[3], PALETTE[4], PALETTE[5], PALETTE[6],
+];
+initialItems.forEach(addCharm);
+
+(function render(){
+  for(const {body,el} of charms){
+    el.style.transform =
+      `translate(${body.position.x-R}px, ${body.position.y-R}px) rotate(${body.angle}rad)`;
+  }
+  requestAnimationFrame(render);
+})();
+(function step(){ Engine.update(engine, 1000/60); requestAnimationFrame(step); })();
+
+function shake(power=18){
+  for(const {body} of charms){
+    Body.setVelocity(body, {x:(Math.random()-0.5)*power*2, y:(Math.random()-0.7)*power*2});
+    Body.setAngularVelocity(body, (Math.random()-0.5)*0.6);
+  }
+}
+function settle(){ for(const {body} of charms) Body.setVelocity(body, {x:0,y:0}); }
+function clearAll(){
+  charms.forEach(({body,el})=>{ World.remove(engine.world, body); el.remove(); });
+  charms.length = 0;
 }
 
-function renderAll(){
-  renderList();
-  renderShaka(document.getElementById("shakaFront"), false);
-  renderShaka(document.getElementById("shakaBack"), true);
-  tickClock();
-}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const flip=document.getElementById("flip");
-const faceFront=document.querySelector(".face.front");
-const faceBack=document.querySelector(".face.back");
-function showBack(){
-  flip.classList.add("flipped");
-  faceFront.style.cssText="opacity:0;pointer-events:none;z-index:1";
-  faceBack.style.cssText="opacity:1;pointer-events:auto;z-index:3";
+let lx,ly,lz,motionOn=false;
+function onMotion(e){
+  const a=e.accelerationIncludingGravity;
+  if(a && a.x!=null){
+    engine.gravity.x = clamp(a.x/9.8,-1,1);
+    engine.gravity.y = clamp(-a.y/9.8,0.8,1.2);
+  }
+  const acc=e.acceleration||a;
+  if(acc && acc.x!=null){
+    if(lx!=null){
+      const d=Math.abs(acc.x-lx)+Math.abs(acc.y-ly)+Math.abs(acc.z-lz);
+      if(d>12) shake(12);
+    }
+    lx=acc.x; ly=acc.y; lz=acc.z;
+  }
 }
-function showFront(){
-  flip.classList.remove("flipped");
-  faceBack.style.cssText="opacity:0;pointer-events:none;z-index:1";
-  faceFront.style.cssText="opacity:1;pointer-events:auto;z-index:2";
-}
-document.getElementById("toShaka").onclick=()=>{ state.sortMode=false; renderShaka(document.getElementById("shakaBack"), true); showBack(); };
-document.getElementById("toTimeline").onclick=()=>{ document.getElementById("drawer").classList.remove("open"); showFront(); };
-
-document.getElementById("drawerTab").onclick=()=>document.getElementById("drawer").classList.toggle("open");
-
-let motionOn=false;
-let lastMotion={x:null,y:null,z:null};
 function enableMotion(){
-  if(motionOn) return;
+  if(motionOn){ return; }
   if(typeof DeviceMotionEvent==='undefined'){
-    toast("⚠️","この端末では振動検知が使えません。");
+    showNotice('この端末では振動検知が使えません。');
     return;
   }
   const attach = ()=>{
-    window.addEventListener('devicemotion', onMotion);
+    window.addEventListener('devicemotion',onMotion);
     motionOn=true;
-    toast("📳","振動検知を有効にしました");
+    showNotice('', 0);
   };
   if(typeof DeviceMotionEvent.requestPermission==='function'){
-    DeviceMotionEvent.requestPermission().then(result=>{
-      if(result==='granted') attach();
-      else toast("⚠️","振動検知の許可が必要です。");
-    }).catch(()=>toast("⚠️","振動検知の許可取得に失敗しました。"));
-  } else {
-    attach();
-  }
-}
-function onMotion(event){
-  const acc = event.accelerationIncludingGravity || event.acceleration;
-  if(!acc || acc.x==null) return;
-  if(lastMotion.x!=null){
-    const d = Math.abs(acc.x-lastMotion.x)+Math.abs(acc.y-lastMotion.y)+Math.abs(acc.z-lastMotion.z);
-    if(d > 16) performShake();
-  }
-  lastMotion = {x:acc.x, y:acc.y, z:acc.z};
-}
-function performShake(){
-  state.sortMode=false;
-  const el=document.getElementById("shakaBack");
-  renderShaka(el, true);
-  el.querySelectorAll("span").forEach(s=>{
-    const x=(Math.random()-.5)*16;
-    const y=(Math.random()-.5)*16;
-    const r=(Math.random()-.5)*40;
-    s.style.transform=`translate(${x}px,${y}px) rotate(${r}deg)`;
-  });
-  toast("🫨","シャカシャカ…");
-  setTimeout(()=>renderShaka(el, true),420);
-}
-document.getElementById("shakeBtn").onclick=()=>{ enableMotion(); performShake(); };
-document.getElementById("sortBtn").onclick=()=>{ state.sortMode=true; renderShaka(document.getElementById("shakaBack"), true); toast("🧺","きれいにそろえた"); };
-
-let toastT;
-function toast(em,txt){
-  const t=document.getElementById("toast");
-  t.innerHTML=`<span class="em">${em}</span>${txt}`;
-  t.classList.add("on"); clearTimeout(toastT);
-  toastT=setTimeout(()=>t.classList.remove("on"),1600);
+    DeviceMotionEvent.requestPermission().then(s=>{
+      if(s==='granted') attach();
+      else showNotice('振動検知の許可が必要です。');
+    }).catch(()=> showNotice('振動検知の許可取得に失敗しました。'));
+  }else{ attach(); }
 }
 
-const scrim=document.getElementById("scrim"), addSheet=document.getElementById("addSheet");
-let sel={title:"",act:"会議",mood:"🥲",delta:12};
-function buildAddSheet(){
-  const ac=document.getElementById("actChips"); ac.innerHTML="";
-  ACTIONS.forEach(a=>{
-    const c=document.createElement("button");
-    c.className="chip"+(a===sel.act?" sel":""); c.innerHTML=`${EMOJI_MAP[a]} ${a}`;
-    c.onclick=()=>{sel.act=a;buildAddSheet();}; ac.appendChild(c);
-  });
-  const mr=document.getElementById("moodRow"); mr.innerHTML="";
-  MOODS.forEach(m=>{
-    const b=document.createElement("button");
-    b.className="moodbtn"+(m===sel.mood?" sel":""); b.textContent=m;
-    b.onclick=()=>{sel.mood=m;buildAddSheet();}; mr.appendChild(b);
-  });
-  document.getElementById("deltaNum").value=sel.delta;
-  updateGrid();
-}
-function updateGrid(){
-  const grid=document.getElementById("emojiGrid");
-  const em=EMOJI_MAP[sel.act]||"✨";
-  grid.innerHTML=Array.from({length:Math.abs(sel.delta)},()=>`<span>${em}</span>`).join("");
-  grid.style.opacity=sel.delta>=0?1:.25;
-}
-function openAdd(){
-  sel={title:"",act:"会議",mood:"🥲",delta:12};
-  document.getElementById("tTitle").value="";
-  buildAddSheet(); scrim.classList.add("on"); addSheet.classList.add("on");
-}
-function closeSheets(){ scrim.classList.remove("on"); addSheet.classList.remove("on"); document.getElementById("detailSheet").classList.remove("on"); }
-document.getElementById("addBtn").onclick=openAdd;
-document.getElementById("cancelAdd").onclick=closeSheets;
-scrim.onclick=closeSheets;
+document.getElementById('shake').addEventListener('click', ()=>{enableMotion();shake();});
+document.getElementById('settle').addEventListener('click', settle);
+document.getElementById('clear').addEventListener('click', clearAll);
 
-document.getElementById("tTitle").oninput=(e)=>{
-  const t=e.target.value;
-  const found=ACTIONS.find(a=>t.includes(a));
-  if(found && found!==sel.act){ sel.act=found; buildAddSheet(); }
-};
-document.getElementById("stepUp").onclick=()=>{ sel.delta=Math.min(100,sel.delta+1); document.getElementById("deltaNum").value=sel.delta; updateGrid(); };
-document.getElementById("stepDown").onclick=()=>{ sel.delta=Math.max(-100,sel.delta-1); document.getElementById("deltaNum").value=sel.delta; updateGrid(); };
-document.getElementById("deltaNum").oninput=(e)=>{ sel.delta=Math.max(-100,Math.min(100,Math.round(+e.target.value||0))); updateGrid(); };
-document.getElementById("saveAdd").onclick=()=>{
-  const from=document.getElementById("tFrom").value, to=document.getElementById("tTo").value;
-  const title=(document.getElementById("tTitle").value||"").trim() || sel.act;
-  const delta=sel.delta;
-  if(sel.act==="睡眠"){
-    state.entries.forEach(e=>e.exp=true);
-    state.entries.push({from,to,title,act:"睡眠",mood:sel.mood,delta:0,exp:false});
-    state.entries.sort((a,b)=>a.from.localeCompare(b.from));
-    state.sortMode=false;
-    closeSheets(); showFront(); renderAll(); save();
-    toast("🛌","眠った。ケースを空にした");
-    return;
-  }
-  state.entries.push({from,to,title,act:sel.act,mood:sel.mood,delta,exp:false});
-  state.entries.sort((a,b)=>a.from.localeCompare(b.from));
-  closeSheets(); renderAll();
-  toast(EMOJI_MAP[sel.act]||"✨", delta>=0?"記録した（+"+delta+"）":"回復した（"+delta+"）");
-  save();
-};
-
-const detailSheet=document.getElementById("detailSheet");
-function openDetail(i){
-  const e=state.entries[i];
-  const body=document.getElementById("detailBody");
-  const sign=e.delta>=0?"+":"−";
-  body.innerHTML=`
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
-      <div style="font-size:40px;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))">${EMOJI_MAP[e.act]||"✨"}</div>
-      <div style="flex:1"><div style="font-size:19px;font-weight:700">${e.title||e.act}</div>
-        <div class="caps">${e.from} – ${e.to} ・ ${e.mood}</div></div>
-      <div style="font-family:var(--font-display);font-weight:800;font-size:30px;color:${e.delta>=0?'var(--ink)':'var(--lime-ink)'}">${sign}${Math.abs(e.delta)}</div>
-    </div>
-    <div style="background:var(--surface-sunk);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--ink-2);margin:14px 0 18px">
-      ${e.delta>0
-        ? (e.exp?"この行動の疲労はもう効果が切れています。ケースから消せます。":"この行動はいまケースに積もっています。食事や休憩から1時間ほどで効果が切れ、消せるようになります。")
-        : "回復のログ。睡眠後はまとめてケースを空にできます。"}
-    </div>
-    <div style="display:flex;gap:10px">
-      ${e.delta>0 && !e.exp
-        ? `<button class="btn sunk" style="flex:1;padding:13px" data-act="expire">効果が切れた</button>`
-        : ``}
-      <button class="btn ${e.delta>0&&!e.exp?'pink':'pri'}" style="flex:1;padding:13px" data-act="remove">この項目を消す</button>
-    </div>`;
-  body.querySelectorAll("button").forEach(b=>{
-    b.onclick=()=>{
-      const a=b.dataset.act;
-      if(a==="expire"){ e.exp=true; toast("⌛","効果が切れた"); }
-      else { state.entries.splice(i,1); toast("🧹","消した"); }
-      closeSheets(); renderAll(); save();
-    };
-  });
-  scrim.classList.add("on"); detailSheet.classList.add("on");
-}
-
-function save(){ try{localStorage.setItem("shaka_proto_v2",JSON.stringify(state));}catch(e){} }
-function load(){ try{const s=localStorage.getItem("shaka_proto_v2"); if(s) state=JSON.parse(s);}catch(e){} }
-load(); renderAll();
-setInterval(tickClock,1000);
+window.addEventListener('resize', ()=>{
+  W=window.innerWidth; H=window.innerHeight-barH; buildWalls();
+});
 </script>
 </body>
 </html>
