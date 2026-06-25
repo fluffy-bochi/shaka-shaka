@@ -29,6 +29,8 @@
 
   .physics{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
   .charm{position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;user-select:none;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.22));transform-origin:center center}
+  .charm img{display:block;width:100%;height:100%;object-fit:contain;}
+  .emoji-icon img{display:inline-block;vertical-align:middle;}
 
   .caps{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
   .tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px;border-radius:var(--r-sm)}
@@ -227,6 +229,37 @@ const EMOJI_MAP = {
 const ACTIONS = Object.keys(EMOJI_MAP);
 const MOODS = ["😆","🙂","😌","🥲","😩","😢"];
 
+const ASSET_DIR = "design_handoff_fatigue_shaka/emoji-3d/";
+const ACT_ASSET = {
+  "会議":"speech_balloon","通勤":"tsukin_train","レビュー":"review_laptop","作業":"sagyo_keyboard",
+  "資料作成":"shiryo_pencil","メール":"mail","勉強":"benkyo_books","運動":"undo_run","散歩":"sanpo_walk",
+  "家事":"kaji_broom","育児":"ikuji_bottle","通話":"tsuwa_phone","睡眠":"suimin_bed","食事":"shokuji_rice",
+  "休憩":"kyukei_coffee","昼寝":"hirune_sleep","ゲーム":"game","読書":"dokusho_openbook","入浴":"nyuyoku_bath"
+};
+const MOOD_ASSET = {
+  "😆":"mood_grin","🙂":"mood_smile","😌":"mood_relieved","🥲":"mood_tear","😩":"mood_weary","😢":"mood_cry"
+};
+const FALLBACK_ASSET = "fallback_sparkles";
+
+function assetSrc(name){ return ASSET_DIR + name + ".png"; }
+function createAssetImg(name, altText, size="100%"){
+  const img=document.createElement("img");
+  img.src = assetSrc(name);
+  img.alt = altText;
+  img.draggable = false;
+  img.decoding = "async";
+  img.loading = "eager";
+  img.style.width = typeof size === "number" ? `${size}px` : size;
+  img.style.height = typeof size === "number" ? `${size}px` : size;
+  img.style.objectFit = "contain";
+  img.style.verticalAlign = "middle";
+  img.style.pointerEvents = "none";
+  img.onerror = ()=>{ if(img.parentNode){ img.parentNode.replaceChild(document.createTextNode(altText), img); } };
+  return img;
+}
+function actIcon(act, size=22){ return createAssetImg(ACT_ASSET[act] || FALLBACK_ASSET, EMOJI_MAP[act] || "✨", size); }
+function moodIcon(mood, size=22){ return MOOD_ASSET[mood] ? createAssetImg(MOOD_ASSET[mood], mood, size) : document.createTextNode(mood); }
+
 function rng(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280;};}
 
 let state = {
@@ -296,7 +329,7 @@ function clamp(value, min, max){
 function buildPhysics(){
   if(engine) return;
   engine = Engine.create();
-  engine.gravity.y = 9.8;
+  engine.gravity.y = 1;
   engine.gravity.x = 0;
   runner = Runner.create();
   Runner.run(runner, engine);
@@ -342,13 +375,14 @@ function createPhysicsParticle(act){
     frictionAir: PHYS_FRICTION_AIR,
     density: PHYS_DENSITY,
   });
+  body.act = act;
   body.emoji = EMOJI_MAP[act] || "✨";
   World.add(engine.world, body);
   const el = document.createElement("div");
   el.className = "charm";
-  el.textContent = body.emoji;
   el.style.width = el.style.height = `${currentPhysRadius*2}px`;
-  el.style.fontSize = `${currentPhysFont}px`;
+  const img = actIcon(act);
+  el.appendChild(img);
   physicsEl.appendChild(el);
   physicsBodies.push({body, el});
 }
@@ -412,15 +446,31 @@ function renderList(){
   const list = document.getElementById("list");
   list.innerHTML="";
   state.entries.forEach((e,i)=>{
-    const d=document.createElement("div");
-    d.className="item"+(e.exp?" exp":"");
+    const item=document.createElement("div");
+    item.className="item"+(e.exp?" exp":"");
     const sign=e.delta>=0?"+":"−";
     const col=e.delta>=0?"var(--ink-2)":"var(--lime-ink)";
-    d.innerHTML=`<div class="tt"><span class="f">${e.from}</span><span class="t">${e.to}</span></div>
-      <div class="bd"><span class="ttl">${EMOJI_MAP[e.act]||""} ${e.title||e.act}</span><span class="face">${e.mood}</span>
-      <span class="d" style="color:${col}">${sign}${Math.abs(e.delta)}</span></div>`;
-    d.onclick=()=>openDetail(i);
-    list.appendChild(d);
+    const tt=document.createElement("div"); tt.className="tt";
+    tt.innerHTML = `<span class="f">${e.from}</span><span class="t">${e.to}</span>`;
+    const bd=document.createElement("div"); bd.className="bd";
+    const ttl=document.createElement("span"); ttl.className="ttl";
+    const icon = actIcon(e.act);
+    icon.style.width = icon.style.height = "22px";
+    icon.style.marginRight = "8px";
+    ttl.appendChild(icon);
+    ttl.appendChild(document.createTextNode(`${e.title||e.act}`));
+    const faceSpan=document.createElement("span"); faceSpan.className="face";
+    faceSpan.appendChild(moodIcon(e.mood));
+    const d=document.createElement("span"); d.className="d";
+    d.style.color = col;
+    d.textContent = `${sign}${Math.abs(e.delta)}`;
+    bd.appendChild(ttl);
+    bd.appendChild(faceSpan);
+    bd.appendChild(d);
+    item.appendChild(tt);
+    item.appendChild(bd);
+    item.onclick=()=>openDetail(i);
+    list.appendChild(item);
   });
 }
 
@@ -516,13 +566,16 @@ function buildAddSheet(){
   const ac=document.getElementById("actChips"); ac.innerHTML="";
   ACTIONS.forEach(a=>{
     const c=document.createElement("button");
-    c.className="chip"+(a===sel.act?" sel":""); c.innerHTML=`${EMOJI_MAP[a]} ${a}`;
+    c.className="chip"+(a===sel.act?" sel":"");
+    c.appendChild(actIcon(a,18));
+    c.appendChild(document.createTextNode(` ${a}`));
     c.onclick=()=>{sel.act=a;buildAddSheet();}; ac.appendChild(c);
   });
   const mr=document.getElementById("moodRow"); mr.innerHTML="";
   MOODS.forEach(m=>{
     const b=document.createElement("button");
-    b.className="moodbtn"+(m===sel.mood?" sel":""); b.textContent=m;
+    b.className="moodbtn"+(m===sel.mood?" sel":"");
+    b.appendChild(moodIcon(m,22));
     b.onclick=()=>{sel.mood=m;buildAddSheet();}; mr.appendChild(b);
   });
   document.getElementById("deltaNum").value=sel.delta;
@@ -530,8 +583,14 @@ function buildAddSheet(){
 }
 function updateGrid(){
   const grid=document.getElementById("emojiGrid");
-  const em=EMOJI_MAP[sel.act]||"✨";
-  grid.innerHTML=Array.from({length:Math.abs(sel.delta)},()=>`<span>${em}</span>`).join("");
+  grid.innerHTML="";
+  const count = Math.abs(sel.delta);
+  for(let i=0;i<count;i++){
+    const span=document.createElement("span");
+    const icon = actIcon(sel.act,22);
+    span.appendChild(icon);
+    grid.appendChild(span);
+  }
   grid.style.opacity=sel.delta>=0?1:.25;
 }
 function openAdd(){
@@ -576,25 +635,71 @@ const detailSheet=document.getElementById("detailSheet");
 function openDetail(i){
   const e=state.entries[i];
   const body=document.getElementById("detailBody");
+  body.innerHTML = "";
   const sign=e.delta>=0?"+":"−";
-  body.innerHTML=`
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
-      <div style="font-size:40px;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))">${EMOJI_MAP[e.act]||"✨"}</div>
-      <div style="flex:1"><div style="font-size:19px;font-weight:700">${e.title||e.act}</div>
-        <div class="caps">${e.from} – ${e.to} ・ ${e.mood}</div></div>
-      <div style="font-family:var(--font-display);font-weight:800;font-size:30px;color:${e.delta>=0?'var(--ink)':'var(--lime-ink)'}">${sign}${Math.abs(e.delta)}</div>
-    </div>
-    <div style="background:var(--surface-sunk);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--ink-2);margin:14px 0 18px">
-      ${e.delta>0
-        ? (e.exp?"この行動の疲労はもう効果が切れています。ケースから消せます。":"この行動はいまケースに積もっています。食事や休憩から1時間ほどで効果が切れ、消せるようになります。")
-        : "回復のログ。睡眠後はまとめてケースを空にできます。"}
-    </div>
-    <div style="display:flex;gap:10px">
-      ${e.delta>0 && !e.exp
-        ? `<button class="btn sunk" style="flex:1;padding:13px" data-act="expire">効果が切れた</button>`
-        : ``}
-      <button class="btn ${e.delta>0&&!e.exp?'pink':'pri'}" style="flex:1;padding:13px" data-act="remove">この項目を消す</button>
-    </div>`;
+  const frame = document.createElement("div");
+  frame.style.display = "flex";
+  frame.style.alignItems = "center";
+  frame.style.gap = "12px";
+  frame.style.marginBottom = "6px";
+  const iconWrap = document.createElement("div");
+  iconWrap.style.width = "56px";
+  iconWrap.style.height = "56px";
+  iconWrap.style.filter = "drop-shadow(0 4px 5px rgba(27,27,24,.2))";
+  const icon = actIcon(e.act,56);
+  iconWrap.appendChild(icon);
+  const info = document.createElement("div");
+  info.style.flex = "1";
+  const title = document.createElement("div");
+  title.style.fontSize = "19px";
+  title.style.fontWeight = "700";
+  title.textContent = e.title||e.act;
+  const meta = document.createElement("div");
+  meta.className = "caps";
+  meta.textContent = `${e.from} – ${e.to} ・ ${e.mood}`;
+  info.appendChild(title);
+  info.appendChild(meta);
+  const value = document.createElement("div");
+  value.style.fontFamily = "var(--font-display)";
+  value.style.fontWeight = "800";
+  value.style.fontSize = "30px";
+  value.style.color = e.delta>=0 ? "var(--ink)" : "var(--lime-ink)";
+  value.textContent = `${sign}${Math.abs(e.delta)}`;
+  frame.appendChild(iconWrap);
+  frame.appendChild(info);
+  frame.appendChild(value);
+  body.appendChild(frame);
+  const notice = document.createElement("div");
+  notice.style.background = "var(--surface-sunk)";
+  notice.style.borderRadius = "12px";
+  notice.style.padding = "12px 14px";
+  notice.style.fontSize = "13px";
+  notice.style.color = "var(--ink-2)";
+  notice.style.margin = "14px 0 18px";
+  notice.textContent = e.delta>0
+    ? (e.exp?"この行動の疲労はもう効果が切れています。ケースから消せます。":"この行動はいまケースに積もっています。食事や休憩から1時間ほどで効果が切れ、消せるようになります。")
+    : "回復のログ。睡眠後はまとめてケースを空にできます。";
+  body.appendChild(notice);
+  const actions = document.createElement("div");
+  actions.style.display = "flex";
+  actions.style.gap = "10px";
+  if(e.delta>0 && !e.exp){
+    const expireBtn = document.createElement("button");
+    expireBtn.className = "btn sunk";
+    expireBtn.style.flex = "1";
+    expireBtn.style.padding = "13px";
+    expireBtn.dataset.act = "expire";
+    expireBtn.textContent = "効果が切れた";
+    actions.appendChild(expireBtn);
+  }
+  const removeBtn = document.createElement("button");
+  removeBtn.className = `btn ${e.delta>0&&!e.exp?"pink":"pri"}`;
+  removeBtn.style.flex = "1";
+  removeBtn.style.padding = "13px";
+  removeBtn.dataset.act = "remove";
+  removeBtn.textContent = "この項目を消す";
+  actions.appendChild(removeBtn);
+  body.appendChild(actions);
   body.querySelectorAll("button").forEach(b=>{
     b.onclick=()=>{
       const a=b.dataset.act;

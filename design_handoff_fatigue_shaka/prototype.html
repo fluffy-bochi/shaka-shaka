@@ -238,6 +238,22 @@ const EMOJI_MAP = {
 const ACTIONS = Object.keys(EMOJI_MAP);
 const MOODS = ["😆","🙂","😌","🥲","😩","😢"];
 
+/* ════ Fluent UI 3D emoji assets (Microsoft fluentui-emoji, MIT) ════ */
+const ASSET_DIR = "emoji-3d/";
+const ACT_ASSET = {
+  "会議":"kaigi_speech","通勤":"tsukin_train","レビュー":"review_laptop","作業":"sagyo_keyboard",
+  "資料作成":"shiryo_pencil","メール":"mail","勉強":"benkyo_books","運動":"undo_run","散歩":"sanpo_walk",
+  "家事":"kaji_broom","育児":"ikuji_bottle","通話":"tsuwa_phone","睡眠":"suimin_bed","食事":"shokuji_rice",
+  "休憩":"kyukei_coffee","昼寝":"hirune_sleep","ゲーム":"game","読書":"dokusho_openbook","入浴":"nyuyoku_bath"
+};
+const MOOD_ASSET = {"😆":"mood_grin","🙂":"mood_smile","😌":"mood_relieved","🥲":"mood_tear","😩":"mood_weary","😢":"mood_cry"};
+const actSrc = act => ASSET_DIR + (ACT_ASSET[act] || "fallback_sparkles") + ".png";
+const moodSrc = m => MOOD_ASSET[m] ? ASSET_DIR + MOOD_ASSET[m] + ".png" : null;
+const esc = s => String(s).replace(/'/g,"\\'");
+// inline <img> with Unicode-emoji fallback if the asset 404s
+function actImg(act, px){ const fb = EMOJI_MAP[act]||"✨"; return `<img src="${actSrc(act)}" alt="${fb}" draggable="false" style="width:${px}px;height:${px}px;object-fit:contain;vertical-align:middle" onerror="this.replaceWith(document.createTextNode('${esc(fb)}'))">`; }
+function moodImg(m, px){ const s = moodSrc(m); if(!s) return m; return `<img src="${s}" alt="${m}" draggable="false" style="width:${px}px;height:${px}px;object-fit:contain;vertical-align:middle" onerror="this.replaceWith(document.createTextNode('${esc(m)}'))">`; }
+
 // fatigue pile emoji = the actions that ADD fatigue
 function rng(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280;};}
 
@@ -299,15 +315,21 @@ function buildWalls(){
   M.World.add(engine.world, walls);
 }
 const charms = [];
-function addCharm(emoji){
+function addCharm(act){
   const x = R + Math.random()*(PW-2*R);
   const y = R + Math.random()*(PH*0.5);              // drop in from the upper half
   const body = M.Bodies.circle(x, y, R, {restitution:0.35, friction:0.05, frictionAir:0.014, density:0.001});
   M.World.add(engine.world, body);
   const el = document.createElement("div");
-  el.className = "charm"; el.textContent = emoji;
+  el.className = "charm";
   el.style.width = el.style.height = (2*R)+"px";
-  el.style.fontSize = FONT+"px";
+  const img = document.createElement("img");
+  img.src = actSrc(act); img.draggable = false;
+  img.style.width = img.style.height = (2*R)+"px";
+  img.style.objectFit = "contain";
+  const fb = EMOJI_MAP[act] || "✨";
+  img.onerror = ()=>{ el.removeChild(img); el.textContent = fb; el.style.fontSize = FONT+"px"; };
+  el.appendChild(img);
   physEl.appendChild(el);
   charms.push({body, el});
 }
@@ -316,15 +338,14 @@ function removeCharm(){ const c = charms.pop(); if(c){ M.World.remove(engine.wor
 function pileBag(){
   const bag = [];
   state.entries.filter(e=>e.delta>0 && !e.exp).forEach(e=>{
-    const em = EMOJI_MAP[e.act] || "✨";
-    for(let i=0;i<e.delta;i++) bag.push(em);
+    for(let i=0;i<e.delta;i++) bag.push(e.act);
   });
   return bag;
 }
 function syncPile(){
   const bag = pileBag();
   const n = Math.min(100, bag.length);              // 100 = case full
-  while(charms.length < n) addCharm(bag[charms.length] || "✨");
+  while(charms.length < n) addCharm(bag[charms.length] || "");
   while(charms.length > n) removeCharm();
 }
 function shakePile(power=16){
@@ -371,7 +392,7 @@ function renderList(){
     const sign=e.delta>=0?"+":"−";
     const col=e.delta>=0?"var(--ink-2)":"var(--lime-ink)";
     d.innerHTML=`<div class="tt"><span class="f">${e.from}</span><span class="t">${e.to}</span></div>
-      <div class="bd"><span class="ttl">${EMOJI_MAP[e.act]||""} ${e.title||e.act}</span><span class="face">${e.mood}</span>
+      <div class="bd"><span class="ttl">${actImg(e.act,22)} ${e.title||e.act}</span><span class="face">${moodImg(e.mood,22)}</span>
       <span class="d" style="color:${col}">${sign}${Math.abs(e.delta)}</span></div>`;
     d.onclick=()=>openDetail(i);
     list.appendChild(d);
@@ -433,13 +454,13 @@ function buildAddSheet(){
   const ac=document.getElementById("actChips"); ac.innerHTML="";
   ACTIONS.forEach(a=>{
     const c=document.createElement("button");
-    c.className="chip"+(a===sel.act?" sel":""); c.innerHTML=`${EMOJI_MAP[a]} ${a}`;
+    c.className="chip"+(a===sel.act?" sel":""); c.innerHTML=`${actImg(a,20)} ${a}`;
     c.onclick=()=>{sel.act=a;buildAddSheet();}; ac.appendChild(c);
   });
   const mr=document.getElementById("moodRow"); mr.innerHTML="";
   MOODS.forEach(m=>{
     const b=document.createElement("button");
-    b.className="moodbtn"+(m===sel.mood?" sel":""); b.textContent=m;
+    b.className="moodbtn"+(m===sel.mood?" sel":""); b.innerHTML=moodImg(m,24);
     b.onclick=()=>{sel.mood=m;buildAddSheet();}; mr.appendChild(b);
   });
   // sign toggle + number + emoji preview (背景に積もるサイズ)
@@ -448,8 +469,7 @@ function buildAddSheet(){
 }
 function updateGrid(){
   const grid=document.getElementById("emojiGrid");
-  const em=EMOJI_MAP[sel.act]||"✨";
-  grid.innerHTML=Array.from({length:Math.abs(sel.delta)},()=>`<span>${em}</span>`).join("");
+  grid.innerHTML=Array.from({length:Math.abs(sel.delta)},()=>`<span>${actImg(sel.act,26)}</span>`).join("");
   grid.style.opacity=sel.delta>=0?1:.25;
 }
 function openAdd(){
@@ -500,9 +520,9 @@ function openDetail(i){
   const sign=e.delta>=0?"+":"−";
   body.innerHTML=`
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
-      <div style="font-size:40px;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))">${EMOJI_MAP[e.act]||"✨"}</div>
+      <div style="font-size:40px;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))">${actImg(e.act,40)}</div>
       <div style="flex:1"><div style="font-size:19px;font-weight:700">${e.title||e.act}</div>
-        <div class="caps">${e.from} – ${e.to} ・ ${e.mood}</div></div>
+        <div class="caps">${e.from} – ${e.to} ・ ${moodImg(e.mood,16)}</div></div>
       <div style="font-family:var(--font-display);font-weight:800;font-size:30px;color:${e.delta>=0?'var(--ink)':'var(--lime-ink)'}">${sign}${Math.abs(e.delta)}</div>
     </div>
     <div style="background:var(--surface-sunk);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--ink-2);margin:14px 0 18px">
