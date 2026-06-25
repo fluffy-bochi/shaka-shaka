@@ -25,7 +25,7 @@
   .statusbar.light{color:#fff}
 
   .shaka{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-  .shaka span{position:absolute;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:transform .5s ease, opacity .5s ease}
+  .shaka span{position:absolute;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:bottom .7s cubic-bezier(.2,.8,.3,1), transform .5s ease, opacity .5s ease}
 
   .caps{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
   .tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px;border-radius:var(--r-sm)}
@@ -270,15 +270,40 @@ function renderShaka(el, full){
   const pile = state.entries.filter(e=>e.delta>0 && !e.exp);
   let html="";
   for(let i=0;i<n;i++){
-    const left = state.sortMode ? ((i%10)*9.2 + 4) : (rand()*90+3);
-    const bottom = state.sortMode ? (Math.floor(i/10)*8.4 + 1) : Math.pow(rand(),1.15)*fillH;
-    const rot = state.sortMode ? 0 : (rand()-.5)*60;
+    const left = state.sortMode ? ((i%10)*9.2 + 4) : (rand()*75 + 8);
+    const bottom = state.sortMode ? (Math.floor(i/10)*8.4 + 1) : (full ? Math.pow(rand(),1.8)*fillH : Math.pow(rand(),1.15)*fillH);
+    const rot = state.sortMode ? 0 : (rand()-.5)*30;
     const size = 20+rand()*12;
     const src = pile.length ? pile[Math.floor(rand()*pile.length)].act : ACTIONS[Math.floor(rand()*ACTIONS.length)];
     const e = EMOJI_MAP[src] || "✨";
     html+=`<span style="left:${left}%;bottom:${bottom}%;font-size:${size}px;transform:rotate(${rot}deg)">${e}</span>`;
   }
   el.innerHTML=html;
+}
+
+function dropShaka(el){
+  const v = fatigue();
+  const n = Math.min(100, Math.round(v));
+  const rand = Math.random;
+  const pile = state.entries.filter(e=>e.delta>0 && !e.exp);
+  let html="";
+  for(let i=0;i<n;i++){
+    const col = i % 10;
+    const row = Math.floor(i / 10);
+    const left = 5 + col * 9 + (rand() - .5) * 4;
+    const bottom = 3 + row * 7 + rand() * 3;
+    const rot = (rand() - .5) * 40;
+    const size = 20 + rand() * 12;
+    const src = pile.length ? pile[Math.floor(rand() * pile.length)].act : ACTIONS[Math.floor(rand() * ACTIONS.length)];
+    const e = EMOJI_MAP[src] || "✨";
+    html += `<span data-final-bottom="${Math.min(bottom, 88).toFixed(2)}" style="left:${Math.min(left, 90).toFixed(2)}%;bottom:110%;font-size:${size}px;transform:rotate(${rot}deg)">${e}</span>`;
+  }
+  el.innerHTML = html;
+  requestAnimationFrame(()=>{
+    el.querySelectorAll("span").forEach(s=>{
+      s.style.bottom = s.dataset.finalBottom + "%";
+    });
+  });
 }
 
 function renderList(){
@@ -331,21 +356,45 @@ document.getElementById("toTimeline").onclick=()=>{ document.getElementById("dra
 
 document.getElementById("drawerTab").onclick=()=>document.getElementById("drawer").classList.toggle("open");
 
+let motionOn=false;
+let lastMotion={x:null,y:null,z:null};
+function enableMotion(){
+  if(motionOn) return;
+  if(typeof DeviceMotionEvent==='undefined'){
+    toast("⚠️","この端末では振動検知が使えません。");
+    return;
+  }
+  const attach = ()=>{
+    window.addEventListener('devicemotion', onMotion);
+    motionOn=true;
+    toast("📳","本体振動を検知するようにしました");
+  };
+  if(typeof DeviceMotionEvent.requestPermission==='function'){
+    DeviceMotionEvent.requestPermission().then(result=>{
+      if(result==='granted') attach();
+      else toast("⚠️","振動検知の許可が必要です。");
+    }).catch(()=>toast("⚠️","振動検知の許可取得に失敗しました。"));
+  } else {
+    attach();
+  }
+}
+function onMotion(event){
+  const acc = event.accelerationIncludingGravity || event.acceleration;
+  if(!acc || acc.x==null) return;
+  if(lastMotion.x!=null){
+    const d = Math.abs(acc.x-lastMotion.x)+Math.abs(acc.y-lastMotion.y)+Math.abs(acc.z-lastMotion.z);
+    if(d > 13) performShake();
+  }
+  lastMotion = {x:acc.x, y:acc.y, z:acc.z};
+}
 function performShake(){
   state.sortMode=false;
   const el=document.getElementById("shakaBack");
-  renderShaka(el, true);
-  el.querySelectorAll("span").forEach(s=>{
-    const x=(Math.random()-.5)*16;
-    const y=(Math.random()-.5)*16;
-    const r=(Math.random()-.5)*40;
-    s.style.transform=`translate(${x}px,${y}px) rotate(${r}deg)`;
-  });
+  dropShaka(el);
   toast("🫨","シャカシャカ…");
-  setTimeout(()=>renderShaka(el, true),420);
 }
 
-document.getElementById("shakeBtn").onclick=performShake;
+document.getElementById("shakeBtn").onclick=()=>{ enableMotion(); performShake(); };
 document.getElementById("sortBtn").onclick=()=>{ state.sortMode=true; renderShaka(document.getElementById("shakaBack"), true); toast("🧺","きれいにそろえた"); };
 
 let toastT;
