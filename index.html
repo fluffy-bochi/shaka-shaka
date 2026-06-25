@@ -342,17 +342,51 @@ document.getElementById("toTimeline").onclick=()=>{ document.getElementById("dra
 
 document.getElementById("drawerTab").onclick=()=>document.getElementById("drawer").classList.toggle("open");
 
-document.getElementById("shakeBtn").onclick=()=>{
+let motionOn=false;
+let lastMotion={x:null,y:null,z:null};
+function enableMotion(){
+  if(motionOn) return;
+  if(typeof DeviceMotionEvent==='undefined'){
+    toast("⚠️","この端末では振動検知が使えません。");
+    return;
+  }
+  const attach = ()=>{
+    window.addEventListener('devicemotion', onMotion);
+    motionOn=true;
+    toast("📳","振動検知を有効にしました");
+  };
+  if(typeof DeviceMotionEvent.requestPermission==='function'){
+    DeviceMotionEvent.requestPermission().then(result=>{
+      if(result==='granted') attach();
+      else toast("⚠️","振動検知の許可が必要です。");
+    }).catch(()=>toast("⚠️","振動検知の許可取得に失敗しました。"));
+  } else {
+    attach();
+  }
+}
+function onMotion(event){
+  const acc = event.accelerationIncludingGravity || event.acceleration;
+  if(!acc || acc.x==null) return;
+  if(lastMotion.x!=null){
+    const d = Math.abs(acc.x-lastMotion.x)+Math.abs(acc.y-lastMotion.y)+Math.abs(acc.z-lastMotion.z);
+    if(d > 16) performShake();
+  }
+  lastMotion = {x:acc.x, y:acc.y, z:acc.z};
+}
+function performShake(){
   state.sortMode=false;
   const el=document.getElementById("shakaBack");
   renderShaka(el, true);
   el.querySelectorAll("span").forEach(s=>{
-    const x=(Math.random()-.5)*16, y=(Math.random()-.5)*16, r=(Math.random()-.5)*40;
+    const x=(Math.random()-.5)*16;
+    const y=(Math.random()-.5)*16;
+    const r=(Math.random()-.5)*40;
     s.style.transform=`translate(${x}px,${y}px) rotate(${r}deg)`;
   });
   toast("🫨","シャカシャカ…");
   setTimeout(()=>renderShaka(el, true),420);
-};
+}
+document.getElementById("shakeBtn").onclick=()=>{ enableMotion(); performShake(); };
 document.getElementById("sortBtn").onclick=()=>{ state.sortMode=true; renderShaka(document.getElementById("shakaBack"), true); toast("🧺","きれいにそろえた"); };
 
 let toastT;
