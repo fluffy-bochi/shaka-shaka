@@ -324,7 +324,7 @@ function clamp(value, min, max){
 function buildPhysics(){
   if(engine) return;
   engine = Engine.create();
-  engine.gravity.y = 1;
+  engine.gravity.y = 0.5;
   engine.gravity.x = 0;
   runner = Runner.create();
   Runner.run(runner, engine);
