@@ -269,8 +269,8 @@ function backMsg(v){
 
 const { Engine, World, Bodies, Body, Runner } = Matter;
 const physicsEl = document.getElementById("physics");
-const PHYS_RADIUS = 18;
-const PHYS_FONT = 30;
+let currentPhysRadius = 18;
+let currentPhysFont = 30;
 const PHYS_BOUNCE = 0.35;
 const PHYS_FRICTION = 0.05;
 const PHYS_FRICTION_AIR = 0.014;
@@ -279,6 +279,14 @@ let engine, runner;
 let physicsBodies = [];
 let physicsWalls = [];
 let physicsStarted = false;
+
+function updatePhysicsSize(){
+  const rect = physicsEl.getBoundingClientRect();
+  const cell = Math.min(rect.width / 10, rect.height / 10);
+  const diameter = Math.max(20, Math.min(cell * 0.9, 72));
+  currentPhysRadius = diameter / 2;
+  currentPhysFont = Math.round(diameter * 0.9);
+}
 
 function clamp(value, min, max){
   return Math.max(min, Math.min(max, value));
@@ -291,6 +299,7 @@ function buildPhysics(){
   engine.gravity.x = 0;
   runner = Runner.create();
   Runner.run(runner, engine);
+  updatePhysicsSize();
   buildPhysicsWalls();
   physicsStarted = true;
   requestAnimationFrame(renderPhysics);
@@ -322,10 +331,12 @@ function createPileBag(){
 }
 
 function createPhysicsParticle(act){
+  updatePhysicsSize();
   const rect = physicsEl.getBoundingClientRect();
-  const x = 24 + Math.random() * Math.max(0, rect.width - 48);
-  const y = -PHYS_RADIUS*2 - Math.random() * 60;
-  const body = Bodies.circle(x, y, PHYS_RADIUS, {
+  const margin = currentPhysRadius * 1.2;
+  const x = margin + Math.random() * Math.max(0, rect.width - margin * 2);
+  const y = -currentPhysRadius * 2 - Math.random() * 60;
+  const body = Bodies.circle(x, y, currentPhysRadius, {
     restitution: PHYS_BOUNCE,
     friction: PHYS_FRICTION,
     frictionAir: PHYS_FRICTION_AIR,
@@ -336,8 +347,8 @@ function createPhysicsParticle(act){
   const el = document.createElement("div");
   el.className = "charm";
   el.textContent = body.emoji;
-  el.style.width = el.style.height = `${PHYS_RADIUS*2}px`;
-  el.style.fontSize = `${PHYS_FONT}px`;
+  el.style.width = el.style.height = `${currentPhysRadius*2}px`;
+  el.style.fontSize = `${currentPhysFont}px`;
   physicsEl.appendChild(el);
   physicsBodies.push({body, el});
 }
@@ -372,7 +383,10 @@ function renderPhysics(){
 }
 
 window.addEventListener('resize', ()=>{
-  if(engine) buildPhysicsWalls();
+  if(engine){
+    updatePhysicsSize();
+    buildPhysicsWalls();
+  }
 });
 
 function shakePhysics(){
