@@ -433,11 +433,87 @@ function syncPhysics(){
   while(physicsBodies.length > target) removePhysicsParticle();
 }
 
+/* ---- negative (recovery) particles ---- */
+let negBodies = []; // {body, el, consumed}
+
+function dropNegativeParticles(act, count){
+  buildPhysics();
+  updatePhysicsSize();
+  const rect = physicsEl.getBoundingClientRect();
+  for(let i=0;i<count;i++){
+    setTimeout(()=>{
+      const x = currentPhysRadius + Math.random() * (rect.width - 2 * currentPhysRadius);
+      const y = -currentPhysRadius * 2;
+      const body = Bodies.circle(x, y, currentPhysRadius, {
+        restitution: 0.5, friction: 0.05, frictionAir: 0.01, density: 0.002,
+      });
+      body.isNegative = true;
+      World.add(engine.world, body);
+      const el = document.createElement("div");
+      el.className = "charm";
+      el.style.width = el.style.height = `${currentPhysRadius*2}px`;
+      el.style.opacity = "0.85";
+      const img = actIcon(act, currentPhysRadius*2);
+      el.appendChild(img);
+      physicsEl.appendChild(el);
+      const neg = {body, el, consumed:false};
+      negBodies.push(neg);
+      // 消す相手が見つからなかった場合、5秒後に自動消滅
+      setTimeout(()=>{
+        if(!neg.consumed){
+          neg.consumed = true;
+          el.style.transition = "opacity .4s";
+          el.style.opacity = "0";
+          World.remove(engine.world, body);
+          setTimeout(()=>el.remove(), 400);
+        }
+      }, 5000);
+    }, i * 120);
+  }
+}
+
+function checkNegativeCollisions(){
+  for(let ni=negBodies.length-1;ni>=0;ni--){
+    const neg = negBodies[ni];
+    if(neg.consumed) continue;
+    const np = neg.body.position;
+    for(let pi=physicsBodies.length-1;pi>=0;pi--){
+      const pos = physicsBodies[pi];
+      const pp = pos.body.position;
+      const dx = np.x - pp.x, dy = np.y - pp.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if(dist < currentPhysRadius * 2){
+        // remove positive particle
+        pos.el.style.transition = "transform .3s, opacity .3s";
+        pos.el.style.opacity = "0";
+        pos.el.style.transform += " scale(0.3)";
+        World.remove(engine.world, pos.body);
+        setTimeout(()=>pos.el.remove(), 300);
+        physicsBodies.splice(pi, 1);
+        // remove negative particle
+        neg.consumed = true;
+        neg.el.style.transition = "transform .3s, opacity .3s";
+        neg.el.style.opacity = "0";
+        neg.el.style.transform += " scale(1.3)";
+        World.remove(engine.world, neg.body);
+        setTimeout(()=>neg.el.remove(), 300);
+        break;
+      }
+    }
+  }
+  negBodies = negBodies.filter(n=>!n.consumed);
+  // clean up negatives that fell off screen after 5s with no collision
+}
+
 function renderPhysics(){
   if(!physicsStarted) return;
   physicsBodies.forEach(({body,el})=>{
     el.style.transform = `translate(${body.position.x - currentPhysRadius}px, ${body.position.y - currentPhysRadius}px) rotate(${body.angle}rad)`;
   });
+  negBodies.forEach(({body,el,consumed})=>{
+    if(!consumed) el.style.transform = `translate(${body.position.x - currentPhysRadius}px, ${body.position.y - currentPhysRadius}px) rotate(${body.angle}rad)`;
+  });
+  if(negBodies.length > 0) checkNegativeCollisions();
   requestAnimationFrame(renderPhysics);
 }
 
@@ -665,8 +741,16 @@ document.getElementById("saveAdd").onclick=()=>{
   }
   state.entries.push({from,to,title,act:sel.act,mood:sel.mood,delta,exp:false});
   state.entries.sort((a,b)=>a.from.localeCompare(b.from));
-  closeSheets(); renderAll();
-  toast(EMOJI_MAP[sel.act]||"✨", delta>=0?"記録した（+"+delta+"）":"回復した（"+delta+"）");
+  closeSheets();
+  if(delta < 0){
+    renderList();
+    tickClock();
+    dropNegativeParticles(sel.act, Math.abs(delta));
+    toast(EMOJI_MAP[sel.act]||"✨", "回復した（"+delta+"）");
+  } else {
+    renderAll();
+    toast(EMOJI_MAP[sel.act]||"✨", "記録した（+"+delta+"）");
+  }
   save();
 };
 
