@@ -1,0 +1,31 @@
+:root {
+  /* ── Brand / accents ─────────────────────────────── */
+  --lime: #c4f000;          /* signature — primary action, highlights */
+  --lime-ink: #2f3a00;      /* text on lime */
+  --pink: #ff5fa2;          /* accent — emphasis, "today", warnings-soft */
+  --pink-soft: #ffd9e8;
+
+  /* ── Neutrals (warm off-white / near-black, low chroma) ── */
+  --ink: #1b1b18;           /* primary text, ticket black tab */
+  --ink-2: #55554e;         /* secondary text */
+  --ink-3: #8a8a82;         /* tertiary / captions */
+  --line: #e4e1d8;          /* hairlines */
+  --paper: #f7f4ec;         /* app background — cream, like ticket card */
+  --surface: #ffffff;       /* cards */
+  --surface-sunk: #efece3;  /* inset / track */
+
+  /* ── Fatigue scale (積み上がり度) — subtle ramp, not loud signal ── */
+  --fatigue-0: #d8e89a;     /* 余白あり・軽い */
+  --fatigue-40: #f0d24e;    /* ほどほど */
+  --fatigue-70: #f5994e;    /* 多い */
+  --fatigue-100: #ff5fa2;   /* 満杯（要休息） */
+
+  /* ── Semantic aliases ────────────────────────────── */
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-2);
+  --text-caption: var(--ink-3);
+  --bg-app: var(--paper);
+  --surface-card: var(--surface);
+  --accent: var(--pink);
+  --action: var(--lime);
+}

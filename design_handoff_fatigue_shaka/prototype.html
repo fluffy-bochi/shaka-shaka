@@ -1,10 +1,11 @@
+<!-- @startingPoint section="Fatigue App" subtitle="疲労シャカシャカ 動くプロトタイプ（タイムライン⇄シャカシャカ）" viewport="460x920" -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>疲労シャカシャカ — プロトタイプ</title>
-<link rel="stylesheet" href="design_handoff_fatigue_shaka/styles.css">
+<link rel="stylesheet" href="../../styles.css">
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
@@ -150,6 +151,7 @@
       <div class="backwrap">
         <div class="shaka" id="shakaBack"></div>
         <div class="glasscase"></div>
+        <!-- right-edge drawer: 道具（振る / そろえる）必要な時に取り出す -->
         <div class="drawer" id="drawer">
           <button class="drawer-tab" id="drawerTab">道具</button>
           <div class="drawer-body">
@@ -170,6 +172,7 @@
     </div>
   </div>
 
+  <!-- ════════ ADD SHEET ════════ -->
   <div class="scrim" id="scrim"></div>
   <div class="sheet" id="addSheet">
     <div class="grab"></div>
@@ -215,6 +218,7 @@
     </div>
   </div>
 
+  <!-- ════════ DETAIL SHEET ════════ -->
   <div class="sheet" id="detailSheet">
     <div class="grab"></div>
     <div id="detailBody"></div>
@@ -233,6 +237,7 @@ const EMOJI_MAP = {
 const ACTIONS = Object.keys(EMOJI_MAP);
 const MOODS = ["😆","🙂","😌","🥲","😩","😢"];
 
+// fatigue pile emoji = the actions that ADD fatigue
 function rng(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280;};}
 
 let state = {
@@ -275,9 +280,9 @@ function backMsg(v){
 
 function renderShaka(el, full){
   const v = fatigue();
-  const n = Math.min(100, Math.round(v));
+  const n = Math.min(100, Math.round(v));   // 100個でいっぱいになる
   const rand = rng(7);
-  const fillH = full ? 90 : 58;
+  const fillH = full ? 90 : 58;             // 裏面は満杯まで／表面は控えめ
   const pile = state.entries.filter(e=>e.delta>0 && !e.exp);
   let html="";
   for(let i=0;i<n;i++){
@@ -324,6 +329,7 @@ function renderAll(){
   tickClock();
 }
 
+/* ---- flip (inline-style driven for bulletproof cascade) ---- */
 const flip=document.getElementById("flip");
 const faceFront=document.querySelector(".face.front");
 const faceBack=document.querySelector(".face.back");
@@ -340,8 +346,10 @@ function showFront(){
 document.getElementById("toShaka").onclick=()=>{ state.sortMode=false; renderShaka(document.getElementById("shakaBack"), true); showBack(); };
 document.getElementById("toTimeline").onclick=()=>{ document.getElementById("drawer").classList.remove("open"); showFront(); };
 
+/* ---- tool drawer (振る/そろえる) ---- */
 document.getElementById("drawerTab").onclick=()=>document.getElementById("drawer").classList.toggle("open");
 
+/* ---- shaka actions ---- */
 document.getElementById("shakeBtn").onclick=()=>{
   state.sortMode=false;
   const el=document.getElementById("shakaBack");
@@ -355,6 +363,7 @@ document.getElementById("shakeBtn").onclick=()=>{
 };
 document.getElementById("sortBtn").onclick=()=>{ state.sortMode=true; renderShaka(document.getElementById("shakaBack"), true); toast("🧺","きれいにそろえた"); };
 
+/* ---- toast ---- */
 let toastT;
 function toast(em,txt){
   const t=document.getElementById("toast");
@@ -363,6 +372,7 @@ function toast(em,txt){
   toastT=setTimeout(()=>t.classList.remove("on"),1600);
 }
 
+/* ---- add sheet ---- */
 const scrim=document.getElementById("scrim"), addSheet=document.getElementById("addSheet");
 let sel={title:"",act:"会議",mood:"🥲",delta:12};
 function buildAddSheet(){
@@ -378,6 +388,7 @@ function buildAddSheet(){
     b.className="moodbtn"+(m===sel.mood?" sel":""); b.textContent=m;
     b.onclick=()=>{sel.mood=m;buildAddSheet();}; mr.appendChild(b);
   });
+  // sign toggle + number + emoji preview (背景に積もるサイズ)
   document.getElementById("deltaNum").value=sel.delta;
   updateGrid();
 }
@@ -397,6 +408,7 @@ document.getElementById("addBtn").onclick=openAdd;
 document.getElementById("cancelAdd").onclick=closeSheets;
 scrim.onclick=closeSheets;
 
+// title free input → auto-select matching action chip
 document.getElementById("tTitle").oninput=(e)=>{
   const t=e.target.value;
   const found=ACTIONS.find(a=>t.includes(a));
@@ -409,6 +421,7 @@ document.getElementById("saveAdd").onclick=()=>{
   const from=document.getElementById("tFrom").value, to=document.getElementById("tTo").value;
   const title=(document.getElementById("tTitle").value||"").trim() || sel.act;
   const delta=sel.delta;
+  // 睡眠をログに入れたら、ケースを空にする
   if(sel.act==="睡眠"){
     state.entries.forEach(e=>e.exp=true);
     state.entries.push({from,to,title,act:"睡眠",mood:sel.mood,delta:0,exp:false});
@@ -425,6 +438,7 @@ document.getElementById("saveAdd").onclick=()=>{
   save();
 };
 
+/* ---- detail sheet ---- */
 const detailSheet=document.getElementById("detailSheet");
 function openDetail(i){
   const e=state.entries[i];
@@ -459,6 +473,7 @@ function openDetail(i){
   scrim.classList.add("on"); detailSheet.classList.add("on");
 }
 
+/* ---- persist ---- */
 function save(){ try{localStorage.setItem("shaka_proto_v2",JSON.stringify(state));}catch(e){} }
 function load(){ try{const s=localStorage.getItem("shaka_proto_v2"); if(s) state=JSON.parse(s);}catch(e){} }
 load(); renderAll();

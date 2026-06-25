@@ -1,0 +1,16 @@
+:root {
+  /* Radii — tickets are mostly square-ish with small softening */
+  --r-sm: 6px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-pill: 999px;
+
+  /* Shadows — soft, low, single-direction (no glow) */
+  --shadow-card: 0 2px 10px rgba(27, 27, 24, 0.08);
+  --shadow-pop: 0 8px 28px rgba(27, 27, 24, 0.14);
+  --shadow-emoji: 0 6px 10px rgba(27, 27, 24, 0.18); /* 3D絵文字の接地影 */
+
+  /* Borders */
+  --border-hair: 1px solid var(--line);
+  --border-ink: 2px solid var(--ink);
+}

@@ -1,0 +1,7 @@
+/* SHAKA — 疲労可視化アプリ デザインシステム
+   18TRIPの配色・タイポの“雰囲気”を継承したオリジナル体系（ブランド要素は非複製） */
+@import url("./tokens/fonts.css");
+@import url("./tokens/colors.css");
+@import url("./tokens/typography.css");
+@import url("./tokens/spacing.css");
+@import url("./tokens/effects.css");
