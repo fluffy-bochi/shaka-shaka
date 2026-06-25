@@ -27,7 +27,8 @@
 
   /* shaka layer */
   .shaka{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-  .shaka span{position:absolute;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:transform .5s ease, opacity .5s ease}
+  .shaka span{position:absolute;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:transform .5s ease, opacity .5s ease;animation:drop .6s ease both}
+  @keyframes drop{from{transform:translateY(-36px) rotate(var(--init-rot,0deg));opacity:.2;}to{transform:translateY(0) rotate(var(--init-rot,0deg));opacity:1;}}
 
   .caps{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
   .tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px;border-radius:var(--r-sm)}
@@ -277,17 +278,22 @@ function renderShaka(el, full){
   const v = fatigue();
   const n = Math.min(100, Math.round(v));
   const rand = rng(7);
-  const fillH = full ? 90 : 58;
   const pile = state.entries.filter(e=>e.delta>0 && !e.exp);
   let html="";
   for(let i=0;i<n;i++){
     const left = state.sortMode ? ((i%10)*9.2 + 4) : (rand()*90+3);
-    const bottom = state.sortMode ? (Math.floor(i/10)*8.4 + 1) : Math.pow(rand(),1.15)*fillH;
+    const row = Math.floor(i/10);
+    const bottom = state.sortMode
+      ? (row*8.4 + 1)
+      : full
+        ? (row*7 + 2 + rand()*3)
+        : (row*4 + 2 + rand()*2);
     const rot = state.sortMode ? 0 : (rand()-.5)*60;
     const size = 20+rand()*12;
     const src = pile.length ? pile[Math.floor(rand()*pile.length)].act : ACTIONS[Math.floor(rand()*ACTIONS.length)];
     const e = EMOJI_MAP[src] || "✨";
-    html+=`<span style="left:${left}%;bottom:${bottom}%;font-size:${size}px;transform:rotate(${rot}deg)">${e}</span>`;
+    const delay = (rand()*180).toFixed(0);
+    html+=`<span style="left:${left}%;bottom:${bottom}%;font-size:${size}px;transform:rotate(${rot}deg);animation-delay:${delay}ms;--init-rot:${rot}deg">${e}</span>`;
   }
   el.innerHTML=html;
 }
