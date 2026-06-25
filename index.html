@@ -379,8 +379,8 @@ function shakePhysics(){
   if(!engine) return;
   physicsBodies.forEach(({body})=>{
     Body.setVelocity(body, {
-      x:(Math.random()-0.5)*18,
-      y:Math.random()*18 + 4
+      x:(Math.random()-0.5)*24,
+      y:Math.random()*6 + 2
     });
     Body.setAngularVelocity(body, (Math.random()-0.5)*0.6);
   });
@@ -389,7 +389,7 @@ function shakePhysics(){
 function settlePhysics(){
   if(!engine) return;
   physicsBodies.forEach(({body})=>{
-    Body.setVelocity(body, {x:0, y:0});
+    Body.setVelocity(body, {x:0, y:body.velocity.y});
     Body.setAngularVelocity(body, 0);
   });
 }
@@ -470,7 +470,7 @@ function onMotion(event){
   if(!acc || acc.x==null) return;
   if(engine){
     engine.gravity.x = clamp(acc.x / 9.8, -1, 1);
-    engine.gravity.y = clamp(-acc.y / 9.8, -1, 1);
+    engine.gravity.y = clamp(Math.max(-acc.y, 1) / 9.8, 0.5, 1.5);
   }
   if(lastMotion.x!=null){
     const d = Math.abs(acc.x-lastMotion.x)+Math.abs(acc.y-lastMotion.y)+Math.abs(acc.z-lastMotion.z);
