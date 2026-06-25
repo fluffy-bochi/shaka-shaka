@@ -5,7 +5,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>疲労シャカシャカ — プロトタイプ</title>
-<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
@@ -26,9 +27,9 @@
   .statusbar{height:44px;flex:0 0 44px;display:flex;align-items:center;justify-content:space-between;padding:0 26px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--ink);position:relative;z-index:6}
   .statusbar.light{color:#fff}
 
-  /* shaka layer */
-  .shaka{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-  .shaka span{position:absolute;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:transform .5s ease, opacity .5s ease}
+  /* physics shaka layer — one simulation shared BEHIND both faces */
+  .physics{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+  .charm{position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;user-select:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.22))}
 
   .caps{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
   .tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px;border-radius:var(--r-sm)}
@@ -110,8 +111,7 @@
   .emojigrid span{font-size:26px;line-height:1;filter:drop-shadow(0 2px 3px rgba(27,27,24,.16))}
 
   /* shaka-only back face — clear case on the same cream ground */
-  .backwrap{position:absolute;inset:0;background:var(--paper);display:flex;flex-direction:column}
-  .backwrap .shaka span{filter:drop-shadow(0 5px 8px rgba(27,27,24,.18))}
+  .backwrap{position:absolute;inset:0;background:transparent;display:flex;flex-direction:column}
   /* case outer frame + glass reflection over the emoji layer */
   .glasscase{position:absolute;inset:0;border-radius:38px;z-index:2;pointer-events:none;
     border:3px solid var(--lime);
@@ -126,11 +126,13 @@
 <body>
 <div class="phone"><div class="stage">
 
+  <!-- shared physics shaka background — visible behind BOTH faces -->
+  <div class="physics" id="physics"></div>
+
   <div class="flip" id="flip">
 
     <!-- ════════ FRONT — TIMELINE ════════ -->
     <div class="face front">
-      <div class="shaka" id="shakaFront"></div>
       <div style="position:relative;z-index:2;display:flex;flex-direction:column;height:100%">
         <div class="statusbar"><span>9:41</span><span>VoLTE ▮▮▮ 64%</span></div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 20px 10px">
@@ -149,7 +151,6 @@
     <!-- ════════ BACK — SHAKA ONLY ════════ -->
     <div class="face back">
       <div class="backwrap">
-        <div class="shaka" id="shakaBack"></div>
         <div class="glasscase"></div>
         <!-- right-edge drawer: 道具（振る / そろえる）必要な時に取り出す -->
         <div class="drawer" id="drawer">
@@ -278,24 +279,88 @@ function backMsg(v){
   return "まだ余白たっぷり。";
 }
 
-function renderShaka(el, full){
-  const v = fatigue();
-  const n = Math.min(100, Math.round(v));   // 100個でいっぱいになる
-  const rand = rng(7);
-  const fillH = full ? 90 : 58;             // 裏面は満杯まで／表面は控えめ
-  const pile = state.entries.filter(e=>e.delta>0 && !e.exp);
-  let html="";
-  for(let i=0;i<n;i++){
-    const left = state.sortMode ? ((i%10)*9.2 + 4) : (rand()*90+3);
-    const bottom = state.sortMode ? (Math.floor(i/10)*8.4 + 1) : Math.pow(rand(),1.15)*fillH;
-    const rot = state.sortMode ? 0 : (rand()-.5)*60;
-    const size = 20+rand()*12;
-    const src = pile.length ? pile[Math.floor(rand()*pile.length)].act : ACTIONS[Math.floor(rand()*ACTIONS.length)];
-    const e = EMOJI_MAP[src] || "✨";
-    html+=`<span style="left:${left}%;bottom:${bottom}%;font-size:${size}px;transform:rotate(${rot}deg)">${e}</span>`;
-  }
-  el.innerHTML=html;
+/* ════════ PHYSICS SHAKA (Matter.js) ════════ */
+const M = window.Matter;
+const physEl = document.getElementById("physics");
+const engine = M.Engine.create();
+engine.gravity.y = 1;
+const R = 18, FONT = 30, WT = 80;          // charm radius / font / wall thickness
+let PW = 374, PH = 828, walls = [];
+function measurePhys(){ const r = physEl.getBoundingClientRect(); if(r.width){ PW = r.width; PH = r.height; } }
+function buildWalls(){
+  walls.forEach(w=>M.World.remove(engine.world, w));
+  const o = {isStatic:true};
+  walls = [
+    M.Bodies.rectangle(PW/2, PH+WT/2, PW+WT*2, WT, o),   // floor
+    M.Bodies.rectangle(PW/2, -WT/2,  PW+WT*2, WT, o),    // ceiling
+    M.Bodies.rectangle(-WT/2, PH/2,  WT, PH+WT*2, o),    // left
+    M.Bodies.rectangle(PW+WT/2, PH/2, WT, PH+WT*2, o),   // right
+  ];
+  M.World.add(engine.world, walls);
 }
+const charms = [];
+function addCharm(emoji){
+  const x = R + Math.random()*(PW-2*R);
+  const y = R + Math.random()*(PH*0.5);              // drop in from the upper half
+  const body = M.Bodies.circle(x, y, R, {restitution:0.35, friction:0.05, frictionAir:0.014, density:0.001});
+  M.World.add(engine.world, body);
+  const el = document.createElement("div");
+  el.className = "charm"; el.textContent = emoji;
+  el.style.width = el.style.height = (2*R)+"px";
+  el.style.fontSize = FONT+"px";
+  physEl.appendChild(el);
+  charms.push({body, el});
+}
+function removeCharm(){ const c = charms.pop(); if(c){ M.World.remove(engine.world, c.body); c.el.remove(); } }
+// emoji bag: every fatigue point ≈ one charm of that action
+function pileBag(){
+  const bag = [];
+  state.entries.filter(e=>e.delta>0 && !e.exp).forEach(e=>{
+    const em = EMOJI_MAP[e.act] || "✨";
+    for(let i=0;i<e.delta;i++) bag.push(em);
+  });
+  return bag;
+}
+function syncPile(){
+  const bag = pileBag();
+  const n = Math.min(100, bag.length);              // 100 = case full
+  while(charms.length < n) addCharm(bag[charms.length] || "✨");
+  while(charms.length > n) removeCharm();
+}
+function shakePile(power=16){
+  enableMotion();
+  for(const {body} of charms){
+    M.Body.setVelocity(body, {x:(Math.random()-0.5)*power*2, y:(Math.random()-0.7)*power*2});
+    M.Body.setAngularVelocity(body, (Math.random()-0.5)*0.6);
+  }
+}
+function settlePile(){ for(const {body} of charms) M.Body.setVelocity(body, {x:0, y:0}); }
+// device tilt → gravity ; sudden movement → auto-shake (real phone)
+const clampG = (v,a,b)=>Math.max(a,Math.min(b,v));
+let lax, lay, laz, motionOn=false;
+function onMotion(ev){
+  const g = ev.accelerationIncludingGravity;
+  if(g && g.x!=null){ engine.gravity.x = clampG(g.x/9.8,-1,1); engine.gravity.y = clampG(-g.y/9.8,-1,1); }
+  const a = ev.acceleration || g;
+  if(a && a.x!=null){
+    if(lax!=null){ const d = Math.abs(a.x-lax)+Math.abs(a.y-lay)+Math.abs(a.z-laz); if(d>16) shakePile(12); }
+    lax=a.x; lay=a.y; laz=a.z;
+  }
+}
+function enableMotion(){
+  if(motionOn || typeof DeviceMotionEvent==="undefined") return;
+  if(typeof DeviceMotionEvent.requestPermission==="function"){
+    DeviceMotionEvent.requestPermission().then(s=>{ if(s==="granted"){ window.addEventListener("devicemotion", onMotion); motionOn=true; } }).catch(()=>{});
+  } else { window.addEventListener("devicemotion", onMotion); motionOn=true; }
+}
+// render + step loops
+(function render(){
+  for(const {body, el} of charms){
+    el.style.transform = `translate(${body.position.x-R}px, ${body.position.y-R}px) rotate(${body.angle}rad)`;
+  }
+  requestAnimationFrame(render);
+})();
+(function step(){ M.Engine.update(engine, 1000/60); requestAnimationFrame(step); })();
 
 function renderList(){
   const list = document.getElementById("list");
@@ -324,8 +389,7 @@ function tickClock(){
 
 function renderAll(){
   renderList();
-  renderShaka(document.getElementById("shakaFront"), false);
-  renderShaka(document.getElementById("shakaBack"), true);
+  syncPile();
   tickClock();
 }
 
@@ -343,25 +407,15 @@ function showFront(){
   faceBack.style.cssText="opacity:0;pointer-events:none;z-index:1";
   faceFront.style.cssText="opacity:1;pointer-events:auto;z-index:2";
 }
-document.getElementById("toShaka").onclick=()=>{ state.sortMode=false; renderShaka(document.getElementById("shakaBack"), true); showBack(); };
+document.getElementById("toShaka").onclick=()=>{ showBack(); };
 document.getElementById("toTimeline").onclick=()=>{ document.getElementById("drawer").classList.remove("open"); showFront(); };
 
 /* ---- tool drawer (振る/そろえる) ---- */
 document.getElementById("drawerTab").onclick=()=>document.getElementById("drawer").classList.toggle("open");
 
 /* ---- shaka actions ---- */
-document.getElementById("shakeBtn").onclick=()=>{
-  state.sortMode=false;
-  const el=document.getElementById("shakaBack");
-  renderShaka(el, true);
-  el.querySelectorAll("span").forEach(s=>{
-    const x=(Math.random()-.5)*16, y=(Math.random()-.5)*16, r=(Math.random()-.5)*40;
-    s.style.transform=`translate(${x}px,${y}px) rotate(${r}deg)`;
-  });
-  toast("🫨","シャカシャカ…");
-  setTimeout(()=>renderShaka(el, true),420);
-};
-document.getElementById("sortBtn").onclick=()=>{ state.sortMode=true; renderShaka(document.getElementById("shakaBack"), true); toast("🧺","きれいにそろえた"); };
+document.getElementById("shakeBtn").onclick=()=>{ shakePile(); toast("🫨","シャカシャカ…"); };
+document.getElementById("sortBtn").onclick=()=>{ settlePile(); toast("🧺","そろえた"); };
 
 /* ---- toast ---- */
 let toastT;
@@ -476,6 +530,8 @@ function openDetail(i){
 /* ---- persist ---- */
 function save(){ try{localStorage.setItem("shaka_proto_v2",JSON.stringify(state));}catch(e){} }
 function load(){ try{const s=localStorage.getItem("shaka_proto_v2"); if(s) state=JSON.parse(s);}catch(e){} }
+measurePhys(); buildWalls();
+window.addEventListener("resize", ()=>{ measurePhys(); buildWalls(); });
 load(); renderAll();
 setInterval(tickClock,1000);
 </script>

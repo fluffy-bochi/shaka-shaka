@@ -27,6 +27,9 @@
   .shaka{position:absolute;inset:0;overflow:hidden;pointer-events:none}
   .shaka span{position:absolute;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:bottom .7s cubic-bezier(.2,.8,.3,1), transform .5s ease, opacity .5s ease}
 
+  .physics{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+  .charm{position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;user-select:none;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.22));transform-origin:center center}
+
   .caps{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
   .tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px;border-radius:var(--r-sm)}
   .track{height:12px;border-radius:999px;background:var(--surface-sunk);overflow:hidden}
@@ -101,7 +104,7 @@
   .emojigrid{display:flex;flex-wrap:wrap;gap:2px;margin-top:12px;min-height:28px;transition:opacity .2s}
   .emojigrid span{font-size:26px;line-height:1;filter:drop-shadow(0 2px 3px rgba(27,27,24,.16))}
 
-  .backwrap{position:absolute;inset:0;background:var(--paper);display:flex;flex-direction:column}
+  .backwrap{position:absolute;inset:0;background:transparent;display:flex;flex-direction:column}
   .backwrap .shaka span{filter:drop-shadow(0 5px 8px rgba(27,27,24,.18))}
   .glasscase{position:absolute;inset:0;border-radius:38px;z-index:2;pointer-events:none;
     border:3px solid var(--lime);
@@ -112,10 +115,12 @@
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
   .toast .em{margin-right:6px}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 </head>
 <body>
 <div class="phone"><div class="stage">
 
+  <div class="physics" id="physics"></div>
   <div class="flip" id="flip">
 
     <div class="face front">
@@ -262,47 +267,127 @@ function backMsg(v){
   return "まだ余白たっぷり。";
 }
 
-function renderShaka(el, full){
-  const v = fatigue();
-  const n = Math.min(100, Math.round(v));
-  const rand = rng(7);
-  const fillH = full ? 90 : 58;
-  const pile = state.entries.filter(e=>e.delta>0 && !e.exp);
-  let html="";
-  for(let i=0;i<n;i++){
-    const left = state.sortMode ? ((i%10)*9.2 + 4) : (rand()*75 + 8);
-    const bottom = state.sortMode ? (Math.floor(i/10)*8.4 + 1) : (full ? Math.pow(rand(),1.8)*fillH : Math.pow(rand(),1.15)*fillH);
-    const rot = state.sortMode ? 0 : (rand()-.5)*30;
-    const size = 20+rand()*12;
-    const src = pile.length ? pile[Math.floor(rand()*pile.length)].act : ACTIONS[Math.floor(rand()*ACTIONS.length)];
-    const e = EMOJI_MAP[src] || "✨";
-    html+=`<span style="left:${left}%;bottom:${bottom}%;font-size:${size}px;transform:rotate(${rot}deg)">${e}</span>`;
-  }
-  el.innerHTML=html;
+const { Engine, World, Bodies, Body, Runner } = Matter;
+const physicsEl = document.getElementById("physics");
+const PHYS_RADIUS = 18;
+const PHYS_FONT = 30;
+const PHYS_BOUNCE = 0.35;
+const PHYS_FRICTION = 0.05;
+const PHYS_FRICTION_AIR = 0.014;
+const PHYS_DENSITY = 0.001;
+let engine, runner;
+let physicsBodies = [];
+let physicsWalls = [];
+let physicsStarted = false;
+
+function clamp(value, min, max){
+  return Math.max(min, Math.min(max, value));
 }
 
-function dropShaka(el){
-  const v = fatigue();
-  const n = Math.min(100, Math.round(v));
-  const rand = Math.random;
-  const pile = state.entries.filter(e=>e.delta>0 && !e.exp);
-  let html="";
-  for(let i=0;i<n;i++){
-    const col = i % 10;
-    const row = Math.floor(i / 10);
-    const left = 5 + col * 9 + (rand() - .5) * 4;
-    const bottom = 3 + row * 7 + rand() * 3;
-    const rot = (rand() - .5) * 40;
-    const size = 20 + rand() * 12;
-    const src = pile.length ? pile[Math.floor(rand() * pile.length)].act : ACTIONS[Math.floor(rand() * ACTIONS.length)];
-    const e = EMOJI_MAP[src] || "✨";
-    html += `<span data-final-bottom="${Math.min(bottom, 88).toFixed(2)}" style="left:${Math.min(left, 90).toFixed(2)}%;bottom:110%;font-size:${size}px;transform:rotate(${rot}deg)">${e}</span>`;
+function buildPhysics(){
+  if(engine) return;
+  engine = Engine.create();
+  engine.gravity.y = 1;
+  engine.gravity.x = 0;
+  runner = Runner.create();
+  Runner.run(runner, engine);
+  buildPhysicsWalls();
+  physicsStarted = true;
+  requestAnimationFrame(renderPhysics);
+}
+
+function buildPhysicsWalls(){
+  if(!engine) return;
+  physicsWalls.forEach(w=>World.remove(engine.world, w));
+  physicsWalls = [];
+  const rect = physicsEl.getBoundingClientRect();
+  const W = rect.width;
+  const H = rect.height;
+  const t = 80;
+  physicsWalls.push(Bodies.rectangle(W/2, H + t/2, W + t*2, t, {isStatic:true}));
+  physicsWalls.push(Bodies.rectangle(W/2, -t/2, W + t*2, t, {isStatic:true}));
+  physicsWalls.push(Bodies.rectangle(-t/2, H/2, t, H + t*2, {isStatic:true}));
+  physicsWalls.push(Bodies.rectangle(W + t/2, H/2, t, H + t*2, {isStatic:true}));
+  World.add(engine.world, physicsWalls);
+}
+
+function createPileBag(){
+  const bag = [];
+  state.entries.forEach(e=>{
+    if(e.delta > 0 && !e.exp){
+      for(let i=0;i<e.delta;i++) bag.push(e.act);
+    }
+  });
+  return bag;
+}
+
+function createPhysicsParticle(act){
+  const rect = physicsEl.getBoundingClientRect();
+  const x = 24 + Math.random() * Math.max(0, rect.width - 48);
+  const y = -PHYS_RADIUS*2 - Math.random() * 60;
+  const body = Bodies.circle(x, y, PHYS_RADIUS, {
+    restitution: PHYS_BOUNCE,
+    friction: PHYS_FRICTION,
+    frictionAir: PHYS_FRICTION_AIR,
+    density: PHYS_DENSITY,
+  });
+  body.emoji = EMOJI_MAP[act] || "✨";
+  World.add(engine.world, body);
+  const el = document.createElement("div");
+  el.className = "charm";
+  el.textContent = body.emoji;
+  el.style.width = el.style.height = `${PHYS_RADIUS*2}px`;
+  el.style.fontSize = `${PHYS_FONT}px`;
+  physicsEl.appendChild(el);
+  physicsBodies.push({body, el});
+}
+
+function removePhysicsParticle(){
+  const particle = physicsBodies.pop();
+  if(!particle) return;
+  World.remove(engine.world, particle.body);
+  particle.el.remove();
+}
+
+function syncPhysics(){
+  buildPhysics();
+  buildPhysicsWalls();
+  const target = Math.min(100, fatigue());
+  const bag = createPileBag();
+  while(physicsBodies.length < target){
+    const act = bag.length ? bag[Math.floor(Math.random() * bag.length)] : ACTIONS[Math.floor(Math.random() * ACTIONS.length)];
+    createPhysicsParticle(act);
   }
-  el.innerHTML = html;
-  requestAnimationFrame(()=>{
-    el.querySelectorAll("span").forEach(s=>{
-      s.style.bottom = s.dataset.finalBottom + "%";
-    });
+  while(physicsBodies.length > target){
+    removePhysicsParticle();
+  }
+}
+
+function renderPhysics(){
+  if(!physicsStarted) return;
+  physicsBodies.forEach(({body,el})=>{
+    el.style.transform = `translate(${body.position.x - PHYS_RADIUS}px, ${body.position.y - PHYS_RADIUS}px) rotate(${body.angle}rad)`;
+  });
+  requestAnimationFrame(renderPhysics);
+}
+
+window.addEventListener('resize', ()=>{
+  if(engine) buildPhysicsWalls();
+});
+
+function shakePhysics(){
+  if(!engine) return;
+  physicsBodies.forEach(({body})=>{
+    Body.setVelocity(body, {x:(Math.random()-0.5)*28, y:(Math.random()-0.9)*28});
+    Body.setAngularVelocity(body, (Math.random()-0.5)*0.6);
+  });
+}
+
+function settlePhysics(){
+  if(!engine) return;
+  physicsBodies.forEach(({body})=>{
+    Body.setVelocity(body, {x:0, y:0});
+    Body.setAngularVelocity(body, 0);
   });
 }
 
@@ -333,8 +418,7 @@ function tickClock(){
 
 function renderAll(){
   renderList();
-  renderShaka(document.getElementById("shakaFront"), false);
-  renderShaka(document.getElementById("shakaBack"), true);
+  syncPhysics();
   tickClock();
 }
 
@@ -351,7 +435,7 @@ function showFront(){
   faceBack.style.cssText="opacity:0;pointer-events:none;z-index:1";
   faceFront.style.cssText="opacity:1;pointer-events:auto;z-index:2";
 }
-document.getElementById("toShaka").onclick=()=>{ state.sortMode=false; renderShaka(document.getElementById("shakaBack"), true); showBack(); };
+document.getElementById("toShaka").onclick=()=>{ state.sortMode=false; showBack(); };
 document.getElementById("toTimeline").onclick=()=>{ document.getElementById("drawer").classList.remove("open"); showFront(); };
 
 document.getElementById("drawerTab").onclick=()=>document.getElementById("drawer").classList.toggle("open");
@@ -381,6 +465,10 @@ function enableMotion(){
 function onMotion(event){
   const acc = event.accelerationIncludingGravity || event.acceleration;
   if(!acc || acc.x==null) return;
+  if(engine){
+    engine.gravity.x = clamp(acc.x / 9.8, -1, 1);
+    engine.gravity.y = clamp(-acc.y / 9.8, -1, 1);
+  }
   if(lastMotion.x!=null){
     const d = Math.abs(acc.x-lastMotion.x)+Math.abs(acc.y-lastMotion.y)+Math.abs(acc.z-lastMotion.z);
     if(d > 13) performShake();
@@ -389,13 +477,13 @@ function onMotion(event){
 }
 function performShake(){
   state.sortMode=false;
-  const el=document.getElementById("shakaBack");
-  dropShaka(el);
+  syncPhysics();
+  shakePhysics();
   toast("🫨","シャカシャカ…");
 }
 
 document.getElementById("shakeBtn").onclick=()=>{ enableMotion(); performShake(); };
-document.getElementById("sortBtn").onclick=()=>{ state.sortMode=true; renderShaka(document.getElementById("shakaBack"), true); toast("🧺","きれいにそろえた"); };
+document.getElementById("sortBtn").onclick=()=>{ state.sortMode=true; settlePhysics(); toast("🧺","きれいにそろえた"); };
 
 let toastT;
 function toast(em,txt){
