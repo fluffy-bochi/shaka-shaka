@@ -335,7 +335,7 @@ function createPhysicsParticle(act){
   updatePhysicsSize();
   const rect = physicsEl.getBoundingClientRect();
   const x = currentPhysRadius + Math.random() * Math.max(0, rect.width - currentPhysRadius * 2);
-  const y = -currentPhysRadius * 2 - Math.random() * 60;
+  const y = currentPhysRadius + Math.random() * Math.max(0, rect.height / 2 - currentPhysRadius);
   const body = Bodies.circle(x, y, currentPhysRadius, {
     restitution: PHYS_BOUNCE,
     friction: PHYS_FRICTION,
