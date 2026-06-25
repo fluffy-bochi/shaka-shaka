@@ -482,20 +482,21 @@ function checkNegativeCollisions(){
       const dx = np.x - pp.x, dy = np.y - pp.y;
       const dist = Math.sqrt(dx*dx + dy*dy);
       if(dist < currentPhysRadius * 2){
-        // remove positive particle
-        pos.el.style.transition = "transform .3s, opacity .3s";
-        pos.el.style.opacity = "0";
-        pos.el.style.transform += " scale(0.3)";
+        // 物理演算から外して位置を固定
+        const posX = pp.x, posY = pp.y;
+        const negX = np.x, negY = np.y;
         World.remove(engine.world, pos.body);
-        setTimeout(()=>pos.el.remove(), 300);
-        physicsBodies.splice(pi, 1);
-        // remove negative particle
-        neg.consumed = true;
-        neg.el.style.transition = "transform .3s, opacity .3s";
-        neg.el.style.opacity = "0";
-        neg.el.style.transform += " scale(1.3)";
         World.remove(engine.world, neg.body);
-        setTimeout(()=>neg.el.remove(), 300);
+        neg.consumed = true;
+        physicsBodies.splice(pi, 1);
+        // ポップ演出: 一瞬大きくなってから消える
+        pos.el.style.transition = "transform .5s cubic-bezier(.2,1,.3,1), opacity .3s ease .2s";
+        pos.el.style.transform = `translate(${posX - currentPhysRadius}px, ${posY - currentPhysRadius}px) scale(1.6)`;
+        pos.el.style.opacity = "0";
+        neg.el.style.transition = "transform .5s cubic-bezier(.2,1,.3,1), opacity .3s ease .2s";
+        neg.el.style.transform = `translate(${negX - currentPhysRadius}px, ${negY - currentPhysRadius}px) scale(1.6)`;
+        neg.el.style.opacity = "0";
+        setTimeout(()=>{ pos.el.remove(); neg.el.remove(); }, 500);
         break;
       }
     }
