@@ -53,8 +53,13 @@
   .item.exp{opacity:.42}
   .item.exp .ttl{text-decoration:line-through}
 
-  .menu{width:40px;height:40px;background:var(--ink);border-radius:10px;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;cursor:pointer}
+  .menu{width:40px;height:40px;background:var(--ink);border-radius:10px;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;cursor:pointer;position:relative;z-index:12}
   .menu i{width:18px;height:2px;background:#fff;display:block}
+  .menu-dropdown{display:none;position:absolute;right:20px;top:90px;background:var(--ink);border-radius:14px;padding:14px 16px;z-index:11;box-shadow:var(--shadow-pop);align-items:center;gap:10px;min-width:200px}
+  .menu-dropdown.open{display:flex}
+  .menu-label{font-family:var(--font-mono);font-size:11px;font-weight:700;color:#fff;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+  .menu-slider{flex:1;accent-color:var(--lime);height:4px}
+  .menu-value{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--lime);min-width:32px;text-align:right}
 
   .btn{font-family:var(--font-ui);font-weight:700;border:none;border-radius:12px;cursor:pointer;font-size:14px}
   .btn-mono{font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
@@ -134,7 +139,12 @@
             <div class="caps">2026 · JUL 17 · WED</div>
             <div style="font-size:22px;font-weight:700;margin-top:2px">今日のログ</div>
           </div>
-          <div class="menu"><i></i><i></i><i></i></div>
+          <div class="menu" id="menuBtn"><i></i><i></i><i></i></div>
+          <div class="menu-dropdown" id="menuDropdown">
+            <label class="menu-label">ボカシ</label>
+            <input type="range" id="blurSlider" min="0" max="20" value="6" class="menu-slider">
+            <span class="menu-value" id="blurValue">6px</span>
+          </div>
         </div>
         <div class="list" id="list" style="padding-top:8px"></div>
       </div>
@@ -497,6 +507,7 @@ function renderAll(){
   tickClock();
 }
 
+let blurAmount=6;
 const flip=document.getElementById("flip");
 const faceFront=document.querySelector(".face.front");
 const faceBack=document.querySelector(".face.back");
@@ -505,17 +516,33 @@ function showBack(){
   faceFront.style.cssText="opacity:0;pointer-events:none;z-index:1";
   faceBack.style.cssText="opacity:1;pointer-events:auto;z-index:3";
   physicsEl.classList.remove("frosted");
+  physicsEl.style.filter="none";
 }
 function showFront(){
   flip.classList.remove("flipped");
   faceBack.style.cssText="opacity:0;pointer-events:none;z-index:1";
   faceFront.style.cssText="opacity:1;pointer-events:auto;z-index:2";
   physicsEl.classList.add("frosted");
+  physicsEl.style.filter=`blur(${blurAmount}px)`;
 }
 document.getElementById("toShaka").onclick=()=>{ state.sortMode=false; showBack(); };
 document.getElementById("toTimeline").onclick=()=>{ document.getElementById("drawer").classList.remove("open"); showFront(); };
 
 document.getElementById("drawerTab").onclick=()=>document.getElementById("drawer").classList.toggle("open");
+
+/* ---- menu dropdown ---- */
+const menuBtn=document.getElementById("menuBtn");
+const menuDropdown=document.getElementById("menuDropdown");
+menuBtn.onclick=()=>menuDropdown.classList.toggle("open");
+document.addEventListener("click",(e)=>{
+  if(!menuBtn.contains(e.target)&&!menuDropdown.contains(e.target)) menuDropdown.classList.remove("open");
+});
+document.getElementById("blurSlider").oninput=(e)=>{
+  blurAmount=+e.target.value;
+  document.getElementById("blurValue").textContent=blurAmount+"px";
+  physicsEl.style.filter=physicsEl.classList.contains("frosted")?`blur(${blurAmount}px)`:"none";
+};
+
 
 let motionOn=false;
 let lastMotion={x:null,y:null,z:null};
