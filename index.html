@@ -734,22 +734,24 @@ document.getElementById("saveAdd").onclick=()=>{
     state.entries.push({from,to,title,act:"睡眠",mood:sel.mood,delta:0,exp:false});
     state.entries.sort((a,b)=>a.from.localeCompare(b.from));
     state.sortMode=false;
-    closeSheets(); showFront(); renderAll(); save();
-    toast("🛌","眠った。ケースを空にした");
+    closeSheets(); renderAll(); showBack(); save();
+    setTimeout(()=>toast("🛌","眠った。ケースを空にした"), 400);
     return;
   }
   state.entries.push({from,to,title,act:sel.act,mood:sel.mood,delta,exp:false});
   state.entries.sort((a,b)=>a.from.localeCompare(b.from));
   closeSheets();
-  if(delta < 0){
-    renderList();
-    tickClock();
-    dropNegativeParticles(sel.act, Math.abs(delta));
-    toast(EMOJI_MAP[sel.act]||"✨", "回復した（"+delta+"）");
-  } else {
-    renderAll();
-    toast(EMOJI_MAP[sel.act]||"✨", "記録した（+"+delta+"）");
-  }
+  renderAll();
+  showBack();
+  setTimeout(()=>{
+    if(delta < 0){
+      dropNegativeParticles(sel.act, Math.abs(delta));
+      toast(EMOJI_MAP[sel.act]||"✨", "回復した（"+delta+"）");
+    } else {
+      shakePhysics(16);
+      toast(EMOJI_MAP[sel.act]||"✨", "記録した（+"+delta+"）");
+    }
+  }, 400);
   save();
 };
 
