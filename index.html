@@ -47,7 +47,7 @@
   .item .tt .t{font-size:9px;color:var(--ink-3)}
   .item .bd{flex:1;padding:9px 13px;display:flex;align-items:center;gap:9px}
   .item .ttl{flex:1;font-size:14px;font-weight:500}
-  .item .face{font-size:22px;filter:drop-shadow(0 3px 4px rgba(27,27,24,.18))}
+  .item .mood-face{font-size:22px;filter:drop-shadow(0 3px 4px rgba(27,27,24,.18))}
   .item .d{font-family:var(--font-mono);font-size:13px;font-weight:700;min-width:34px;text-align:right}
   .item.exp{opacity:.42}
   .item.exp .ttl{text-decoration:line-through}
@@ -227,19 +227,39 @@ const EMOJI_MAP = {
 const ACTIONS = Object.keys(EMOJI_MAP);
 const MOODS = ["😆","🙂","😌","🥲","😩","😢"];
 
-const ASSET_DIR = "design_handoff_fatigue_shaka/emoji-3d/";
+const FLUENT_BASE = "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/";
 const ACT_ASSET = {
-  "会議":"speech_balloon","通勤":"tsukin_train","レビュー":"review_laptop","作業":"sagyo_keyboard",
-  "資料作成":"shiryo_pencil","メール":"mail","勉強":"benkyo_books","運動":"undo_run","散歩":"sanpo_walk",
-  "家事":"kaji_broom","育児":"ikuji_bottle","通話":"tsuwa_phone","睡眠":"suimin_bed","食事":"shokuji_rice",
-  "休憩":"kyukei_coffee","昼寝":"hirune_sleep","ゲーム":"game","読書":"dokusho_openbook","入浴":"nyuyoku_bath"
+  "会議":  "Speech balloon/3D/speech_balloon_3d.png",
+  "通勤":  "Railway car/3D/railway_car_3d.png",
+  "レビュー":"Laptop/3D/laptop_3d.png",
+  "作業":  "Keyboard/3D/keyboard_3d.png",
+  "資料作成":"Pencil/3D/pencil_3d.png",
+  "メール": "E-mail/3D/e-mail_3d.png",
+  "勉強":  "Books/3D/books_3d.png",
+  "運動":  "Person running/Default/3D/person_running_3d_default.png",
+  "散歩":  "Person walking/Default/3D/person_walking_3d_default.png",
+  "家事":  "Broom/3D/broom_3d.png",
+  "育児":  "Baby bottle/3D/baby_bottle_3d.png",
+  "通話":  "Telephone receiver/3D/telephone_receiver_3d.png",
+  "睡眠":  "Person in bed/Default/3D/person_in_bed_3d_default.png",
+  "食事":  "Rice ball/3D/rice_ball_3d.png",
+  "休憩":  "Hot beverage/3D/hot_beverage_3d.png",
+  "昼寝":  "Sleeping face/3D/sleeping_face_3d.png",
+  "ゲーム": "Video game/3D/video_game_3d.png",
+  "読書":  "Open book/3D/open_book_3d.png",
+  "入浴":  "Bathtub/3D/bathtub_3d.png",
 };
 const MOOD_ASSET = {
-  "😆":"mood_grin","🙂":"mood_smile","😌":"mood_relieved","🥲":"mood_tear","😩":"mood_weary","😢":"mood_cry"
+  "😆":"Grinning squinting face/3D/grinning_squinting_face_3d.png",
+  "🙂":"Slightly smiling face/3D/slightly_smiling_face_3d.png",
+  "😌":"Relieved face/3D/relieved_face_3d.png",
+  "🥲":"Smiling face with tear/3D/smiling_face_with_tear_3d.png",
+  "😩":"Weary face/3D/weary_face_3d.png",
+  "😢":"Crying face/3D/crying_face_3d.png",
 };
-const FALLBACK_ASSET = "fallback_sparkles";
+const FALLBACK_ASSET = "Sparkles/3D/sparkles_3d.png";
 
-function assetSrc(name){ return ASSET_DIR + name + ".png"; }
+function assetSrc(path){ return FLUENT_BASE + encodeURI(path); }
 function createAssetImg(name, altText, size="100%"){
   const img=document.createElement("img");
   img.src = assetSrc(name);
@@ -446,7 +466,7 @@ function renderList(){
     icon.style.marginRight = "8px";
     ttl.appendChild(icon);
     ttl.appendChild(document.createTextNode(`${e.title||e.act}`));
-    const faceSpan=document.createElement("span"); faceSpan.className="face";
+    const faceSpan=document.createElement("span"); faceSpan.className="mood-face";
     faceSpan.appendChild(moodIcon(e.mood));
     const d=document.createElement("span"); d.className="d";
     d.style.color = col;
