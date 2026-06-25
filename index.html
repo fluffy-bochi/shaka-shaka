@@ -282,10 +282,11 @@ let physicsStarted = false;
 
 function updatePhysicsSize(){
   const rect = physicsEl.getBoundingClientRect();
+  if(rect.width <= 0 || rect.height <= 0) return;
   const cell = Math.min(rect.width / 10, rect.height / 10);
-  const diameter = Math.max(20, Math.min(cell * 0.9, 72));
+  const diameter = Math.max(22, Math.min(cell * 0.95, 90));
   currentPhysRadius = diameter / 2;
-  currentPhysFont = Math.round(diameter * 0.9);
+  currentPhysFont = Math.round(diameter * 0.95);
 }
 
 function clamp(value, min, max){
