@@ -302,8 +302,8 @@ function backMsg(v){
 
 const { Engine, World, Bodies, Body, Runner } = Matter;
 const physicsEl = document.getElementById("physics");
-let currentPhysRadius = 18;
-let currentPhysFont = 30;
+const currentPhysRadius = 18;
+const currentPhysFont = 30;
 const PHYS_BOUNCE = 0.35;
 const PHYS_FRICTION = 0.05;
 const PHYS_FRICTION_AIR = 0.014;
@@ -314,12 +314,7 @@ let physicsWalls = [];
 let physicsStarted = false;
 
 function updatePhysicsSize(){
-  const rect = physicsEl.getBoundingClientRect();
-  if(rect.width <= 0 || rect.height <= 0) return;
-  const cell = Math.min(rect.width / 10, rect.height / 10);
-  const diameter = Math.max(22, Math.min(cell * 0.95, 90));
-  currentPhysRadius = diameter / 2;
-  currentPhysFont = Math.round(diameter * 0.95);
+  // fixed size matching design handoff (R=18, FONT=30)
 }
 
 function clamp(value, min, max){
@@ -367,8 +362,8 @@ function createPileBag(){
 function createPhysicsParticle(act){
   updatePhysicsSize();
   const rect = physicsEl.getBoundingClientRect();
-  const x = currentPhysRadius + Math.random() * Math.max(0, rect.width - currentPhysRadius * 2);
-  const y = currentPhysRadius + Math.random() * Math.max(0, rect.height / 2 - currentPhysRadius);
+  const x = currentPhysRadius + Math.random() * (rect.width - 2 * currentPhysRadius);
+  const y = currentPhysRadius + Math.random() * (rect.height * 0.5);
   const body = Bodies.circle(x, y, currentPhysRadius, {
     restitution: PHYS_BOUNCE,
     friction: PHYS_FRICTION,
@@ -381,7 +376,7 @@ function createPhysicsParticle(act){
   const el = document.createElement("div");
   el.className = "charm";
   el.style.width = el.style.height = `${currentPhysRadius*2}px`;
-  const img = actIcon(act);
+  const img = actIcon(act, currentPhysRadius*2);
   el.appendChild(img);
   physicsEl.appendChild(el);
   physicsBodies.push({body, el});
@@ -397,15 +392,10 @@ function removePhysicsParticle(){
 function syncPhysics(){
   buildPhysics();
   buildPhysicsWalls();
-  const target = Math.min(100, fatigue());
   const bag = createPileBag();
-  while(physicsBodies.length < target){
-    const act = bag.length ? bag[Math.floor(Math.random() * bag.length)] : ACTIONS[Math.floor(Math.random() * ACTIONS.length)];
-    createPhysicsParticle(act);
-  }
-  while(physicsBodies.length > target){
-    removePhysicsParticle();
-  }
+  const target = Math.min(100, bag.length);
+  while(physicsBodies.length < target) createPhysicsParticle(bag[physicsBodies.length] || "");
+  while(physicsBodies.length > target) removePhysicsParticle();
 }
 
 function renderPhysics(){
@@ -423,12 +413,13 @@ window.addEventListener('resize', ()=>{
   }
 });
 
-function shakePhysics(){
+function shakePhysics(power=16){
   if(!engine) return;
+  enableMotion();
   physicsBodies.forEach(({body})=>{
     Body.setVelocity(body, {
-      x:(Math.random()-0.5)*24,
-      y:Math.random()*6 + 2
+      x:(Math.random()-0.5)*power*2,
+      y:(Math.random()-0.7)*power*2
     });
     Body.setAngularVelocity(body, (Math.random()-0.5)*0.6);
   });
@@ -437,8 +428,7 @@ function shakePhysics(){
 function settlePhysics(){
   if(!engine) return;
   physicsBodies.forEach(({body})=>{
-    Body.setVelocity(body, {x:0, y:body.velocity.y});
-    Body.setAngularVelocity(body, 0);
+    Body.setVelocity(body, {x:0, y:0});
   });
 }
 
@@ -530,22 +520,23 @@ function enableMotion(){
   }
 }
 function onMotion(event){
-  const acc = event.accelerationIncludingGravity || event.acceleration;
-  if(!acc || acc.x==null) return;
-  if(engine){
-    engine.gravity.x = clamp(acc.x / 9.8, -1, 1);
-    engine.gravity.y = clamp(Math.max(-acc.y, 1) / 9.8, 0.5, 1.5);
+  const g = event.accelerationIncludingGravity;
+  if(g && g.x!=null && engine){
+    engine.gravity.x = clamp(g.x/9.8, -1, 1);
+    engine.gravity.y = clamp(-g.y/9.8, -1, 1);
   }
+  const a = event.acceleration || g;
+  if(!a || a.x==null) return;
   if(lastMotion.x!=null){
-    const d = Math.abs(acc.x-lastMotion.x)+Math.abs(acc.y-lastMotion.y)+Math.abs(acc.z-lastMotion.z);
-    if(d > 13) performShake();
+    const d = Math.abs(a.x-lastMotion.x)+Math.abs(a.y-lastMotion.y)+Math.abs(a.z-lastMotion.z);
+    if(d > 16) shakePhysics(12);
   }
-  lastMotion = {x:acc.x, y:acc.y, z:acc.z};
+  lastMotion = {x:a.x, y:a.y, z:a.z};
 }
 function performShake(){
   state.sortMode=false;
   syncPhysics();
-  shakePhysics();
+  shakePhysics(16);
   toast("🫨","シャカシャカ…");
 }
 
