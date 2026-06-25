@@ -25,10 +25,9 @@
   .statusbar.light{color:#fff}
 
   .shaka{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-  .shaka span{position:absolute;width:40px;height:40px;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:opacity .25s ease, transform .25s ease}
-  .shaka span img{width:100%;height:100%;display:block;object-fit:contain;pointer-events:none}
+  .shaka span{position:absolute;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:bottom .7s cubic-bezier(.2,.8,.3,1), transform .5s ease, opacity .5s ease}
 
-  .caps{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)
+  .caps{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
   .tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px;border-radius:var(--r-sm)}
   .track{height:12px;border-radius:999px;background:var(--surface-sunk);overflow:hidden}
   .fill{height:100%;border-radius:999px;transition:width .5s ease, background .4s ease}
@@ -220,213 +219,92 @@ const EMOJI_MAP = {
   "勉強":"📚","運動":"🏃","散歩":"🚶","家事":"🧹","育児":"🍼","通話":"📞",
   "睡眠":"🛌","食事":"🍙","休憩":"☕","昼寝":"😴","ゲーム":"🎮","読書":"📖","入浴":"🛁"
 };
-const ASSET_BASE = 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/';
-const ACTION_CONFIG = {
-  "会議":{name:"Folded hands",file:"folded_hands_3d.png",alt:"会議"},
-  "通勤":{name:"Automobile",file:"automobile_3d.png",alt:"通勤"},
-  "レビュー":{name:"Laptop",file:"laptop_3d.png",alt:"レビュー"},
-  "作業":{name:"Keyboard",file:"keyboard_3d.png",alt:"作業"},
-  "資料作成":{name:"Memo",file:"memo_3d.png",alt:"資料作成"},
-  "メール":{name:"Envelope",file:"envelope_3d.png",alt:"メール"},
-  "勉強":{name:"Books",file:"books_3d.png",alt:"勉強"},
-  "運動":{name:"Person running",file:"person_running_3d.png",alt:"運動"},
-  "散歩":{name:"Person walking",file:"person_walking_3d.png",alt:"散歩"},
-  "家事":{name:"Broom",file:"broom_3d.png",alt:"家事"},
-  "育児":{name:"Baby bottle",file:"baby_bottle_3d.png",alt:"育児"},
-  "通話":{name:"Telephone receiver",file:"telephone_receiver_3d.png",alt:"通話"},
-  "睡眠":{name:"Bed",file:"bed_3d.png",alt:"睡眠"},
-  "食事":{name:"Bento box",file:"bento_box_3d.png",alt:"食事"},
-  "休憩":{name:"Hot beverage",file:"hot_beverage_3d.png",alt:"休憩"},
-  "昼寝":{name:"Sleeping face",file:"sleeping_face_3d.png",alt:"昼寝"},
-  "ゲーム":{name:"Video game",file:"video_game_3d.png",alt:"ゲーム"},
-  "読書":{name:"Open book",file:"open_book_3d.png",alt:"読書"},
-  "入浴":{name:"Bathtub",file:"bathtub_3d.png",alt:"入浴"}
-};
-const DEFAULT_ASSET = {name:"Beaming face with smiling eyes",file:"beaming_face_with_smiling_eyes_3d.png",alt:"emoji"};
 const ACTIONS = Object.keys(EMOJI_MAP);
 const MOODS = ["😆","🙂","😌","🥲","😩","😢"];
 
-function assetUrl(config){
-  return ASSET_BASE + encodeURIComponent(config.name) + "/3D/" + config.file;
+function rng(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280;};}
+
+let state = {
+  entries: [
+    {from:"07:30",to:"08:00",title:"通勤・満員電車",act:"通勤",mood:"😩",delta:14,exp:false},
+    {from:"09:00",to:"10:30",title:"会議3本",act:"会議",mood:"🥲",delta:18,exp:false},
+    {from:"12:30",to:"13:00",title:"ランチ",act:"食事",mood:"🙂",delta:-12,exp:true},
+    {from:"15:00",to:"17:40",title:"レビュー対応",act:"レビュー",mood:"😌",delta:16,exp:false},
+    {from:"18:30",to:"19:00",title:"散歩",act:"散歩",mood:"🙂",delta:-8,exp:false},
+  ],
+  sortMode:false,
+};
+
+function fatigue(){
+  let f = 0;
+  state.entries.forEach(e=>{ if(!e.exp) f += e.delta; });
+  return Math.max(0, Math.min(100, Math.round(f)));
 }
-function actionAsset(action){
-  return ACTION_CONFIG[action] || DEFAULT_ASSET;
+
+function fillColor(v){
+  if(v<40) return "var(--fatigue-0)";
+  if(v<70) return "var(--fatigue-40)";
+  if(v<100) return "var(--fatigue-70)";
+  return "var(--fatigue-100)";
 }
-function getRandomAction(){
+function msg(v){
+  const yohaku = Math.max(0,100-v);
+  if(v>=100) return "満杯。今日はここまで、休もう。";
+  if(v>85) return `余白 ${yohaku}% — そろそろ休もう`;
+  if(v>60) return `余白 ${yohaku}% — 詰め込みすぎ注意`;
+  if(v>30) return `余白 ${yohaku}% — いいペース`;
+  return `余白 ${yohaku}% — まだいける`;
+}
+function backMsg(v){
+  if(v>=100) return "ケースが満杯。眠って空にしよう。";
+  if(v>85) return "そろそろ振って、休む合図。";
+  if(v>50) return "ほどよく積もってきた。";
+  return "まだ余白たっぷり。";
+}
+
+function renderShaka(el, full){
+  const v = fatigue();
+  const n = Math.min(100, Math.round(v));
+  const rand = rng(7);
+  const fillH = full ? 90 : 58;
   const pile = state.entries.filter(e=>e.delta>0 && !e.exp);
-  if(pile.length) return pile[Math.floor(Math.random()*pile.length)].act;
-  return ACTIONS[Math.floor(Math.random()*ACTIONS.length)];
+  let html="";
+  for(let i=0;i<n;i++){
+    const left = state.sortMode ? ((i%10)*9.2 + 4) : (rand()*75 + 8);
+    const bottom = state.sortMode ? (Math.floor(i/10)*8.4 + 1) : (full ? Math.pow(rand(),1.8)*fillH : Math.pow(rand(),1.15)*fillH);
+    const rot = state.sortMode ? 0 : (rand()-.5)*30;
+    const size = 20+rand()*12;
+    const src = pile.length ? pile[Math.floor(rand()*pile.length)].act : ACTIONS[Math.floor(rand()*ACTIONS.length)];
+    const e = EMOJI_MAP[src] || "✨";
+    html+=`<span style="left:${left}%;bottom:${bottom}%;font-size:${size}px;transform:rotate(${rot}deg)">${e}</span>`;
+  }
+  el.innerHTML=html;
 }
 
-function createImageBody(act,size){
-  const config = actionAsset(act);
-  return {
-    act,
-    size,
-    radius:size * 0.44,
-    x:0,
-    y:0,
-    vx:0,
-    vy:0,
-    angle:(Math.random()-.5) * 0.5,
-    va:(Math.random()-.5) * 2,
-    src:assetUrl(config),
-    alt:config.alt
-  };
-}
-
-class ShakaScene {
-  constructor(el, options={}){
-    this.el = el;
-    this.full = !!options.full;
-    this.bodies = [];
-    this.running = false;
-    this.width = 0;
-    this.height = 0;
-    this.lastTime = 0;
-    this.gravity = 1800;
-    this.bounce = 0.28;
-    this.drag = 0.995;
-    this.floorBounce = 0.32;
-    this.maxCount = this.full ? 60 : 42;
+function dropShaka(el){
+  const v = fatigue();
+  const n = Math.min(100, Math.round(v));
+  const rand = Math.random;
+  const pile = state.entries.filter(e=>e.delta>0 && !e.exp);
+  let html="";
+  for(let i=0;i<n;i++){
+    const col = i % 10;
+    const row = Math.floor(i / 10);
+    const left = 5 + col * 9 + (rand() - .5) * 4;
+    const bottom = 3 + row * 7 + rand() * 3;
+    const rot = (rand() - .5) * 40;
+    const size = 20 + rand() * 12;
+    const src = pile.length ? pile[Math.floor(rand() * pile.length)].act : ACTIONS[Math.floor(rand() * ACTIONS.length)];
+    const e = EMOJI_MAP[src] || "✨";
+    html += `<span data-final-bottom="${Math.min(bottom, 88).toFixed(2)}" style="left:${Math.min(left, 90).toFixed(2)}%;bottom:110%;font-size:${size}px;transform:rotate(${rot}deg)">${e}</span>`;
   }
-  measure(){
-    const rect = this.el.getBoundingClientRect();
-    this.width = rect.width || 320;
-    this.height = rect.height || 640;
-  }
-  reset(){
-    this.stop();
-    this.el.innerHTML = "";
-    this.measure();
-    this.bodies = [];
-    const count = Math.min(this.maxCount, Math.max(18, Math.round(fatigue())));
-    for(let i=0;i<count;i++){
-      const size = 24 + Math.random() * 18;
-      const act = getRandomAction();
-      const body = createImageBody(act, size);
-      body.x = 8 + Math.random() * Math.max(0, this.width - body.size - 16);
-      body.y = this.height + Math.random() * 140;
-      body.vx = (Math.random() - 0.5) * 90;
-      body.vy = -Math.random() * 90;
-      body.el = this.createBody(body);
-      this.bodies.push(body);
-    }
-    this.start();
-    requestAnimationFrame(()=>this.bodies.forEach(b=>b.el.style.opacity="1"));
-  }
-  createBody(body){
-    const span = document.createElement("span");
-    span.style.width = body.size + "px";
-    span.style.height = body.size + "px";
-    span.style.left = body.x + "px";
-    span.style.bottom = body.y + "px";
-    const img = document.createElement("img");
-    img.src = body.src;
-    img.alt = body.alt;
-    span.appendChild(img);
-    this.el.appendChild(span);
-    return span;
-  }
-  start(){
-    if(this.running) return;
-    this.running = true;
-    this.lastTime = performance.now();
-    this.tick();
-  }
-  stop(){
-    this.running = false;
-  }
-  tick(){
-    if(!this.running) return;
-    const now = performance.now();
-    const dt = Math.min(0.032, (now - this.lastTime) / 1000);
-    this.lastTime = now;
-    this.step(dt);
-    requestAnimationFrame(()=>this.tick());
-  }
-  step(dt){
-    this.measure();
-    const bodies = this.bodies;
-    for(const body of bodies){
-      body.vy += this.gravity * dt;
-      body.vx *= this.drag;
-      body.vy *= 0.998;
-      body.x += body.vx * dt;
-      body.y += body.vy * dt;
-      body.angle += body.va * dt;
-      if(body.x < 0){ body.x = 0; body.vx = Math.abs(body.vx) * this.bounce; }
-      const rightLimit = this.width - body.size;
-      if(body.x > rightLimit){ body.x = rightLimit; body.vx = -Math.abs(body.vx) * this.bounce; }
-      if(body.y < 0){ body.y = 0; body.vy = -body.vy * this.floorBounce; body.vx *= 0.82; if(Math.abs(body.vy) < 30) body.vy = 0; }
-    }
-    const len = bodies.length;
-    for(let i=0;i<len;i++){
-      for(let j=i+1;j<len;j++){
-        const a = bodies[i];
-        const b = bodies[j];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const dist = Math.sqrt(dx*dx + dy*dy) || 0.0001;
-        const minDist = a.radius + b.radius;
-        if(dist < minDist){
-          const overlap = (minDist - dist) * 0.5;
-          const nx = dx / dist;
-          const ny = dy / dist;
-          a.x -= nx * overlap;
-          a.y -= ny * overlap;
-          b.x += nx * overlap;
-          b.y += ny * overlap;
-          const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-          if(rel < 0){
-            const impulse = -(1 + this.bounce) * rel * 0.5;
-            a.vx -= impulse * nx;
-            a.vy -= impulse * ny;
-            b.vx += impulse * nx;
-            b.vy += impulse * ny;
-          }
-        }
-      }
-    }
-    this.updateElements();
-  }
-  updateElements(){
-    const right = this.width;
-    const top = this.height;
-    for(const body of this.bodies){
-      body.el.style.left = `${Math.max(0, Math.min(right - body.size, body.x))}px`;
-      body.el.style.bottom = `${Math.max(0, Math.min(top - body.size, body.y))}px`;
-      body.el.style.transform = `rotate(${body.angle}rad)`;
-    }
-  }
-  shake(){
-    for(const body of this.bodies){
-      body.vx += (Math.random() - 0.5) * 420;
-      body.vy += -Math.random() * 320;
-    }
-    this.start();
-  }
-  organize(){
-    this.stop();
-    this.measure();
-    const cols = Math.min(10, this.bodies.length);
-    const margin = 12;
-    const gapX = (this.width - margin*2) / cols;
-    this.bodies.forEach((body, index) => {
-      const col = index % cols;
-      const row = Math.floor(index / cols);
-      body.vx = 0;
-      body.vy = 0;
-      body.x = margin + col * gapX + (gapX - body.size) / 2;
-      body.y = margin + row * (body.size + 6);
-      body.angle = (Math.random() - 0.5) * 0.35;
-      if(body.el) body.el.style.opacity = "1";
+  el.innerHTML = html;
+  requestAnimationFrame(()=>{
+    el.querySelectorAll("span").forEach(s=>{
+      s.style.bottom = s.dataset.finalBottom + "%";
     });
-    this.updateElements();
-  }
+  });
 }
-
-let sceneFront, sceneBack;
 
 function renderList(){
   const list = document.getElementById("list");
@@ -455,16 +333,8 @@ function tickClock(){
 
 function renderAll(){
   renderList();
-  if(!sceneFront){
-    sceneFront = new ShakaScene(document.getElementById("shakaFront"), {full:false});
-  } else {
-    sceneFront.reset();
-  }
-  if(!sceneBack){
-    sceneBack = new ShakaScene(document.getElementById("shakaBack"), {full:true});
-  } else {
-    sceneBack.reset();
-  }
+  renderShaka(document.getElementById("shakaFront"), false);
+  renderShaka(document.getElementById("shakaBack"), true);
   tickClock();
 }
 
@@ -481,7 +351,7 @@ function showFront(){
   faceBack.style.cssText="opacity:0;pointer-events:none;z-index:1";
   faceFront.style.cssText="opacity:1;pointer-events:auto;z-index:2";
 }
-document.getElementById("toShaka").onclick=()=>{ state.sortMode=false; sceneBack && sceneBack.reset(); showBack(); };
+document.getElementById("toShaka").onclick=()=>{ state.sortMode=false; renderShaka(document.getElementById("shakaBack"), true); showBack(); };
 document.getElementById("toTimeline").onclick=()=>{ document.getElementById("drawer").classList.remove("open"); showFront(); };
 
 document.getElementById("drawerTab").onclick=()=>document.getElementById("drawer").classList.toggle("open");
@@ -519,13 +389,13 @@ function onMotion(event){
 }
 function performShake(){
   state.sortMode=false;
-  sceneBack && sceneBack.shake();
-  sceneFront && sceneFront.shake();
+  const el=document.getElementById("shakaBack");
+  dropShaka(el);
   toast("🫨","シャカシャカ…");
 }
 
 document.getElementById("shakeBtn").onclick=()=>{ enableMotion(); performShake(); };
-document.getElementById("sortBtn").onclick=()=>{ state.sortMode=true; sceneBack && sceneBack.organize(); toast("🧺","きれいにそろえた"); };
+document.getElementById("sortBtn").onclick=()=>{ state.sortMode=true; renderShaka(document.getElementById("shakaBack"), true); toast("🧺","きれいにそろえた"); };
 
 let toastT;
 function toast(em,txt){
