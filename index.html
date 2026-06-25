@@ -31,6 +31,8 @@
   .physics.frosted{filter:blur(6px)}
   .charm{position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;user-select:none;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.22));transform-origin:center center}
   .charm img{display:block;width:100%;height:100%;object-fit:contain;}
+  .pop-fx{position:absolute;pointer-events:none;border-radius:50%;border:3px solid var(--lime);animation:popfx .4s ease-out forwards}
+  @keyframes popfx{0%{width:0;height:0;opacity:.9}60%{opacity:.6}100%{width:60px;height:60px;opacity:0;margin:-30px}}
   .emoji-icon img{display:inline-block;vertical-align:middle;}
 
   .caps{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
@@ -482,21 +484,23 @@ function checkNegativeCollisions(){
       const dx = np.x - pp.x, dy = np.y - pp.y;
       const dist = Math.sqrt(dx*dx + dy*dy);
       if(dist < currentPhysRadius * 2){
-        // 物理演算から外して位置を固定
-        const posX = pp.x, posY = pp.y;
-        const negX = np.x, negY = np.y;
+        const cx = (pp.x + np.x) / 2, cy = (pp.y + np.y) / 2;
         World.remove(engine.world, pos.body);
         World.remove(engine.world, neg.body);
         neg.consumed = true;
         physicsBodies.splice(pi, 1);
-        // ポップ演出: 一瞬大きくなってから消える
-        pos.el.style.transition = "transform .5s cubic-bezier(.2,1,.3,1), opacity .3s ease .2s";
-        pos.el.style.transform = `translate(${posX - currentPhysRadius}px, ${posY - currentPhysRadius}px) scale(1.6)`;
+        // パッと消える
+        pos.el.style.transition = "opacity .15s";
         pos.el.style.opacity = "0";
-        neg.el.style.transition = "transform .5s cubic-bezier(.2,1,.3,1), opacity .3s ease .2s";
-        neg.el.style.transform = `translate(${negX - currentPhysRadius}px, ${negY - currentPhysRadius}px) scale(1.6)`;
+        neg.el.style.transition = "opacity .15s";
         neg.el.style.opacity = "0";
-        setTimeout(()=>{ pos.el.remove(); neg.el.remove(); }, 500);
+        // ポップエフェクト（リングがぱっと広がる）
+        const fx = document.createElement("div");
+        fx.className = "pop-fx";
+        fx.style.left = cx + "px";
+        fx.style.top = cy + "px";
+        physicsEl.appendChild(fx);
+        setTimeout(()=>{ pos.el.remove(); neg.el.remove(); fx.remove(); }, 400);
         break;
       }
     }
