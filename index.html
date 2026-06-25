@@ -27,7 +27,8 @@
   .shaka{position:absolute;inset:0;overflow:hidden;pointer-events:none}
   .shaka span{position:absolute;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:bottom .7s cubic-bezier(.2,.8,.3,1), transform .5s ease, opacity .5s ease}
 
-  .physics{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+  .physics{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;transition:filter .4s ease}
+  .physics.frosted{filter:blur(6px) saturate(0.45)}
   .charm{position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;user-select:none;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.22));transform-origin:center center}
   .charm img{display:block;width:100%;height:100%;object-fit:contain;}
   .emoji-icon img{display:inline-block;vertical-align:middle;}
@@ -122,7 +123,7 @@
 <body>
 <div class="phone"><div class="stage">
 
-  <div class="physics" id="physics"></div>
+  <div class="physics frosted" id="physics"></div>
   <div class="flip" id="flip">
 
     <div class="face front">
@@ -503,11 +504,13 @@ function showBack(){
   flip.classList.add("flipped");
   faceFront.style.cssText="opacity:0;pointer-events:none;z-index:1";
   faceBack.style.cssText="opacity:1;pointer-events:auto;z-index:3";
+  physicsEl.classList.remove("frosted");
 }
 function showFront(){
   flip.classList.remove("flipped");
   faceBack.style.cssText="opacity:0;pointer-events:none;z-index:1";
   faceFront.style.cssText="opacity:1;pointer-events:auto;z-index:2";
+  physicsEl.classList.add("frosted");
 }
 document.getElementById("toShaka").onclick=()=>{ state.sortMode=false; showBack(); };
 document.getElementById("toTimeline").onclick=()=>{ document.getElementById("drawer").classList.remove("open"); showFront(); };
