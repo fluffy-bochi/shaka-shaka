@@ -519,12 +519,7 @@ function enableMotion(){
   }
 }
 function onMotion(event){
-  const g = event.accelerationIncludingGravity;
-  if(g && g.x!=null && engine){
-    engine.gravity.x = clamp(g.x/9.8, -1, 1);
-    engine.gravity.y = clamp(-g.y/9.8, -1, 1);
-  }
-  const a = event.acceleration || g;
+  const a = event.acceleration || event.accelerationIncludingGravity;
   if(!a || a.x==null) return;
   if(lastMotion.x!=null){
     const d = Math.abs(a.x-lastMotion.x)+Math.abs(a.y-lastMotion.y)+Math.abs(a.z-lastMotion.z);
