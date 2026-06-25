@@ -333,8 +333,7 @@ function createPileBag(){
 function createPhysicsParticle(act){
   updatePhysicsSize();
   const rect = physicsEl.getBoundingClientRect();
-  const margin = currentPhysRadius * 1.2;
-  const x = margin + Math.random() * Math.max(0, rect.width - margin * 2);
+  const x = currentPhysRadius + Math.random() * Math.max(0, rect.width - currentPhysRadius * 2);
   const y = -currentPhysRadius * 2 - Math.random() * 60;
   const body = Bodies.circle(x, y, currentPhysRadius, {
     restitution: PHYS_BOUNCE,
@@ -377,7 +376,7 @@ function syncPhysics(){
 function renderPhysics(){
   if(!physicsStarted) return;
   physicsBodies.forEach(({body,el})=>{
-    el.style.transform = `translate(${body.position.x - PHYS_RADIUS}px, ${body.position.y - PHYS_RADIUS}px) rotate(${body.angle}rad)`;
+    el.style.transform = `translate(${body.position.x - currentPhysRadius}px, ${body.position.y - currentPhysRadius}px) rotate(${body.angle}rad)`;
   });
   requestAnimationFrame(renderPhysics);
 }
