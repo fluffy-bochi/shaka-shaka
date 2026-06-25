@@ -415,11 +415,10 @@ window.addEventListener('resize', ()=>{
 
 function shakePhysics(power=16){
   if(!engine) return;
-  enableMotion();
   physicsBodies.forEach(({body})=>{
     Body.setVelocity(body, {
       x:(Math.random()-0.5)*power*2,
-      y:(Math.random()-0.7)*power*2
+      y:(Math.random()-0.5)*power*2
     });
     Body.setAngularVelocity(body, (Math.random()-0.5)*0.6);
   });
