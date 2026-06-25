@@ -418,9 +418,9 @@ function shakePhysics(power=16){
   physicsBodies.forEach(({body})=>{
     Body.setVelocity(body, {
       x:(Math.random()-0.5)*power*2,
-      y:(Math.random()-0.5)*power*2
+      y:0
     });
-    Body.setAngularVelocity(body, (Math.random()-0.5)*0.6);
+    Body.setAngularVelocity(body, (Math.random()-0.5)*0.3);
   });
 }
 
@@ -528,7 +528,7 @@ function onMotion(event){
   if(!a || a.x==null) return;
   if(lastMotion.x!=null){
     const d = Math.abs(a.x-lastMotion.x)+Math.abs(a.y-lastMotion.y)+Math.abs(a.z-lastMotion.z);
-    if(d > 16) shakePhysics(12);
+    if(d > 16) shakePhysics(10);
   }
   lastMotion = {x:a.x, y:a.y, z:a.z};
 }
