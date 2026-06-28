@@ -125,6 +125,24 @@
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
   .toast .em{margin-right:6px}
 
+  /* ---- achievement (collect) page ---- */
+  .collect{position:absolute;inset:0;z-index:9;background:var(--paper);display:flex;flex-direction:column;color:var(--ink);transform:translateX(100%);transition:transform .35s cubic-bezier(.6,.02,.2,1)}
+  .collect.open{transform:translateX(0)}
+  .collect-head{display:flex;align-items:center;gap:12px;padding:2px 20px 12px}
+  .collect-back{border:none;background:var(--ink);color:#fff;font-family:var(--font-mono);font-size:12px;font-weight:700;border-radius:999px;padding:9px 14px;cursor:pointer}
+  .collect-title{font-size:18px;font-weight:700}
+  .collect-total{margin-left:auto;font-family:var(--font-display);font-weight:800;font-size:26px}
+  .collect-scroll{flex:1;overflow-y:auto;position:relative}
+  .collect-scroll::-webkit-scrollbar{display:none}
+  .collect-stack{position:relative;width:100%}
+  .collect-grid{position:absolute;left:0;right:0;height:0;border-top:1px dashed var(--line);pointer-events:none}
+  .collect-grid span{position:absolute;top:0;transform:translateY(-50%);font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--ink-3);background:var(--paper);padding:0 6px}
+  .collect-grid .lab-l{left:8px}
+  .collect-grid .lab-r{right:8px}
+  .collect-charm{position:absolute;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 4px 5px rgba(27,27,24,.22))}
+  .collect-charm img{width:100%;height:100%;object-fit:contain;pointer-events:none}
+  .collect-empty{position:absolute;left:0;right:0;bottom:40px;display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:14px;text-align:center;padding:0 44px;line-height:1.6}
+
   /* ---- auth gate ---- */
   .authgate{position:absolute;inset:0;z-index:100;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:28px}
   .authgate.hidden{display:none}
@@ -216,7 +234,19 @@
           <div style="flex:1"></div>
         </div>
       </div>
+      <button class="flipbtn" id="toCollect" style="bottom:78px"><span class="dot">🏆</span> ためた回復を見る</button>
       <button class="flipbtn" id="toTimeline"><span class="dot">⤾</span> ログに戻る</button>
+    </div>
+  </div>
+
+  <div class="collect" id="collectPage">
+    <div class="statusbar"><span>9:41</span></div>
+    <div class="collect-head">
+      <button class="collect-back" id="collectBack">← もどる</button>
+      <div class="collect-title">ためた回復</div>
+    </div>
+    <div class="collect-scroll" id="collectScroll">
+      <div class="collect-stack" id="collectStack"></div>
     </div>
   </div>
 
@@ -367,7 +397,7 @@ const SEED_ENTRIES = [
   {from:"15:00",to:"17:40",title:"レビュー対応",act:"レビュー",mood:"😌",delta:16,exp:false},
   {from:"18:30",to:"19:00",title:"散歩",act:"散歩",mood:"🙂",delta:-8,exp:false},
 ];
-function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e})), sortMode:false }; }
+function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e})), sortMode:false, collected:[], collectedSeen:0 }; }
 let state = freshState();
 
 function fatigue(){
@@ -527,7 +557,7 @@ function dropNegativeParticles(act, count){
     const img = actIcon(act, currentPhysRadius*2);
     el.appendChild(img);
     physicsEl.appendChild(el);
-    const neg = {body, el, consumed:false};
+    const neg = {body, el, consumed:false, act};
     negBodies.push(neg);
     setTimeout(()=>{
       if(!neg.consumed){
@@ -542,6 +572,7 @@ function dropNegativeParticles(act, count){
 }
 
 function checkNegativeCollisions(){
+  let didCollect=false;
   for(let ni=negBodies.length-1;ni>=0;ni--){
     const neg = negBodies[ni];
     if(neg.consumed) continue;
@@ -557,6 +588,9 @@ function checkNegativeCollisions(){
         World.remove(engine.world, neg.body);
         neg.consumed = true;
         physicsBodies.splice(pi, 1);
+        addCollected(neg.act, 1);          // 使った回復の絵文字（食事・休憩など）
+        addCollected(pos.body.act, 1);     // 回復で弾かれて消えたプラスの記録（作業など）
+        didCollect = true;
         // パッと消える
         pos.el.style.transition = "opacity .15s";
         pos.el.style.opacity = "0";
@@ -574,6 +608,7 @@ function checkNegativeCollisions(){
     }
   }
   negBodies = negBodies.filter(n=>!n.consumed);
+  if(didCollect) save();
   // clean up negatives that fell off screen after 5s with no collision
 }
 
@@ -854,6 +889,7 @@ document.getElementById("saveAdd").onclick=()=>{
   const title=(document.getElementById("tTitle").value||"").trim() || sel.act;
   const delta=sel.delta;
   if(sel.act==="睡眠"){
+    addCollected("睡眠", fatigue()); // 眠って空にした疲労量ぶん積む
     state.entries.forEach(e=>e.exp=true);
     state.entries.push({from,to,title,act:"睡眠",mood:sel.mood,delta:0,exp:false});
     state.entries.sort((a,b)=>a.from.localeCompare(b.from));
@@ -952,12 +988,179 @@ function openDetail(i){
     b.onclick=()=>{
       const a=b.dataset.act;
       if(a==="expire"){ e.exp=true; toast("⌛","効果が切れた"); }
-      else { state.entries.splice(i,1); toast("🧹","消した"); }
+      else {
+        if(e.delta > 0) addCollected(e.act, e.delta); // 消したプラスの記録を達成ページに積む（回復はログ時に加算済み）
+        state.entries.splice(i,1); toast("🧹","消した");
+      }
       closeSheets(); renderAll(); save();
     };
   });
   scrim.classList.add("on"); detailSheet.classList.add("on");
 }
+
+/* ---- achievement (collect) page ---- */
+const COLLECT_UNIT = 100; // メモリ1目盛り＝画面の高さ（単位は後で変更可）
+
+function addCollected(act, amount){
+  if(!Array.isArray(state.collected)) state.collected = [];
+  const amt = Math.max(0, Math.round(amount || 0));
+  if(amt <= 0) return;
+  state.collected.push({ act, amount: amt, ts: Date.now() });
+}
+function collectTotal(){
+  return (state.collected||[]).reduce((s,c)=>s + Math.max(0, Math.round(c.amount||0)), 0);
+}
+function collectUnits(){
+  // イベントを1個ずつに展開（消えた古い順 → 底から積む）
+  const arr = [];
+  (state.collected||[]).forEach(c=>{
+    const n = Math.max(0, Math.round(c.amount||0));
+    for(let i=0;i<n;i++) arr.push({ act:c.act, ts:c.ts||0 });
+  });
+  return arr;
+}
+const COLLECT_MAX = 500; // 物理ボディ数の上限（多すぎると重いため）
+let collectEngine=null, collectRunner=null, collectBodies=[], collectRAF=null, collectActive=false, collectDropT=null;
+
+function clearCollectPhysics(){
+  collectActive=false;
+  if(collectRAF){ cancelAnimationFrame(collectRAF); collectRAF=null; }
+  if(collectDropT){ clearTimeout(collectDropT); collectDropT=null; }
+  if(collectRunner){ Runner.stop(collectRunner); collectRunner=null; }
+  if(collectEngine){ World.clear(collectEngine.world,false); Engine.clear(collectEngine); collectEngine=null; }
+  collectBodies=[];
+}
+
+function renderCollect(){
+  const scroll = document.getElementById("collectScroll");
+  const stack  = document.getElementById("collectStack");
+  clearCollectPhysics();
+  stack.innerHTML = "";
+
+  let units = collectUnits();
+  if(units.length > COLLECT_MAX) units = units.slice(units.length - COLLECT_MAX); // 直近を優先
+  const total = units.length;
+
+  const W  = scroll.clientWidth;
+  const Hv = scroll.clientHeight;
+  const itemPx = Math.max(20, (currentPhysRadius || 18) * 2); // ホーム/シャカと同サイズ
+  const r = itemPx/2;
+  // 約 COLLECT_UNIT 個で1画面ぶん積もる（シャカシャカと同じ密度）
+  const screens = Math.max(1, Math.ceil(total / COLLECT_UNIT) + 1);
+  const worldH = Math.max(Hv, screens * Hv);
+  stack.style.height = worldH + "px";
+
+  // メモリ線（画面の高さごと＝100, 200, 300 …）左右にラベル
+  const levels = Math.ceil(worldH / Hv);
+  for(let k=1; k<=levels; k++){
+    const y = worldH - k * Hv;
+    if(y < -2) continue;
+    const line = document.createElement("div");
+    line.className = "collect-grid";
+    line.style.top = y + "px";
+    const ll = document.createElement("span"); ll.className="lab-l"; ll.textContent = k * COLLECT_UNIT;
+    const lr = document.createElement("span"); lr.className="lab-r"; lr.textContent = k * COLLECT_UNIT;
+    line.appendChild(ll); line.appendChild(lr);
+    stack.appendChild(line);
+  }
+
+  if(total === 0){
+    const em = document.createElement("div");
+    em.className = "collect-empty";
+    em.textContent = "まだ何も。食事・休憩・睡眠で回復すると、ここに積もっていきます。";
+    stack.appendChild(em);
+    scroll.scrollTop = Math.max(0, worldH - Hv);
+    return;
+  }
+
+  // --- physics world (シャカシャカと同じ挙動・振らない) ---
+  collectEngine = Engine.create();
+  collectEngine.gravity.y = 1;
+  collectEngine.gravity.x = 0;
+  const wt = 140;
+  World.add(collectEngine.world, [
+    Bodies.rectangle(W/2, worldH + wt/2, W + wt*2, wt, {isStatic:true}), // 床
+    Bodies.rectangle(-wt/2, worldH/2, wt, worldH*2 + wt, {isStatic:true}), // 左壁
+    Bodies.rectangle(W + wt/2, worldH/2, wt, worldH*2 + wt, {isStatic:true}), // 右壁
+  ]);
+
+  function spawn(u, x, y){
+    const body = Bodies.circle(x, y, r, {restitution:0.2, friction:0.1, frictionAir:0.02, density:0.001});
+    World.add(collectEngine.world, body);
+    const el = document.createElement("div");
+    el.className = "collect-charm";
+    el.style.width = el.style.height = itemPx + "px";
+    el.appendChild(actIcon(u.act, itemPx));
+    stack.appendChild(el);
+    collectBodies.push({body, el});
+  }
+
+  const seen = state.collectedSeen || 0;
+  const olds = [], news = [];
+  units.forEach(u=>{ (u.ts > seen ? news : olds).push(u); });
+
+  // 既に積もっていた分（前回まで）: 床付近に並べて事前に落ち着かせる
+  const cols = Math.max(1, Math.floor(W / itemPx));
+  olds.forEach((u, idx)=>{
+    const col = idx % cols, row = Math.floor(idx / cols);
+    const sx = Math.min(W - r, Math.max(r, r + col*itemPx + (row%2 ? itemPx*0.5 : 0)));
+    const sy = worldH - r - 2 - row * (itemPx*0.92);
+    spawn(u, sx, sy);
+  });
+  for(let s=0; s<360; s++){ Engine.update(collectEngine, 1000/60); } // 静かに沈める
+
+  // 一度描画して積もった状態に
+  collectBodies.forEach(({body,el})=>{
+    el.style.transform = `translate(${body.position.x - r}px, ${body.position.y - r}px) rotate(${body.angle}rad)`;
+  });
+
+  // 山の頂上を求めてスクロール位置に
+  let pileTop = worldH;
+  collectBodies.forEach(({body})=>{ pileTop = Math.min(pileTop, body.position.y - r); });
+  if(collectBodies.length === 0) pileTop = worldH;
+  scroll.scrollTop = Math.max(0, pileTop - Hv*0.4);
+
+  // ライブ開始
+  collectActive = true;
+  collectRunner = Runner.create();
+  Runner.run(collectRunner, collectEngine);
+  const loop = ()=>{
+    if(!collectActive) return;
+    collectBodies.forEach(({body,el})=>{
+      el.style.transform = `translate(${body.position.x - r}px, ${body.position.y - r}px) rotate(${body.angle}rad)`;
+    });
+    collectRAF = requestAnimationFrame(loop);
+  };
+  collectRAF = requestAnimationFrame(loop);
+
+  // 新しく消えた分を、消えた順に上から1つずつ落とす
+  const dropFromY = Math.max(r + 2, pileTop - Hv*0.7);
+  let ni = 0;
+  function dropNext(){
+    if(!collectActive || ni >= news.length) return;
+    spawn(news[ni], r + Math.random()*(W - 2*r), dropFromY);
+    ni++;
+    collectDropT = setTimeout(dropNext, 110);
+  }
+  if(news.length) collectDropT = setTimeout(dropNext, 250);
+
+  // 「見た」記録 → 次回はこれより後の分だけ降る
+  state.collectedSeen = Date.now();
+  save();
+}
+
+function openCollect(){
+  pausePhysics();          // 裏のホーム/シャカ演算は止めて軽くする
+  renderCollect();
+  document.getElementById("collectPage").classList.add("open");
+}
+function closeCollect(){
+  document.getElementById("collectPage").classList.remove("open");
+  clearCollectPhysics();
+  updateMotionState();     // 元の画面の動き設定に戻す
+}
+document.getElementById("toCollect").onclick = openCollect;
+document.getElementById("collectBack").onclick = closeCollect;
 
 /* ---- persistence (cloud via Firebase, wired below) ---- */
 function save(){ if(window.__cloudSave) window.__cloudSave(state); }
@@ -966,9 +1169,16 @@ function save(){ if(window.__cloudSave) window.__cloudSave(state); }
 // Called when a user logs in: applies their cloud data (or a fresh
 // starter state for new users) and renders the app.
 window.__applyState = function(data){
-  state = (data && Array.isArray(data.entries))
-    ? { entries: data.entries.map(e=>({...e})), sortMode: !!data.sortMode }
-    : freshState();
+  if(data && Array.isArray(data.entries)){
+    state = {
+      entries: data.entries.map(e=>({...e})),
+      sortMode: !!data.sortMode,
+      collected: Array.isArray(data.collected) ? data.collected.map(c=>({...c})) : [],
+      collectedSeen: typeof data.collectedSeen === "number" ? data.collectedSeen : 0
+    };
+  } else {
+    state = freshState();
+  }
   renderAll();
 };
 window.__getState = function(){ return state; };
@@ -1065,6 +1275,8 @@ tickClock();
       setDoc(userDoc(), {
         entries: st.entries,
         sortMode: !!st.sortMode,
+        collected: st.collected || [],
+        collectedSeen: st.collectedSeen || 0,
         updatedAt: Date.now()
       }).catch(err=>console.warn("[shaka] save failed", err));
     }, 600);
