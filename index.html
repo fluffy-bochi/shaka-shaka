@@ -186,6 +186,8 @@
   /* ---- auth gate ---- */
   .authgate{position:absolute;inset:0;z-index:100;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:28px}
   .authgate.hidden{display:none}
+  .authclose{position:absolute;top:18px;right:18px;width:38px;height:38px;border:none;border-radius:50%;background:var(--surface-sunk);color:var(--ink-2);font-size:16px;cursor:pointer;z-index:101}
+  .authguest{margin-top:8px;border:none;background:transparent;color:var(--ink-3);font-family:var(--font-ui);font-size:13px;font-weight:700;text-decoration:underline;cursor:pointer;padding:8px}
   .authcard{width:100%;max-width:340px;display:flex;flex-direction:column;gap:11px}
   .authlogo{font-size:26px;font-weight:800;text-align:center}
   .authsub{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);text-align:center;margin-bottom:8px}
@@ -258,7 +260,8 @@
                 <button type="button" data-v="1" class="menu-seg-btn">動かす</button>
               </div>
             </div>
-            <button class="menu-acct" id="accountBtn">アカウント</button>
+            <button class="menu-acct" id="loginBtn">ログイン</button>
+            <button class="menu-acct" id="accountBtn" style="display:none">アカウント</button>
           </div>
         </div>
         <div class="list" id="list" style="padding-top:8px"></div>
@@ -368,10 +371,11 @@
     <div id="accountBody"></div>
   </div>
 
-  <div class="authgate" id="authGate">
+  <div class="authgate hidden" id="authGate">
+    <button class="authclose" id="authClose" aria-label="閉じる">✕</button>
     <div class="authcard">
       <div class="authlogo">疲労シャカシャカ</div>
-      <div class="authsub">ログインして記録を同期</div>
+      <div class="authsub">ログインすると記録が端末をまたいで同期されます</div>
       <button class="authgoogle" id="googleBtn">
         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="">
         Googleでログイン
@@ -384,6 +388,7 @@
         <button class="authprimary alt" id="authSignupBtn">新規登録</button>
         <button class="authprimary" id="authLoginBtn">ログイン</button>
       </div>
+      <button class="authguest" id="authGuest">ログインせずに使う（ゲスト）</button>
     </div>
   </div>
 
@@ -457,6 +462,11 @@ const SEED_ENTRIES = [
   {from:"12:30",to:"13:00",title:"ランチ",act:"食事",mood:"🙂",delta:-12,exp:true},
   {from:"15:00",to:"17:40",title:"レビュー対応",act:"レビュー",mood:"😌",delta:16,exp:false},
   {from:"18:30",to:"19:00",title:"散歩",act:"散歩",mood:"🙂",delta:-8,exp:false},
+  {from:"22:00",to:"23:00",title:"明日の資料づくり",act:"資料作成",mood:"🙂",delta:10,exp:false,planned:true,dropped:0},
+];
+const SEED_TASKS = [
+  {srcId:"sample:1",title:"買い出しに行く",done:false,act:"家事",delta:6,mood:"🙂"},
+  {srcId:"sample:2",title:"メールの返信",done:false,act:"メール",delta:4,mood:"🙂"},
 ];
 /* ---- date helpers (1日ごとの表示) ---- */
 const MON_ABBR=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
@@ -476,7 +486,7 @@ function dateLabelFor(s){
 }
 let viewDate = todayStr();
 
-function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected:[], collectedSeen:0, templates:{}, tasks:[] }; }
+function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected:[], collectedSeen:0, templates:{}, tasks: SEED_TASKS.map(t=>({...t})) }; }
 let state = freshState();
 
 /* ---- templates (あすけん方式: 同じ予定は同じ疲労度) ---- */
@@ -1465,7 +1475,10 @@ document.getElementById("toCollect").onclick = openCollect;
 document.getElementById("collectBack").onclick = closeCollect;
 
 /* ---- persistence (cloud via Firebase, wired below) ---- */
-function save(){ if(window.__cloudSave) window.__cloudSave(state); }
+function save(){
+  if(window.__loggedIn){ if(window.__cloudSave) window.__cloudSave(state); }
+  else { try{ localStorage.setItem("shaka_guest", JSON.stringify(state)); }catch(e){} } // ゲストは端末内に保存
+}
 
 // Bridge for the Firebase module script (loaded after this script).
 // Called when a user logs in: applies their cloud data (or a fresh
@@ -1615,15 +1628,36 @@ tickClock();
     }
   }
 
-  /* ---- auth state gate ---- */
+  /* ---- ログイン/ゲストの切替（ログインはハンバーガーメニューから） ---- */
+  function updateMenuAuth(loggedIn){
+    $("loginBtn").style.display = loggedIn ? "none" : "block";
+    $("accountBtn").style.display = loggedIn ? "block" : "none";
+  }
+  function loadGuest(){
+    let g = null;
+    try{ const s = localStorage.getItem("shaka_guest"); if(s) g = JSON.parse(s); }catch(e){}
+    window.__loggedIn = false;
+    window.__applyState(g); // データ無しなら freshState のサンプルが表示される
+  }
+  // メニューの「ログイン」→ ログイン画面を開く
+  $("loginBtn").onclick = ()=>{ $("menuDropdown").classList.remove("open"); clearErr(); gate.classList.remove("hidden"); };
+  // ログイン画面を閉じる / ゲストのまま使う
+  $("authClose").onclick = ()=> gate.classList.add("hidden");
+  $("authGuest").onclick = ()=> gate.classList.add("hidden");
+
   onAuthStateChanged(auth, (user)=>{
     if(user){
       clearErr();
       $("authPass").value = "";
       gate.classList.add("hidden");
+      window.__loggedIn = true;
+      updateMenuAuth(true);
       loadUserData();
     } else {
-      gate.classList.remove("hidden");
+      // 未ログイン＝ゲスト。画面はブロックせずサンプル/端末内データを表示
+      gate.classList.add("hidden");
+      updateMenuAuth(false);
+      loadGuest();
     }
   });
 
