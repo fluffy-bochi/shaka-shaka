@@ -54,7 +54,17 @@
   .item .d{font-family:var(--font-mono);font-size:13px;font-weight:700;min-width:34px;text-align:right}
   .item.exp{opacity:.42}
   .item.exp .ttl{text-decoration:line-through}
+  .item.planned{background:var(--surface-sunk)}
+  .item.planned .tt{background:var(--ink-3)}
+  .item.planned .ttl{color:var(--ink-3)}
+  .item.planned .mood-face{filter:grayscale(1);opacity:.6}
+  .plan-badge{display:inline-block;font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;color:#fff;background:var(--ink-3);border-radius:5px;padding:2px 6px;margin-right:7px;vertical-align:middle}
   .list-empty{text-align:center;color:var(--ink-3);font-size:14px;padding:48px 20px;line-height:1.6}
+  .task-head{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--ink-3);margin:18px 2px 4px}
+  .task-row{display:flex;align-items:center;gap:11px;background:var(--surface);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:12px 14px;cursor:default}
+  .task-check{flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:2px solid var(--line);background:var(--surface);cursor:pointer;padding:0;transition:all .15s}
+  .task-check:active{background:var(--lime);border-color:var(--lime)}
+  .task-ttl{flex:1;font-size:14px;font-weight:500;color:var(--ink)}
 
   .dnav{width:30px;height:30px;flex:0 0 auto;border:none;background:var(--surface-sunk);color:var(--ink);border-radius:50%;font-size:20px;line-height:1;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0 0 2px}
   .dnav:active{background:var(--line)}
@@ -261,8 +271,16 @@
   <div class="sheet" id="addSheet">
     <div class="grab"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <span style="font-size:19px;font-weight:700">やったことを記録</span>
+      <span id="addSheetTitle" style="font-size:19px;font-weight:700">やったことを記録</span>
       <span class="tag ink" style="background:var(--ink);color:var(--lime)">LOG</span>
+    </div>
+
+    <div class="field" id="kindField">
+      <label>種類</label>
+      <div class="chips" id="kindChips">
+        <button type="button" class="chip" data-kind="entry">記録・予定</button>
+        <button type="button" class="chip" data-kind="task">タスク</button>
+      </div>
     </div>
 
     <div class="field">
@@ -275,12 +293,12 @@
       <div class="chips" id="actChips"></div>
     </div>
 
-    <div class="field">
+    <div class="field entry-only">
       <label>時間</label>
       <div class="timeinputs"><input id="tFrom" type="time" value="20:00"><span class="caps">→</span><input id="tTo" type="time" value="21:00"></div>
     </div>
 
-    <div class="field">
+    <div class="field entry-only">
       <label>気持ち</label>
       <div class="moodrow" id="moodRow"></div>
     </div>
@@ -300,6 +318,7 @@
       <button class="btn sunk" style="flex:0 0 90px;padding:14px" id="cancelAdd">やめる</button>
       <button class="btn pri" style="flex:1;padding:14px;font-size:15px" id="saveAdd">記録する</button>
     </div>
+    <button class="btn" id="deleteEntry" style="display:none;width:100%;margin-top:10px;padding:13px;background:transparent;color:var(--pink);font-weight:700">この記録を消す</button>
   </div>
 
   <div class="sheet" id="detailSheet">
@@ -422,12 +441,154 @@ function dateLabelFor(s){
 }
 let viewDate = todayStr();
 
-function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected:[], collectedSeen:0 }; }
+function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected:[], collectedSeen:0, templates:{}, tasks:[] }; }
 let state = freshState();
+
+/* ---- templates (あすけん方式: 同じ予定は同じ疲労度) ---- */
+function normTitle(t){ return (t||"").trim().replace(/\s+/g," ").toLowerCase(); }
+function getTemplate(title){ const k=normTitle(title); return (state.templates && state.templates[k]) || null; }
+function setTemplate(title, act, delta){
+  const k=normTitle(title);
+  if(!k) return;
+  if(!state.templates) state.templates={};
+  state.templates[k] = { act, delta };
+}
+
+/* ---- planned entries → 時間で割って1個ずつ降らせ、終了で記録に ---- */
+function entryStartTs(e){
+  const d = strToDate(e.date || todayStr());
+  const [hh,mm] = (e.from||"00:00").split(":").map(Number);
+  d.setHours(hh||0, mm||0, 0, 0);
+  return d.getTime();
+}
+function entryEndTs(e){
+  const d = strToDate(e.date || todayStr());
+  const [hh,mm] = (e.to||"00:00").split(":").map(Number);
+  d.setHours(hh||0, mm||0, 0, 0);
+  return d.getTime();
+}
+// 現時点で「降っているべき」個数（from→to を疲労度ぶんに等分。第1個は from+間隔）
+function planUnitsDue(e, now){
+  const N = Math.abs(e.delta);
+  if(N <= 0) return 0;
+  const fromTs = entryStartTs(e), toTs = entryEndTs(e);
+  if(now < fromTs) return 0;
+  if(toTs <= fromTs) return now >= toTs ? N : 0; // 長さ0は終了時に全部
+  const interval = (toTs - fromTs) / N;
+  return Math.max(0, Math.min(N, Math.floor((now - fromTs) / interval)));
+}
+// 予定の進捗を更新：時間が来たぶんだけ降らせる。全部降ったら記録に昇格
+// 予定の進捗を更新（描画はしない）。{changed, negDrops} を返す
+function advancePlans(){
+  const now = Date.now();
+  let changed = false;
+  const negDrops = [];
+  state.entries.forEach(e=>{
+    if(!e.planned) return;
+    const N = Math.abs(e.delta);
+    const due = planUnitsDue(e, now);
+    const cur = e.dropped || 0;
+    if(due > cur){
+      if(e.delta < 0){ for(let i=0;i<(due-cur);i++) negDrops.push(e.act); }
+      e.dropped = due; changed = true;
+    }
+    if((e.dropped||0) >= N){ e.dropped = N; e.planned = false; changed = true; }
+  });
+  return { changed, negDrops };
+}
+// 起動時・追加時のキャッチアップ用（描画は呼び出し側）
+function promoteDuePlans(){ return advancePlans().changed; }
+// 1秒ごとのリアルタイム進行：降ったぶんを反映して落とす
+function tickPlans(){
+  const r = advancePlans();
+  if(r.changed){ renderAll(); save(); }
+  r.negDrops.forEach(act=>dropNegativeParticles(act, 1));
+}
+
+/* ---- Googleカレンダー/ToDo 取り込み（モジュールから呼ばれる） ---- */
+const IMPORT_DEFAULT_DELTA = 10; // テンプレ未登録の予定のデフォルト疲労度
+function guessAct(title){ return ACTIONS.find(a=>(title||"").includes(a)) || "作業"; }
+// items: [{srcId, title, date, from, to}]
+window.__importEvents = function(items){
+  if(!Array.isArray(items)) return 0;
+  const existing = new Set(state.entries.filter(e=>e.srcId).map(e=>e.srcId));
+  let added = 0;
+  items.forEach(it=>{
+    if(!it || !it.srcId || existing.has(it.srcId)) return; // 重複防止
+    const tmpl = getTemplate(it.title);
+    const act = tmpl ? tmpl.act : guessAct(it.title);
+    const delta = tmpl ? tmpl.delta : IMPORT_DEFAULT_DELTA;
+    const date = it.date || todayStr();
+    const from = it.from || "00:00";
+    const to = it.to || "23:59";
+    const planned = entryEndTs({date, to}) > Date.now();
+    state.entries.push({ from, to, title: it.title||"(無題)", act, mood:"🙂", delta, exp:false, date, planned, dropped:0, srcId: it.srcId, needsSetup: !tmpl });
+    existing.add(it.srcId);
+    added++;
+  });
+  if(added){
+    state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
+    promoteDuePlans();
+    renderAll();
+    save();
+  }
+  return added;
+};
+
+// ToDo（Google Tasks）は entries とは別に state.tasks に入れ、TASKリストに縦表示
+window.__importTasks = function(items){
+  if(!Array.isArray(items)) return 0;
+  if(!Array.isArray(state.tasks)) state.tasks = [];
+  const existing = new Set(state.tasks.map(t=>t.srcId));
+  let added = 0;
+  items.forEach(it=>{
+    if(!it || !it.srcId || existing.has(it.srcId)) return;
+    state.tasks.push({ srcId: it.srcId, title: it.title||"(無題)", done:false });
+    existing.add(it.srcId);
+    added++;
+  });
+  if(added){ renderAll(); save(); }
+  return added;
+};
+
+// タスクにチェック → チェックした時刻の記録として entries に入れ、絵文字を降らせる
+function checkTask(srcId){
+  const t = (state.tasks||[]).find(x=>x.srcId===srcId);
+  if(!t || t.done) return;
+  t.done = true;
+  const now = new Date();
+  const hhmm = pad2(now.getHours())+":"+pad2(now.getMinutes());
+  const tmpl = getTemplate(t.title);
+  const act = t.act || (tmpl ? tmpl.act : guessAct(t.title));
+  const delta = (typeof t.delta === "number") ? t.delta : (tmpl ? tmpl.delta : IMPORT_DEFAULT_DELTA);
+  const mood = t.mood || "🙂";
+  state.entries.push({
+    from: hhmm, to: hhmm, title: t.title,
+    act, mood, delta,
+    exp:false, date: todayStr(), planned:false, srcId: "taskdone:"+srcId, needsSetup: !tmpl && typeof t.delta!=="number"
+  });
+  state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
+  renderAll();
+  showBack();          // シャカシャカ画面で絵文字が降ってくる
+  setTimeout(()=>{
+    if(delta < 0){
+      dropNegativeParticles(act, Math.abs(delta));
+      toast(EMOJI_MAP[act]||"✨", "タスク完了（回復 "+delta+"）");
+    } else {
+      shakePhysics(16);
+      toast(EMOJI_MAP[act]||"✨", "タスク完了（+"+delta+"）");
+    }
+  }, 400);
+  save();
+}
 
 function fatigue(){
   let f = 0;
-  state.entries.forEach(e=>{ if(!e.exp && e.date===viewDate) f += e.delta; });
+  state.entries.forEach(e=>{
+    if(e.exp || e.date!==viewDate) return;
+    if(e.planned){ const n=e.dropped||0; f += (e.delta>=0 ? n : -n); } // 予定は降ったぶんだけ
+    else f += e.delta;
+  });
   return Math.max(0, Math.min(100, Math.round(f)));
 }
 
@@ -515,7 +676,8 @@ function createPileBag(){
   const bag = [];
   state.entries.forEach(e=>{
     if(e.delta > 0 && !e.exp && e.date===td){
-      for(let i=0;i<e.delta;i++) bag.push(e.act);
+      const n = e.planned ? (e.dropped||0) : e.delta; // 予定は降ったぶんだけ積む
+      for(let i=0;i<n;i++) bag.push(e.act);
     }
   });
   return bag;
@@ -715,7 +877,7 @@ function renderList(){
     if((e.date||"")!==viewDate) return; // 表示中の日だけ
     shown++;
     const item=document.createElement("div");
-    item.className="item"+(e.exp?" exp":"");
+    item.className="item"+(e.exp?" exp":"")+(e.planned?" planned":"");
     const sign=e.delta>=0?"+":"−";
     const col=e.delta>=0?"var(--ink-2)":"var(--lime-ink)";
     const tt=document.createElement("div"); tt.className="tt";
@@ -726,18 +888,22 @@ function renderList(){
     icon.style.width = icon.style.height = "22px";
     icon.style.marginRight = "8px";
     ttl.appendChild(icon);
+    if(e.planned){
+      const badge=document.createElement("span"); badge.className="plan-badge"; badge.textContent="予定";
+      ttl.appendChild(badge);
+    }
     ttl.appendChild(document.createTextNode(`${e.title||e.act}`));
     const faceSpan=document.createElement("span"); faceSpan.className="mood-face";
     faceSpan.appendChild(moodIcon(e.mood));
     const d=document.createElement("span"); d.className="d";
-    d.style.color = col;
-    d.textContent = `${sign}${Math.abs(e.delta)}`;
+    d.style.color = e.planned ? "var(--ink-3)" : col;
+    d.textContent = e.planned ? `${e.dropped||0}/${Math.abs(e.delta)}` : `${sign}${Math.abs(e.delta)}`;
     bd.appendChild(ttl);
     bd.appendChild(faceSpan);
     bd.appendChild(d);
     item.appendChild(tt);
     item.appendChild(bd);
-    item.onclick=()=>openDetail(i);
+    item.onclick=()=>openEdit(i);
     list.appendChild(item);
   });
   if(shown===0){
@@ -745,6 +911,22 @@ function renderList(){
     empty.className="list-empty";
     empty.textContent="この日の記録はまだありません。";
     list.appendChild(empty);
+  }
+  // TASK（ToDo）セクション：予定の下に縦に表示（今日のみ）
+  if(viewDate===todayStr()){
+    const openTasks=(state.tasks||[]).filter(t=>!t.done);
+    if(openTasks.length){
+      const head=document.createElement("div"); head.className="task-head"; head.textContent="TASK";
+      list.appendChild(head);
+      openTasks.forEach(t=>{
+        const row=document.createElement("div"); row.className="task-row";
+        const cb=document.createElement("button"); cb.className="task-check"; cb.setAttribute("aria-label","完了にする");
+        cb.onclick=(ev)=>{ ev.stopPropagation(); checkTask(t.srcId); };
+        const ttl=document.createElement("span"); ttl.className="task-ttl"; ttl.textContent=t.title;
+        row.appendChild(cb); row.appendChild(ttl);
+        list.appendChild(row);
+      });
+    }
   }
 }
 
@@ -882,6 +1064,7 @@ function toast(em,txt){
 
 const scrim=document.getElementById("scrim"), addSheet=document.getElementById("addSheet");
 let sel={title:"",act:"会議",mood:"🥲",delta:12};
+let editIndex=null; // null=新規追加 / 数値=その entry を編集中
 function buildAddSheet(){
   const ac=document.getElementById("actChips"); ac.innerHTML="";
   ACTIONS.forEach(a=>{
@@ -913,18 +1096,65 @@ function updateGrid(){
   }
   grid.style.opacity=sel.delta>=0?1:.25;
 }
+let addKind='entry'; // 'entry'（記録・予定） / 'task'
+const kindChips=document.getElementById("kindChips");
+function paintKind(){
+  kindChips.querySelectorAll(".chip").forEach(c=>c.classList.toggle("sel", c.dataset.kind===addKind));
+  const isTask = addKind==='task';
+  document.querySelectorAll("#addSheet .entry-only").forEach(el=>el.style.display = isTask ? "none" : "");
+  document.getElementById("saveAdd").textContent = isTask ? "タスクを追加" : "記録する";
+  document.getElementById("addSheetTitle").textContent = isTask ? "タスクを追加" : "やったことを記録";
+  document.getElementById("tTitle").placeholder = isTask ? "例：請求書を送る、買い物…" : "例：チームMTG、企画書づくり…";
+}
+kindChips.querySelectorAll(".chip").forEach(c=>{
+  c.onclick=()=>{ addKind=c.dataset.kind; paintKind(); };
+});
 function openAdd(){
+  editIndex=null;
+  addKind='entry';
   sel={title:"",act:"会議",mood:"🥲",delta:12};
   document.getElementById("tTitle").value="";
+  document.getElementById("tFrom").value="20:00";
+  document.getElementById("tTo").value="21:00";
+  document.getElementById("kindField").style.display="";
+  document.getElementById("deleteEntry").style.display="none";
+  paintKind();
   buildAddSheet(); scrim.classList.add("on"); addSheet.classList.add("on");
 }
-function closeSheets(){ scrim.classList.remove("on"); addSheet.classList.remove("on"); document.getElementById("detailSheet").classList.remove("on"); document.getElementById("accountSheet").classList.remove("on"); }
+function openEdit(i){
+  const e=state.entries[i];
+  if(!e) return;
+  editIndex=i;
+  addKind='entry';
+  sel={title:e.title||"", act:e.act, mood:e.mood, delta:e.delta};
+  document.getElementById("tTitle").value=e.title||"";
+  document.getElementById("tFrom").value=e.from||"00:00";
+  document.getElementById("tTo").value=e.to||"00:00";
+  document.getElementById("kindField").style.display="none"; // 編集中は種類変更なし
+  document.querySelectorAll("#addSheet .entry-only").forEach(el=>el.style.display="");
+  document.getElementById("addSheetTitle").textContent= e.planned ? "予定を編集" : "記録を編集";
+  document.getElementById("saveAdd").textContent="保存する";
+  const del=document.getElementById("deleteEntry");
+  del.style.display="block"; del.textContent= e.planned ? "この予定を消す" : "この記録を消す";
+  buildAddSheet(); scrim.classList.add("on"); addSheet.classList.add("on");
+}
+function closeSheets(){ editIndex=null; scrim.classList.remove("on"); addSheet.classList.remove("on"); document.getElementById("detailSheet").classList.remove("on"); document.getElementById("accountSheet").classList.remove("on"); }
 document.getElementById("addBtn").onclick=openAdd;
 document.getElementById("cancelAdd").onclick=closeSheets;
+document.getElementById("deleteEntry").onclick=()=>{
+  if(editIndex==null) return;
+  const wasPlanned=state.entries[editIndex] && state.entries[editIndex].planned;
+  state.entries.splice(editIndex,1);
+  editIndex=null;
+  closeSheets(); renderAll(); save();
+  toast("🧹", wasPlanned ? "予定を消した" : "消した");
+};
 scrim.onclick=closeSheets;
 
 document.getElementById("tTitle").oninput=(e)=>{
   const t=e.target.value;
+  const tmpl=getTemplate(t); // 同じタイトルの登録済みテンプレを自動適用
+  if(tmpl){ sel.act=tmpl.act; sel.delta=tmpl.delta; buildAddSheet(); return; }
   const found=ACTIONS.find(a=>t.includes(a));
   if(found && found!==sel.act){ sel.act=found; buildAddSheet(); }
 };
@@ -935,6 +1165,36 @@ document.getElementById("saveAdd").onclick=()=>{
   const from=document.getElementById("tFrom").value, to=document.getElementById("tTo").value;
   const title=(document.getElementById("tTitle").value||"").trim() || sel.act;
   const delta=sel.delta;
+
+  // ---- タスクとして追加（新規時のみ）----
+  if(editIndex==null && addKind==='task'){
+    const tt=(document.getElementById("tTitle").value||"").trim();
+    if(!tt){ toast("⚠️","タスク名を入れてください"); return; }
+    if(!Array.isArray(state.tasks)) state.tasks=[];
+    setTemplate(tt, sel.act, sel.delta); // タスクもテンプレ学習
+    state.tasks.push({ srcId:"local:"+Date.now()+":"+Math.random().toString(36).slice(2,7), title:tt, done:false, act:sel.act, delta:sel.delta, mood:sel.mood });
+    closeSheets(); renderAll(); save();
+    toast("📝","タスクを追加した");
+    return;
+  }
+
+  // ---- 編集モード：既存の entry を更新 ----
+  if(editIndex!=null){
+    const e=state.entries[editIndex];
+    if(e){
+      e.from=from; e.to=to; e.title=title; e.act=sel.act; e.mood=sel.mood; e.delta=delta;
+      e.planned = entryEndTs({date:e.date||viewDate, to}) > Date.now();
+      if(e.planned){ e.dropped = planUnitsDue(e, Date.now()); } // 時間・疲労度の変更を反映
+      setTemplate(title, sel.act, delta); // 編集内容もテンプレに反映
+      e.needsSetup = false;
+    }
+    editIndex=null;
+    state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
+    closeSheets(); renderAll(); save();
+    toast("✏️","更新した");
+    return;
+  }
+
   if(sel.act==="睡眠"){
     addCollected("睡眠", fatigue()); // 眠って空にした疲労量ぶん積む（表示中の日）
     state.entries.forEach(e=>{ if(e.date===viewDate) e.exp=true; });
@@ -945,9 +1205,21 @@ document.getElementById("saveAdd").onclick=()=>{
     setTimeout(()=>toast("🛌","眠った。ケースを空にした"), 400);
     return;
   }
-  state.entries.push({from,to,title,act:sel.act,mood:sel.mood,delta,exp:false,date:viewDate});
+  // テンプレ学習（同じタイトルは次回から同じ疲労度に自動）
+  setTemplate(title, sel.act, delta);
+
+  // 記録時点で終了時刻が今より先なら「予定（グレー）」、過ぎていれば即「記録」
+  const planned = entryEndTs({date:viewDate, to}) > Date.now();
+  state.entries.push({from,to,title,act:sel.act,mood:sel.mood,delta,exp:false,date:viewDate,planned,dropped:0});
   state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
   closeSheets();
+  if(planned){
+    promoteDuePlans(); // 開始時刻を既に過ぎていれば、その分だけ降らせておく
+    renderAll();
+    save();
+    toast("🗓️","予定を追加した（時間どおり1個ずつ記録）");
+    return;
+  }
   renderAll();
   showBack();
   setTimeout(()=>{
@@ -962,88 +1234,6 @@ document.getElementById("saveAdd").onclick=()=>{
   save();
 };
 
-const detailSheet=document.getElementById("detailSheet");
-function openDetail(i){
-  const e=state.entries[i];
-  const body=document.getElementById("detailBody");
-  body.innerHTML = "";
-  const sign=e.delta>=0?"+":"−";
-  const frame = document.createElement("div");
-  frame.style.display = "flex";
-  frame.style.alignItems = "center";
-  frame.style.gap = "12px";
-  frame.style.marginBottom = "6px";
-  const iconWrap = document.createElement("div");
-  iconWrap.style.width = "56px";
-  iconWrap.style.height = "56px";
-  iconWrap.style.filter = "drop-shadow(0 4px 5px rgba(27,27,24,.2))";
-  const icon = actIcon(e.act,56);
-  iconWrap.appendChild(icon);
-  const info = document.createElement("div");
-  info.style.flex = "1";
-  const title = document.createElement("div");
-  title.style.fontSize = "19px";
-  title.style.fontWeight = "700";
-  title.textContent = e.title||e.act;
-  const meta = document.createElement("div");
-  meta.className = "caps";
-  meta.textContent = `${e.from} – ${e.to} ・ ${e.mood}`;
-  info.appendChild(title);
-  info.appendChild(meta);
-  const value = document.createElement("div");
-  value.style.fontFamily = "var(--font-display)";
-  value.style.fontWeight = "800";
-  value.style.fontSize = "30px";
-  value.style.color = e.delta>=0 ? "var(--ink)" : "var(--lime-ink)";
-  value.textContent = `${sign}${Math.abs(e.delta)}`;
-  frame.appendChild(iconWrap);
-  frame.appendChild(info);
-  frame.appendChild(value);
-  body.appendChild(frame);
-  const notice = document.createElement("div");
-  notice.style.background = "var(--surface-sunk)";
-  notice.style.borderRadius = "12px";
-  notice.style.padding = "12px 14px";
-  notice.style.fontSize = "13px";
-  notice.style.color = "var(--ink-2)";
-  notice.style.margin = "14px 0 18px";
-  notice.textContent = e.delta>0
-    ? (e.exp?"この行動の疲労はもう効果が切れています。ケースから消せます。":"この行動はいまケースに積もっています。食事や休憩から1時間ほどで効果が切れ、消せるようになります。")
-    : "回復のログ。睡眠後はまとめてケースを空にできます。";
-  body.appendChild(notice);
-  const actions = document.createElement("div");
-  actions.style.display = "flex";
-  actions.style.gap = "10px";
-  if(e.delta>0 && !e.exp){
-    const expireBtn = document.createElement("button");
-    expireBtn.className = "btn sunk";
-    expireBtn.style.flex = "1";
-    expireBtn.style.padding = "13px";
-    expireBtn.dataset.act = "expire";
-    expireBtn.textContent = "効果が切れた";
-    actions.appendChild(expireBtn);
-  }
-  const removeBtn = document.createElement("button");
-  removeBtn.className = `btn ${e.delta>0&&!e.exp?"pink":"pri"}`;
-  removeBtn.style.flex = "1";
-  removeBtn.style.padding = "13px";
-  removeBtn.dataset.act = "remove";
-  removeBtn.textContent = "この項目を消す";
-  actions.appendChild(removeBtn);
-  body.appendChild(actions);
-  body.querySelectorAll("button").forEach(b=>{
-    b.onclick=()=>{
-      const a=b.dataset.act;
-      if(a==="expire"){ e.exp=true; toast("⌛","効果が切れた"); }
-      else {
-        if(e.delta > 0) addCollected(e.act, e.delta); // 消したプラスの記録を達成ページに積む（回復はログ時に加算済み）
-        state.entries.splice(i,1); toast("🧹","消した");
-      }
-      closeSheets(); renderAll(); save();
-    };
-  });
-  scrim.classList.add("on"); detailSheet.classList.add("on");
-}
 
 /* ---- achievement (collect) page ---- */
 const COLLECT_UNIT = 100; // メモリ1目盛り＝画面の高さ（単位は後で変更可）
@@ -1222,16 +1412,23 @@ window.__applyState = function(data){
       entries: data.entries.map(e=>({...e, date: e.date || todayStr()})),
       sortMode: !!data.sortMode,
       collected: Array.isArray(data.collected) ? data.collected.map(c=>({...c})) : [],
-      collectedSeen: typeof data.collectedSeen === "number" ? data.collectedSeen : 0
+      collectedSeen: typeof data.collectedSeen === "number" ? data.collectedSeen : 0,
+      templates: (data.templates && typeof data.templates === "object") ? data.templates : {},
+      tasks: Array.isArray(data.tasks) ? data.tasks.map(t=>({...t})) : []
     };
   } else {
     state = freshState();
   }
+  const promoted = promoteDuePlans(); // アプリを閉じている間に終了した予定を記録化
   renderAll();
+  if(promoted) save();
 };
 window.__getState = function(){ return state; };
 
-setInterval(tickClock,1000);
+setInterval(()=>{
+  tickClock();
+  tickPlans(); // 予定を時間どおりに1個ずつ降らせ、終了で記録化
+}, 1000);
 tickClock();
 </script>
 
@@ -1241,7 +1438,7 @@ tickClock();
     getAuth, onAuthStateChanged, signOut,
     GoogleAuthProvider, signInWithPopup,
     signInWithEmailAndPassword, createUserWithEmailAndPassword,
-    EmailAuthProvider, linkWithCredential, linkWithPopup
+    EmailAuthProvider, linkWithCredential, linkWithPopup, reauthenticateWithPopup
   } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
   import {
     initializeFirestore, persistentLocalCache, doc, getDoc, setDoc
@@ -1262,6 +1459,11 @@ tickClock();
   // オフラインでも直近データを表示できるようローカルキャッシュを有効化
   const db = initializeFirestore(app, { localCache: persistentLocalCache() });
   const googleProvider = new GoogleAuthProvider();
+  // カレンダー/ToDo取り込み用（読み取り権限つき）。ログインとは分けて、連携時だけ許可を求める
+  const calendarProvider = new GoogleAuthProvider();
+  calendarProvider.addScope("https://www.googleapis.com/auth/calendar.readonly");
+  calendarProvider.addScope("https://www.googleapis.com/auth/tasks.readonly");
+  let googleAccessToken = null;
 
   const $ = (id)=>document.getElementById(id);
   const gate = $("authGate");
@@ -1325,6 +1527,8 @@ tickClock();
         sortMode: !!st.sortMode,
         collected: st.collected || [],
         collectedSeen: st.collectedSeen || 0,
+        templates: st.templates || {},
+        tasks: st.tasks || [],
         updatedAt: Date.now()
       }).catch(err=>console.warn("[shaka] save failed", err));
     }, 600);
@@ -1368,6 +1572,90 @@ tickClock();
     $("accountSheet").classList.remove("on");
   }
 
+  /* ---- Google Calendar / Tasks import ---- */
+  function pad2m(n){ return String(n).padStart(2,"0"); }
+  function hm(d){ return pad2m(d.getHours())+":"+pad2m(d.getMinutes()); }
+  function ymd(d){ return d.getFullYear()+"-"+pad2m(d.getMonth()+1)+"-"+pad2m(d.getDate()); }
+  function sameDay(a,b){ return ymd(a)===ymd(b); }
+
+  async function ensureGoogleToken(){
+    if(googleAccessToken) return googleAccessToken;
+    const u = auth.currentUser;
+    if(!u) return null;
+    const hasGoogle = u.providerData.some(p=>p.providerId==="google.com");
+    // Googleログイン済みなら再認証、メール/パスワードのみなら連携してトークン取得
+    const result = hasGoogle
+      ? await reauthenticateWithPopup(u, calendarProvider)
+      : await linkWithPopup(u, calendarProvider);
+    const cred = GoogleAuthProvider.credentialFromResult(result);
+    googleAccessToken = (cred && cred.accessToken) || null;
+    return googleAccessToken;
+  }
+
+  async function fetchCalendarToday(token){
+    const start = new Date(); start.setHours(0,0,0,0);
+    const end = new Date(); end.setHours(23,59,59,999);
+    const url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+      + "?timeMin=" + encodeURIComponent(start.toISOString())
+      + "&timeMax=" + encodeURIComponent(end.toISOString())
+      + "&singleEvents=true&orderBy=startTime";
+    const res = await fetch(url, { headers:{ Authorization:"Bearer "+token } });
+    if(!res.ok) throw new Error("calendar "+res.status);
+    const data = await res.json();
+    return (data.items||[])
+      .filter(ev=>ev.status!=="cancelled")
+      .map(ev=>{
+        const allDay = !(ev.start && ev.start.dateTime);
+        const s = ev.start && (ev.start.dateTime || (ev.start.date ? ev.start.date+"T00:00:00" : null));
+        const e = ev.end && (ev.end.dateTime || (ev.end.date ? ev.end.date+"T00:00:00" : null));
+        const sd = s ? new Date(s) : new Date();
+        const ed = e ? new Date(e) : sd;
+        return {
+          srcId: "cal:"+ev.id,
+          title: ev.summary || "(無題の予定)",
+          date: ymd(sd),
+          from: allDay ? "00:00" : hm(sd),
+          to:   allDay ? "23:59" : hm(ed)
+        };
+      });
+  }
+
+  async function fetchTasksToday(token){
+    const url = "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks?showCompleted=false&maxResults=100";
+    const res = await fetch(url, { headers:{ Authorization:"Bearer "+token } });
+    if(!res.ok) throw new Error("tasks "+res.status);
+    const data = await res.json();
+    const now = new Date();
+    return (data.items||[])
+      .filter(t=>t.due && sameDay(new Date(t.due), now)) // 今日が期限のToDo
+      .map(t=>({
+        srcId: "task:"+t.id,
+        title: t.title || "(無題のToDo)",
+        date: ymd(now),
+        from: "00:00",
+        to: "23:59" // 時刻が無いので終日扱い → 1日の終わりに自動記録
+      }));
+  }
+
+  async function syncGoogleData(){
+    try {
+      window.__toast && window.__toast("⏳","取り込み中…");
+      const token = await ensureGoogleToken();
+      if(!token){ window.__toast && window.__toast("⚠️","Google連携が必要です"); return; }
+      const [cal, tasks] = await Promise.all([
+        fetchCalendarToday(token).catch(e=>{ console.warn("[shaka] calendar", e); return []; }),
+        fetchTasksToday(token).catch(e=>{ console.warn("[shaka] tasks", e); return []; })
+      ]);
+      const nCal = window.__importEvents ? window.__importEvents(cal) : 0;
+      const nTask = window.__importTasks ? window.__importTasks(tasks) : 0;
+      const n = nCal + nTask;
+      window.__toast && window.__toast("🗓️", n>0 ? "予定"+nCal+"件・ToDo"+nTask+"件" : "新しい予定はなし");
+    } catch(e){
+      console.warn("[shaka] sync failed", e);
+      window.__toast && window.__toast("⚠️", "取り込み失敗: "+jpError((e&&e.code)||""));
+    }
+  }
+
   window.__renderAccount = function(){
     const u = auth.currentUser;
     if(!u) return;
@@ -1389,6 +1677,16 @@ tickClock();
 
     body.appendChild(provRow("Google", hasGoogle));
     body.appendChild(provRow("メール＋パスワード", hasPassword));
+
+    // カレンダー / ToDo 取り込み
+    const syncLabel = document.createElement("div");
+    syncLabel.className = "acct-label"; syncLabel.style.marginTop = "16px";
+    syncLabel.textContent = "Googleカレンダー / ToDo";
+    body.appendChild(syncLabel);
+    const syncBtn = document.createElement("button");
+    syncBtn.className = "acct-link"; syncBtn.textContent = "今日の予定/ToDoを取り込む";
+    syncBtn.onclick = async ()=>{ closeSheet(); await syncGoogleData(); };
+    body.appendChild(syncBtn);
 
     if(!hasGoogle){
       const b = document.createElement("button");
