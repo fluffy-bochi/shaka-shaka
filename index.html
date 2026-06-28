@@ -468,6 +468,17 @@ const SEED_TASKS = [
   {srcId:"sample:1",title:"買い出しに行く",done:false,act:"家事",delta:6,mood:"🙂"},
   {srcId:"sample:2",title:"メールの返信",done:false,act:"メール",delta:4,mood:"🙂"},
 ];
+// 達成ページ「ためた回復」のサンプル（回復系＋消した行動）。合計120個ぶん
+const SEED_COLLECTED = [
+  {act:"睡眠", amount:30, ts:1},
+  {act:"会議", amount:16, ts:2},
+  {act:"通勤", amount:14, ts:3},
+  {act:"食事", amount:12, ts:4},
+  {act:"作業", amount:18, ts:5},
+  {act:"休憩", amount:8,  ts:6},
+  {act:"レビュー", amount:16, ts:7},
+  {act:"散歩", amount:6,  ts:8},
+];
 /* ---- date helpers (1日ごとの表示) ---- */
 const MON_ABBR=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 const WD_ABBR=["SUN","MON","TUE","WED","THU","FRI","SAT"];
@@ -486,7 +497,7 @@ function dateLabelFor(s){
 }
 let viewDate = todayStr();
 
-function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected:[], collectedSeen:0, templates:{}, tasks: SEED_TASKS.map(t=>({...t})) }; }
+function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected: SEED_COLLECTED.map(c=>({...c})), collectedSeen: Date.now(), templates:{}, tasks: SEED_TASKS.map(t=>({...t})) }; }
 let state = freshState();
 
 /* ---- templates (あすけん方式: 同じ予定は同じ疲労度) ---- */
