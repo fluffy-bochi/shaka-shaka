@@ -18,6 +18,27 @@
   .phone{width:100vw;height:100vh;background:transparent;border-radius:0;padding:0;box-shadow:none;position:relative}
   .stage{position:absolute;inset:0;border-radius:0;overflow:hidden;background:var(--paper)}
 
+  /* スマホ用LPをPCで開いたとき：中央に縦長のスマホ枠、周りに装飾 */
+  .deco{display:none}
+  @media (min-width:760px){
+    body{align-items:center;background:radial-gradient(120% 120% at 50% 0%, #e6e4dc 0%, #d2d0c7 100%)}
+    .phone{width:392px;height:92vh;border-radius:46px;overflow:hidden;
+      box-shadow:0 30px 70px rgba(27,27,24,.28), 0 0 0 10px #1b1b18, 0 0 0 12px #2c2c28}
+    .stage{border-radius:36px}
+  }
+  /* 装飾は左右に余白が取れる広い画面のみ */
+  @media (min-width:1040px){
+    .deco{display:flex;position:fixed;z-index:2;align-items:center}
+    .deco img{display:block}
+    .deco-brand{top:34px;left:44px;gap:14px}
+    .deco-brand img{width:54px;height:54px;border-radius:14px;box-shadow:0 6px 16px rgba(27,27,24,.2)}
+    .deco-title{font-family:var(--font-display,var(--font-ui));font-weight:800;font-size:26px;color:var(--ink,#1b1b18)}
+    /* 右側の余白（スマホ枠の右端〜画面右端）の中央に配置。枠幅392px→半分196px */
+    .deco-qr{left:calc(75% + 98px);top:50%;transform:translate(-50%,-50%);flex-direction:column;gap:10px}
+    .deco-qr img{width:160px;height:160px}
+    .deco-qr-label{font-family:var(--font-mono,monospace);font-size:12px;font-weight:700;letter-spacing:.06em;color:#1b1b18}
+  }
+
   .flip{position:absolute;inset:0}
   .face{position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column;transition:opacity .4s ease}
   .face.front{opacity:1;transform:none;z-index:2}
@@ -52,8 +73,10 @@
   .item .tt{background:var(--ink);color:#fff;padding:9px 11px;font-family:var(--font-mono);min-width:60px;display:flex;flex-direction:column;justify-content:center}
   .item .tt .f{font-size:12px;font-weight:700}
   .item .tt .t{font-size:9px;color:var(--ink-3)}
-  .item .bd{flex:1;padding:9px 13px;display:flex;align-items:center;gap:9px}
-  .item .ttl{flex:1;font-size:14px;font-weight:500}
+  .item .bd{flex:1;padding:9px 13px;display:flex;align-items:center;gap:9px;min-width:0}
+  .item .ttl{flex:1;min-width:0;font-size:14px;font-weight:500;display:flex;align-items:flex-start;gap:8px}
+  .item .ttl > img{flex:0 0 auto;margin-top:1px}
+  .ttl-text{flex:1;min-width:0;line-height:1.35;word-break:break-word}
   .item .mood-face{font-size:22px;filter:drop-shadow(0 3px 4px rgba(27,27,24,.18))}
   .item .d{font-family:var(--font-mono);font-size:13px;font-weight:700;min-width:34px;text-align:right}
   .item.exp{opacity:.42}
@@ -196,6 +219,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 </head>
 <body>
+<div class="deco deco-brand">
+  <img src="icon/kamepace-icon-512.png" alt="かめペース">
+  <span class="deco-title">かめペース</span>
+</div>
+<div class="deco deco-qr">
+  <img src="qr_kame-pace.png" alt="このアプリへのQRコード">
+  <span class="deco-qr-label">スマホで開く</span>
+</div>
 <div class="phone"><div class="stage">
 
   <div class="physics frosted" id="physics"></div>
@@ -919,13 +950,14 @@ function renderList(){
     const ttl=document.createElement("span"); ttl.className="ttl";
     const icon = actIcon(e.act);
     icon.style.width = icon.style.height = "22px";
-    icon.style.marginRight = "8px";
     ttl.appendChild(icon);
+    const ttlText=document.createElement("span"); ttlText.className="ttl-text";
     if(e.planned){
       const badge=document.createElement("span"); badge.className="plan-badge"; badge.textContent="予定";
-      ttl.appendChild(badge);
+      ttlText.appendChild(badge);
     }
-    ttl.appendChild(document.createTextNode(`${e.title||e.act}`));
+    ttlText.appendChild(document.createTextNode(`${e.title||e.act}`));
+    ttl.appendChild(ttlText);
     const faceSpan=document.createElement("span"); faceSpan.className="mood-face";
     faceSpan.appendChild(moodIcon(e.mood));
     const d=document.createElement("span"); d.className="d";
