@@ -28,7 +28,7 @@
   .shaka span{position:absolute;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:bottom .7s cubic-bezier(.2,.8,.3,1), transform .5s ease, opacity .5s ease}
 
   .physics{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;transition:filter .4s ease}
-  .physics.frosted{filter:blur(6px)}
+  .physics.frosted{filter:blur(2px)}
   .charm{position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;user-select:none;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.22));transform-origin:center center}
   .charm img{display:block;width:100%;height:100%;object-fit:contain;}
   .pop-fx{position:absolute;pointer-events:none;border-radius:50%;border:3px solid var(--lime);animation:popfx .4s ease-out forwards}
@@ -144,8 +144,8 @@
           <div class="menu" id="menuBtn"><i></i><i></i><i></i></div>
           <div class="menu-dropdown" id="menuDropdown">
             <label class="menu-label">ボカシ</label>
-            <input type="range" id="blurSlider" min="0" max="20" value="6" class="menu-slider">
-            <span class="menu-value" id="blurValue">6px</span>
+            <input type="range" id="blurSlider" min="0" max="20" value="2" class="menu-slider">
+            <span class="menu-value" id="blurValue">2px</span>
           </div>
         </div>
         <div class="list" id="list" style="padding-top:8px"></div>
@@ -593,7 +593,7 @@ function renderAll(){
   tickClock();
 }
 
-let blurAmount=6;
+let blurAmount=2;
 const flip=document.getElementById("flip");
 const faceFront=document.querySelector(".face.front");
 const faceBack=document.querySelector(".face.back");
