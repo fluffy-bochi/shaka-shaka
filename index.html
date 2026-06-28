@@ -54,7 +54,10 @@
   .item .d{font-family:var(--font-mono);font-size:13px;font-weight:700;min-width:34px;text-align:right}
   .item.exp{opacity:.42}
   .item.exp .ttl{text-decoration:line-through}
+  .list-empty{text-align:center;color:var(--ink-3);font-size:14px;padding:48px 20px;line-height:1.6}
 
+  .dnav{width:30px;height:30px;flex:0 0 auto;border:none;background:var(--surface-sunk);color:var(--ink);border-radius:50%;font-size:20px;line-height:1;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0 0 2px}
+  .dnav:active{background:var(--line)}
   .menu{width:40px;height:40px;background:var(--ink);border-radius:10px;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;cursor:pointer;position:relative;z-index:12}
   .menu i{width:18px;height:2px;background:#fff;display:block}
   .menu-dropdown{display:none;position:absolute;right:20px;top:90px;background:var(--ink);border-radius:14px;padding:14px 16px;z-index:11;box-shadow:var(--shadow-pop);align-items:center;gap:10px;min-width:200px}
@@ -188,9 +191,13 @@
       <div style="position:relative;z-index:2;display:flex;flex-direction:column;height:100%">
         <div class="statusbar"><span>9:41</span></div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 20px 10px">
-          <div>
-            <div class="caps">2026 · JUL 17 · WED</div>
-            <div style="font-size:22px;font-weight:700;margin-top:2px">今日のログ</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <button class="dnav" id="prevDay" aria-label="前の日">‹</button>
+            <div>
+              <div class="caps" id="dateCaps">2026 · JUL 17 · WED</div>
+              <div id="dateLabel" style="font-size:22px;font-weight:700;margin-top:2px">今日のログ</div>
+            </div>
+            <button class="dnav" id="nextDay" aria-label="次の日">›</button>
           </div>
           <div class="menu" id="menuBtn"><i></i><i></i><i></i></div>
           <div class="menu-dropdown" id="menuDropdown">
@@ -397,12 +404,30 @@ const SEED_ENTRIES = [
   {from:"15:00",to:"17:40",title:"レビュー対応",act:"レビュー",mood:"😌",delta:16,exp:false},
   {from:"18:30",to:"19:00",title:"散歩",act:"散歩",mood:"🙂",delta:-8,exp:false},
 ];
-function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e})), sortMode:false, collected:[], collectedSeen:0 }; }
+/* ---- date helpers (1日ごとの表示) ---- */
+const MON_ABBR=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const WD_ABBR=["SUN","MON","TUE","WED","THU","FRI","SAT"];
+function pad2(n){ return String(n).padStart(2,"0"); }
+function dateToStr(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+function strToDate(s){ const [y,m,dd]=s.split("-").map(Number); return new Date(y, m-1, dd); }
+function todayStr(){ return dateToStr(new Date()); }
+function shiftDate(s, days){ const d=strToDate(s); d.setDate(d.getDate()+days); return dateToStr(d); }
+function formatDateCaps(s){ const d=strToDate(s); return d.getFullYear()+" · "+MON_ABBR[d.getMonth()]+" "+d.getDate()+" · "+WD_ABBR[d.getDay()]; }
+function dateLabelFor(s){
+  const t=todayStr();
+  if(s===t) return "今日のログ";
+  if(s===shiftDate(t,-1)) return "昨日のログ";
+  if(s===shiftDate(t,1)) return "明日のログ";
+  const d=strToDate(s); return (d.getMonth()+1)+"月"+d.getDate()+"日のログ";
+}
+let viewDate = todayStr();
+
+function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected:[], collectedSeen:0 }; }
 let state = freshState();
 
 function fatigue(){
   let f = 0;
-  state.entries.forEach(e=>{ if(!e.exp) f += e.delta; });
+  state.entries.forEach(e=>{ if(!e.exp && e.date===viewDate) f += e.delta; });
   return Math.max(0, Math.min(100, Math.round(f)));
 }
 
@@ -485,9 +510,11 @@ function buildPhysicsWalls(){
 }
 
 function createPileBag(){
+  // シャカシャカ画面・ホーム背景の山は常に「今日」を反映（リストの表示日とは独立）
+  const td = todayStr();
   const bag = [];
   state.entries.forEach(e=>{
-    if(e.delta > 0 && !e.exp){
+    if(e.delta > 0 && !e.exp && e.date===td){
       for(let i=0;i<e.delta;i++) bag.push(e.act);
     }
   });
@@ -683,7 +710,10 @@ function updateMotionState(){
 function renderList(){
   const list = document.getElementById("list");
   list.innerHTML="";
+  let shown=0;
   state.entries.forEach((e,i)=>{
+    if((e.date||"")!==viewDate) return; // 表示中の日だけ
+    shown++;
     const item=document.createElement("div");
     item.className="item"+(e.exp?" exp":"");
     const sign=e.delta>=0?"+":"−";
@@ -710,6 +740,19 @@ function renderList(){
     item.onclick=()=>openDetail(i);
     list.appendChild(item);
   });
+  if(shown===0){
+    const empty=document.createElement("div");
+    empty.className="list-empty";
+    empty.textContent="この日の記録はまだありません。";
+    list.appendChild(empty);
+  }
+}
+
+function renderHeaderDate(){
+  const caps=document.getElementById("dateCaps");
+  const label=document.getElementById("dateLabel");
+  if(caps) caps.textContent=formatDateCaps(viewDate);
+  if(label) label.textContent=dateLabelFor(viewDate);
 }
 
 function tickClock(){
@@ -722,11 +765,15 @@ function tickClock(){
 }
 
 function renderAll(){
+  renderHeaderDate();
   renderList();
   syncPhysics();
   tickClock();
   updateMotionState();
 }
+
+document.getElementById("prevDay").onclick=()=>{ viewDate=shiftDate(viewDate,-1); state.sortMode=false; renderAll(); };
+document.getElementById("nextDay").onclick=()=>{ viewDate=shiftDate(viewDate, 1); state.sortMode=false; renderAll(); };
 
 let blurAmount=2;
 const flip=document.getElementById("flip");
@@ -889,17 +936,17 @@ document.getElementById("saveAdd").onclick=()=>{
   const title=(document.getElementById("tTitle").value||"").trim() || sel.act;
   const delta=sel.delta;
   if(sel.act==="睡眠"){
-    addCollected("睡眠", fatigue()); // 眠って空にした疲労量ぶん積む
-    state.entries.forEach(e=>e.exp=true);
-    state.entries.push({from,to,title,act:"睡眠",mood:sel.mood,delta:0,exp:false});
-    state.entries.sort((a,b)=>a.from.localeCompare(b.from));
+    addCollected("睡眠", fatigue()); // 眠って空にした疲労量ぶん積む（表示中の日）
+    state.entries.forEach(e=>{ if(e.date===viewDate) e.exp=true; });
+    state.entries.push({from,to,title,act:"睡眠",mood:sel.mood,delta:0,exp:false,date:viewDate});
+    state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
     state.sortMode=false;
     closeSheets(); renderAll(); showBack(); save();
     setTimeout(()=>toast("🛌","眠った。ケースを空にした"), 400);
     return;
   }
-  state.entries.push({from,to,title,act:sel.act,mood:sel.mood,delta,exp:false});
-  state.entries.sort((a,b)=>a.from.localeCompare(b.from));
+  state.entries.push({from,to,title,act:sel.act,mood:sel.mood,delta,exp:false,date:viewDate});
+  state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
   closeSheets();
   renderAll();
   showBack();
@@ -1169,9 +1216,10 @@ function save(){ if(window.__cloudSave) window.__cloudSave(state); }
 // Called when a user logs in: applies their cloud data (or a fresh
 // starter state for new users) and renders the app.
 window.__applyState = function(data){
+  viewDate = todayStr();
   if(data && Array.isArray(data.entries)){
     state = {
-      entries: data.entries.map(e=>({...e})),
+      entries: data.entries.map(e=>({...e, date: e.date || todayStr()})),
       sortMode: !!data.sortMode,
       collected: Array.isArray(data.collected) ? data.collected.map(c=>({...c})) : [],
       collectedSeen: typeof data.collectedSeen === "number" ? data.collectedSeen : 0
