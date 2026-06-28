@@ -1,0 +1,13 @@
+{
+  "name": "疲労シャカシャカ",
+  "short_name": "シャカシャカ",
+  "description": "やったことを記録して、疲労を見える化するアプリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#dcdad2",
+  "theme_color": "#dcdad2",
+  "icons": [
+    { "src": "icon/kamepace-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon/kamepace-icon-1024.png", "sizes": "1024x1024", "type": "image/png" }
+  ]
+}

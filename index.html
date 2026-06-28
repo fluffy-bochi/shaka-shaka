@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>疲労シャカシャカ — プロトタイプ</title>
+<link rel="icon" type="image/png" href="icon/kamepace-icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon/kamepace-icon-180.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#dcdad2">
 <link rel="stylesheet" href="design_handoff_fatigue_shaka/styles.css">
 <style>
   *{box-sizing:border-box}
@@ -507,7 +511,36 @@ function tickPlans(){
 
 /* ---- Googleカレンダー/ToDo 取り込み（モジュールから呼ばれる） ---- */
 const IMPORT_DEFAULT_DELTA = 10; // テンプレ未登録の予定のデフォルト疲労度
-function guessAct(title){ return ACTIONS.find(a=>(title||"").includes(a)) || "作業"; }
+// タイトルから行動を推測（日本語＋英語＋言い換え）。判定できなければ "" = 中立アイコン
+const ACT_KEYWORDS = [
+  ["資料作成", ["資料作成","資料","スライド","ドキュメント","slide","ppt","企画書","レポート"]],
+  ["会議", ["会議","ミーティング","mtg","meeting","打ち合わせ","打合せ","面談","1on1","商談","朝会","定例"]],
+  ["通勤", ["通勤","出社","退社","移動","commute"]],
+  ["レビュー", ["レビュー","review","確認","チェック","検収"]],
+  ["メール", ["メール","mail","返信","連絡"]],
+  ["勉強", ["勉強","学習","study","研修","セミナー","講座","勉強会","受講"]],
+  ["運動", ["運動","ジム","トレーニング","筋トレ","workout","gym","ランニング","run","ヨガ"]],
+  ["散歩", ["散歩","walk","ウォーキング","お散歩"]],
+  ["家事", ["家事","掃除","洗濯","料理","買い物"]],
+  ["育児", ["育児","子供","こども","保育","送迎","お迎え","送り"]],
+  ["通話", ["通話","電話","call","tel","コール"]],
+  ["睡眠", ["睡眠","就寝","寝る","sleep","お休み"]],
+  ["昼寝", ["昼寝","仮眠","nap"]],
+  ["食事", ["食事","昼食","夕食","朝食","ランチ","lunch","dinner","ディナー","ご飯","ごはん","飲み会","会食","ランチMTG"]],
+  ["休憩", ["休憩","休み","break","コーヒー","カフェ","お茶","ブレイク"]],
+  ["ゲーム", ["ゲーム","game","プレイ"]],
+  ["読書", ["読書","読む","book","リーディング"]],
+  ["入浴", ["入浴","風呂","お風呂","シャワー","bath","sauna","サウナ"]],
+  ["作業", ["作業","タスク","work","実装","開発","コーディング","対応","準備"]],
+];
+function guessAct(title){
+  const t = (title||"").toLowerCase();
+  if(!t) return "";
+  for(const [act, kws] of ACT_KEYWORDS){
+    if(kws.some(k=>t.includes(k.toLowerCase()))) return act;
+  }
+  return ""; // 未分類 → 中立アイコン（タップして設定すればテンプレ学習）
+}
 // items: [{srcId, title, date, from, to}]
 window.__importEvents = function(items){
   if(!Array.isArray(items)) return 0;
