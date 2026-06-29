@@ -1,6 +1,6 @@
 {
-  "name": "疲労シャカシャカ",
-  "short_name": "シャカシャカ",
+  "name": "かめペース",
+  "short_name": "かめペース",
   "description": "やったことを記録して、疲労を見える化するアプリ",
   "start_url": "./index.html",
   "display": "standalone",

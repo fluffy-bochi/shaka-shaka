@@ -7,6 +7,8 @@
 <link rel="icon" type="image/png" href="icon/kamepace-icon-512.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icon/kamepace-icon-180.png">
 <link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-title" content="かめペース">
+<meta name="application-name" content="かめペース">
 <meta name="theme-color" content="#dcdad2">
 <link rel="stylesheet" href="design_handoff_fatigue_shaka/styles.css">
 <style>
@@ -698,8 +700,50 @@ function backMsg(v){
   return "まだ余白たっぷり。";
 }
 
-const { Engine, World, Bodies, Body, Runner } = Matter;
+const { Engine, World, Bodies, Body, Runner, Events } = Matter;
 const physicsEl = document.getElementById("physics");
+
+/* ---- ぶつかった時の効果音（シャカシャカ） ---- */
+const SHAKA_POOL_SIZE = 5;       // 同時に重ねて鳴らせる数
+const SHAKA_MIN_SPEED = 4.2;     // この相対速度未満の接触は鳴らさない（積もって接しているだけ＝無音）
+const SHAKA_COOLDOWN = 45;       // 連続発音の最小間隔(ms)。シャカっとした粒立ちに
+const shakaPool = [];
+let shakaPoolIdx = 0;
+let shakaUnlocked = false;
+let lastShakaPlay = 0;
+(function initShakaSound(){
+  for(let i=0;i<SHAKA_POOL_SIZE;i++){
+    const a = new Audio("sound/syakasyaka.mp3");
+    a.preload = "auto";
+    a.volume = 0;
+    shakaPool.push(a);
+  }
+})();
+// モバイルは初回ユーザー操作で音声を解錠する必要がある
+function unlockShakaSound(){
+  if(shakaUnlocked) return;
+  shakaUnlocked = true;
+  shakaPool.forEach(a=>{
+    a.play().then(()=>{ a.pause(); a.currentTime = 0; }).catch(()=>{});
+  });
+}
+window.addEventListener("pointerdown", unlockShakaSound, {once:false});
+window.addEventListener("touchstart", unlockShakaSound, {once:false});
+function playShaka(speed){
+  const now = performance.now();
+  if(now - lastShakaPlay < SHAKA_COOLDOWN) return;
+  lastShakaPlay = now;
+  const a = shakaPool[shakaPoolIdx];
+  shakaPoolIdx = (shakaPoolIdx + 1) % SHAKA_POOL_SIZE;
+  // 衝突の強さで音量を調整（弱い接触は控えめ、激しい衝突はくっきり）
+  const v = clamp((speed - SHAKA_MIN_SPEED) / 14, 0.15, 1);
+  try{
+    a.volume = v;
+    a.currentTime = 0;
+    const p = a.play();
+    if(p && p.catch) p.catch(()=>{});
+  }catch(e){}
+}
 let currentPhysRadius = 18;
 let currentPhysFont = 30;
 const PHYS_BOUNCE = 0.35;
@@ -731,6 +775,23 @@ function buildPhysics(){
   engine = Engine.create();
   engine.gravity.y = 0.5;
   engine.gravity.x = 0;
+  // 絵文字どうしが「ぶつかった瞬間」だけ音を鳴らす。
+  // collisionStart は新しく接触し始めた時だけ発火するので、積もって接しているだけの粒は対象外。
+  // さらに相対速度のしきい値で、そっと触れただけ／落ち着いた山の微振動は無音にする。
+  Events.on(engine, "collisionStart", (ev)=>{
+    for(const pair of ev.pairs){
+      const a = pair.bodyA, b = pair.bodyB;
+      // 壁との衝突は対象外。絵文字（円ボディ）どうしだけ。
+      if(a.isStatic || b.isStatic) continue;
+      const dvx = a.velocity.x - b.velocity.x;
+      const dvy = a.velocity.y - b.velocity.y;
+      const relSpeed = Math.sqrt(dvx*dvx + dvy*dvy);
+      if(relSpeed >= SHAKA_MIN_SPEED){
+        playShaka(relSpeed);
+        break; // 1フレームに1回で十分（重なりすぎ防止）
+      }
+    }
+  });
   runner = Runner.create();
   Runner.run(runner, engine);
   physicsRunning = true;
