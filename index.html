@@ -343,7 +343,7 @@
       <div class="moodrow" id="moodRow"></div>
     </div>
 
-    <div class="field">
+    <div class="field" id="deltaField">
       <label>疲労度の変化</label>
       <div class="deltarow">
         <button type="button" id="stepDown" class="stepbtn">−</button>
@@ -352,6 +352,17 @@
         <span class="caps">FATIGUE</span>
       </div>
       <div class="emojigrid" id="emojiGrid"></div>
+    </div>
+
+    <div class="field" id="sleepField" style="display:none">
+      <label>今、体の疲れはどれくらい残ってる？</label>
+      <div class="deltarow">
+        <button type="button" id="remainDown" class="stepbtn">−</button>
+        <input id="remainNum" type="number" min="0" max="100" value="20" class="numinput">
+        <button type="button" id="remainUp" class="stepbtn">＋</button>
+        <span class="caps">% / 100</span>
+      </div>
+      <div class="emojigrid" id="remainGrid"></div>
     </div>
 
     <div style="display:flex;gap:10px;margin-top:8px">
@@ -1229,6 +1240,15 @@ function buildAddSheet(){
     b.onclick=()=>{sel.mood=m;buildAddSheet();}; mr.appendChild(b);
   });
   document.getElementById("deltaNum").value=sel.delta;
+  // 睡眠だけ「残量」を入力する専用UIに切り替える（記録の新規追加時のみ）
+  const isSleep = sel.act==="睡眠" && addKind!=='task' && editIndex==null;
+  document.getElementById("deltaField").style.display = isSleep ? "none" : "";
+  document.getElementById("sleepField").style.display = isSleep ? "" : "none";
+  if(isSleep){
+    if(sel.remain==null) sel.remain = 20;
+    document.getElementById("remainNum").value = sel.remain;
+    updateRemainGrid();
+  }
   updateGrid();
 }
 function updateGrid(){
@@ -1242,6 +1262,21 @@ function updateGrid(){
     grid.appendChild(span);
   }
   grid.style.opacity=sel.delta>=0?1:.25;
+}
+// 睡眠：いま降ってくる睡眠絵文字（マイナス）の数 = 今の疲労 − 残量
+function updateRemainGrid(){
+  const grid=document.getElementById("remainGrid");
+  if(!grid) return;
+  grid.innerHTML="";
+  const cur = fatigue();
+  const remain = Math.max(0, Math.min(100, Math.round(sel.remain||0)));
+  const fall = Math.max(0, cur - remain);
+  for(let i=0;i<fall;i++){
+    const span=document.createElement("span");
+    span.appendChild(actIcon("睡眠",22));
+    grid.appendChild(span);
+  }
+  grid.style.opacity=.45;
 }
 let addKind='entry'; // 'entry'（記録・予定） / 'task'
 const kindChips=document.getElementById("kindChips");
@@ -1308,6 +1343,9 @@ document.getElementById("tTitle").oninput=(e)=>{
 document.getElementById("stepUp").onclick=()=>{ sel.delta=Math.min(100,sel.delta+1); document.getElementById("deltaNum").value=sel.delta; updateGrid(); };
 document.getElementById("stepDown").onclick=()=>{ sel.delta=Math.max(-100,sel.delta-1); document.getElementById("deltaNum").value=sel.delta; updateGrid(); };
 document.getElementById("deltaNum").oninput=(e)=>{ sel.delta=Math.max(-100,Math.min(100,Math.round(+e.target.value||0))); updateGrid(); };
+document.getElementById("remainUp").onclick=()=>{ sel.remain=Math.min(100,(sel.remain||0)+1); document.getElementById("remainNum").value=sel.remain; updateRemainGrid(); };
+document.getElementById("remainDown").onclick=()=>{ sel.remain=Math.max(0,(sel.remain||0)-1); document.getElementById("remainNum").value=sel.remain; updateRemainGrid(); };
+document.getElementById("remainNum").oninput=(e)=>{ sel.remain=Math.max(0,Math.min(100,Math.round(+e.target.value||0))); updateRemainGrid(); };
 document.getElementById("saveAdd").onclick=()=>{
   const from=document.getElementById("tFrom").value, to=document.getElementById("tTo").value;
   const title=(document.getElementById("tTitle").value||"").trim() || sel.act;
@@ -1343,13 +1381,18 @@ document.getElementById("saveAdd").onclick=()=>{
   }
 
   if(sel.act==="睡眠"){
-    addCollected("睡眠", fatigue()); // 眠って空にした疲労量ぶん積む（表示中の日）
-    state.entries.forEach(e=>{ if(e.date===viewDate) e.exp=true; });
-    state.entries.push({from,to,title,act:"睡眠",mood:sel.mood,delta:0,exp:false,date:viewDate});
+    // 睡眠は「残量」を指定。全消しにせず、今の疲労との差分だけ回復させる
+    const cur = fatigue();
+    const remain = Math.max(0, Math.min(100, Math.round(sel.remain ?? 20)));
+    const recover = Math.max(0, cur - remain);
+    state.entries.push({from,to,title,act:"睡眠",mood:sel.mood,delta:-recover,exp:false,date:viewDate});
     state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
     state.sortMode=false;
     closeSheets(); renderAll(); showBack(); save();
-    setTimeout(()=>toast("🛌","眠った。ケースを空にした"), 400);
+    setTimeout(()=>{
+      if(recover>0) dropNegativeParticles("睡眠", recover); // 睡眠絵文字（マイナス）が降ってくる
+      toast("🛌", recover>0 ? `眠った。疲れを${remain}%まで減らした` : `眠った。疲れは${remain}%のまま`);
+    }, 400);
     return;
   }
   // テンプレ学習（同じタイトルは次回から同じ疲労度に自動）
