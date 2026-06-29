@@ -508,7 +508,7 @@ function dateLabelFor(s){
 }
 let viewDate = todayStr();
 
-function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected: SEED_COLLECTED.map(c=>({...c})), collectedSeen: Date.now(), templates:{}, tasks: SEED_TASKS.map(t=>({...t})) }; }
+function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected: SEED_COLLECTED.map(c=>({...c})), collectedSeen: Date.now(), templates:{}, tasks: SEED_TASKS.map(t=>({...t, date: todayStr()})) }; }
 let state = freshState();
 
 /* ---- templates (あすけん方式: 同じ予定は同じ疲労度) ---- */
@@ -639,7 +639,7 @@ window.__importTasks = function(items){
   let added = 0;
   items.forEach(it=>{
     if(!it || !it.srcId || existing.has(it.srcId)) return;
-    state.tasks.push({ srcId: it.srcId, title: it.title||"(無題)", done:false });
+    state.tasks.push({ srcId: it.srcId, title: it.title||"(無題)", done:false, date: todayStr() });
     existing.add(it.srcId);
     added++;
   });
@@ -1339,7 +1339,7 @@ document.getElementById("saveAdd").onclick=()=>{
     if(!tt){ toast("⚠️","タスク名を入れてください"); return; }
     if(!Array.isArray(state.tasks)) state.tasks=[];
     setTemplate(tt, sel.act, sel.delta); // タスクもテンプレ学習
-    state.tasks.push({ srcId:"local:"+Date.now()+":"+Math.random().toString(36).slice(2,7), title:tt, done:false, act:sel.act, delta:sel.delta, mood:sel.mood });
+    state.tasks.push({ srcId:"local:"+Date.now()+":"+Math.random().toString(36).slice(2,7), title:tt, done:false, act:sel.act, delta:sel.delta, mood:sel.mood, date: todayStr() });
     closeSheets(); renderAll(); save();
     toast("📝","タスクを追加した");
     return;
@@ -1574,22 +1574,65 @@ document.getElementById("collectBack").onclick = closeCollect;
 /* ---- persistence (cloud via Firebase, wired below) ---- */
 function save(){
   if(window.__loggedIn){ if(window.__cloudSave) window.__cloudSave(state); }
-  else { try{ localStorage.setItem("shaka_guest", JSON.stringify(state)); }catch(e){} } // ゲストは端末内に保存
+  else { try{ localStorage.setItem("shaka_guest", JSON.stringify(window.__serialize(state))); }catch(e){} } // ゲストは端末内に保存
 }
+
+// ---- 保存フォーマット（親子構造）----
+// users/{uid} ドキュメント内を「日にち → 予定・行動(entries)・task」の入れ子で持つ。
+// 日付は親キーになるので、各 entry/task からは date を取り除く。
+// ためた回復(collected)・テンプレ等は日をまたぐ“ユーザー単位”のデータなのでトップに置く。
+window.__serialize = function(st){
+  const days = {};
+  const bucket = (d)=>{ if(!days[d]) days[d] = { entries:[], tasks:[] }; return days[d]; };
+  (st.entries||[]).forEach(e=>{
+    const { date, ...rest } = e;
+    bucket(date || todayStr()).entries.push(rest);
+  });
+  (st.tasks||[]).forEach(t=>{
+    const { date, ...rest } = t;
+    bucket(date || todayStr()).tasks.push(rest);
+  });
+  return {
+    schema: 2,
+    days,
+    collected: st.collected || [],     // ユーザーごとにためる回復（日付をまたぐプール）
+    collectedSeen: st.collectedSeen || 0,
+    templates: st.templates || {},
+    sortMode: !!st.sortMode,
+    updatedAt: Date.now()
+  };
+};
 
 // Bridge for the Firebase module script (loaded after this script).
 // Called when a user logs in: applies their cloud data (or a fresh
 // starter state for new users) and renders the app.
 window.__applyState = function(data){
   viewDate = todayStr();
-  if(data && Array.isArray(data.entries)){
-    state = {
+  let loaded = null;
+  if(data && data.days && typeof data.days === "object"){
+    // 新フォーマット（日にち→entries/tasks の親子構造）
+    const entries = [], tasks = [];
+    Object.keys(data.days).forEach(d=>{
+      const day = data.days[d] || {};
+      (day.entries||[]).forEach(e=>entries.push({...e, date: d}));
+      (day.tasks||[]).forEach(t=>tasks.push({...t, date: d}));
+    });
+    loaded = { entries, tasks };
+  } else if(data && Array.isArray(data.entries)){
+    // 旧フォーマット（フラット）→ 自動で新フォーマットへ移行
+    loaded = {
       entries: data.entries.map(e=>({...e, date: e.date || todayStr()})),
-      sortMode: !!data.sortMode,
+      tasks: Array.isArray(data.tasks) ? data.tasks.map(t=>({...t, date: t.date || todayStr()})) : []
+    };
+  }
+  if(loaded){
+    state = {
+      entries: loaded.entries,
+      tasks: loaded.tasks,
+      sortMode: !!(data.sortMode),
       collected: Array.isArray(data.collected) ? data.collected.map(c=>({...c})) : [],
       collectedSeen: typeof data.collectedSeen === "number" ? data.collectedSeen : 0,
-      templates: (data.templates && typeof data.templates === "object") ? data.templates : {},
-      tasks: Array.isArray(data.tasks) ? data.tasks.map(t=>({...t})) : []
+      templates: (data.templates && typeof data.templates === "object") ? data.templates : {}
     };
   } else {
     state = freshState();
@@ -1697,15 +1740,9 @@ tickClock();
     if(!auth.currentUser) return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(()=>{
-      setDoc(userDoc(), {
-        entries: st.entries,
-        sortMode: !!st.sortMode,
-        collected: st.collected || [],
-        collectedSeen: st.collectedSeen || 0,
-        templates: st.templates || {},
-        tasks: st.tasks || [],
-        updatedAt: Date.now()
-      }).catch(err=>console.warn("[shaka] save failed", err));
+      // ユーザーごと（users/{uid}）に「日にち→予定・行動／task」の親子構造で保存
+      const payload = window.__serialize ? window.__serialize(st) : st;
+      setDoc(userDoc(), payload).catch(err=>console.warn("[shaka] save failed", err));
     }, 600);
   };
 
