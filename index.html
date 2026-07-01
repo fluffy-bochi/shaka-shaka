@@ -508,7 +508,18 @@ function dateLabelFor(s){
 }
 let viewDate = todayStr();
 
-function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected: SEED_COLLECTED.map(c=>({...c})), collectedSeen: Date.now(), templates:{}, tasks: SEED_TASKS.map(t=>({...t, date: todayStr()})), consumed:0 }; }
+function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr(), sample:true})), sortMode:false, collected: SEED_COLLECTED.map(c=>({...c})), collectedSeen: Date.now(), templates:{}, tasks: SEED_TASKS.map(t=>({...t, date: todayStr(), sample:true})), consumed:0, sampleDay: todayStr() }; }
+// ゲストのサンプル（予定・タスク）は日をまたいだら毎日その日ぶんとして作り直す。
+// ただし当日中はそのゲスト自身の編集を残す（sampleDay が今日ならそのまま）。翌日リセットでOK。
+function refreshGuestSamples(){
+  if(state.sampleDay === todayStr()) return; // すでに今日ぶんに整えてある → 編集を保持
+  state.entries = (state.entries||[]).filter(e=>!e.sample);
+  state.tasks = (state.tasks||[]).filter(t=>!t.sample);
+  SEED_ENTRIES.forEach(e=> state.entries.push({...e, date: todayStr(), sample:true}));
+  SEED_TASKS.forEach(t=> state.tasks.push({...t, date: todayStr(), sample:true}));
+  state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
+  state.sampleDay = todayStr();
+}
 let state = freshState();
 
 /* ---- templates (あすけん方式: 同じ予定は同じ疲労度) ---- */
@@ -1613,6 +1624,8 @@ window.__serialize = function(st){
     collectedSeen: st.collectedSeen || 0,
     templates: st.templates || {},
     sortMode: !!st.sortMode,
+    consumed: st.consumed || 0,        // マイナスで消した山のぶん（日付をまたいで持ち越す）
+    sampleDay: st.sampleDay || null,   // ゲストのサンプルを整えた日（当日は編集を保持）
     updatedAt: Date.now()
   };
 };
@@ -1646,7 +1659,9 @@ window.__applyState = function(data){
       sortMode: !!(data.sortMode),
       collected: Array.isArray(data.collected) ? data.collected.map(c=>({...c})) : [],
       collectedSeen: typeof data.collectedSeen === "number" ? data.collectedSeen : 0,
-      templates: (data.templates && typeof data.templates === "object") ? data.templates : {}
+      templates: (data.templates && typeof data.templates === "object") ? data.templates : {},
+      consumed: typeof data.consumed === "number" ? data.consumed : 0,
+      sampleDay: data.sampleDay || null
     };
   } else {
     state = freshState();
@@ -1786,6 +1801,10 @@ tickClock();
     try{ const s = localStorage.getItem("shaka_guest"); if(s) g = JSON.parse(s); }catch(e){}
     window.__loggedIn = false;
     window.__applyState(g); // データ無しなら freshState のサンプルが表示される
+    refreshGuestSamples();  // サンプルの予定・タスクを今日の日付で作り直す（毎日表示されるように）
+    promoteDuePlans();      // 開始時刻を過ぎているサンプル予定はそのぶん降らせておく
+    renderAll();
+    save();
   }
   // メニューの「ログイン」→ ログイン画面を開く
   $("loginBtn").onclick = ()=>{ $("menuDropdown").classList.remove("open"); clearErr(); gate.classList.remove("hidden"); };
