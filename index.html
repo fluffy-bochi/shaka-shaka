@@ -508,7 +508,7 @@ function dateLabelFor(s){
 }
 let viewDate = todayStr();
 
-function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected: SEED_COLLECTED.map(c=>({...c})), collectedSeen: Date.now(), templates:{}, tasks: SEED_TASKS.map(t=>({...t, date: todayStr()})) }; }
+function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr()})), sortMode:false, collected: SEED_COLLECTED.map(c=>({...c})), collectedSeen: Date.now(), templates:{}, tasks: SEED_TASKS.map(t=>({...t, date: todayStr()})), consumed:0 }; }
 let state = freshState();
 
 /* ---- templates (あすけん方式: 同じ予定は同じ疲労度) ---- */
@@ -825,17 +825,28 @@ function buildPhysicsWalls(){
   World.add(engine.world, physicsWalls);
 }
 
+// プラスの絵文字の総数（日付に関わらず全部）。予定は降ったぶんだけ数える。
+function pilePositiveTotal(){
+  let n = 0;
+  state.entries.forEach(e=>{
+    if(e.delta > 0 && !e.exp){
+      n += e.planned ? (e.dropped||0) : e.delta;
+    }
+  });
+  return n;
+}
 function createPileBag(){
-  // シャカシャカ画面・ホーム背景の山は常に「今日」を反映（リストの表示日とは独立）
-  const td = todayStr();
+  // 山は日付に関わらず全部持ち越す。減るのはマイナス（回復）の絵文字がぶつかったときだけ。
   const bag = [];
   state.entries.forEach(e=>{
-    if(e.delta > 0 && !e.exp && e.date===td){
+    if(e.delta > 0 && !e.exp){
       const n = e.planned ? (e.dropped||0) : e.delta; // 予定は降ったぶんだけ積む
       for(let i=0;i<n;i++) bag.push(e.act);
     }
   });
-  return bag;
+  // マイナスの絵文字で消したぶん（回復）を古い順に差し引く
+  const consumed = Math.min(state.consumed||0, bag.length);
+  return bag.slice(consumed);
 }
 
 function createPhysicsParticle(act){
@@ -934,6 +945,8 @@ function checkNegativeCollisions(){
         physicsBodies.splice(pi, 1);
         addCollected(neg.act, 1);          // 使った回復の絵文字（食事・休憩など）
         addCollected(pos.body.act, 1);     // 回復で弾かれて消えたプラスの記録（作業など）
+        // マイナスで消したぶんを永続化（山を再構築しても戻らないように）
+        state.consumed = Math.min((state.consumed||0) + 1, pilePositiveTotal());
         didCollect = true;
         // パッと消える
         pos.el.style.transition = "opacity .15s";
@@ -1363,9 +1376,10 @@ document.getElementById("saveAdd").onclick=()=>{
   }
 
   if(sel.act==="睡眠"){
-    // 睡眠は「残量」を指定。全消しにせず、今の疲労との差分だけ回復させる
-    const cur = fatigue();
-    const remain = Math.max(0, Math.min(100, Math.round(sel.remain ?? 20)));
+    // 睡眠は「残量」を指定。全消しにせず、今シャカシャカ画面にある山との差分だけ回復させる
+    // （山は日付をまたいで持ち越すので、今日ぶんの fatigue() ではなく山の実数で計算する）
+    const cur = createPileBag().length;
+    const remain = Math.max(0, Math.round(sel.remain ?? 20));
     const recover = Math.max(0, cur - remain);
     state.entries.push({from,to,title,act:"睡眠",mood:sel.mood,delta:-recover,exp:false,date:viewDate});
     state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
@@ -1373,7 +1387,7 @@ document.getElementById("saveAdd").onclick=()=>{
     closeSheets(); renderAll(); showBack(); save();
     setTimeout(()=>{
       if(recover>0) dropNegativeParticles("睡眠", recover); // 睡眠絵文字（マイナス）が降ってくる
-      toast("🛌", recover>0 ? `眠った。疲れを${remain}%まで減らした` : `眠った。疲れは${remain}%のまま`);
+      toast("🛌", recover>0 ? `眠った。疲れを${remain}まで減らした` : `眠った。疲れは${remain}のまま`);
     }, 400);
     return;
   }
