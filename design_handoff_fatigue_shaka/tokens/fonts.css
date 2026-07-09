@@ -1,8 +1,0 @@
-/* Webfonts — gothic clean (JP) + monospace caption (EN) + heavy display numerals */
-@import url("https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Space+Mono:wght@400;700&family=Archivo:wght@600;700;800&display=swap");
-
-:root {
-  --font-ui: "Zen Kaku Gothic New", system-ui, sans-serif;     /* 本文・UI（和文ゴシック） */
-  --font-mono: "Space Mono", ui-monospace, monospace;          /* 英字キャプション・バーコード風 */
-  --font-display: "Archivo", "Zen Kaku Gothic New", sans-serif;/* 大きな英数字ディスプレイ */
-}
