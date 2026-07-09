@@ -17,6 +17,18 @@ input { font-family: inherit; }
 @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @keyframes moonfall { 0% { transform: translateY(0); opacity: 1; } 75% { opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } }
 
+/* マイナス絵文字がプラスを消したときのリングエフェクト */
+@keyframes popfx { 0% { transform: translate(-50%, -50%) scale(.4); opacity: .95; } 100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } }
+.pop-fx {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border: 3px solid #c4f000;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: popfx .4s ease-out forwards;
+}
+
 /* app fills the viewport like the prototype's phone screen */
 #root { min-height: 100dvh; }
 .app-screen {

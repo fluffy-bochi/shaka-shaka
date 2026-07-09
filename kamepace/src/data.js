@@ -156,6 +156,9 @@ export const ACT_EMOJI = {
   '昼寝': '😴', 'ゲーム': '🎮', '読書': '📖', '入浴': '🛁',
 };
 
+/* 絵文字 → act の逆引き（回復で消した記録を collected に act 付きで積む＝旧アプリ表示互換） */
+export const EMOJI_ACT = Object.fromEntries(Object.entries(ACT_EMOJI).map(([a, g]) => [g, a]));
+
 /* タイトルから行動を推測（旧本番と同一: カレンダー取り込み・テンプレ用） */
 const ACT_KEYWORDS = [
   ['資料作成', ['資料作成', '資料', 'スライド', 'ドキュメント', 'slide', 'ppt', '企画書', 'レポート']],

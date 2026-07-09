@@ -5,7 +5,7 @@
 import React from 'react';
 import Matter from 'matter-js';
 import {
-  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI,
+  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT,
   guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA,
 } from './data';
 import {
@@ -359,10 +359,20 @@ export default class App extends React.Component {
     const anyImmediate = newEntries.some(r => !r.planned);
     const toastMsg = framePlan ? ('きろくして「' + framePlan + '」をテンプレに保存')
       : isEdit ? 'へんこうしました' : (anyImmediate ? 'きろくしました' : '予定を追加した（時間どおりに記録）');
-    this.set({ entries, templates, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, toast: toastMsg });
+    // マイナス（回復）の記録は山から引かず、そのぶんの絵文字をシャカで降らせて衝突で消す
+    const negGlyphs = [];
+    newEntries.forEach(e => {
+      if (!e.planned && e.delta < 0) { for (let i = 0; i < -e.delta; i++) negGlyphs.push(e.glyph || entryGlyph(e)); }
+    });
+    this.set({
+      entries, templates, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, toast: toastMsg,
+      // 編集で山が縮んだ場合に consumed が超過しないように
+      consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)),
+    });
     this.save();
     if (anyImmediate) {
       this.stopPhysics();
+      if (negGlyphs.length) this._pendingNeg = [...(this._pendingNeg || []), ...negGlyphs];
       requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
     }
     clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1800);
@@ -419,32 +429,24 @@ export default class App extends React.Component {
     return Math.max(12, Math.min(r, 60));
   }
 
-  /* 積む絵文字: 全日付の正の疲労から回復を引く。日をまたいで持ち越す。
-     時系列（日付・時刻順）に処理し、回復は「古いものから・その時点で積もっているぶんだけ」消す。
-     ※末尾（最新）から引くと、回復残高がある間は新しい記録が山に出ず降ってこない。
-       また合計で引くと回復が山を超えたぶんが「借金」になり将来の記録まで消してしまう。 */
+  /* 積む絵文字（旧本番 createPileBag と同じ考え方）:
+     山＝全日付の正の疲労だけ。マイナス（回復）記録は山から直接引かず、
+     マイナスの絵文字が降ってプラスにぶつかったぶん（consumed）だけ古い順に減る。 */
   pileSource() {
-    const t = todayStr();
     const stack = [];
-    const proc = (r) => {
+    sortEntries(this.state.entries).forEach(r => {
       if (r.exp) return;
       if (r.delta > 0) {
         const n = r.planned ? (r.dropped || 0) : r.delta;
         for (let i = 0; i < n; i++) stack.push({ g: entryGlyph(r), isNew: !!r._new });
-      } else if (r.delta < 0) {
-        const n = r.planned ? (r.dropped || 0) : -r.delta;
-        stack.splice(0, n);
       }
-      if (r.after) stack.splice(0, r.after);
-    };
-    const all = sortEntries(this.state.entries);
-    // 昨日まで → 睡眠で消したぶん（consumed）は持ち越し分にだけ効かせる → 今日
-    // （consumed を最後に引くと、過剰な回復残高が今日の新規記録まで食ってしまう）
-    all.filter(e => (e.date || '') < t).forEach(proc);
-    const consumed = this.state.consumed || 0;
-    if (consumed > 0) stack.splice(0, consumed);
-    all.filter(e => (e.date || '') >= t).forEach(proc);
-    return stack;
+    });
+    const consumed = Math.min(this.state.consumed || 0, stack.length);
+    return stack.slice(consumed);
+  }
+  /* 山の正の合計（consumed のキャップ用・旧本番 pilePositiveTotal） */
+  pilePositiveTotal(entries) {
+    return (entries || this.state.entries).reduce((a, e) => a + (e.delta > 0 && !e.exp ? (e.planned ? (e.dropped || 0) : e.delta) : 0), 0);
   }
   pileGlyphs() { return this.pileSource().map(x => x.g); }
   // old/new を分け、新しく記録した分だけ上から降らせる
@@ -689,16 +691,26 @@ export default class App extends React.Component {
 
   /* ================= 予定の時間進行（旧本番と統一） ================= */
   advancePlans() {
-    const now = Date.now(); let changed = false; const drops = [];
+    const now = Date.now(); let changed = false; const drops = []; const negDrops = [];
     const entries = this.state.entries.map(e => {
       if (!e.planned) return e;
       const N = Math.abs(e.delta); const due = planUnitsDue(e, now); let ne = e;
       // シャカ画面以外で進んだ分も、次のシャカ表示で降るように _new を立てる
-      if (due > (e.dropped || 0)) { const add = due - (e.dropped || 0); if (e.delta > 0) { for (let i = 0; i < add; i++) drops.push(entryGlyph(e)); } ne = { ...e, dropped: due, _new: true }; changed = true; }
+      if (due > (e.dropped || 0)) {
+        const add = due - (e.dropped || 0);
+        if (e.delta > 0) { for (let i = 0; i < add; i++) drops.push(entryGlyph(e)); }
+        else { for (let i = 0; i < add; i++) negDrops.push(entryGlyph(e)); }
+        ne = { ...e, dropped: due, _new: true }; changed = true;
+      }
       if ((ne.dropped || 0) >= N) { ne = { ...ne, planned: false, dropped: N }; changed = true; }
       return ne;
     });
-    if (changed) { this.set({ entries }); this.save(); if (this.state.screen === 'shaka' && drops.length) this.addFallingBodies(drops); }
+    if (changed) {
+      this.set({ entries });
+      this.save();
+      if (this.state.screen === 'shaka' && drops.length) this.addFallingBodies(drops);
+      if (negDrops.length) this.dropNegativeBodies(negDrops); // シャカ以外なら保留→次のシャカ表示で降る
+    }
   }
 
   /* ================= matter.js physics ================= */
@@ -780,14 +792,20 @@ export default class App extends React.Component {
       el.appendChild(d);
       this.bodies.push({ body, el: d });
     });
+    this.negBodies = [];
     this.runner = Runner.create();
     Runner.run(this.runner, this.engine);
     this._running = true;
     if (newCount > 0) { clearTimeout(this._newT); this._newT = setTimeout(() => this.clearNewFlags(), 2600); }
     this._startLoop();
+    // 保留中のマイナス絵文字（回復記録・予定の進行分）を降らせる
+    if (this._pendingNeg && this._pendingNeg.length) {
+      const pend = this._pendingNeg.splice(0);
+      this.dropNegativeBodies(pend);
+    }
     // 固定モードなら落下が落ち着いてから演算を止める（絵文字は積もったまま静止）
     clearTimeout(this._settleT);
-    if (!this.state.homeMotion) this._settleT = setTimeout(() => { if (!this.state.homeMotion) this.freezeMotion(); }, 2000);
+    if (!this.state.homeMotion) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
   }
   _startLoop() {
     this._phys = true;
@@ -797,9 +815,24 @@ export default class App extends React.Component {
       this.bodies.forEach(({ body, el }) => {
         el.style.transform = `translate(${body.position.x - rr}px, ${body.position.y - rr}px) rotate(${body.angle}rad)`;
       });
+      if (this.negBodies && this.negBodies.length) {
+        this.negBodies.forEach(({ body, el, consumed }) => {
+          if (!consumed) el.style.transform = `translate(${body.position.x - rr}px, ${body.position.y - rr}px) rotate(${body.angle}rad)`;
+        });
+        this.checkNegativeCollisions();
+      }
       this._raf = requestAnimationFrame(loop);
     };
     this._raf = requestAnimationFrame(loop);
+  }
+  /* 固定モードの停止判定: マイナス絵文字が残っている間は動かし続ける */
+  _maybeFreeze() {
+    if (this.state.homeMotion) return;
+    if ((this.negBodies || []).some(n => !n.consumed)) {
+      this._settleT = setTimeout(() => this._maybeFreeze(), 1000);
+      return;
+    }
+    this.freezeMotion();
   }
   freezeMotion() { if (!this.runner || !this._running) return; this._running = false; Matter.Runner.stop(this.runner); }
   resumeMotion() { if (!this.engine || this._running) return; this._running = true; Matter.Runner.run(this.runner, this.engine); if (!this._phys) this._startLoop(); }
@@ -829,7 +862,97 @@ export default class App extends React.Component {
       this.bodies.push({ body, el: d });
     });
     clearTimeout(this._settleT);
-    if (!this.state.homeMotion) this._settleT = setTimeout(() => { if (!this.state.homeMotion) this.freezeMotion(); }, 2000);
+    if (!this.state.homeMotion) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
+  }
+  /* ---- マイナス（回復）絵文字: 降らせて、プラスに触れたら両方消して「ためた回復」へ ---- */
+  dropNegativeBodies(glyphs) {
+    if (!glyphs || !glyphs.length) return;
+    const el = document.getElementById('shakacase');
+    if (!this.engine || !el) {
+      // シャカ画面が開いていなければ、次に開いたときに降らせる
+      this._pendingNeg = [...(this._pendingNeg || []), ...glyphs];
+      return;
+    }
+    const { World, Bodies } = Matter;
+    const rect = el.getBoundingClientRect();
+    const W = rect.width || 350, H = rect.height || 700, r = this.PR;
+    this.resumeMotion();
+    glyphs.slice(0, 40).forEach(g => {
+      const x = r + Math.random() * (W - 2 * r);
+      const y = -r - Math.random() * (H * 0.4);
+      const body = Bodies.circle(x, y, r, { restitution: 0.35, friction: 0.05, frictionAir: 0.01, density: 0.001 });
+      body.isNegative = true;
+      World.add(this.engine.world, body);
+      const d = document.createElement('div');
+      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))';
+      d.style.width = d.style.height = (2 * r) + 'px';
+      d.style.fontSize = Math.round(r * 1.6) + 'px';
+      d.textContent = g;
+      el.appendChild(d);
+      const neg = { body, el: d, consumed: false, glyph: g };
+      this.negBodies.push(neg);
+      // 30秒ぶつからなければフェードアウト（旧本番と同じ）
+      setTimeout(() => {
+        if (neg.consumed) return;
+        neg.consumed = true;
+        d.style.transition = 'opacity .4s';
+        d.style.opacity = '0';
+        try { World.remove(this.engine.world, body); } catch (e) { /* engine already gone */ }
+        setTimeout(() => d.remove(), 400);
+      }, 30000);
+    });
+    clearTimeout(this._settleT);
+    if (!this.state.homeMotion) this._settleT = setTimeout(() => this._maybeFreeze(), 2500);
+  }
+  /* 距離判定: マイナスがプラスに触れたら両方消して collected へ・consumed を加算（旧本番と同一挙動） */
+  checkNegativeCollisions() {
+    if (!this.negBodies || !this.negBodies.length || !this.bodies || !this.engine) return;
+    const el = document.getElementById('shakacase');
+    const r = this.PR, hitDist2 = (r * 2) * (r * 2);
+    const collectedAdd = [];
+    let hits = 0;
+    for (let ni = this.negBodies.length - 1; ni >= 0; ni--) {
+      const neg = this.negBodies[ni];
+      if (neg.consumed) continue;
+      const np = neg.body.position;
+      for (let pi = this.bodies.length - 1; pi >= 0; pi--) {
+        const pos = this.bodies[pi];
+        const dx = np.x - pos.body.position.x, dy = np.y - pos.body.position.y;
+        if (dx * dx + dy * dy < hitDist2) {
+          const cx = (np.x + pos.body.position.x) / 2, cy = (np.y + pos.body.position.y) / 2;
+          Matter.World.remove(this.engine.world, pos.body);
+          Matter.World.remove(this.engine.world, neg.body);
+          neg.consumed = true;
+          this.bodies.splice(pi, 1);
+          collectedAdd.push(neg.glyph, pos.el.textContent); // 使った回復＋消えたプラスの記録
+          hits++;
+          // パッと消える＋リングのポップエフェクト
+          pos.el.style.transition = 'opacity .15s'; pos.el.style.opacity = '0';
+          neg.el.style.transition = 'opacity .15s'; neg.el.style.opacity = '0';
+          if (el) {
+            const fx = document.createElement('div');
+            fx.className = 'pop-fx';
+            fx.style.left = cx + 'px'; fx.style.top = cy + 'px';
+            el.appendChild(fx);
+            setTimeout(() => fx.remove(), 450);
+          }
+          const pe = pos.el, ne = neg.el;
+          setTimeout(() => { pe.remove(); ne.remove(); }, 400);
+          break;
+        }
+      }
+    }
+    this.negBodies = this.negBodies.filter(n => !n.consumed);
+    if (hits) {
+      const now = Date.now();
+      const add = collectedAdd.map(g => ({ act: EMOJI_ACT[g] || '', glyph: g, amount: 1, ts: now }));
+      this.set({
+        collected: [...this.state.collected, ...add],
+        // マイナスで消したぶんを永続化（山を再構築しても戻らないように）
+        consumed: Math.min((this.state.consumed || 0) + hits, this.pilePositiveTotal()),
+      });
+      this.save();
+    }
   }
   stopPhysics() {
     this._phys = false; this._running = false; clearTimeout(this._settleT);
@@ -837,9 +960,10 @@ export default class App extends React.Component {
     if (this.runner) Matter.Runner.stop(this.runner);
     if (this.engine) { Matter.World.clear(this.engine.world); Matter.Engine.clear(this.engine); }
     if (this.bodies) this.bodies.forEach(({ el }) => el.remove());
+    if (this.negBodies) this.negBodies.forEach(({ el }) => el.remove());
     const caseEl = document.getElementById('shakacase');
     if (caseEl) caseEl.innerHTML = '';
-    this.engine = null; this.runner = null; this.bodies = [];
+    this.engine = null; this.runner = null; this.bodies = []; this.negBodies = [];
   }
   shake = () => {
     if (!this.bodies) return;
