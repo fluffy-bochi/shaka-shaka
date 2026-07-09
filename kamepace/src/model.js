@@ -45,6 +45,8 @@ export function entryToRecord(e) {
     name: e.title, glyph: entryGlyph(e), min: entryMin(e), fat: e.delta,
     plan: e.plan, after: e.after, planned: e.planned, dropped: e.dropped,
     from: e.from, to: e.to, _new: e._new, slot: slotOfEntry(e),
+    // カレンダー取り込みの「枠」（タイトルだけ・行動待ち）
+    frame: !!e.needsSetup && !e.delta,
   };
 }
 

@@ -9,7 +9,7 @@ import {
   guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA,
 } from './data';
 import {
-  todayStr, shiftDate, formatDateCaps, formatDateShort, pad2,
+  todayStr, shiftDate, formatDateCaps, formatDateShort, pad2, hmToTsOn,
   entryToRecord, entryGlyph, entryMin, planUnitsDue, entryEndTs,
   serialize, deserialize, freshState, sortEntries, normTitle, getTemplate, baseEntry,
 } from './model';
@@ -68,6 +68,8 @@ export default class App extends React.Component {
     /* ---- auth ---- */
     /* ---- 記録の編集（確認画面フローで置き換える対象の entries インデックス） ---- */
     editIdxs: null,
+    /* カレンダー枠に行動を入れているとき、その枠のタイトル（テンプレ保存キー） */
+    framePlan: null,
     user: null,
     authOpen: false,
     authEmail: '',
@@ -233,7 +235,7 @@ export default class App extends React.Component {
   onStartTime = (e) => this.set({ startTime: e.target.value });
   onEndTime = (e) => this.set({ endTime: e.target.value });
   backFromConfirm = () => {
-    if (this.state.confirmOrigin === 'edit') this.set({ searchStep: null, searchCart: [], screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration' });
+    if (this.state.confirmOrigin === 'edit') this.set({ searchStep: null, searchCart: [], screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', framePlan: null });
     else if (this.state.confirmOrigin === 'search') this.set({ searchStep: 'results' });
     else if (this.state.confirmOrigin === 'cat') this.set({ searchStep: null });
     else this.set({ searchStep: null, searchCart: [], catId: null, cart: {} });
@@ -294,7 +296,7 @@ export default class App extends React.Component {
     if (!items.length) {
       if (isEdit) {
         // カートを空にして確定 = 削除
-        this.set({ entries: baseEntries, searchStep: null, screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', searchCart: [] });
+        this.set({ entries: baseEntries, searchStep: null, screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', searchCart: [], framePlan: null });
         this.save();
         this.toast('削除しました');
       } else this.set({ searchStep: null });
@@ -322,7 +324,9 @@ export default class App extends React.Component {
         ...baseEntry(t.name, fat),
         glyph: t.glyph, min: mins[i], _new: true,
       };
-      if (t.plan) e.plan = t.plan;
+      // 枠に入れているときは枠タイトルでグループ化（既製の予定経由でも枠が勝つ）
+      if (this.state.framePlan) e.plan = this.state.framePlan;
+      else if (t.plan) e.plan = t.plan;
       if (t.after) e.after = Math.round(t.after * (mins[i] / 60));
       if (timeMode) {
         const fromTs = cursor, toTs = cursor + mins[i] * 60000;
@@ -339,10 +343,23 @@ export default class App extends React.Component {
       if (k) templates[k] = { act: e.act, delta: fat };
       return e;
     });
+    // カレンダー枠への記録: 構成をテンプレ保存 → 次回同じタイトルの取り込みで自動適用
+    const framePlan = this.state.framePlan;
+    if (framePlan) {
+      const fk = normTitle(framePlan);
+      if (fk) {
+        templates[fk] = {
+          act: guessAct(framePlan) || '',
+          delta: newEntries.reduce((a, e) => a + (e.delta || 0), 0),
+          tasks: newEntries.map(e => ({ name: e.title, glyph: e.glyph, min: e.min, fat: e.delta })),
+        };
+      }
+    }
     const entries = sortEntries([...baseEntries, ...newEntries]);
     const anyImmediate = newEntries.some(r => !r.planned);
-    const toastMsg = isEdit ? 'へんこうしました' : (anyImmediate ? 'きろくしました' : '予定を追加した（時間どおりに記録）');
-    this.set({ entries, templates, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', toast: toastMsg });
+    const toastMsg = framePlan ? ('きろくして「' + framePlan + '」をテンプレに保存')
+      : isEdit ? 'へんこうしました' : (anyImmediate ? 'きろくしました' : '予定を追加した（時間どおりに記録）');
+    this.set({ entries, templates, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, toast: toastMsg });
     this.save();
     if (anyImmediate) {
       this.stopPhysics();
@@ -365,6 +382,7 @@ export default class App extends React.Component {
         if (planIdx[r.plan] == null) { planIdx[r.plan] = out.length; out.push({ glyph: '📋', title: r.plan, _signed: 0, _planned: false, _count: 0, isPlan: true, idxs: [] }); }
         const g = out[planIdx[r.plan]];
         g._signed += signedSoFar; g._count += 1; if (isPlanned) g._planned = true;
+        if (r.frame) g._frame = true;
         if (r._i != null) g.idxs.push(r._i);
       } else {
         out.push({
@@ -375,7 +393,18 @@ export default class App extends React.Component {
         });
       }
     });
-    out.forEach(g => { if (g.isPlan) { g.subText = g._count + '件のタスク'; g.hasSub = true; g.planned = g._planned; g.fatText = (g._signed >= 0 ? '+' + g._signed : '' + g._signed); g.fatColor = g._planned ? '#a5a39a' : '#f5994e'; } });
+    out.forEach(g => {
+      if (!g.isPlan) return;
+      if (g._frame && g._count === 1) {
+        // 行動待ちの枠（カレンダー取り込み・初回）
+        g.isFrame = true; g.subText = 'タップして行動を入れる'; g.hasSub = true;
+        g.planned = true; g.fatText = ''; g.fatColor = '#a5a39a';
+      } else {
+        g.subText = g._count + '件のタスク'; g.hasSub = true; g.planned = g._planned;
+        g.fatText = (g._signed >= 0 ? '+' + g._signed : '' + g._signed);
+        g.fatColor = g._planned ? '#a5a39a' : '#f5994e';
+      }
+    });
     return out;
   }
 
@@ -483,7 +512,7 @@ export default class App extends React.Component {
     const n = this.pileGlyphs().length;
     this.set({ screen: 'sleep', residual: n });
   };
-  openRecord(id) { this.set({ slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search' }); }
+  openRecord(id) { this.set({ slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
   toggleSlotMenu = () => this.set({ slotMenuOpen: !this.state.slotMenuOpen });
   pickSlot = (id) => this.set({ slotId: id, slotMenuOpen: false });
   selectCat = (id) => this.set({ catId: id });
@@ -509,7 +538,7 @@ export default class App extends React.Component {
     const totalMin = plan.tasks.reduce((a, t) => a + (t.min || 0), 0) || plan.tasks.length * 30;
     const cart = plan.tasks.map((t, i) => { const fh = t.min ? (t.fat * 60 / t.min) : t.fat; return { id: 'scp' + Date.now() + i, name: t.name, glyph: t.glyph, fh, kw: [plan.name, t.name], picks: [], plan: plan.name }; });
     const fracs = plan.tasks.map(t => (t.min || 30) / totalMin);
-    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: totalMin, searchFracs: fracs, planDetailId: null, planAddOpen: false, confirmOrigin: 'plan' });
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: totalMin, searchFracs: fracs, planDetailId: null, planAddOpen: false, confirmOrigin: this.state.confirmOrigin === 'edit' ? 'edit' : 'plan' });
   }
   openPlan = (id) => { const p = this.planById(id); if (p) this.planToConfirm(p); };
   closePlan = () => this.set({ planDetailId: null });
@@ -553,7 +582,7 @@ export default class App extends React.Component {
     const totalMin = items.reduce((a, t) => a + durOf(t), 0);
     const cart = items.map((t, i) => ({ id: 'scc' + Date.now() + i, name: t.name, glyph: t.glyph, fh: this.cartFh(t), kw: [t.name], picks: [], after: t.after || 0 }));
     const fracs = items.map(t => durOf(t) / totalMin);
-    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: totalMin, searchFracs: fracs, confirmOrigin: 'cat' });
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: totalMin, searchFracs: fracs, confirmOrigin: this.state.confirmOrigin === 'edit' ? 'edit' : 'cat' });
   };
   toggleTemplateToast = () => {
     this.set({ toast: 'テンプレに保存しました' });
@@ -588,6 +617,21 @@ export default class App extends React.Component {
       startTime: anyPlanned ? (first.from || '') : '',
       endTime: anyPlanned ? (last.to || '') : '',
       catId: null, cart: {}, keywords: [''], resolvedIdx: [], moreKw: null, intensityId: null, slotMenuOpen: false,
+    });
+  };
+
+  /* カレンダー枠に行動を入れる: 記録フローの入口から選ばせ、確定時に枠を置き換えてテンプレ保存 */
+  openFrameFill = (g) => {
+    const idx = g.idxs && g.idxs[0];
+    const e = idx != null ? this.state.entries[idx] : null;
+    if (!e) return;
+    this.set({
+      screen: 'record', slotId: e.slot || slotOfEntry(e),
+      searchStep: null, catId: null, cart: {},
+      confirmOrigin: 'edit', editIdxs: [idx], framePlan: e.plan || e.title,
+      confirmMode: 'time', startTime: e.from || '', endTime: e.to || '',
+      keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null,
+      slotMenuOpen: false, degreeItem: null, planDetailId: null, planAddOpen: false,
     });
   };
 
@@ -661,6 +705,8 @@ export default class App extends React.Component {
   PR = 18;
   componentDidMount() {
     initShakaSound();
+    // 旧本番と同じ外部フック（デバッグ・検証用）
+    window.__importEvents = (items) => this.importEvents(items);
     this._unwatch = watchAuth((user) => {
       this.set({ user, authOpen: false, authPass: '' });
       if (user) this.loadCloud(); else this.loadGuest();
@@ -940,22 +986,59 @@ export default class App extends React.Component {
       this.toast('⚠️ 取り込み失敗: ' + jpError((e && e.code) || ''));
     }
   };
+  /* "HH:MM" に分を足す */
+  addHm(hm, add) {
+    const [h, m] = (hm || '0:0').split(':').map(Number);
+    const t = (((h || 0) * 60 + (m || 0) + add) % 1440 + 1440) % 1440;
+    return pad2(Math.floor(t / 60)) + ':' + pad2(t % 60);
+  }
+  /* カレンダーの予定は「枠」（タイトルだけ）として取り込む。
+     - テンプレ（タスク構成つき）があれば自動適用: 枠の時間をタスクに配分して記録
+     - 初めてのタイトルは行動待ちの枠として置く（ホームでタップして行動を入れる → テンプレ保存） */
   importEvents(items) {
     if (!Array.isArray(items)) return 0;
-    const existing = new Set(this.state.entries.filter(e => e.srcId).map(e => e.srcId));
+    // srcId は「cal:<id>#<タスク番号>」にもなるため、基部で重複判定
+    const existing = new Set(this.state.entries.filter(e => e.srcId).map(e => String(e.srcId).split('#')[0]));
     let added = 0;
     const newEntries = [];
+    const now = Date.now();
     items.forEach(it => {
       if (!it || !it.srcId || existing.has(it.srcId)) return; // 重複防止
-      const tmpl = getTemplate(this.state.templates, it.title);
-      const act = tmpl ? tmpl.act : guessAct(it.title);
-      const delta = tmpl ? tmpl.delta : IMPORT_DEFAULT_DELTA;
+      const title = it.title || '(無題)';
       const date = it.date || todayStr();
       const from = it.from || '00:00';
       const to = it.to || '23:59';
-      const planned = entryEndTs({ date, to }) > Date.now();
-      // _new: 取り込んだ分は次のシャカ表示で上から降らせる
-      newEntries.push({ from, to, title: it.title || '(無題)', act, mood: '🙂', delta, exp: false, date, planned, dropped: 0, srcId: it.srcId, needsSetup: !tmpl, plan: it.title || '(無題)', _new: true });
+      const tmpl = getTemplate(this.state.templates, title);
+      if (tmpl && Array.isArray(tmpl.tasks) && tmpl.tasks.length) {
+        // テンプレ自動適用: 枠の時間をテンプレのタスク構成比で配分（日またぎは+24h補正）
+        let spanMin = Math.round((hmToTsOn(date, to) - hmToTsOn(date, from)) / 60000);
+        if (spanMin <= 0) spanMin += 1440;
+        spanMin = Math.max(1, spanMin);
+        const tmplTotal = tmpl.tasks.reduce((a, t) => a + (t.min || 0), 0) || tmpl.tasks.length * 30;
+        let cursorMin = 0;
+        tmpl.tasks.forEach((task, k) => {
+          const last = k === tmpl.tasks.length - 1;
+          const min = Math.max(1, last ? spanMin - cursorMin : Math.round(spanMin * (task.min || 30) / tmplTotal));
+          const fh = task.min ? (task.fat * 60 / task.min) : (task.fat || 0);
+          const delta = Math.round(fh * min / 60);
+          const e = {
+            from: this.addHm(from, cursorMin), to: this.addHm(from, cursorMin + min),
+            title: task.name, act: guessAct(task.name) || tmpl.act || '', mood: '🙂',
+            delta, exp: false, date, glyph: task.glyph, min, plan: title,
+            srcId: it.srcId + '#' + k, _new: true,
+          };
+          cursorMin += min;
+          if (hmToTsOn(date, e.to) > now) { e.planned = true; e.dropped = 0; }
+          newEntries.push(e);
+        });
+      } else if (tmpl) {
+        // 旧形式テンプレ（単発の act/delta）→ 従来どおり1件で記録
+        const planned = entryEndTs({ date, to }) > now;
+        newEntries.push({ from, to, title, act: tmpl.act, mood: '🙂', delta: tmpl.delta, exp: false, date, planned, dropped: 0, srcId: it.srcId, plan: title, _new: true });
+      } else {
+        // 初めての予定: 行動待ちの「枠」として置く（疲労0・ホームでタップして行動を入れる）
+        newEntries.push({ from, to, title, act: guessAct(title), mood: '🙂', delta: 0, exp: false, date, planned: false, srcId: it.srcId, needsSetup: true, plan: title });
+      }
       existing.add(it.srcId);
       added++;
     });
@@ -995,7 +1078,7 @@ export default class App extends React.Component {
         sumText: empty ? '' : (sum >= 0 ? '+' + sum : '' + sum),
         circleBg: empty ? '#eef0e6' : '#eaf5c9',
         nameColor: empty ? '#8a8a82' : '#1b1b18',
-        groups: this.groupRecords(records).map(g => ({ ...g, onTap: () => this.openEditFlow(g) })),
+        groups: this.groupRecords(records).map(g => ({ ...g, onTap: () => (g.isFrame ? this.openFrameFill(g) : this.openEditFlow(g)) })),
         onAdd: () => this.openRecord(sd.id),
       };
     });
