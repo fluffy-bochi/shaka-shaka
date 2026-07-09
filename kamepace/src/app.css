@@ -1,0 +1,31 @@
+html, body { margin: 0; padding: 0; }
+body {
+  background: #f7f4ec;
+  color: #1b1b18;
+  font-family: "Zen Kaku Gothic New", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+* { box-sizing: border-box; }
+::selection { background: #c4f000; color: #2f3a00; }
+.nos::-webkit-scrollbar { display: none; }
+.nos { scrollbar-width: none; }
+button { font-family: inherit; }
+input { font-family: inherit; }
+
+@keyframes drop { 0% { transform: translateY(-16px) rotate(var(--r)); opacity: 0; } 100% { transform: translateY(0) rotate(var(--r)); opacity: 1; } }
+@keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes moonfall { 0% { transform: translateY(0); opacity: 1; } 75% { opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } }
+
+/* app fills the viewport like the prototype's phone screen */
+#root { height: 100dvh; }
+.app-screen {
+  position: relative;
+  isolation: isolate;
+  height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
