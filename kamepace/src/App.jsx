@@ -349,9 +349,10 @@ export default class App extends React.Component {
     return out;
   }
 
-  /* 画面サイズ（プロトタイプの固定372x812の代わりに実測） */
-  screenW() { return Math.min(480, window.innerWidth || 372); }
-  screenH() { return (window.innerHeight || 812) - 104; }
+  /* 画面サイズ: 実際のアプリ画面要素を実測（PC表示のスマホ枠にも追従） */
+  _screenRef = React.createRef();
+  screenW() { const el = this._screenRef.current; return (el && el.clientWidth) || Math.min(480, window.innerWidth || 372); }
+  screenH() { const el = this._screenRef.current; return ((el && el.clientHeight) || window.innerHeight || 812) - 104; }
   // 100個で画面全体を埋めるサイズ（旧本番と同一式）
   calcR(w, h) {
     const area = Math.max(1, w) * Math.max(1, h);
@@ -1114,7 +1115,7 @@ export default class App extends React.Component {
   render() {
     const v = this.renderVals();
     return (
-      <div className="app-screen" style={{ background: v.screenBg }}>
+      <div className="app-screen" ref={this._screenRef} style={{ background: v.screenBg }}>
         {/* status bar spacer */}
         <div style={{ height: 'max(40px, env(safe-area-inset-top))', flex: '0 0 auto', zIndex: 5 }} />
         {v.isHome && <Home v={v} />}
