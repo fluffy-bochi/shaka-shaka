@@ -390,17 +390,32 @@ export default class App extends React.Component {
     return Math.max(12, Math.min(r, 60));
   }
 
-  /* 積む絵文字: 全日付の正の疲労 −（回復＋後から回復＋睡眠で消したぶん consumed）。日をまたいで持ち越す */
+  /* 積む絵文字: 全日付の正の疲労から回復を引く。日をまたいで持ち越す。
+     時系列（日付・時刻順）に処理し、回復は「古いものから・その時点で積もっているぶんだけ」消す。
+     ※末尾（最新）から引くと、回復残高がある間は新しい記録が山に出ず降ってこない。
+       また合計で引くと回復が山を超えたぶんが「借金」になり将来の記録まで消してしまう。 */
   pileSource() {
-    const pos = []; let recover = 0, afterRec = 0;
-    sortEntries(this.state.entries).forEach(r => {
+    const t = todayStr();
+    const stack = [];
+    const proc = (r) => {
       if (r.exp) return;
-      if (r.delta > 0) { const n = r.planned ? (r.dropped || 0) : r.delta; for (let i = 0; i < n; i++) pos.push({ g: entryGlyph(r), isNew: !!r._new }); }
-      else if (r.delta < 0) { recover += r.planned ? (r.dropped || 0) : -r.delta; }
-      if (r.after) afterRec += r.after;
-    });
-    const trim = recover + afterRec + (this.state.consumed || 0);
-    return trim > 0 ? pos.slice(0, Math.max(0, pos.length - trim)) : pos;
+      if (r.delta > 0) {
+        const n = r.planned ? (r.dropped || 0) : r.delta;
+        for (let i = 0; i < n; i++) stack.push({ g: entryGlyph(r), isNew: !!r._new });
+      } else if (r.delta < 0) {
+        const n = r.planned ? (r.dropped || 0) : -r.delta;
+        stack.splice(0, n);
+      }
+      if (r.after) stack.splice(0, r.after);
+    };
+    const all = sortEntries(this.state.entries);
+    // 昨日まで → 睡眠で消したぶん（consumed）は持ち越し分にだけ効かせる → 今日
+    // （consumed を最後に引くと、過剰な回復残高が今日の新規記録まで食ってしまう）
+    all.filter(e => (e.date || '') < t).forEach(proc);
+    const consumed = this.state.consumed || 0;
+    if (consumed > 0) stack.splice(0, consumed);
+    all.filter(e => (e.date || '') >= t).forEach(proc);
+    return stack;
   }
   pileGlyphs() { return this.pileSource().map(x => x.g); }
   // old/new を分け、新しく記録した分だけ上から降らせる
@@ -416,13 +431,13 @@ export default class App extends React.Component {
   }
 
   makePile(seed) {
-    const glyphs = this.pileGlyphs();
+    const glyphs = this.pileGlyphs().slice(-130); // 上限は新しい側を残す
     const W = this.screenW(), H = this.screenH();
     const r = this.calcR(W, H);
     const d = r * 2, font = Math.round(r * 1.6);
     let s = seed; const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
     const cols = Math.max(1, Math.floor(W / d)), out = [];
-    const n = Math.min(glyphs.length, 130);
+    const n = glyphs.length;
     for (let i = 0; i < n; i++) {
       const row = Math.floor(i / cols), col = i % cols;
       const x = Math.round(col * d + (row % 2 ? d / 2 : 0) + (rng() - 0.5) * (d * 0.35));
@@ -690,9 +705,10 @@ export default class App extends React.Component {
       Bodies.rectangle(W + t / 2, H / 2, t, H + t * 2, { isStatic: true }),
     ]);
     this.bodies = [];
+    // 90個上限は新しい側（末尾）を残す — 先頭を残すと新規分が表示から漏れて降ってこない
     let marks;
-    if (this.state.dayOffset === 0) marks = this.pileGlyphsMarked().slice(0, 90);
-    else marks = this.currentBag().slice(0, 90).map(g => ({ g, isNew: false }));
+    if (this.state.dayOffset === 0) marks = this.pileGlyphsMarked().slice(-90);
+    else marks = this.currentBag().slice(-90).map(g => ({ g, isNew: false }));
     const newCount = marks.filter(m => m.isNew).length;
     const oldCount = marks.length - newCount;
     const perRow = Math.max(1, Math.floor(W / (2 * r)));
