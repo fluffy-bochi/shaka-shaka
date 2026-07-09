@@ -127,3 +127,11 @@ export function guessAct(title) {
   return '';
 }
 export const IMPORT_DEFAULT_DELTA = 10;
+
+/* 記録の編集で選べる絵文字（SEARCH_DB・ACT_EMOJI の行動グリフから） */
+export const EMOJI_CHOICES = [
+  '🚃', '🚌', '🚶', '🚲', '🚗', '💬', '💻', '📝', '⌨️', '📧',
+  '🍽', '🧹', '🧺', '🛒', '🍳', '🍻', '🏃', '🏋️', '🧘', '☕',
+  '🛁', '😴', '📚', '📞', '🎮', '📖', '🍙', '🍼', '🌿', '🌳',
+  '🌙', '⭐', '✨',
+];

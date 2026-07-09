@@ -5,7 +5,7 @@
 import React from 'react';
 import Matter from 'matter-js';
 import {
-  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI,
+  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_CHOICES,
   guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA,
 } from './data';
 import {
@@ -25,6 +25,7 @@ import Shaka from './screens/Shaka';
 import Collect from './screens/Collect';
 import MyPage from './screens/MyPage';
 import Nav from './screens/Nav';
+import EditSheet from './screens/Edit';
 
 export default class App extends React.Component {
   state = {
@@ -66,6 +67,11 @@ export default class App extends React.Component {
     homeMotion: (() => { try { return localStorage.getItem('shaka_home_motion') === '1'; } catch (e) { return false; } })(),
     slotMenuOpen: false,
     /* ---- auth ---- */
+    /* ---- 記録の編集 ---- */
+    editOpen: null, // {idx, backTo?} | {plan, idxs}
+    editGlyph: '',
+    editTitle: '',
+    editMin: 0,
     user: null,
     authOpen: false,
     authEmail: '',
@@ -121,9 +127,17 @@ export default class App extends React.Component {
   todayEntries() { return sortEntries(this.state.entries).filter(e => e.date === todayStr() && !e.exp); }
   slotRecords() {
     const out = { asa: [], am: [], pm: [], yoru: [] };
-    this.todayEntries().forEach(e => {
+    const t = todayStr();
+    // 編集用に state.entries 内のインデックスを添えて、from 順で各スロットへ
+    const rows = this.state.entries
+      .map((e, i) => ({ e, i }))
+      .filter(({ e }) => e.date === t && !e.exp)
+      .sort((a, b) => (a.e.from || '').localeCompare(b.e.from || ''));
+    rows.forEach(({ e, i }) => {
       const sid = e.slot || slotOfEntry(e);
-      (out[sid] || out.yoru).push(entryToRecord(e));
+      const r = entryToRecord(e);
+      r._i = i;
+      (out[sid] || out.yoru).push(r);
     });
     return out;
   }
@@ -334,14 +348,16 @@ export default class App extends React.Component {
       const signedSoFar = (r.fat >= 0 ? 1 : -1) * soFar;
       const isPlanned = !!r.planned && (r.dropped || 0) < target;
       if (r.plan) {
-        if (planIdx[r.plan] == null) { planIdx[r.plan] = out.length; out.push({ glyph: '📋', title: r.plan, _signed: 0, _planned: false, _count: 0, isPlan: true }); }
+        if (planIdx[r.plan] == null) { planIdx[r.plan] = out.length; out.push({ glyph: '📋', title: r.plan, _signed: 0, _planned: false, _count: 0, isPlan: true, idxs: [] }); }
         const g = out[planIdx[r.plan]];
         g._signed += signedSoFar; g._count += 1; if (isPlanned) g._planned = true;
+        if (r._i != null) g.idxs.push(r._i);
       } else {
         out.push({
           glyph: r.glyph, title: r.name + (r.after ? ' ⏰' : ''), subText: '', hasSub: false, planned: isPlanned,
           fatText: isPlanned ? ((r.dropped || 0) + '/' + target) : (r.fat >= 0 ? '+' + r.fat : '' + r.fat),
           fatColor: isPlanned ? '#a5a39a' : '#f5994e',
+          idx: r._i,
         });
       }
     });
@@ -513,6 +529,65 @@ export default class App extends React.Component {
   toggleTemplateToast = () => {
     this.set({ toast: 'テンプレに保存しました' });
     clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1600);
+  };
+
+  /* ================= 記録の編集 =================
+     絵文字・なまえ・時間だけ編集可（疲労は時間に比例して自動再計算 = §E）。
+     山は entries の glyph から導出するため、絵文字変更は積まれたアイコンにも反映される。 */
+  openEditEntry = (idx, backTo) => {
+    const e = this.state.entries[idx];
+    if (!e) return;
+    this.set({ editOpen: { idx, backTo: backTo || null }, editGlyph: entryGlyph(e), editTitle: e.title || '', editMin: entryMin(e) || 1 });
+  };
+  openEditGroup = (g) => {
+    if (g.isPlan) this.set({ editOpen: { plan: g.title, idxs: g.idxs } });
+    else if (g.idx != null) this.openEditEntry(g.idx);
+  };
+  closeEdit = () => this.set({ editOpen: null });
+  backEdit = () => {
+    const eo = this.state.editOpen;
+    if (eo && eo.backTo) this.set({ editOpen: eo.backTo });
+    else this.closeEdit();
+  };
+  editPickGlyph = (g) => this.set({ editGlyph: g });
+  onEditTitle = (e) => this.set({ editTitle: e.target.value });
+  editAddMin = (d) => this.set({ editMin: Math.max(1, Math.round((this.state.editMin || 1) + d)) });
+  /* 時間比例で疲労を再計算（符号維持・最低±1） */
+  editCalcDelta(e, newMin) {
+    const oldMin = entryMin(e) || 0;
+    if (oldMin <= 0 || newMin === oldMin || !e.delta) return e.delta;
+    const v = Math.round(e.delta * newMin / oldMin);
+    return v === 0 ? (e.delta > 0 ? 1 : -1) : v;
+  }
+  saveEdit = () => {
+    const eo = this.state.editOpen;
+    if (!eo || eo.idx == null) return;
+    const entries = [...this.state.entries];
+    const e = entries[eo.idx];
+    if (!e) { this.closeEdit(); return; }
+    const newMin = Math.max(1, Math.round(this.state.editMin || entryMin(e) || 1));
+    const delta = this.editCalcDelta(e, newMin);
+    const title = (this.state.editTitle || '').trim() || e.title;
+    const ne = { ...e, title, glyph: this.state.editGlyph || entryGlyph(e), min: newMin, delta, act: guessAct(title) || e.act };
+    // to を from＋新しい時間に合わせる
+    if (ne.from) {
+      const [h, m] = ne.from.split(':').map(Number);
+      let t = ((h || 0) * 60 + (m || 0) + newMin) % 1440;
+      ne.to = pad2(Math.floor(t / 60)) + ':' + pad2(t % 60);
+    }
+    if (ne.planned) ne.dropped = Math.min(ne.dropped || 0, Math.abs(delta));
+    entries[eo.idx] = ne;
+    this.set({ entries, editOpen: null });
+    this.save();
+    this.toast('へんこうしました');
+  };
+  deleteEdit = () => {
+    const eo = this.state.editOpen;
+    if (!eo || eo.idx == null) return;
+    const entries = this.state.entries.filter((_, i) => i !== eo.idx);
+    this.set({ entries, editOpen: null });
+    this.save();
+    this.toast('削除しました');
   };
 
   /* ================= 睡眠（回復は consumed に積む＝日をまたいで持ち越し） ================= */
@@ -916,7 +991,7 @@ export default class App extends React.Component {
         sumText: empty ? '' : (sum >= 0 ? '+' + sum : '' + sum),
         circleBg: empty ? '#eef0e6' : '#eaf5c9',
         nameColor: empty ? '#8a8a82' : '#1b1b18',
-        groups: this.groupRecords(records),
+        groups: this.groupRecords(records).map(g => ({ ...g, onTap: () => this.openEditGroup(g) })),
         onAdd: () => this.openRecord(sd.id),
       };
     });
@@ -1020,6 +1095,43 @@ export default class App extends React.Component {
     const activeSlot = this.slotDef(st.slotId || slotForNow());
     const viewDateStr = shiftDate(todayStr(), st.dayOffset);
 
+    /* ---- 記録の編集シート ---- */
+    const eo = st.editOpen;
+    let editVals = { editOpen: false };
+    if (eo && eo.idx != null) {
+      const e = st.entries[eo.idx];
+      if (e) {
+        const newMin = Math.max(1, Math.round(st.editMin || 1));
+        const fat = this.editCalcDelta(e, newMin);
+        const choices = EMOJI_CHOICES.includes(st.editGlyph) ? EMOJI_CHOICES : [st.editGlyph, ...EMOJI_CHOICES];
+        editVals = {
+          editOpen: true, editIsPlan: false,
+          editGlyph: st.editGlyph, editTitle: st.editTitle,
+          editMinText: this.fmtMin(newMin),
+          editFatText: (fat >= 0 ? '+' + fat : '' + fat),
+          editPlanTag: e.plan || '',
+          editPlanned: !!e.planned,
+          editHasBack: !!eo.backTo,
+          emojiChoices: choices.map(g => ({ g, on: g === st.editGlyph, onPick: () => this.editPickGlyph(g) })),
+          onEditTitle: this.onEditTitle,
+          editM10: () => this.editAddMin(-10), editM1: () => this.editAddMin(-1),
+          editP1: () => this.editAddMin(1), editP10: () => this.editAddMin(10),
+          saveEdit: this.saveEdit, deleteEdit: this.deleteEdit,
+          closeEdit: this.closeEdit, backEdit: this.backEdit,
+        };
+      }
+    } else if (eo && eo.idxs) {
+      editVals = {
+        editOpen: true, editIsPlan: true, editPlanName: eo.plan,
+        editPlanRows: eo.idxs.map(i => {
+          const e = st.entries[i];
+          if (!e) return null;
+          return { i, glyph: entryGlyph(e), name: e.title, minText: this.fmtMin(entryMin(e)), fatText: (e.delta >= 0 ? '+' + e.delta : '' + e.delta), onEdit: () => this.openEditEntry(i, eo) };
+        }).filter(Boolean),
+        closeEdit: this.closeEdit,
+      };
+    }
+
     return {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
       isHome: st.screen === 'home', isRecord: st.screen === 'record',
@@ -1102,6 +1214,7 @@ export default class App extends React.Component {
       prevColor: st.dayOffset <= -3 ? '#d8d5cb' : '#55554e',
       nextColor: st.dayOffset >= 0 ? '#d8d5cb' : '#55554e',
       showToast: !!st.toast, toastText: st.toast || '',
+      ...editVals,
       /* auth / mypage */
       user: st.user,
       authOpen: st.authOpen, authEmail: st.authEmail, authPass: st.authPass, authErr: st.authErr, authBusy: st.authBusy,
@@ -1124,6 +1237,7 @@ export default class App extends React.Component {
         {v.isShaka && <Shaka v={v} />}
         {v.isCollect && <Collect v={v} />}
         {v.isMypage && <MyPage v={v} />}
+        {v.editOpen && <EditSheet v={v} />}
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}

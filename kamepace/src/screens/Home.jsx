@@ -41,7 +41,7 @@ export default function Home({ v }) {
             {s.hasRecords && (
               <div style={{ borderTop: '1px solid #f1efe8' }}>
                 {s.groups.map((g, gi) => (
-                  <div key={gi} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '9px 15px', borderBottom: '1px solid #f1efe8' }}>
+                  <div key={gi} onClick={g.onTap} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '9px 15px', borderBottom: '1px solid #f1efe8', cursor: 'pointer' }}>
                     <span style={{ fontSize: 15, flex: '0 0 auto', marginTop: 1 }}>{g.glyph}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1b1b18', lineHeight: 1.4 }}>
