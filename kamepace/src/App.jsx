@@ -580,7 +580,7 @@ export default class App extends React.Component {
     if (!items.length) return;
     const durOf = (t) => (t.fh < 0 || t.id === 'shop') ? 30 : 60;
     const totalMin = items.reduce((a, t) => a + durOf(t), 0);
-    const cart = items.map((t, i) => ({ id: 'scc' + Date.now() + i, name: t.name, glyph: t.glyph, fh: this.cartFh(t), kw: [t.name], picks: [], after: t.after || 0 }));
+    const cart = items.map((t, i) => ({ id: 'scc' + Date.now() + i, name: t.name, glyph: t.glyph, fh: this.cartFh(t), kw: [...(t.kw || []), t.name], picks: [], after: t.after || 0 }));
     const fracs = items.map(t => durOf(t) / totalMin);
     this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: totalMin, searchFracs: fracs, confirmOrigin: this.state.confirmOrigin === 'edit' ? 'edit' : 'cat' });
   };

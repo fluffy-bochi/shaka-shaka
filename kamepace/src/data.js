@@ -18,32 +18,99 @@ export function slotOfEntry(e) {
 }
 export function slotForNow() { return slotForHour(new Date().getHours()); }
 
+/* カテゴリマスタ（カテゴリマスタ設計_v2.md 準拠）
+   body/mind は設計書の（体, 心）/h。表示・計算は合計の fh（回復はマイナス）。
+   2軸の個人係数・モディファイア・職業別表示は将来対応（値だけ内部保持しておく）。 */
+const act = (id, glyph, icon, name, body, mind, extra = {}) => {
+  const sum = body + mind;
+  const recover = !!extra.recover;
+  return {
+    id, glyph, icon, name, body, mind,
+    fh: recover ? -sum : sum,
+    last: `目安 ${recover ? '−' : '+'}${sum}/h`,
+    ...extra,
+  };
+};
+
 export const CATS = [
-  { id: 'idou', icon: 'directions_subway', color: '#6f8fbf', name: 'いどう', sub: '通勤・運転・送迎', items: [
-    { id: 'commute', glyph: '🚃', icon: 'directions_subway', name: '通勤', last: '前回 0.5h ・ +4', fh: 8 },
-    { id: 'drive', glyph: '🚗', icon: 'directions_car', name: '運転', last: '前回 1h ・ +7', fh: 7 },
+  { id: 'idou', icon: 'directions_subway', color: '#6f8fbf', name: 'いどう', sub: '通勤通学・運転・送迎', items: [
+    act('commute', '🚃', 'directions_subway', '通勤・通学（電車バス）', 5, 4, { kw: ['移動', '電車', '満員電車', 'バス', '通勤', '通学'] }),
+    act('drive', '🚗', 'directions_car', '車の運転', 5, 7, { kw: ['移動', '運転', '車', '渋滞'] }),
+    act('pickup', '🚙', 'airport_shuttle', '送迎', 4, 5, { kw: ['移動', '送り', 'お迎え', '子供'] }),
+    act('walkmove', '🚶', 'directions_walk', '徒歩移動', 7, 2, { kw: ['移動', '徒歩', '歩き'] }),
+    act('bicycle', '🚲', 'directions_bike', '自転車', 8, 2, { kw: ['移動', 'チャリ', 'サイクリング'] }),
   ] },
-  { id: 'work', icon: 'work', color: '#c58b3d', name: 'しごと・学業', sub: '会議・資料・集中作業', items: [
-    { id: 'meeting', glyph: '💬', icon: 'forum', name: '会議', last: '前回 1h ・ +10', fh: 10 },
-    { id: 'docs', glyph: '📝', icon: 'description', name: '資料作成', last: '前回 2h ・ +12', fh: 6 },
-    { id: 'focus', glyph: '⌨️', icon: 'computer', name: '集中作業', last: '前回 1h ・ +8', fh: 8 },
+  { id: 'work', icon: 'work', color: '#c58b3d', name: '仕事', sub: '会議・デスクワーク・接客・現場', items: [
+    act('meeting', '💬', 'forum', '会議・打ち合わせ', 3, 7, { kw: ['仕事', '会議', 'ミーティング', 'MTG', '打ち合わせ'] }),
+    act('docs', '📝', 'description', 'デスクワーク・資料作成', 4, 6, { kw: ['仕事', '資料', '作業', '事務', 'パソコン'] }),
+    act('workcall', '📞', 'call', '電話・通話対応', 2, 6, { kw: ['仕事', '電話', '通話', 'コール'] }),
+    act('reception', '🤝', 'support_agent', '来客・接客', 4, 8, { kw: ['仕事', '接客', '来客', '窓口', 'クレーム'] }),
+    act('fieldwork', '🧳', 'business_center', '外回り・出張', 7, 6, { kw: ['仕事', '営業', '外回り', '出張'] }),
+    act('labor', '🔧', 'construction', '力仕事・現場', 9, 4, { kw: ['仕事', '現場', '力仕事', '肉体労働'] }),
+    act('teach', '🧑‍🏫', 'cast_for_education', '教える・指導', 4, 7, { kw: ['仕事', '指導', '研修', '教える'] }),
   ] },
-  { id: 'house', icon: 'cleaning_services', color: '#4fa88a', name: '家事', sub: '皿洗い・掃除・洗濯・買い物', items: [
-    { id: 'dishes', glyph: '🍽', icon: 'local_dining', name: '皿洗い', last: '前回 0.5h ・ +4', fh: 8, after: 1, degree: true, degLabels: ['すくなめ', '多め'], degFh: [5, 8, 11] },
-    { id: 'clean', glyph: '🧹', icon: 'mop', name: '掃除', last: '前回 0.5h ・ +3', fh: 6, after: 1 },
-    { id: 'laundry', glyph: '🧺', icon: 'local_laundry_service', name: '洗濯', last: '前回 0.5h ・ +3', fh: 6, after: 1 },
-    { id: 'shop', glyph: '🛒', icon: 'shopping_basket', name: '買い物', last: '前回 0.5h ・ +3', fh: 6 },
+  { id: 'baito', icon: 'storefront', color: '#d97a6a', name: 'バイト', sub: '接客・レジ・調理・品出し', items: [
+    act('serve', '🙋', 'support_agent', '接客', 5, 8, { kw: ['仕事', 'バイト', '接客', 'ホール', 'クレーム'] }),
+    act('register', '🧾', 'point_of_sale', 'レジ', 5, 6, { kw: ['仕事', 'バイト', 'レジ', '会計'] }),
+    act('cookwork', '🍳', 'restaurant', '調理', 7, 5, { kw: ['仕事', 'バイト', '調理', 'キッチン'] }),
+    act('stock', '📦', 'inventory', '品出し', 7, 3, { kw: ['仕事', 'バイト', '品出し', '陳列'] }),
+    act('carry', '🍽', 'room_service', '配膳', 8, 5, { kw: ['仕事', 'バイト', '配膳', 'ホール'] }),
+    act('cleanwork', '🧹', 'mop', '清掃', 7, 3, { kw: ['仕事', 'バイト', '清掃', '掃除'] }),
+    act('tutor', '✏️', 'school', '塾講・指導', 3, 7, { kw: ['仕事', 'バイト', '塾', '家庭教師', '指導'] }),
+    act('lightwork', '🗃', 'package_2', '軽作業', 6, 3, { kw: ['仕事', 'バイト', '軽作業', '倉庫', 'ピッキング'] }),
   ] },
-  { id: 'talk', icon: 'groups', color: '#b07bc4', name: '対人・イベント', sub: '打ち合わせ・飲み会', items: [
-    { id: 'talk', glyph: '💬', icon: 'groups', name: '打ち合わせ', last: '前回 1h ・ +9', fh: 9 },
+  { id: 'school', icon: 'school', color: '#5b8fd4', name: '授業・学校', sub: '講義・演習・発表・テスト', items: [
+    act('lecture', '📖', 'menu_book', '講義（聞く中心）', 2, 5, { kw: ['授業', '講義', '学校', '大学'] }),
+    act('seminar', '🔬', 'science', '演習・実習', 4, 6, { kw: ['授業', '演習', '実習', 'ゼミ'] }),
+    act('present', '🎤', 'co_present', '発表・プレゼン', 3, 9, { kw: ['授業', '発表', 'プレゼン'] }),
+    act('pe', '🏃', 'directions_run', '体育・実技', 9, 3, { kw: ['運動', '体育', '実技'] }),
+    act('online_class', '💻', 'computer', 'オンライン授業', 2, 4, { kw: ['授業', 'オンライン', 'リモート'] }),
+    act('exam', '✍️', 'quiz', 'テスト', 3, 8, { kw: ['授業', 'テスト', '試験', '受験'] }),
   ] },
-  { id: 'rest', icon: 'self_improvement', color: '#7a9a00', name: '休憩・回復', sub: 'お茶・入浴・昼寝・ストレッチ ・ −回復', items: [
-    { id: 'rest', glyph: '☕', icon: 'local_cafe', name: '休憩・お茶', last: '前回 0.5h ・ −4', fh: -8 },
-    { id: 'bath', glyph: '🛁', icon: 'bathtub', name: '入浴', last: '前回 0.5h ・ −6', fh: -12 },
-    { id: 'nap', glyph: '😴', icon: 'bedtime', name: '昼寝・仮眠', last: '前回 0.5h ・ −10', fh: -20 },
-    { id: 'stretch', glyph: '🧘', icon: 'self_improvement', name: 'ストレッチ・ヨガ', last: '前回 0.5h ・ −5', fh: -10 },
-    { id: 'breathe', glyph: '🌿', icon: 'spa', name: '深呼吸・瞑想', last: '前回 10分 ・ −3', fh: -8 },
-    { id: 'nature', glyph: '🌳', icon: 'park', name: 'ぼーっとする', last: '前回 15分 ・ −4', fh: -8 },
+  { id: 'study', icon: 'edit_note', color: '#8a7bc4', name: '課題・勉強', sub: 'レポート・テスト勉強・就活', items: [
+    act('report', '📝', 'edit_note', 'レポート・課題', 3, 6, { kw: ['勉強', '課題', 'レポート', '宿題'] }),
+    act('examstudy', '📚', 'menu_book', 'テスト勉強', 3, 6, { kw: ['勉強', 'テスト', '試験', '暗記'] }),
+    act('create', '🎨', 'palette', '制作・作品づくり', 4, 6, { kw: ['勉強', '制作', '作品', 'デザイン'] }),
+    act('groupwork', '👥', 'group', 'グループワーク', 3, 7, { kw: ['勉強', 'グループ', '共同', 'ゼミ'] }),
+    act('jobhunt', '👔', 'badge', '就活・受験', 4, 9, { kw: ['就活', '面接', 'ES', '受験'] }),
+  ] },
+  { id: 'club', icon: 'sports_soccer', color: '#58a34d', name: '部活・サークル', sub: '練習・試合・ミーティング', items: [
+    act('practice', '⚽', 'sports_soccer', '練習', 8, 4, { kw: ['運動', '部活', 'サークル', '練習'] }),
+    act('match', '🏆', 'emoji_events', '試合・大会・本番', 9, 8, { kw: ['運動', '部活', '試合', '大会', '本番', 'ライブ'] }),
+    act('clubmtg', '💬', 'forum', 'ミーティング', 2, 5, { kw: ['部活', 'サークル', 'ミーティング'] }),
+    act('clubadmin', '📋', 'assignment', '運営・幹部業務', 3, 7, { kw: ['部活', 'サークル', '運営', '幹事'] }),
+    act('camp', '🚌', 'directions_bus', '合宿・遠征', 8, 6, { kw: ['部活', '合宿', '遠征', '旅行'] }),
+  ] },
+  { id: 'house', icon: 'cleaning_services', color: '#4fa88a', name: '家事・生活', sub: '掃除・料理・育児・手続き', items: [
+    act('dishes', '🍽', 'local_dining', '皿洗い', 5, 3, { kw: ['家事', '皿洗い', '洗い物', '食器'], after: 1, degree: true, degLabels: ['すくなめ', '多め'], degFh: [5, 8, 11] }),
+    act('cleanlaundry', '🧺', 'local_laundry_service', '掃除・洗濯', 6, 2, { kw: ['家事', '掃除', '洗濯', '片付け'], after: 1 }),
+    act('cook', '🍳', 'lunch_dining', '料理', 5, 3, { kw: ['家事', '料理', '自炊', 'ごはん'] }),
+    act('shop', '🛒', 'shopping_basket', '買い物', 5, 4, { kw: ['家事', '買い物', '買い出し', 'スーパー'] }),
+    act('childcare', '🍼', 'child_care', '育児', 7, 7, { kw: ['家事', '育児', '子供', '保育'] }),
+    act('carework', '🩺', 'medical_services', '介護・看病', 7, 8, { kw: ['家事', '介護', '看病'] }),
+    act('errands', '📄', 'receipt_long', '手続き・役所・病院', 4, 6, { kw: ['手続き', '役所', '病院', '銀行', '待ち時間'] }),
+  ] },
+  { id: 'talk', icon: 'groups', color: '#b07bc4', name: '対人', sub: '相談・飲み会・イベント', items: [
+    act('consult', '💬', 'groups', '打ち合わせ・相談', 3, 7, { kw: ['対人', '相談', '打ち合わせ'] }),
+    act('privatecall', '📞', 'call', '電話・通話', 2, 6, { kw: ['対人', '電話', '通話'] }),
+    act('party', '🍻', 'local_bar', '交流会・飲み会', 5, 7, { kw: ['対人', '飲み会', '交流会', '宴会', 'イベント'] }),
+    act('hangout', '🎉', 'celebration', '遊び・イベント', 5, 5, { kw: ['対人', '遊び', 'イベント', 'お出かけ'] }),
+    act('firstmeet', '🤝', 'handshake', '初対面の場', 4, 9, { kw: ['対人', '初対面', '面談', '挨拶'] }),
+    act('family', '👪', 'diversity_3', '家族の対応', 3, 6, { kw: ['対人', '家族', '親', '親戚'] }),
+  ] },
+  { id: 'rest', icon: 'self_improvement', color: '#7a9a00', name: '休憩・回復', sub: 'お茶・入浴・昼寝・趣味 ・ −回復', items: [
+    act('rest', '☕', 'local_cafe', '休憩・コーヒー', 2, 5, { recover: true, kw: ['休憩', 'お茶', 'カフェ', 'コーヒー', '休む'] }),
+    act('meal', '🍙', 'restaurant', '食事', 3, 4, { recover: true, kw: ['休憩', '食事', 'ランチ', 'ごはん'] }),
+    act('bath', '🛁', 'bathtub', '入浴', 5, 7, { recover: true, kw: ['休憩', '風呂', 'お風呂', 'サウナ'] }),
+    act('nap', '😴', 'bedtime', '昼寝・仮眠', 7, 6, { recover: true, kw: ['休憩', '昼寝', '仮眠', '寝る'] }),
+    act('hobby', '🎧', 'interests', '趣味・娯楽', 2, 8, { recover: true, kw: ['休憩', '趣味', '娯楽', '音楽', '読書'] }),
+    act('gaming', '🎮', 'sports_esports', 'ゲーム', 1, 6, { recover: true, kw: ['休憩', 'ゲーム', 'プレイ'] }),
+    act('sns', '📱', 'smartphone', 'SNS・動画', 1, 4, { recover: true, kw: ['休憩', 'SNS', '動画', 'スマホ', 'YouTube'] }),
+    // 設計書では体は微疲労・心は回復の混合（未決）。1軸のいまは小さめの回復として扱う
+    act('stroll', '🚶', 'park', '散歩・軽い運動', 1, 2, { recover: true, kw: ['休憩', '散歩', 'ウォーキング', '軽い運動'] }),
+    act('stretch', '🧘', 'self_improvement', 'ストレッチ・ヨガ', 5, 5, { recover: true, kw: ['休憩', 'ストレッチ', 'ヨガ'] }),
+    act('breathe', '🌿', 'spa', '深呼吸・瞑想', 3, 5, { recover: true, kw: ['休憩', '深呼吸', '瞑想', 'マインドフルネス'] }),
+    act('nature', '🌳', 'park', 'ぼーっとする', 3, 5, { recover: true, kw: ['休憩', 'ぼーっと', '外気浴'] }),
   ] },
 ];
 
@@ -61,31 +128,24 @@ export const PLANS = [
 
 export const KW_PLACEHOLDERS = ['(例)通勤', '(例)会議 打ち合わせ', '(例)皿洗い', '(例)買い物 スーパー', '(例)ランニング', '(例)休憩 お茶', '(例)資料作成', '(例)入浴', '(例)掃除', '(例)飲み会'];
 
-export const SEARCH_DB = [
-  { name: '通勤（電車・座れた）', glyph: '🚃', fh: 5, kw: ['通勤', '電車', '移動'] },
-  { name: '通勤（電車・立ち）', glyph: '🚃', fh: 8, kw: ['通勤', '電車', '移動'] },
-  { name: '通勤（バス）', glyph: '🚌', fh: 6, kw: ['通勤', 'バス', '移動'] },
-  { name: '通勤（徒歩）', glyph: '🚶', fh: 7, kw: ['通勤', '徒歩', '移動', '散歩'] },
-  { name: '通勤（自転車）', glyph: '🚲', fh: 9, kw: ['通勤', '自転車', '移動'] },
-  { name: '運転（街中）', glyph: '🚗', fh: 8, kw: ['運転', '車', '移動'] },
-  { name: '会議', glyph: '💬', fh: 10, kw: ['会議', 'ミーティング', '打ち合わせ', '仕事'] },
+/* 検索候補: カテゴリマスタの全行動＋バリエーション（座れた/立ち等の分岐） */
+const SEARCH_VARIANTS = [
+  { name: '通勤（電車・座れた）', glyph: '🚃', fh: 7, kw: ['通勤', '電車', '移動'] },
+  { name: '通勤（電車・立ち）', glyph: '🚃', fh: 10, kw: ['通勤', '電車', '移動'] },
+  { name: '通勤（バス）', glyph: '🚌', fh: 8, kw: ['通勤', 'バス', '移動'] },
   { name: 'オンライン会議', glyph: '💻', fh: 8, kw: ['会議', 'オンライン', '仕事'] },
-  { name: '資料作成', glyph: '📝', fh: 6, kw: ['資料', '作成', '仕事', '書類'] },
   { name: '集中作業', glyph: '⌨️', fh: 8, kw: ['集中', '作業', '仕事'] },
   { name: 'メール返信', glyph: '📧', fh: 4, kw: ['メール', '返信', '仕事'] },
-  { name: '皿洗い', glyph: '🍽', fh: 8, kw: ['皿洗い', '家事', '洗い物', '食器'] },
   { name: '掃除機がけ', glyph: '🧹', fh: 7, kw: ['掃除', '家事', '掃除機'] },
-  { name: '洗濯', glyph: '🧺', fh: 6, kw: ['洗濯', '家事'] },
-  { name: '買い物', glyph: '🛒', fh: 6, kw: ['買い物', '家事', '買い出し', 'スーパー'] },
-  { name: '料理', glyph: '🍳', fh: 7, kw: ['料理', '家事', '自炊'] },
-  { name: '打ち合わせ', glyph: '💬', fh: 9, kw: ['打ち合わせ', '対人', '会議'] },
-  { name: '飲み会', glyph: '🍻', fh: 11, kw: ['飲み会', '対人', 'イベント'] },
   { name: 'ランニング', glyph: '🏃', fh: 12, kw: ['ランニング', '運動', 'ジョギング', '走る'] },
   { name: '筋トレ', glyph: '🏋️', fh: 14, kw: ['筋トレ', '運動', 'ジム', 'トレーニング'] },
-  { name: 'ヨガ', glyph: '🧘', fh: 5, kw: ['ヨガ', '運動', 'ストレッチ'] },
-  { name: '休憩・お茶', glyph: '☕', fh: -8, kw: ['休憩', 'お茶', 'カフェ', 'コーヒー', '休む'] },
-  { name: '入浴', glyph: '🛁', fh: -6, kw: ['入浴', '風呂', 'お風呂'] },
-  { name: '昼寝', glyph: '😴', fh: -10, kw: ['昼寝', '仮眠', '寝る', '休む'] },
+];
+export const SEARCH_DB = [
+  ...SEARCH_VARIANTS,
+  ...CATS.flatMap(c => c.items.map(it => ({
+    name: it.name, glyph: it.glyph, fh: it.fh,
+    kw: [...(it.kw || []), c.name, it.name],
+  }))),
 ];
 
 /* 旧本番の act → 絵文字（同期互換: 旧データの entries は act しか持たない） */
