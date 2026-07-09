@@ -5,7 +5,7 @@
 import React from 'react';
 import Matter from 'matter-js';
 import {
-  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_CHOICES,
+  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI,
   guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA,
 } from './data';
 import {
@@ -25,7 +25,6 @@ import Shaka from './screens/Shaka';
 import Collect from './screens/Collect';
 import MyPage from './screens/MyPage';
 import Nav from './screens/Nav';
-import EditSheet from './screens/Edit';
 
 export default class App extends React.Component {
   state = {
@@ -67,11 +66,8 @@ export default class App extends React.Component {
     homeMotion: (() => { try { return localStorage.getItem('shaka_home_motion') === '1'; } catch (e) { return false; } })(),
     slotMenuOpen: false,
     /* ---- auth ---- */
-    /* ---- 記録の編集 ---- */
-    editOpen: null, // {idx, backTo?} | {plan, idxs}
-    editGlyph: '',
-    editTitle: '',
-    editMin: 0,
+    /* ---- 記録の編集（確認画面フローで置き換える対象の entries インデックス） ---- */
+    editIdxs: null,
     user: null,
     authOpen: false,
     authEmail: '',
@@ -225,7 +221,7 @@ export default class App extends React.Component {
   };
   clearKeyword = (i) => { const k = [...this.state.keywords]; if (k.length > 1) k.splice(i, 1); else k[0] = ''; this.set({ keywords: k }); };
   runSearch = () => { if (!this.state.keywords.some(k => (k || '').trim())) return; this.set({ searchStep: 'results', resolvedIdx: [] }); };
-  goSearchConfirm = () => { if (this.state.searchCart.length) this.set({ searchStep: 'confirm', confirmOrigin: 'search' }); };
+  goSearchConfirm = () => { if (this.state.searchCart.length) this.set({ searchStep: 'confirm', confirmOrigin: this.state.confirmOrigin === 'edit' ? 'edit' : 'search' }); };
   setConfirmMode = (mode) => {
     if (mode === 'time' && this.state.confirmMode !== 'time') {
       const now = new Date();
@@ -237,7 +233,8 @@ export default class App extends React.Component {
   onStartTime = (e) => this.set({ startTime: e.target.value });
   onEndTime = (e) => this.set({ endTime: e.target.value });
   backFromConfirm = () => {
-    if (this.state.confirmOrigin === 'search') this.set({ searchStep: 'results' });
+    if (this.state.confirmOrigin === 'edit') this.set({ searchStep: null, searchCart: [], screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration' });
+    else if (this.state.confirmOrigin === 'search') this.set({ searchStep: 'results' });
     else if (this.state.confirmOrigin === 'cat') this.set({ searchStep: null });
     else this.set({ searchStep: null, searchCart: [], catId: null, cart: {} });
   };
@@ -290,7 +287,19 @@ export default class App extends React.Component {
   /* ================= 記録の確定（統一確認UI → entries へ） ================= */
   commitSearch = () => {
     const items = this.state.searchCart;
-    if (!items.length) { this.set({ searchStep: null }); return; }
+    // 編集モード: 元の記録を取り除いたうえで置き換える
+    const isEdit = this.state.confirmOrigin === 'edit' && Array.isArray(this.state.editIdxs);
+    const editSet = isEdit ? new Set(this.state.editIdxs) : null;
+    const baseEntries = editSet ? this.state.entries.filter((_, i) => !editSet.has(i)) : this.state.entries;
+    if (!items.length) {
+      if (isEdit) {
+        // カートを空にして確定 = 削除
+        this.set({ entries: baseEntries, searchStep: null, screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', searchCart: [] });
+        this.save();
+        this.toast('削除しました');
+      } else this.set({ searchStep: null });
+      return;
+    }
     const n = items.length;
     const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(1 / n);
     const timeMode = this.state.confirmMode === 'time';
@@ -301,7 +310,11 @@ export default class App extends React.Component {
     const slotId = this.state.slotId || slotForNow();
     const slot = this.slotDef(slotId);
     let cursor = timeMode ? this.hmToTs(this.state.startTime) : null;
-    let slotOffset = this.slotUsedMin(slotId);
+    // 通常記録の配置位置: 同スロットの使用済み分（編集中は元の記録を除いて数える）
+    const t0 = todayStr();
+    let slotOffset = baseEntries
+      .filter(e => e.date === t0 && !e.exp && !e.planned && (e.slot || slotOfEntry(e)) === slotId)
+      .reduce((a, e) => a + entryMin(e), 0);
     const templates = { ...(this.state.templates || {}) };
     const newEntries = items.map((t, i) => {
       const fat = Math.round(this.effFh(t) * (mins[i] / 60));
@@ -326,9 +339,10 @@ export default class App extends React.Component {
       if (k) templates[k] = { act: e.act, delta: fat };
       return e;
     });
-    const entries = sortEntries([...this.state.entries, ...newEntries]);
+    const entries = sortEntries([...baseEntries, ...newEntries]);
     const anyImmediate = newEntries.some(r => !r.planned);
-    this.set({ entries, templates, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', toast: anyImmediate ? 'きろくしました' : '予定を追加した（時間どおりに記録）' });
+    const toastMsg = isEdit ? 'へんこうしました' : (anyImmediate ? 'きろくしました' : '予定を追加した（時間どおりに記録）');
+    this.set({ entries, templates, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', toast: toastMsg });
     this.save();
     if (anyImmediate) {
       this.stopPhysics();
@@ -454,7 +468,7 @@ export default class App extends React.Component {
     const n = this.pileGlyphs().length;
     this.set({ screen: 'sleep', residual: n });
   };
-  openRecord(id) { this.set({ slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null }); }
+  openRecord(id) { this.set({ slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search' }); }
   toggleSlotMenu = () => this.set({ slotMenuOpen: !this.state.slotMenuOpen });
   pickSlot = (id) => this.set({ slotId: id, slotMenuOpen: false });
   selectCat = (id) => this.set({ catId: id });
@@ -532,62 +546,34 @@ export default class App extends React.Component {
   };
 
   /* ================= 記録の編集 =================
-     絵文字・なまえ・時間だけ編集可（疲労は時間に比例して自動再計算 = §E）。
-     山は entries の glyph から導出するため、絵文字変更は積まれたアイコンにも反映される。 */
-  openEditEntry = (idx, backTo) => {
-    const e = this.state.entries[idx];
-    if (!e) return;
-    this.set({ editOpen: { idx, backTo: backTo || null }, editGlyph: entryGlyph(e), editTitle: e.title || '', editMin: entryMin(e) || 1 });
-  };
-  openEditGroup = (g) => {
-    if (g.isPlan) this.set({ editOpen: { plan: g.title, idxs: g.idxs } });
-    else if (g.idx != null) this.openEditEntry(g.idx);
-  };
-  closeEdit = () => this.set({ editOpen: null });
-  backEdit = () => {
-    const eo = this.state.editOpen;
-    if (eo && eo.backTo) this.set({ editOpen: eo.backTo });
-    else this.closeEdit();
-  };
-  editPickGlyph = (g) => this.set({ editGlyph: g });
-  onEditTitle = (e) => this.set({ editTitle: e.target.value });
-  editAddMin = (d) => this.set({ editMin: Math.max(1, Math.round((this.state.editMin || 1) + d)) });
-  /* 時間比例で疲労を再計算（符号維持・最低±1） */
-  editCalcDelta(e, newMin) {
-    const oldMin = entryMin(e) || 0;
-    if (oldMin <= 0 || newMin === oldMin || !e.delta) return e.delta;
-    const v = Math.round(e.delta * newMin / oldMin);
-    return v === 0 ? (e.delta > 0 ? 1 : -1) : v;
-  }
-  saveEdit = () => {
-    const eo = this.state.editOpen;
-    if (!eo || eo.idx == null) return;
-    const entries = [...this.state.entries];
-    const e = entries[eo.idx];
-    if (!e) { this.closeEdit(); return; }
-    const newMin = Math.max(1, Math.round(this.state.editMin || entryMin(e) || 1));
-    const delta = this.editCalcDelta(e, newMin);
-    const title = (this.state.editTitle || '').trim() || e.title;
-    const ne = { ...e, title, glyph: this.state.editGlyph || entryGlyph(e), min: newMin, delta, act: guessAct(title) || e.act };
-    // to を from＋新しい時間に合わせる
-    if (ne.from) {
-      const [h, m] = ne.from.split(':').map(Number);
-      let t = ((h || 0) * 60 + (m || 0) + newMin) % 1440;
-      ne.to = pad2(Math.floor(t / 60)) + ':' + pad2(t % 60);
-    }
-    if (ne.planned) ne.dropped = Math.min(ne.dropped || 0, Math.abs(delta));
-    entries[eo.idx] = ne;
-    this.set({ entries, editOpen: null });
-    this.save();
-    this.toast('へんこうしました');
-  };
-  deleteEdit = () => {
-    const eo = this.state.editOpen;
-    if (!eo || eo.idx == null) return;
-    const entries = this.state.entries.filter((_, i) => i !== eo.idx);
-    this.set({ entries, editOpen: null });
-    this.save();
-    this.toast('削除しました');
+     記録フローと同じ「登録を確認」画面に、元の記録をカートとして積んで入り直す。
+     確定時に元の entries を置き換えるので、選び直した絵文字が山にもそのまま反映される。 */
+  openEditFlow = (g) => {
+    const idxs = g.isPlan ? (g.idxs || []) : (g.idx != null ? [g.idx] : []);
+    if (!idxs.length) return;
+    const entries = this.state.entries;
+    const mins = idxs.map(i => entryMin(entries[i]) || 30);
+    const total = mins.reduce((a, b) => a + b, 0) || idxs.length * 30;
+    const items = idxs.map((i, k) => {
+      const e = entries[i];
+      const min = entryMin(e) || 30;
+      const fh = min ? (e.delta * 60 / min) : e.delta;
+      const it = { id: 'sce' + Date.now() + k, name: e.title, glyph: entryGlyph(e), fh, kw: [e.act, e.title].filter(Boolean), picks: [] };
+      if (e.plan) it.plan = e.plan;
+      if (e.after) it.after = min ? (e.after * 60 / min) : e.after;
+      return it;
+    });
+    const first = entries[idxs[0]], last = entries[idxs[idxs.length - 1]];
+    const anyPlanned = idxs.some(i => !!entries[i].planned);
+    this.set({
+      screen: 'record', slotId: first.slot || slotOfEntry(first),
+      searchStep: 'confirm', confirmOrigin: 'edit', editIdxs: idxs,
+      searchCart: items, searchTotalMin: total, searchFracs: mins.map(m => m / total),
+      confirmMode: anyPlanned ? 'time' : 'duration',
+      startTime: anyPlanned ? (first.from || '') : '',
+      endTime: anyPlanned ? (last.to || '') : '',
+      catId: null, cart: {}, keywords: [''], resolvedIdx: [], moreKw: null, intensityId: null, slotMenuOpen: false,
+    });
   };
 
   /* ================= 睡眠（回復は consumed に積む＝日をまたいで持ち越し） ================= */
@@ -648,7 +634,8 @@ export default class App extends React.Component {
     const entries = this.state.entries.map(e => {
       if (!e.planned) return e;
       const N = Math.abs(e.delta); const due = planUnitsDue(e, now); let ne = e;
-      if (due > (e.dropped || 0)) { const add = due - (e.dropped || 0); if (e.delta > 0) { for (let i = 0; i < add; i++) drops.push(entryGlyph(e)); } ne = { ...e, dropped: due }; changed = true; }
+      // シャカ画面以外で進んだ分も、次のシャカ表示で降るように _new を立てる
+      if (due > (e.dropped || 0)) { const add = due - (e.dropped || 0); if (e.delta > 0) { for (let i = 0; i < add; i++) drops.push(entryGlyph(e)); } ne = { ...e, dropped: due, _new: true }; changed = true; }
       if ((ne.dropped || 0) >= N) { ne = { ...ne, planned: false, dropped: N }; changed = true; }
       return ne;
     });
@@ -951,7 +938,8 @@ export default class App extends React.Component {
       const from = it.from || '00:00';
       const to = it.to || '23:59';
       const planned = entryEndTs({ date, to }) > Date.now();
-      newEntries.push({ from, to, title: it.title || '(無題)', act, mood: '🙂', delta, exp: false, date, planned, dropped: 0, srcId: it.srcId, needsSetup: !tmpl, plan: it.title || '(無題)' });
+      // _new: 取り込んだ分は次のシャカ表示で上から降らせる
+      newEntries.push({ from, to, title: it.title || '(無題)', act, mood: '🙂', delta, exp: false, date, planned, dropped: 0, srcId: it.srcId, needsSetup: !tmpl, plan: it.title || '(無題)', _new: true });
       existing.add(it.srcId);
       added++;
     });
@@ -991,7 +979,7 @@ export default class App extends React.Component {
         sumText: empty ? '' : (sum >= 0 ? '+' + sum : '' + sum),
         circleBg: empty ? '#eef0e6' : '#eaf5c9',
         nameColor: empty ? '#8a8a82' : '#1b1b18',
-        groups: this.groupRecords(records).map(g => ({ ...g, onTap: () => this.openEditGroup(g) })),
+        groups: this.groupRecords(records).map(g => ({ ...g, onTap: () => this.openEditFlow(g) })),
         onAdd: () => this.openRecord(sd.id),
       };
     });
@@ -1095,42 +1083,7 @@ export default class App extends React.Component {
     const activeSlot = this.slotDef(st.slotId || slotForNow());
     const viewDateStr = shiftDate(todayStr(), st.dayOffset);
 
-    /* ---- 記録の編集シート ---- */
-    const eo = st.editOpen;
-    let editVals = { editOpen: false };
-    if (eo && eo.idx != null) {
-      const e = st.entries[eo.idx];
-      if (e) {
-        const newMin = Math.max(1, Math.round(st.editMin || 1));
-        const fat = this.editCalcDelta(e, newMin);
-        const choices = EMOJI_CHOICES.includes(st.editGlyph) ? EMOJI_CHOICES : [st.editGlyph, ...EMOJI_CHOICES];
-        editVals = {
-          editOpen: true, editIsPlan: false,
-          editGlyph: st.editGlyph, editTitle: st.editTitle,
-          editMinText: this.fmtMin(newMin),
-          editFatText: (fat >= 0 ? '+' + fat : '' + fat),
-          editPlanTag: e.plan || '',
-          editPlanned: !!e.planned,
-          editHasBack: !!eo.backTo,
-          emojiChoices: choices.map(g => ({ g, on: g === st.editGlyph, onPick: () => this.editPickGlyph(g) })),
-          onEditTitle: this.onEditTitle,
-          editM10: () => this.editAddMin(-10), editM1: () => this.editAddMin(-1),
-          editP1: () => this.editAddMin(1), editP10: () => this.editAddMin(10),
-          saveEdit: this.saveEdit, deleteEdit: this.deleteEdit,
-          closeEdit: this.closeEdit, backEdit: this.backEdit,
-        };
-      }
-    } else if (eo && eo.idxs) {
-      editVals = {
-        editOpen: true, editIsPlan: true, editPlanName: eo.plan,
-        editPlanRows: eo.idxs.map(i => {
-          const e = st.entries[i];
-          if (!e) return null;
-          return { i, glyph: entryGlyph(e), name: e.title, minText: this.fmtMin(entryMin(e)), fatText: (e.delta >= 0 ? '+' + e.delta : '' + e.delta), onEdit: () => this.openEditEntry(i, eo) };
-        }).filter(Boolean),
-        closeEdit: this.closeEdit,
-      };
-    }
+    const isEditFlow = st.confirmOrigin === 'edit';
 
     return {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
@@ -1174,7 +1127,10 @@ export default class App extends React.Component {
       durTabBg: timeMode ? '#fff' : '#1b1b18', durTabColor: timeMode ? '#8a8a82' : '#fff',
       timeTabBg: timeMode ? '#1b1b18' : '#fff', timeTabColor: timeMode ? '#fff' : '#8a8a82',
       startTime: st.startTime, endTime: st.endTime, onStartTime: this.onStartTime, onEndTime: this.onEndTime,
-      commitLabel: (timeMode && this.hmToTs(st.endTime) > Date.now()) ? '予定を追加' : 'きろくする',
+      commitLabel: (timeMode && this.hmToTs(st.endTime) > Date.now())
+        ? (isEditFlow ? '予定にへんこう' : '予定を追加')
+        : (isEditFlow ? 'へんこうする' : 'きろくする'),
+      confirmTitle: isEditFlow ? 'きろくを編集' : '登録を確認',
       homeMotion: st.homeMotion, setMotionFixed: () => this.setMotion(false), setMotionMove: () => this.setMotion(true),
       motionFixedBg: st.homeMotion ? '#fff' : '#1b1b18', motionFixedColor: st.homeMotion ? '#8a8a82' : '#fff',
       motionMoveBg: st.homeMotion ? '#1b1b18' : '#fff', motionMoveColor: st.homeMotion ? '#fff' : '#8a8a82',
@@ -1214,7 +1170,6 @@ export default class App extends React.Component {
       prevColor: st.dayOffset <= -3 ? '#d8d5cb' : '#55554e',
       nextColor: st.dayOffset >= 0 ? '#d8d5cb' : '#55554e',
       showToast: !!st.toast, toastText: st.toast || '',
-      ...editVals,
       /* auth / mypage */
       user: st.user,
       authOpen: st.authOpen, authEmail: st.authEmail, authPass: st.authPass, authErr: st.authErr, authBusy: st.authBusy,
@@ -1237,7 +1192,6 @@ export default class App extends React.Component {
         {v.isShaka && <Shaka v={v} />}
         {v.isCollect && <Collect v={v} />}
         {v.isMypage && <MyPage v={v} />}
-        {v.editOpen && <EditSheet v={v} />}
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}

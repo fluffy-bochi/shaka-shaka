@@ -203,7 +203,7 @@ function Confirm({ v }) {
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 20px 10px' }}>
         <button onClick={v.backFromConfirm} style={{ background: 'none', border: 'none', fontSize: 19, color: '#8a8a82', cursor: 'pointer' }}>‹</button>
-        <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>登録を確認</div>
+        <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>{v.confirmTitle}</div>
         <SlotPill v={v} />
       </div>
       <div className="nos" style={{ flex: 1, overflowY: 'auto', padding: '2px 16px 8px' }}>
