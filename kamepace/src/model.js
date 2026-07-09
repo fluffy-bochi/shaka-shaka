@@ -76,6 +76,7 @@ export function serialize(st) {
     customCats: st.customCats || [],
     customPlans: st.customPlans || [],
     customActions: st.customActions || [],
+    prefs: st.prefs || {},
     updatedAt: Date.now(),
   };
 }
@@ -110,6 +111,7 @@ export function deserialize(data) {
     customCats: Array.isArray(data.customCats) ? data.customCats : [],
     customPlans: Array.isArray(data.customPlans) ? data.customPlans : [],
     customActions: Array.isArray(data.customActions) ? data.customActions : [],
+    prefs: (data.prefs && typeof data.prefs === 'object') ? data.prefs : {},
   };
 }
 
@@ -117,7 +119,7 @@ export function freshState() {
   return {
     entries: [], tasks: [], sortMode: false,
     collected: [], collectedSeen: 0, templates: {}, consumed: 0, sampleDay: null,
-    customCats: [], customPlans: [], customActions: [],
+    customCats: [], customPlans: [], customActions: [], prefs: {},
   };
 }
 

@@ -31,7 +31,13 @@ export default function MyPage({ v }) {
         <div style={card}>
           <div style={row()}><span style={{ fontSize: 16 }}>🕘</span><span style={{ flex: 1, fontSize: 14 }}>枠のじかん</span><span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span></div>
           <div style={row()}><span style={{ fontSize: 16 }}>🏷</span><span style={{ flex: 1, fontSize: 14 }}>カテゴリの管理</span><span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span></div>
-          <div style={row(true)}><span style={{ fontSize: 16 }}>📋</span><span style={{ flex: 1, fontSize: 14 }}>テンプレート</span><span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span></div>
+          <div style={row()}><span style={{ fontSize: 16 }}>📋</span><span style={{ flex: 1, fontSize: 14 }}>テンプレート</span><span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span></div>
+          <button onClick={v.goTrash} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>🗑</span>
+            <span style={{ flex: 1, fontSize: 14 }}>ゴミ箱</span>
+            {v.trashCount > 0 && <span style={{ ...mono, fontSize: 11.5, color: '#8a8a82' }}>{v.trashCount}件</span>}
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
         </div>
         <div style={label}>つかれの計算</div>
         <div style={card}>

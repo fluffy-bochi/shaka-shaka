@@ -25,6 +25,7 @@ import Shaka from './screens/Shaka';
 import Collect from './screens/Collect';
 import MyPage from './screens/MyPage';
 import Nav from './screens/Nav';
+import Trash from './screens/Trash';
 
 export default class App extends React.Component {
   state = {
@@ -88,6 +89,7 @@ export default class App extends React.Component {
       entries: s.entries, tasks: s.tasks, collected: s.collected, collectedSeen: s.collectedSeen,
       templates: s.templates, sortMode: s.sortMode, consumed: s.consumed, sampleDay: s.sampleDay,
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
+      prefs: s.prefs,
     };
   }
   save() {
@@ -200,8 +202,22 @@ export default class App extends React.Component {
   effFh(item) {
     const qs = this.intensityQuestions(item); let m = 1;
     (item.picks || []).forEach((p, idx) => { if (qs[idx] && qs[idx].mult[p] != null) m *= qs[idx].mult[p]; });
+    // 好き嫌い（行動ごとに永続）: 嫌い=疲れやすい×1.3 / 好き=軽減×0.7。回復系は逆（好きな休憩ほどよく回復）
+    const pref = (this.state.prefs || {})[normTitle(item.name)];
+    if (pref) {
+      const mult = item.fh >= 0 ? { dislike: 1.3, like: 0.7 } : { dislike: 0.7, like: 1.3 };
+      if (mult[pref]) m *= mult[pref];
+    }
     return item.fh * m;
   }
+  setPref = (name, val) => {
+    const k = normTitle(name);
+    if (!k) return;
+    const prefs = { ...(this.state.prefs || {}) };
+    if (val === 'normal') delete prefs[k]; else prefs[k] = val;
+    this.set({ prefs });
+    this.save();
+  };
   intensitySummary(item) {
     const qs = this.intensityQuestions(item);
     return (item.picks || []).map((p, idx) => qs[idx] ? qs[idx].opts[p] : '').filter(Boolean).join('・');
@@ -294,12 +310,8 @@ export default class App extends React.Component {
     const editSet = isEdit ? new Set(this.state.editIdxs) : null;
     const baseEntries = editSet ? this.state.entries.filter((_, i) => !editSet.has(i)) : this.state.entries;
     if (!items.length) {
-      if (isEdit) {
-        // カートを空にして確定 = 削除
-        this.set({ entries: baseEntries, searchStep: null, screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', searchCart: [], framePlan: null });
-        this.save();
-        this.toast('削除しました');
-      } else this.set({ searchStep: null });
+      if (isEdit) this.trashOriginal(); // カートを空にして確定 = ゴミ箱へ
+      else this.set({ searchStep: null });
       return;
     }
     const n = items.length;
@@ -622,6 +634,35 @@ export default class App extends React.Component {
     });
   };
 
+  /* ================= ゴミ箱 =================
+     完全削除せず exp:true にする（旧本番も exp は疲労計算から除外＝同期互換）。 */
+  trashOriginal = () => {
+    const idxs = this.state.editIdxs;
+    if (!Array.isArray(idxs) || !idxs.length) return;
+    const set = new Set(idxs);
+    const entries = this.state.entries.map((e, i) => set.has(i) ? { ...e, exp: true, trashedAt: Date.now() } : e);
+    this.set({
+      entries, searchStep: null, screen: 'home', editIdxs: null, confirmOrigin: 'search',
+      confirmMode: 'duration', searchCart: [], framePlan: null,
+      consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)),
+    });
+    this.save();
+    this.toast('ゴミ箱に移動しました');
+  };
+  goTrash = () => this.set({ screen: 'trash' });
+  restoreTrash = (idx) => {
+    const entries = this.state.entries.map((e, i) => i === idx ? { ...e, exp: false, trashedAt: null } : e);
+    this.set({ entries });
+    this.save();
+    this.toast('もどしました');
+  };
+  purgeTrash = (idx) => {
+    const entries = this.state.entries.filter((_, i) => i !== idx);
+    this.set({ entries, consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)) });
+    this.save();
+    this.toast('完全に削除しました');
+  };
+
   /* カレンダー枠に行動を入れる: 記録フローの入口から選ばせ、確定時に枠を置き換えてテンプレ保存 */
   openFrameFill = (g) => {
     const idx = g.idxs && g.idxs[0];
@@ -693,7 +734,7 @@ export default class App extends React.Component {
   advancePlans() {
     const now = Date.now(); let changed = false; const drops = []; const negDrops = [];
     const entries = this.state.entries.map(e => {
-      if (!e.planned) return e;
+      if (!e.planned || e.exp) return e;
       const N = Math.abs(e.delta); const due = planUnitsDue(e, now); let ne = e;
       // シャカ画面以外で進んだ分も、次のシャカ表示で降るように _new を立てる
       if (due > (e.dropped || 0)) {
@@ -1273,6 +1314,14 @@ export default class App extends React.Component {
       opts: q.opts.map((o, oi) => { const on = (intItem.picks || [])[qi] === oi; return { text: o, onPick: () => this.setIntensityPick(qi, oi), border: on ? '#1b1b18' : '#e4e1d8', bg: on ? '#fbfdf0' : '#fff', color: on ? '#1b1b18' : '#55554e', weight: on ? '900' : '700' }; }),
     })) : [];
     const intFat = intItem ? Math.round(this.effFh(intItem) * ((mins[scItems.indexOf(intItem)] || 30) / 60)) : 0;
+    // 好き嫌い（行動ごとに永続・強度ポップアップで設定）
+    const curPref = intItem ? ((st.prefs || {})[normTitle(intItem.name)] || 'normal') : 'normal';
+    const prefOpts = intItem ? [
+      { key: 'dislike', text: '嫌い' }, { key: 'normal', text: 'ふつう' }, { key: 'like', text: '好き' },
+    ].map(o => {
+      const on = curPref === o.key;
+      return { text: o.text, onPick: () => this.setPref(intItem.name, o.key), border: on ? '#1b1b18' : '#e4e1d8', bg: on ? '#fbfdf0' : '#fff', color: on ? '#1b1b18' : '#55554e', weight: on ? '900' : '700' };
+    }) : [];
     const catIconOpts = ['category', 'pets', 'volunteer_activism', 'self_improvement', 'favorite'];
     const catIconChoices = catIconOpts.map(ic => ({ icon: ic, onPick: () => this.pickCatIcon(ic), border: st.newCatIcon === ic ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', bg: st.newCatIcon === ic ? '#fbfdf0' : '#fff' }));
     const subItems = (activeCat ? activeCat.items : []).map(t => {
@@ -1308,18 +1357,32 @@ export default class App extends React.Component {
 
     const isEditFlow = st.confirmOrigin === 'edit';
 
+    /* ---- ゴミ箱 ---- */
+    const trashRows = st.entries
+      .map((e, i) => ({ e, i }))
+      .filter(({ e }) => e.exp)
+      .sort((a, b) => (b.e.trashedAt || 0) - (a.e.trashedAt || 0) || (b.e.date || '').localeCompare(a.e.date || ''))
+      .map(({ e, i }) => ({
+        i, glyph: entryGlyph(e), name: e.title,
+        meta: (e.date || '') + (e.from ? ' · ' + e.from : '') + ' · ' + this.fmtMin(entryMin(e)),
+        fatText: (e.delta >= 0 ? '+' + e.delta : '' + e.delta),
+        onRestore: () => this.restoreTrash(i),
+        onPurge: () => this.purgeTrash(i),
+      }));
+
     return {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
       isHome: st.screen === 'home', isRecord: st.screen === 'record',
       isSleep: st.screen === 'sleep', isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
+      isTrash: st.screen === 'trash',
       isCollect: st.screen === 'collect', collectedTotal: this.collectedTotal(),
       goCollect: this.goCollect, finishSleep: this.finishSleep,
       navHomeColor: ['home', 'record', 'sleep'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navHomeFill: ['home', 'record', 'sleep'].includes(st.screen) ? 1 : 0,
       navShakaColor: ['shaka', 'collect'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navShakaFill: ['shaka', 'collect'].includes(st.screen) ? 1 : 0,
-      navMypageColor: st.screen === 'mypage' ? '#1b1b18' : '#8a8a82',
-      navMypageFill: st.screen === 'mypage' ? 1 : 0,
+      navMypageColor: ['mypage', 'trash'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
+      navMypageFill: ['mypage', 'trash'].includes(st.screen) ? 1 : 0,
       homeDateCaps: formatDateCaps(todayStr()),
       pile: st.screen === 'home' ? this.makePile(7) : [],
       sleepPile: st.screen === 'sleep' ? this.makeSleepPile().map((p, i) => ({
@@ -1354,6 +1417,8 @@ export default class App extends React.Component {
         ? (isEditFlow ? '予定にへんこう' : '予定を追加')
         : (isEditFlow ? 'へんこうする' : 'きろくする'),
       confirmTitle: isEditFlow ? 'きろくを編集' : '登録を確認',
+      isEditFlow, trashOriginal: this.trashOriginal,
+      trashRows, trashCount: trashRows.length, goTrash: this.goTrash,
       homeMotion: st.homeMotion, setMotionFixed: () => this.setMotion(false), setMotionMove: () => this.setMotion(true),
       motionFixedBg: st.homeMotion ? '#fff' : '#1b1b18', motionFixedColor: st.homeMotion ? '#8a8a82' : '#fff',
       motionMoveBg: st.homeMotion ? '#1b1b18' : '#fff', motionMoveColor: st.homeMotion ? '#fff' : '#8a8a82',
@@ -1362,6 +1427,7 @@ export default class App extends React.Component {
       addMoreMenu: this.addMoreMenu, commitSearch: this.commitSearch, backFromConfirm: this.backFromConfirm,
       intensityOpen: !!intItem, intensityName: intItem ? intItem.name : '', intensityGlyph: intItem ? intItem.glyph : '',
       intensityFatText: (intFat >= 0 ? '+' + intFat : '' + intFat), intQuestions, closeIntensity: this.closeIntensity,
+      prefOpts,
       cats, showCats: st.screen === 'record' && !st.catId && !st.searchStep,
       showSub: st.screen === 'record' && !!st.catId && !st.searchStep,
       subItems, subName: activeCat ? activeCat.name : '', subIcon: activeCat ? activeCat.icon : 'category', subColor: activeCat ? activeCat.color : '#8a8a82',
@@ -1415,6 +1481,7 @@ export default class App extends React.Component {
         {v.isShaka && <Shaka v={v} />}
         {v.isCollect && <Collect v={v} />}
         {v.isMypage && <MyPage v={v} />}
+        {v.isTrash && <Trash v={v} />}
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}

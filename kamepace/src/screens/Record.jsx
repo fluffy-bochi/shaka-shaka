@@ -276,6 +276,9 @@ function Confirm({ v }) {
           <span style={{ ...mono, fontSize: 15, fontWeight: 700 }}>{v.searchTotalFatText}</span>
         </div>
         <button onClick={v.commitSearch} style={{ width: '100%', border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 16, padding: 16, cursor: 'pointer' }}>{v.commitLabel}</button>
+        {v.isEditFlow && (
+          <button onClick={v.trashOriginal} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#b4645a', fontWeight: 700, fontSize: 13, padding: '11px 0', cursor: 'pointer' }}>🗑 この記録をゴミ箱へ</button>
+        )}
       </div>
     </div>
   );
@@ -414,6 +417,14 @@ function IntensityPopup({ v }) {
             </div>
           </React.Fragment>
         ))}
+        {/* 好き嫌い: 行動ごとに保存され、いつも疲労に反映される */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>すき・きらい</div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          {v.prefOpts.map((o, oi) => (
+            <button key={oi} onClick={o.onPick} style={{ flex: 1, textAlign: 'center', border: `1.5px solid ${o.border}`, background: o.bg, color: o.color, borderRadius: 12, padding: '11px 0', fontSize: 12.5, fontWeight: o.weight, cursor: 'pointer' }}>{o.text}</button>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 7, lineHeight: 1.6 }}>この行動にいつも反映されます。嫌いだと疲れやすく、好きだと軽くなります</div>
         <button onClick={v.closeIntensity} style={{ width: '100%', marginTop: 18, border: 'none', borderRadius: 13, background: '#1b1b18', color: '#fff', fontWeight: 700, fontSize: 15, padding: '14px 0', cursor: 'pointer' }}>OK</button>
       </div>
     </div>
