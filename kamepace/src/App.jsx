@@ -790,19 +790,14 @@ export default class App extends React.Component {
   }
   sleepCount() { this.makeSleepPile(); return this._sleepN; }
   finishSleep = () => {
-    if (this.state.sleepAnim) return;
     const recovered = Math.max(0, this.sleepCount() - this.state.residual);
-    let s = 7; const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-    const moons = Array.from({ length: Math.min(recovered, 45) }, (_, i) => ({ x: Math.round(rng() * 86 + 2), delay: (i * 0.03).toFixed(2) + 's' }));
-    this.set({ sleepAnim: true, moons });
-    setTimeout(() => {
-      this.set({
-        collected: [...this.state.collected, { act: '睡眠', amount: recovered, ts: Date.now() }],
-        consumed: (this.state.consumed || 0) + recovered,
-        screen: 'home', sleepAnim: false, moons: [],
-      });
-      this.save();
-    }, 1900);
+    if (recovered <= 0) { this.set({ screen: 'home' }); return; }
+    // 他の回復と同じ: 🌙をシャカに降らせて、プラスの絵文字に触れたぶんだけ消す
+    // （consumed・ためた回復への加算は衝突時に行われる）
+    this._pendingNeg = [...(this._pendingNeg || []), ...Array.from({ length: Math.min(recovered, 80) }, () => '🌙')];
+    this.set({ screen: 'shaka', dayOffset: 0 });
+    this.stopPhysics();
+    requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
   };
 
   /* ================= 予定の時間進行（旧本番と統一） ================= */
@@ -1029,9 +1024,9 @@ export default class App extends React.Component {
     const rect = el.getBoundingClientRect();
     const W = rect.width || 350, H = rect.height || 700, r = this.PR;
     this.resumeMotion();
-    glyphs.slice(0, 40).forEach(g => {
+    glyphs.slice(0, 80).forEach(g => {
       const x = r + Math.random() * (W - 2 * r);
-      const y = -r - Math.random() * (H * 0.4);
+      const y = -r - Math.random() * (H * 0.6);
       const body = Bodies.circle(x, y, r, { restitution: 0.35, friction: 0.05, frictionAir: 0.01, density: 0.001 });
       body.isNegative = true;
       World.add(this.engine.world, body);
