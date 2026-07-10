@@ -69,6 +69,14 @@ export default function MyPage({ v }) {
         </div>
         <div style={label}>ヘルプ</div>
         <div style={card}>
+          <button onClick={v.startTutorial} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>🎓</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14 }}>操作チュートリアル</div>
+              <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 1 }}>サンプルの1日で記録〜睡眠までを体験</div>
+            </div>
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
           <button onClick={v.goHelp} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
             <span style={{ fontSize: 16 }}>📖</span>
             <div style={{ flex: 1, minWidth: 0 }}>

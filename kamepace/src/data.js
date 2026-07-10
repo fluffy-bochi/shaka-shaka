@@ -37,7 +37,7 @@ const act = (id, glyph, icon, name, body, mind, extra = {}) => {
 
 export const CATS = [
   { id: 'idou', icon: 'directions_subway', color: '#6f8fbf', name: 'いどう', sub: '通勤通学・運転・送迎', items: [
-    act('commute', '🚃', 'directions_subway', '通勤・通学（電車バス）', 5, 4, { kw: ['移動', '電車', '満員電車', 'バス', '通勤', '通学'] }),
+    act('commute', '🚃', 'directions_subway', '通勤・通学（電車バス）', 5, 4, { kw: ['移動', '電車', '満員電車', 'バス', '地下鉄', '通勤', '通学'] }),
     act('drive', '🚗', 'directions_car', '車の運転', 5, 7, { kw: ['移動', '運転', '車', '渋滞'] }),
     act('pickup', '🚙', 'airport_shuttle', '送迎', 4, 5, { kw: ['移動', '送り', 'お迎え', '子供'] }),
     act('walkmove', '🚶', 'directions_walk', '徒歩移動', 7, 2, { kw: ['移動', '徒歩', '歩き'] }),

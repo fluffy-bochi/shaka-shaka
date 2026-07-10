@@ -28,6 +28,7 @@ import Nav from './screens/Nav';
 import Trash from './screens/Trash';
 import { SlotTimes, CatsManage, Templates, Sensitivity } from './screens/Settings';
 import Help from './screens/Help';
+import Tutorial from './screens/Tutorial';
 
 export default class App extends React.Component {
   state = {
@@ -73,6 +74,9 @@ export default class App extends React.Component {
     editIdxs: null,
     /* ヘルプで表示中のペルソナ */
     helpPersona: 0,
+    /* 操作チュートリアル（0=オフ、1〜12=ステップ）。実データは退避して終了時に復元 */
+    tutorial: 0,
+    tutFlags: {},
     /* カレンダー枠に行動を入れているとき、その枠のタイトル（テンプレ保存キー） */
     framePlan: null,
     user: null,
@@ -99,6 +103,7 @@ export default class App extends React.Component {
     };
   }
   save() {
+    if (this.state.tutorial) return; // チュートリアル中はサンプルデータを保存しない
     // set() 直後に呼ばれるため、反映後の state で保存する
     setTimeout(() => {
       const data = this.dataState();
@@ -710,6 +715,117 @@ export default class App extends React.Component {
   };
   goTrash = () => this.set({ screen: 'trash' });
 
+  /* ================= 操作チュートリアル =================
+     実データを退避 → 学生の1日サンプルで実際のUIを操作して学ぶ → 終了/スキップで復元 */
+  startTutorial = () => {
+    this.stopPhysics(); // 先に止める（stopPhysics は _pileLayout を上書きするため）
+    this._tutBackup = JSON.parse(JSON.stringify(this.dataState()));
+    this._tutLayoutBackup = this._pileLayout || null;
+    this._pileLayout = null;
+    const t = todayStr();
+    // 学生サンプル: 午前まで記入済み
+    const entries = [
+      { from: '07:40', to: '08:10', title: '通学（電車バス）', act: '通勤', mood: '🙂', delta: 5, exp: false, date: t, glyph: '🚃', min: 30, slot: 'asa' },
+      { from: '09:00', to: '10:30', title: '講義（聞く中心）', act: '勉強', mood: '🙂', delta: 10, exp: false, date: t, glyph: '📖', min: 90, slot: 'am' },
+      { from: '10:40', to: '11:40', title: '自習', act: '勉強', mood: '🙂', delta: 6, exp: false, date: t, glyph: '📚', min: 60, slot: 'am' },
+    ];
+    this.set({
+      ...freshState(), entries,
+      tutorial: 1, tutFlags: {},
+      screen: 'home', dayOffset: 0, slotId: null, catId: null, cart: {},
+      searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [],
+      editIdxs: null, confirmOrigin: 'search', framePlan: null, confirmMode: 'duration',
+    });
+  };
+  endTutorial = () => {
+    this.stopPhysics(); // 先に止める（stopPhysics は _pileLayout を上書きするため）
+    const b = this._tutBackup;
+    this._tutBackup = null;
+    this._pileLayout = this._tutLayoutBackup || null;
+    this._tutLayoutBackup = null;
+    this.set({
+      ...(b || {}),
+      tutorial: 0, tutFlags: {},
+      screen: 'home', dayOffset: 0, slotId: null, catId: null, cart: {},
+      searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [],
+      editIdxs: null, confirmOrigin: 'search', framePlan: null, confirmMode: 'duration',
+    });
+  };
+  /* ステップ移動（入るときの仕込みもここで） */
+  gotoTutStep = (n) => {
+    const patch = { tutorial: n, tutFlags: {} };
+    if (n === 7) {
+      // 1日分のサンプルを足してホームへ
+      const t = todayStr();
+      const evening = [
+        { from: '18:00', to: '20:00', title: 'バイト接客', act: '仕事', mood: '🙂', delta: 26, exp: false, date: t, glyph: '🙋', min: 120, slot: 'yoru' },
+        { from: '21:00', to: '21:30', title: '帰宅（電車バス）', act: '通勤', mood: '🙂', delta: 5, exp: false, date: t, glyph: '🚃', min: 30, slot: 'yoru' },
+      ];
+      patch.entries = sortEntries([...this.state.entries, ...evening]);
+      patch.screen = 'home';
+    }
+    if (n === 8) {
+      // 翌日に移動: サンプルの日付を昨日にして持ち越しを見せる
+      const y = shiftDate(todayStr(), -1);
+      patch.entries = this.state.entries.map(e => ({ ...e, date: y, _new: false }));
+      patch.screen = 'home';
+      this._pileLayout = null;
+    }
+    if (n === 9) patch.screen = 'home';
+    if (n === 10) patch.tutFlags = { res0: this.state.residual };
+    this.set(patch);
+  };
+  tutNext = () => {
+    const t = this.state.tutorial;
+    if (t >= 12) { this.endTutorial(); return; }
+    this.gotoTutStep(t + 1);
+  };
+  /* 操作の検知（componentDidUpdate から呼ばれる） */
+  checkTutorial(prev) {
+    const s = this.state;
+    const t = s.tutorial;
+    if (!t) return;
+    switch (t) {
+      case 1:
+        if (s.screen === 'record' && s.slotId === 'pm') this.gotoTutStep(2);
+        break;
+      case 2:
+        if (s.searchCart.some(it => /課題/.test(it.name))) this.gotoTutStep(3);
+        break;
+      case 3:
+        if (s.searchCart.length >= 4) this.gotoTutStep(4);
+        break;
+      case 4: {
+        if (s.screen === 'shaka') { this.gotoTutStep(6); break; } // 先に保存した
+        const f = { ...s.tutFlags };
+        let changed = false;
+        const picks = (c) => JSON.stringify((c || []).map(i => i.picks));
+        if (!f.int && picks(prev.searchCart) !== picks(s.searchCart)) { f.int = true; changed = true; }
+        if (!f.time && (prev.searchTotalMin !== s.searchTotalMin || prev.searchFracs !== s.searchFracs)) { f.time = true; changed = true; }
+        if (f.int && f.time) { this.gotoTutStep(5); break; }
+        if (changed) this.set({ tutFlags: f });
+        break;
+      }
+      case 5:
+        if (s.screen === 'shaka') this.gotoTutStep(6);
+        break;
+      case 6:
+        // 🔀を押したら shake() が tutFlags.shaken を立てる → カードに「次へ」が出る
+        break;
+      case 9:
+        if (s.screen === 'sleep') this.gotoTutStep(10);
+        break;
+      case 10:
+        if (s.tutFlags.res0 != null && s.residual !== s.tutFlags.res0) this.gotoTutStep(11);
+        break;
+      case 11:
+        if (!s.tutFlags.slept && prev.screen === 'sleep' && s.screen !== 'sleep') this.set({ tutFlags: { ...s.tutFlags, slept: true } });
+        break;
+      default:
+        break;
+    }
+  }
+
   /* ================= マイページの設定サブ画面 ================= */
   goSlotTimes = () => this.set({ screen: 'slotTimes' });
   goHelp = () => this.set({ screen: 'help' });
@@ -877,6 +993,9 @@ export default class App extends React.Component {
     }, 160);
     this._planT = setInterval(() => this.advancePlans(), 1000);
   }
+  componentDidUpdate(prevProps, prevState) {
+    if (this.state.tutorial) this.checkTutorial(prevState);
+  }
   componentWillUnmount() {
     clearInterval(this._tick); clearInterval(this._planT);
     if (this._unwatch) this._unwatch();
@@ -995,7 +1114,9 @@ export default class App extends React.Component {
       a: Math.round(body.angle * 100) / 100,
     }));
     this._pileLayout = layout;
-    try { localStorage.setItem('shaka_pile_layout', JSON.stringify(layout)); } catch (e) { /* ignore */ }
+    if (!this.state.tutorial) {
+      try { localStorage.setItem('shaka_pile_layout', JSON.stringify(layout)); } catch (e) { /* ignore */ }
+    }
   }
   freezeMotion() {
     if (!this.runner || !this._running) return;
@@ -1136,6 +1257,7 @@ export default class App extends React.Component {
   }
   shake = () => {
     if (!this.bodies) return;
+    if (this.state.tutorial === 6 && !this.state.tutFlags.shaken) this.set({ tutFlags: { ...this.state.tutFlags, shaken: true } });
     this.resumeMotion();
     this.bodies.forEach(({ body }) => {
       Matter.Body.setVelocity(body, { x: (Math.random() - 0.5) * 32, y: -Math.random() * 14 });
@@ -1553,6 +1675,8 @@ export default class App extends React.Component {
       isTemplates: st.screen === 'templates', isSensitivity: st.screen === 'sensitivity',
       isHelp: st.screen === 'help', helpPersona: st.helpPersona || 0,
       goHelp: this.goHelp, setHelpPersona: this.setHelpPersona,
+      tutorial: st.tutorial, tutFlags: st.tutFlags,
+      startTutorial: this.startTutorial, endTutorial: this.endTutorial, tutNext: this.tutNext,
       isCollect: st.screen === 'collect', collectedTotal: this.collectedTotal(),
       goCollect: this.goCollect, finishSleep: this.finishSleep,
       navHomeColor: ['home', 'record', 'sleep'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
@@ -1670,6 +1794,7 @@ export default class App extends React.Component {
         {v.isTemplates && <Templates v={v} />}
         {v.isSensitivity && <Sensitivity v={v} />}
         {v.isHelp && <Help v={v} />}
+        {v.tutorial > 0 && <Tutorial v={v} />}
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}
