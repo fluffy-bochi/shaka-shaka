@@ -1,22 +1,25 @@
 /* 静的データ: プロトタイプ（かめペース プロトタイプ.dc.html）と旧本番（reference/index.html）から移植 */
 
 export const SLOTS = [
-  { id: 'asa', emoji: '🌅', name: '朝', fromH: 6, toH: 9, base: '07:00' },
-  { id: 'am', emoji: '☀️', name: '午前', fromH: 9, toH: 12, base: '10:00' },
-  { id: 'pm', emoji: '🌤', name: '午後', fromH: 12, toH: 18, base: '14:00' },
-  { id: 'yoru', emoji: '🌙', name: '夜', fromH: 18, toH: 30, base: '20:00' },
+  { id: 'asa', emoji: '🌅', name: '朝' },
+  { id: 'am', emoji: '☀️', name: '午前' },
+  { id: 'pm', emoji: '🌤', name: '午後' },
+  { id: 'yoru', emoji: '🌙', name: '夜' },
 ];
-export function slotForHour(h) {
-  if (h >= 6 && h < 9) return 'asa';
-  if (h >= 9 && h < 12) return 'am';
-  if (h >= 12 && h < 18) return 'pm';
+/* 枠の開始時刻（朝・午前・午後・夜）。マイページ「枠のじかん」で変更でき同期される */
+export const DEFAULT_SLOT_HOURS = [6, 9, 12, 18];
+export function slotForHour(h, hours = DEFAULT_SLOT_HOURS) {
+  const [a, b, c, d] = hours;
+  if (h >= a && h < b) return 'asa';
+  if (h >= b && h < c) return 'am';
+  if (h >= c && h < d) return 'pm';
   return 'yoru';
 }
-export function slotOfEntry(e) {
+export function slotOfEntry(e, hours) {
   const h = parseInt((e.from || '00:00').split(':')[0], 10) || 0;
-  return slotForHour(h);
+  return slotForHour(h, hours);
 }
-export function slotForNow() { return slotForHour(new Date().getHours()); }
+export function slotForNow(hours) { return slotForHour(new Date().getHours(), hours); }
 
 /* カテゴリマスタ（カテゴリマスタ設計_v2.md 準拠）
    body/mind は設計書の（体, 心）/h。表示・計算は合計の fh（回復はマイナス）。

@@ -77,6 +77,10 @@ export function serialize(st) {
     customPlans: st.customPlans || [],
     customActions: st.customActions || [],
     prefs: st.prefs || {},
+    slotHours: st.slotHours || null,
+    hiddenCats: st.hiddenCats || [],
+    fatigueCoef: st.fatigueCoef || 1,
+    recoverCoef: st.recoverCoef || 1,
     updatedAt: Date.now(),
   };
 }
@@ -112,6 +116,10 @@ export function deserialize(data) {
     customPlans: Array.isArray(data.customPlans) ? data.customPlans : [],
     customActions: Array.isArray(data.customActions) ? data.customActions : [],
     prefs: (data.prefs && typeof data.prefs === 'object') ? data.prefs : {},
+    slotHours: (Array.isArray(data.slotHours) && data.slotHours.length === 4) ? data.slotHours : null,
+    hiddenCats: Array.isArray(data.hiddenCats) ? data.hiddenCats : [],
+    fatigueCoef: typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1,
+    recoverCoef: typeof data.recoverCoef === 'number' ? data.recoverCoef : 1,
   };
 }
 
@@ -120,6 +128,7 @@ export function freshState() {
     entries: [], tasks: [], sortMode: false,
     collected: [], collectedSeen: 0, templates: {}, consumed: 0, sampleDay: null,
     customCats: [], customPlans: [], customActions: [], prefs: {},
+    slotHours: null, hiddenCats: [], fatigueCoef: 1, recoverCoef: 1,
   };
 }
 

@@ -29,9 +29,23 @@ export default function MyPage({ v }) {
         </div>
         <div style={label}>きろく</div>
         <div style={card}>
-          <div style={row()}><span style={{ fontSize: 16 }}>🕘</span><span style={{ flex: 1, fontSize: 14 }}>枠のじかん</span><span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span></div>
-          <div style={row()}><span style={{ fontSize: 16 }}>🏷</span><span style={{ flex: 1, fontSize: 14 }}>カテゴリの管理</span><span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span></div>
-          <div style={row()}><span style={{ fontSize: 16 }}>📋</span><span style={{ flex: 1, fontSize: 14 }}>テンプレート</span><span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span></div>
+          <button onClick={v.goSlotTimes} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>🕘</span>
+            <span style={{ flex: 1, fontSize: 14 }}>枠のじかん</span>
+            <span style={{ ...mono, fontSize: 11.5, color: '#8a8a82' }}>{v.slotTimesSub}時</span>
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
+          <button onClick={v.goCatsManage} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>🏷</span>
+            <span style={{ flex: 1, fontSize: 14 }}>カテゴリの管理</span>
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
+          <button onClick={v.goTemplates} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>📋</span>
+            <span style={{ flex: 1, fontSize: 14 }}>テンプレート</span>
+            {v.templateRows.length > 0 && <span style={{ ...mono, fontSize: 11.5, color: '#8a8a82' }}>{v.templateRows.length}件</span>}
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
           <button onClick={v.goTrash} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
             <span style={{ fontSize: 16 }}>🗑</span>
             <span style={{ flex: 1, fontSize: 14 }}>ゴミ箱</span>
@@ -41,7 +55,12 @@ export default function MyPage({ v }) {
         </div>
         <div style={label}>つかれの計算</div>
         <div style={card}>
-          <div style={row()}><span style={{ fontSize: 16 }}>💪</span><span style={{ flex: 1, fontSize: 14 }}>疲れやすさの調整</span><span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span></div>
+          <button onClick={v.goSensitivity} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>💪</span>
+            <span style={{ flex: 1, fontSize: 14 }}>疲れやすさの調整</span>
+            <span style={{ ...mono, fontSize: 11.5, color: '#8a8a82' }}>疲れ{v.fatigueCoefText} ・ 回復{v.recoverCoefText}</span>
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
           <button onClick={v.doCalendarSync} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
             <span style={{ fontSize: 16 }}>📅</span>
             <span style={{ flex: 1, fontSize: 14 }}>Googleカレンダー / ToDo</span>

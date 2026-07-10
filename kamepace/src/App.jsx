@@ -6,7 +6,7 @@ import React from 'react';
 import Matter from 'matter-js';
 import {
   SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT,
-  guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA,
+  guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA, DEFAULT_SLOT_HOURS,
 } from './data';
 import {
   todayStr, shiftDate, formatDateCaps, formatDateShort, pad2, hmToTsOn,
@@ -26,6 +26,7 @@ import Collect from './screens/Collect';
 import MyPage from './screens/MyPage';
 import Nav from './screens/Nav';
 import Trash from './screens/Trash';
+import { SlotTimes, CatsManage, Templates, Sensitivity } from './screens/Settings';
 
 export default class App extends React.Component {
   state = {
@@ -89,7 +90,8 @@ export default class App extends React.Component {
       entries: s.entries, tasks: s.tasks, collected: s.collected, collectedSeen: s.collectedSeen,
       templates: s.templates, sortMode: s.sortMode, consumed: s.consumed, sampleDay: s.sampleDay,
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
-      prefs: s.prefs,
+      prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats,
+      fatigueCoef: s.fatigueCoef, recoverCoef: s.recoverCoef,
     };
   }
   save() {
@@ -134,14 +136,30 @@ export default class App extends React.Component {
       .filter(({ e }) => e.date === t && !e.exp)
       .sort((a, b) => (a.e.from || '').localeCompare(b.e.from || ''));
     rows.forEach(({ e, i }) => {
-      const sid = e.slot || slotOfEntry(e);
+      const sid = this.slotOf(e);
       const r = entryToRecord(e);
       r._i = i;
       (out[sid] || out.yoru).push(r);
     });
     return out;
   }
-  slotDef(id) { return SLOTS.find(s => s.id === id) || SLOTS[0]; }
+  /* 枠のじかん（マイページで変更可・同期） */
+  slotHoursArr() {
+    const h = this.state.slotHours;
+    return (Array.isArray(h) && h.length === 4) ? h : DEFAULT_SLOT_HOURS;
+  }
+  slotDefs() {
+    const h = this.slotHoursArr();
+    return SLOTS.map((s, i) => ({
+      ...s,
+      fromH: h[i],
+      toH: i < 3 ? h[i + 1] : h[0] + 24,
+      base: pad2(Math.min(h[i] + 1, 23)) + ':00', // 通常記録の配置基準＝枠開始+1h
+    }));
+  }
+  slotDef(id) { const d = this.slotDefs(); return d.find(s => s.id === id) || d[0]; }
+  slotOf(e) { return e.slot || slotOfEntry(e, this.slotHoursArr()); }
+  slotNow() { return slotForNow(this.slotHoursArr()); }
   /* スロット基準時刻＋累積分 → "HH:MM"（通常記録の配置。CLAUDE.md §G） */
   slotHm(slot, offsetMin) {
     const [bh, bm] = slot.base.split(':').map(Number);
@@ -150,7 +168,7 @@ export default class App extends React.Component {
   }
   slotUsedMin(slotId) {
     return this.todayEntries()
-      .filter(e => (e.slot || slotOfEntry(e)) === slotId && !e.planned)
+      .filter(e => this.slotOf(e) === slotId && !e.planned)
       .reduce((a, e) => a + entryMin(e), 0);
   }
   hmToTs(hm) { const [h, m] = (hm || '0:0').split(':').map(Number); const d = new Date(); d.setHours(h || 0, m || 0, 0, 0); return d.getTime(); }
@@ -208,6 +226,8 @@ export default class App extends React.Component {
       const mult = item.fh >= 0 ? { dislike: 1.3, like: 0.7 } : { dislike: 0.7, like: 1.3 };
       if (mult[pref]) m *= mult[pref];
     }
+    // 個人係数（マイページ「疲れやすさの調整」）: 疲労は疲れやすさ、回復は回復しやすさ
+    m *= item.fh >= 0 ? (this.state.fatigueCoef || 1) : (this.state.recoverCoef || 1);
     return item.fh * m;
   }
   setPref = (name, val) => {
@@ -321,13 +341,13 @@ export default class App extends React.Component {
     const mins = fr.map(f => Math.max(1, Math.round(f * totalMin)));
     const d = totalMin - mins.reduce((a, b) => a + b, 0); mins[n - 1] = Math.max(1, mins[n - 1] + d);
     const now = Date.now();
-    const slotId = this.state.slotId || slotForNow();
+    const slotId = this.state.slotId || this.slotNow();
     const slot = this.slotDef(slotId);
     let cursor = timeMode ? this.hmToTs(this.state.startTime) : null;
     // 通常記録の配置位置: 同スロットの使用済み分（編集中は元の記録を除いて数える）
     const t0 = todayStr();
     let slotOffset = baseEntries
-      .filter(e => e.date === t0 && !e.exp && !e.planned && (e.slot || slotOfEntry(e)) === slotId)
+      .filter(e => e.date === t0 && !e.exp && !e.planned && this.slotOf(e) === slotId)
       .reduce((a, e) => a + entryMin(e), 0);
     const templates = { ...(this.state.templates || {}) };
     const newEntries = items.map((t, i) => {
@@ -624,7 +644,7 @@ export default class App extends React.Component {
     const first = entries[idxs[0]], last = entries[idxs[idxs.length - 1]];
     const anyPlanned = idxs.some(i => !!entries[i].planned);
     this.set({
-      screen: 'record', slotId: first.slot || slotOfEntry(first),
+      screen: 'record', slotId: this.slotOf(first),
       searchStep: 'confirm', confirmOrigin: 'edit', editIdxs: idxs,
       searchCart: items, searchTotalMin: total, searchFracs: mins.map(m => m / total),
       confirmMode: anyPlanned ? 'time' : 'duration',
@@ -650,6 +670,42 @@ export default class App extends React.Component {
     this.toast('ゴミ箱に移動しました');
   };
   goTrash = () => this.set({ screen: 'trash' });
+
+  /* ================= マイページの設定サブ画面 ================= */
+  goSlotTimes = () => this.set({ screen: 'slotTimes' });
+  goCatsManage = () => this.set({ screen: 'catsManage' });
+  goTemplates = () => this.set({ screen: 'templates' });
+  goSensitivity = () => this.set({ screen: 'sensitivity' });
+  /* 枠の開始時刻を±1h（前後の枠と最低1時間の間隔を保つ） */
+  adjustSlotHour = (i, d) => {
+    const h = [...this.slotHoursArr()];
+    const nv = h[i] + d;
+    const min = i === 0 ? 0 : h[i - 1] + 1;
+    const max = i === 3 ? 23 : h[i + 1] - 1;
+    if (nv < min || nv > max) return;
+    h[i] = nv;
+    this.set({ slotHours: h });
+    this.save();
+  };
+  toggleCatHidden = (id) => {
+    const cur = this.state.hiddenCats || [];
+    this.set({ hiddenCats: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] });
+    this.save();
+  };
+  deleteCustomCat = (id) => {
+    this.set({ customCats: (this.state.customCats || []).filter(c => c.id !== id) });
+    this.save();
+    this.toast('カテゴリを削除しました');
+  };
+  deleteTemplate = (key) => {
+    const templates = { ...(this.state.templates || {}) };
+    delete templates[key];
+    this.set({ templates });
+    this.save();
+    this.toast('テンプレを削除しました');
+  };
+  setFatigueCoef = (v) => { this.set({ fatigueCoef: v }); this.save(); };
+  setRecoverCoef = (v) => { this.set({ recoverCoef: v }); this.save(); };
   restoreTrash = (idx) => {
     const entries = this.state.entries.map((e, i) => i === idx ? { ...e, exp: false, trashedAt: null } : e);
     this.set({ entries });
@@ -669,7 +725,7 @@ export default class App extends React.Component {
     const e = idx != null ? this.state.entries[idx] : null;
     if (!e) return;
     this.set({
-      screen: 'record', slotId: e.slot || slotOfEntry(e),
+      screen: 'record', slotId: this.slotOf(e),
       searchStep: null, catId: null, cart: {},
       confirmOrigin: 'edit', editIdxs: [idx], framePlan: e.plan || e.title,
       confirmMode: 'time', startTime: e.from || '', endTime: e.to || '',
@@ -1249,7 +1305,9 @@ export default class App extends React.Component {
     });
 
     const activeCat = this.allCats().find(c => c.id === st.catId);
-    const cats = this.allCats().map(c => ({ id: c.id, name: c.name, sub: c.sub, icon: c.icon, color: c.color, onSelect: () => this.selectCat(c.id) }));
+    const hiddenCats = st.hiddenCats || [];
+    // 非表示カテゴリはリストから隠すだけ（検索・既存記録からは到達可能）
+    const cats = this.allCats().filter(c => !hiddenCats.includes(c.id)).map(c => ({ id: c.id, name: c.name, sub: c.sub, icon: c.icon, color: c.color, onSelect: () => this.selectCat(c.id) }));
     const plans = this.allPlans().map(p => { const m = this.planMeta(p); return { id: p.id, name: p.name, meta: m.metaText, onOpen: () => this.openPlan(p.id) }; });
     const detailPlan = st.planDetailId ? this.planById(st.planDetailId) : null;
     const detailMeta = detailPlan ? this.planMeta(detailPlan) : null;
@@ -1352,10 +1410,48 @@ export default class App extends React.Component {
     const sleepN = this.sleepCount();
     const recovered = Math.max(0, sleepN - st.residual);
 
-    const activeSlot = this.slotDef(st.slotId || slotForNow());
+    const activeSlot = this.slotDef(st.slotId || this.slotNow());
     const viewDateStr = shiftDate(todayStr(), st.dayOffset);
 
     const isEditFlow = st.confirmOrigin === 'edit';
+
+    /* ---- マイページの設定サブ画面 ---- */
+    const sh = this.slotHoursArr();
+    const slotDefs = this.slotDefs();
+    const slotTimeRows = slotDefs.map((s, i) => ({
+      id: s.id, emoji: s.emoji, name: s.name,
+      rangeText: s.fromH + ':00 – ' + (i < 3 ? sh[i + 1] + ':00' : '翌' + sh[0] + ':00'),
+      startText: pad2(s.fromH) + ':00',
+      onDec: () => this.adjustSlotHour(i, -1),
+      onInc: () => this.adjustSlotHour(i, 1),
+    }));
+    const slotTimesSub = sh.map(x => x).join(' / ');
+    const catRows = this.allCats().map(c => {
+      const hidden = hiddenCats.includes(c.id);
+      const isCustom = (st.customCats || []).some(x => x.id === c.id);
+      return {
+        id: c.id, name: c.name, icon: c.icon, color: c.color,
+        sub: c.items.length + '件の行動' + (isCustom ? ' ・ じぶんで追加' : ''),
+        hidden, isCustom,
+        onToggle: () => this.toggleCatHidden(c.id),
+        onDelete: isCustom ? () => this.deleteCustomCat(c.id) : null,
+      };
+    });
+    const templateRows = Object.entries(st.templates || {}).map(([key, t]) => ({
+      key, name: key,
+      sub: (t.tasks && t.tasks.length)
+        ? t.tasks.map(x => (x.glyph || '') + x.name).join(' ・ ')
+        : ((t.act || 'その他') + ' ・ ' + (t.delta >= 0 ? '+' + t.delta : t.delta)),
+      onDelete: () => this.deleteTemplate(key),
+    }));
+    const COEF_STEPS = [0.8, 0.9, 1, 1.1, 1.2];
+    const coefOpts = (cur, onPick, labels) => COEF_STEPS.map((v, i) => ({
+      text: labels[i], v,
+      on: Math.abs((cur || 1) - v) < 0.001,
+      onPick: () => onPick(v),
+    }));
+    const fatigueOpts = coefOpts(st.fatigueCoef, this.setFatigueCoef, ['かなり疲れにくい', '疲れにくい', 'ふつう', '疲れやすい', 'かなり疲れやすい']);
+    const recoverOpts = coefOpts(st.recoverCoef, this.setRecoverCoef, ['回復しにくい', 'やや回復しにくい', 'ふつう', 'やや回復しやすい', '回復しやすい']);
 
     /* ---- ゴミ箱 ---- */
     const trashRows = st.entries
@@ -1375,14 +1471,16 @@ export default class App extends React.Component {
       isHome: st.screen === 'home', isRecord: st.screen === 'record',
       isSleep: st.screen === 'sleep', isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
       isTrash: st.screen === 'trash',
+      isSlotTimes: st.screen === 'slotTimes', isCatsManage: st.screen === 'catsManage',
+      isTemplates: st.screen === 'templates', isSensitivity: st.screen === 'sensitivity',
       isCollect: st.screen === 'collect', collectedTotal: this.collectedTotal(),
       goCollect: this.goCollect, finishSleep: this.finishSleep,
       navHomeColor: ['home', 'record', 'sleep'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navHomeFill: ['home', 'record', 'sleep'].includes(st.screen) ? 1 : 0,
       navShakaColor: ['shaka', 'collect'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navShakaFill: ['shaka', 'collect'].includes(st.screen) ? 1 : 0,
-      navMypageColor: ['mypage', 'trash'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
-      navMypageFill: ['mypage', 'trash'].includes(st.screen) ? 1 : 0,
+      navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
+      navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity'].includes(st.screen) ? 1 : 0,
       homeDateCaps: formatDateCaps(todayStr()),
       pile: st.screen === 'home' ? this.makePile(7) : [],
       sleepPile: st.screen === 'sleep' ? this.makeSleepPile().map((p, i) => ({
@@ -1419,6 +1517,11 @@ export default class App extends React.Component {
       confirmTitle: isEditFlow ? 'きろくを編集' : '登録を確認',
       isEditFlow, trashOriginal: this.trashOriginal,
       trashRows, trashCount: trashRows.length, goTrash: this.goTrash,
+      /* マイページの設定サブ画面 */
+      slotTimeRows, slotTimesSub, catRows, templateRows, fatigueOpts, recoverOpts,
+      fatigueCoefText: '×' + (st.fatigueCoef || 1).toFixed(1), recoverCoefText: '×' + (st.recoverCoef || 1).toFixed(1),
+      goSlotTimes: this.goSlotTimes, goCatsManage: this.goCatsManage,
+      goTemplates: this.goTemplates, goSensitivity: this.goSensitivity,
       homeMotion: st.homeMotion, setMotionFixed: () => this.setMotion(false), setMotionMove: () => this.setMotion(true),
       motionFixedBg: st.homeMotion ? '#fff' : '#1b1b18', motionFixedColor: st.homeMotion ? '#8a8a82' : '#fff',
       motionMoveBg: st.homeMotion ? '#1b1b18' : '#fff', motionMoveColor: st.homeMotion ? '#fff' : '#8a8a82',
@@ -1445,7 +1548,7 @@ export default class App extends React.Component {
       openCatAdd: this.openCatAdd, closeCatAdd: this.closeCatAdd, onCatName: this.onCatName, addCat: this.addCat,
       recordSlotName: activeSlot.name, recordSlotEmoji: activeSlot.emoji,
       slotMenuOpen: !!st.slotMenuOpen, toggleSlotMenu: this.toggleSlotMenu,
-      slotOptions: SLOTS.map(s => ({ id: s.id, emoji: s.emoji, name: s.name, active: s.id === (st.slotId || slotForNow()), bg: s.id === (st.slotId || slotForNow()) ? '#fbfdf0' : '#fff', onPick: () => this.pickSlot(s.id) })),
+      slotOptions: SLOTS.map(s => ({ id: s.id, emoji: s.emoji, name: s.name, active: s.id === (st.slotId || this.slotNow()), bg: s.id === (st.slotId || this.slotNow()) ? '#fbfdf0' : '#fff', onPick: () => this.pickSlot(s.id) })),
       showCart: count > 0,
       cartMeta: count + '件 · ' + this.fmtMin(items.reduce((a, t) => a + (this.cartFh(t) < 0 || t.id === 'shop' ? 0.5 : 1), 0) * 60),
       cartFatText: (cartFat >= 0 ? '+' + cartFat : '' + cartFat),
@@ -1482,6 +1585,10 @@ export default class App extends React.Component {
         {v.isCollect && <Collect v={v} />}
         {v.isMypage && <MyPage v={v} />}
         {v.isTrash && <Trash v={v} />}
+        {v.isSlotTimes && <SlotTimes v={v} />}
+        {v.isCatsManage && <CatsManage v={v} />}
+        {v.isTemplates && <Templates v={v} />}
+        {v.isSensitivity && <Sensitivity v={v} />}
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}
