@@ -12,6 +12,9 @@ function Shell() {
         <span>かめペース</span>
       </header>
       <div className="shell-body">
+        <aside className="shell-side">
+          <img className="questionnaire" src="/questionnaire.png" alt="適度に頑張るための支援ツール開発のためのアンケート" />
+        </aside>
         <div className="phone">
           <App />
         </div>
