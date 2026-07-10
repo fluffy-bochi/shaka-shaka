@@ -115,8 +115,18 @@ export default class App extends React.Component {
   loadGuest() {
     let g = null;
     try { const s = localStorage.getItem('shaka_guest'); if (s) g = JSON.parse(s); } catch (e) { /* ignore */ }
-    this.set({ ...deserialize(g), booted: true });
+    const data = deserialize(g);
+    this.set({ ...data, booted: true });
     setTimeout(() => this.advancePlans(), 0); // アプリを閉じている間に進んだ予定をキャッチアップ
+    // はじめてのゲスト（記録がまだ無い）には、開くたびにチュートリアルを自動表示。
+    // ログアウトで戻ってきた同一セッションでは出さない（起動時の1回だけ判定）
+    if (!this._autoTutChecked) {
+      this._autoTutChecked = true;
+      const hasData = (data.entries && data.entries.length > 0)
+        || (data.collected && data.collected.length > 0)
+        || (data.consumed || 0) > 0;
+      if (!hasData) setTimeout(() => { if (!this.state.tutorial && !this.state.user) this.startTutorial(); }, 400);
+    }
   }
   async loadCloud() {
     try {
