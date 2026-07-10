@@ -1100,10 +1100,12 @@ export default class App extends React.Component {
   /* ================= matter.js physics ================= */
   PR = 18;
   /* スイカゲーム風の「硬い」物理: 跳ねない・よく噛む・沈まない */
-  BODY_OPTS = { restitution: 0.12, friction: 0.4, frictionStatic: 0.6, frictionAir: 0.012, density: 0.01, slop: 0.01 };
+  BODY_OPTS = { restitution: 0.12, friction: 0.4, frictionStatic: 0.6, frictionAir: 0.012, density: 0.01, slop: 0.01, sleepThreshold: 30 };
   _tuneEngine(engine) {
-    engine.positionIterations = 12; // めり込み解消の反復を増やす（沈み防止の要）
-    engine.velocityIterations = 8;
+    engine.positionIterations = 16; // めり込み解消の反復を増やす（沈み防止の要）
+    engine.velocityIterations = 10;
+    // 静止した絵文字は完全にスリープさせ、山の圧縮クリープ（じわじわ沈む）を止める
+    engine.enableSleeping = true;
   }
   componentDidMount() {
     initShakaSound();
@@ -1422,6 +1424,7 @@ export default class App extends React.Component {
     if (!this.bodies || !this.engine) return;
     this.resumeMotion();
     this.bodies.forEach(({ body }) => {
+      Matter.Sleeping.set(body, false); // スリープ中でも起こして飛ばす
       Matter.Body.setVelocity(body, { x: (Math.random() - 0.5) * 2 * k, y: -Math.random() * k * 0.9 });
       Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.4);
     });
