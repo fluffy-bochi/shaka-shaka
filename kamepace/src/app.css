@@ -118,4 +118,11 @@ input { font-family: inherit; }
     letter-spacing: .12em;
     color: #8a8a82;
   }
+  /* 左側のアンケートカード（画像自体がカードなので枠なしで表示） */
+  .questionnaire {
+    width: 196px;
+    display: block;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(27,27,24,.14);
+  }
 }
