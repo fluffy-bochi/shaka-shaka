@@ -93,10 +93,10 @@ export function Templates({ v }) {
   );
 }
 
-/* 疲れやすさの調整: 個人係数（疲れやすさ／回復しやすさ）5段階 */
+/* 疲れやすさの調整: 体・心それぞれの個人係数（疲れやすさ／回復しやすさ）5段階 */
 export function Sensitivity({ v }) {
   const section = (label, opts) => (
-    <>
+    <React.Fragment key={label}>
       <div style={{ fontSize: 13, fontWeight: 700, margin: '16px 4px 8px' }}>{label}</div>
       <div style={{ ...card, padding: 6 }}>
         {opts.map((o, i) => (
@@ -107,12 +107,12 @@ export function Sensitivity({ v }) {
           </button>
         ))}
       </div>
-    </>
+    </React.Fragment>
   );
   return (
     <Page v={v} title="💪 疲れやすさの調整">
-      {section('疲れやすさ（がんばりの記録にかかる）', v.fatigueOpts)}
-      {section('回復しやすさ（休憩・回復の記録にかかる）', v.recoverOpts)}
+      <div style={{ fontSize: 11.5, color: '#8a8a82', margin: '4px 6px 0', lineHeight: 1.7 }}>行動ごとの「体」「心」のつかれに、それぞれの係数がかかります（例: 接客＝体5＋心8）。</div>
+      {v.sensSections.map(s => section(s.label, s.opts))}
       <div style={{ fontSize: 11, color: '#b4b2a8', margin: '12px 6px 0', lineHeight: 1.7 }}>これからの記録に反映されます（過去の記録は変わりません）。</div>
     </Page>
   );

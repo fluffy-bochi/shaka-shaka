@@ -58,7 +58,7 @@ export default function MyPage({ v }) {
           <button onClick={v.goSensitivity} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
             <span style={{ fontSize: 16 }}>💪</span>
             <span style={{ flex: 1, fontSize: 14 }}>疲れやすさの調整</span>
-            <span style={{ ...mono, fontSize: 11.5, color: '#8a8a82' }}>疲れ{v.fatigueCoefText} ・ 回復{v.recoverCoefText}</span>
+            <span style={{ ...mono, fontSize: 11.5, color: '#8a8a82' }}>{v.sensSub}</span>
             <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
           </button>
           <button onClick={v.doCalendarSync} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>

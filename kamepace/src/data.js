@@ -131,22 +131,23 @@ export const PLANS = [
 
 export const KW_PLACEHOLDERS = ['(例)通勤', '(例)会議 打ち合わせ', '(例)皿洗い', '(例)買い物 スーパー', '(例)ランニング', '(例)休憩 お茶', '(例)資料作成', '(例)入浴', '(例)掃除', '(例)飲み会'];
 
-/* 検索候補: カテゴリマスタの全行動＋バリエーション（座れた/立ち等の分岐） */
+/* 検索候補: カテゴリマスタの全行動＋バリエーション（座れた/立ち等の分岐）。
+   body/mind は（体, 心）/h の内訳。fh = 合計 */
 const SEARCH_VARIANTS = [
-  { name: '通勤（電車・座れた）', glyph: '🚃', fh: 7, kw: ['通勤', '電車', '移動'] },
-  { name: '通勤（電車・立ち）', glyph: '🚃', fh: 10, kw: ['通勤', '電車', '移動'] },
-  { name: '通勤（バス）', glyph: '🚌', fh: 8, kw: ['通勤', 'バス', '移動'] },
-  { name: 'オンライン会議', glyph: '💻', fh: 8, kw: ['会議', 'オンライン', '仕事'] },
-  { name: '集中作業', glyph: '⌨️', fh: 8, kw: ['集中', '作業', '仕事'] },
-  { name: 'メール返信', glyph: '📧', fh: 4, kw: ['メール', '返信', '仕事'] },
-  { name: '掃除機がけ', glyph: '🧹', fh: 7, kw: ['掃除', '家事', '掃除機'] },
-  { name: 'ランニング', glyph: '🏃', fh: 12, kw: ['ランニング', '運動', 'ジョギング', '走る'] },
-  { name: '筋トレ', glyph: '🏋️', fh: 14, kw: ['筋トレ', '運動', 'ジム', 'トレーニング'] },
+  { name: '通勤（電車・座れた）', glyph: '🚃', fh: 7, body: 4, mind: 3, kw: ['通勤', '電車', '移動'] },
+  { name: '通勤（電車・立ち）', glyph: '🚃', fh: 10, body: 6, mind: 4, kw: ['通勤', '電車', '移動'] },
+  { name: '通勤（バス）', glyph: '🚌', fh: 8, body: 4, mind: 4, kw: ['通勤', 'バス', '移動'] },
+  { name: 'オンライン会議', glyph: '💻', fh: 8, body: 2, mind: 6, kw: ['会議', 'オンライン', '仕事'] },
+  { name: '集中作業', glyph: '⌨️', fh: 8, body: 3, mind: 5, kw: ['集中', '作業', '仕事'] },
+  { name: 'メール返信', glyph: '📧', fh: 4, body: 1, mind: 3, kw: ['メール', '返信', '仕事'] },
+  { name: '掃除機がけ', glyph: '🧹', fh: 7, body: 5, mind: 2, kw: ['掃除', '家事', '掃除機'] },
+  { name: 'ランニング', glyph: '🏃', fh: 12, body: 10, mind: 2, kw: ['ランニング', '運動', 'ジョギング', '走る'] },
+  { name: '筋トレ', glyph: '🏋️', fh: 14, body: 12, mind: 2, kw: ['筋トレ', '運動', 'ジム', 'トレーニング'] },
 ];
 export const SEARCH_DB = [
   ...SEARCH_VARIANTS,
   ...CATS.flatMap(c => c.items.map(it => ({
-    name: it.name, glyph: it.glyph, fh: it.fh,
+    name: it.name, glyph: it.glyph, fh: it.fh, body: it.body, mind: it.mind,
     kw: [...(it.kw || []), c.name, it.name],
   }))),
 ];

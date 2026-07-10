@@ -94,7 +94,8 @@ export default class App extends React.Component {
       templates: s.templates, sortMode: s.sortMode, consumed: s.consumed, sampleDay: s.sampleDay,
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats,
-      fatigueCoef: s.fatigueCoef, recoverCoef: s.recoverCoef,
+      bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
+      bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
     };
   }
   save() {
@@ -229,9 +230,20 @@ export default class App extends React.Component {
       const mult = item.fh >= 0 ? { dislike: 1.3, like: 0.7 } : { dislike: 0.7, like: 1.3 };
       if (mult[pref]) m *= mult[pref];
     }
-    // 個人係数（マイページ「疲れやすさの調整」）: 疲労は疲れやすさ、回復は回復しやすさ
-    m *= item.fh >= 0 ? (this.state.fatigueCoef || 1) : (this.state.recoverCoef || 1);
-    return item.fh * m;
+    // 体・心の2軸: 行動の（体, 心）固有値に軸別の個人係数を掛けて合算
+    // 例) 接客(体5, 心8)・心の疲れやすさ×1.2 → 5×1.0 + 8×1.2 = 14.6/h
+    const st = this.state;
+    const recover = item.fh < 0;
+    const bc = recover ? (st.bodyRecCoef || 1) : (st.bodyFatCoef || 1);
+    const mc = recover ? (st.mindRecCoef || 1) : (st.mindFatCoef || 1);
+    let base;
+    if (typeof item.body === 'number' && typeof item.mind === 'number') {
+      base = (item.body * bc + item.mind * mc) * (recover ? -1 : 1);
+    } else {
+      // 2軸を持たない行動（旧データ・検索の新規登録など）は体・心半々とみなす
+      base = item.fh * (bc + mc) / 2;
+    }
+    return base * m;
   }
   setPref = (name, val) => {
     const k = normTitle(name);
@@ -282,19 +294,19 @@ export default class App extends React.Component {
   selectSearchItem = (kwIndex, item) => {
     const picks = this.intensityQuestions(item).map(q => Math.floor(q.opts.length / 2));
     const id = 'sc' + Date.now() + Math.floor(Math.random() * 1000);
-    const cart = [...this.state.searchCart, { id, name: item.name, glyph: item.glyph, fh: item.fh, kw: item.kw, picks }];
+    const cart = [...this.state.searchCart, { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, kw: item.kw, picks }];
     const resolved = kwIndex == null ? this.state.resolvedIdx : [...this.state.resolvedIdx, kwIndex];
     const remaining = this.remainingKw(resolved);
     const n = cart.length;
     this.set({ searchCart: cart, resolvedIdx: resolved, moreKw: null, searchStep: remaining.length ? 'results' : 'confirm', searchTotalMin: n * 30, searchFracs: Array(n).fill(1 / n) });
   };
   addNewAction = (kwIndex, name) => {
-    const item = { name, glyph: '⭐', fh: 6, kw: [name] };
+    const item = { name, glyph: '⭐', fh: 6, body: 3, mind: 3, kw: [name] };
     this.set({ customActions: [...(this.state.customActions || []), item] });
     this.save();
     this.selectSearchItem(kwIndex, item);
   };
-  addRoughAction = (kwIndex, name) => this.selectSearchItem(kwIndex, { name, glyph: '🌀', fh: 6, kw: [name] });
+  addRoughAction = (kwIndex, name) => this.selectSearchItem(kwIndex, { name, glyph: '🌀', fh: 6, body: 3, mind: 3, kw: [name] });
   addTotal = (d) => this.set({ searchTotalMin: Math.max(1, Math.round((this.state.searchTotalMin || 30) + d)) });
   onFracDrag = (k) => (e) => {
     if (e.type === 'pointermove' && e.buttons === 0) return;
@@ -631,7 +643,17 @@ export default class App extends React.Component {
     if (!items.length) return;
     const durOf = (t) => (t.fh < 0 || t.id === 'shop') ? 30 : 60;
     const totalMin = items.reduce((a, t) => a + durOf(t), 0);
-    const cart = items.map((t, i) => ({ id: 'scc' + Date.now() + i, name: t.name, glyph: t.glyph, fh: this.cartFh(t), kw: [...(t.kw || []), t.name], picks: [], after: t.after || 0 }));
+    const cart = items.map((t, i) => {
+      // 程度（degFh）で fh が変わる場合は体・心も同じ比率でスケール
+      const f = this.cartFh(t);
+      const ratio = t.fh ? f / t.fh : 1;
+      return {
+        id: 'scc' + Date.now() + i, name: t.name, glyph: t.glyph, fh: f,
+        body: t.body != null ? t.body * ratio : undefined,
+        mind: t.mind != null ? t.mind * ratio : undefined,
+        kw: [...(t.kw || []), t.name], picks: [], after: t.after || 0,
+      };
+    });
     const fracs = items.map(t => durOf(t) / totalMin);
     this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: totalMin, searchFracs: fracs, confirmOrigin: this.state.confirmOrigin === 'edit' ? 'edit' : 'cat' });
   };
@@ -723,8 +745,7 @@ export default class App extends React.Component {
     this.save();
     this.toast('テンプレを削除しました');
   };
-  setFatigueCoef = (v) => { this.set({ fatigueCoef: v }); this.save(); };
-  setRecoverCoef = (v) => { this.set({ recoverCoef: v }); this.save(); };
+  setAxisCoef = (key, v) => { this.set({ [key]: v }); this.save(); };
   restoreTrash = (idx) => {
     const entries = this.state.entries.map((e, i) => i === idx ? { ...e, exp: false, trashedAt: null } : e);
     this.set({ entries });
@@ -1496,13 +1517,19 @@ export default class App extends React.Component {
       onDelete: () => this.deleteTemplate(key),
     }));
     const COEF_STEPS = [0.8, 0.9, 1, 1.1, 1.2];
-    const coefOpts = (cur, onPick, labels) => COEF_STEPS.map((v, i) => ({
+    const coefOpts = (key, labels) => COEF_STEPS.map((v, i) => ({
       text: labels[i], v,
-      on: Math.abs((cur || 1) - v) < 0.001,
-      onPick: () => onPick(v),
+      on: Math.abs((st[key] || 1) - v) < 0.001,
+      onPick: () => this.setAxisCoef(key, v),
     }));
-    const fatigueOpts = coefOpts(st.fatigueCoef, this.setFatigueCoef, ['かなり疲れにくい', '疲れにくい', 'ふつう', '疲れやすい', 'かなり疲れやすい']);
-    const recoverOpts = coefOpts(st.recoverCoef, this.setRecoverCoef, ['回復しにくい', 'やや回復しにくい', 'ふつう', 'やや回復しやすい', '回復しやすい']);
+    const FAT_LABELS = ['かなり疲れにくい', '疲れにくい', 'ふつう', '疲れやすい', 'かなり疲れやすい'];
+    const REC_LABELS = ['回復しにくい', 'やや回復しにくい', 'ふつう', 'やや回復しやすい', '回復しやすい'];
+    const sensSections = [
+      { label: '体の疲れやすさ', opts: coefOpts('bodyFatCoef', FAT_LABELS) },
+      { label: '心の疲れやすさ', opts: coefOpts('mindFatCoef', FAT_LABELS) },
+      { label: '体の回復しやすさ', opts: coefOpts('bodyRecCoef', REC_LABELS) },
+      { label: '心の回復しやすさ', opts: coefOpts('mindRecCoef', REC_LABELS) },
+    ];
 
     /* ---- ゴミ箱 ---- */
     const trashRows = st.entries
@@ -1571,8 +1598,8 @@ export default class App extends React.Component {
       isEditFlow, trashOriginal: this.trashOriginal,
       trashRows, trashCount: trashRows.length, goTrash: this.goTrash,
       /* マイページの設定サブ画面 */
-      slotTimeRows, slotTimesSub, catRows, templateRows, fatigueOpts, recoverOpts,
-      fatigueCoefText: '×' + (st.fatigueCoef || 1).toFixed(1), recoverCoefText: '×' + (st.recoverCoef || 1).toFixed(1),
+      slotTimeRows, slotTimesSub, catRows, templateRows, sensSections,
+      sensSub: '体×' + (st.bodyFatCoef || 1).toFixed(1) + ' ・ 心×' + (st.mindFatCoef || 1).toFixed(1),
       goSlotTimes: this.goSlotTimes, goCatsManage: this.goCatsManage,
       goTemplates: this.goTemplates, goSensitivity: this.goSensitivity,
       homeMotion: st.homeMotion, setMotionFixed: () => this.setMotion(false), setMotionMove: () => this.setMotion(true),

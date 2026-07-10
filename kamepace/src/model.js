@@ -79,8 +79,10 @@ export function serialize(st) {
     prefs: st.prefs || {},
     slotHours: st.slotHours || null,
     hiddenCats: st.hiddenCats || [],
-    fatigueCoef: st.fatigueCoef || 1,
-    recoverCoef: st.recoverCoef || 1,
+    bodyFatCoef: st.bodyFatCoef || 1,
+    mindFatCoef: st.mindFatCoef || 1,
+    bodyRecCoef: st.bodyRecCoef || 1,
+    mindRecCoef: st.mindRecCoef || 1,
     updatedAt: Date.now(),
   };
 }
@@ -118,8 +120,11 @@ export function deserialize(data) {
     prefs: (data.prefs && typeof data.prefs === 'object') ? data.prefs : {},
     slotHours: (Array.isArray(data.slotHours) && data.slotHours.length === 4) ? data.slotHours : null,
     hiddenCats: Array.isArray(data.hiddenCats) ? data.hiddenCats : [],
-    fatigueCoef: typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1,
-    recoverCoef: typeof data.recoverCoef === 'number' ? data.recoverCoef : 1,
+    // 体・心それぞれの個人係数。旧1軸フィールド(fatigueCoef/recoverCoef)からの移行も受ける
+    bodyFatCoef: typeof data.bodyFatCoef === 'number' ? data.bodyFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
+    mindFatCoef: typeof data.mindFatCoef === 'number' ? data.mindFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
+    bodyRecCoef: typeof data.bodyRecCoef === 'number' ? data.bodyRecCoef : (typeof data.recoverCoef === 'number' ? data.recoverCoef : 1),
+    mindRecCoef: typeof data.mindRecCoef === 'number' ? data.mindRecCoef : (typeof data.recoverCoef === 'number' ? data.recoverCoef : 1),
   };
 }
 
@@ -128,7 +133,8 @@ export function freshState() {
     entries: [], tasks: [], sortMode: false,
     collected: [], collectedSeen: 0, templates: {}, consumed: 0, sampleDay: null,
     customCats: [], customPlans: [], customActions: [], prefs: {},
-    slotHours: null, hiddenCats: [], fatigueCoef: 1, recoverCoef: 1,
+    slotHours: null, hiddenCats: [],
+    bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1,
   };
 }
 
