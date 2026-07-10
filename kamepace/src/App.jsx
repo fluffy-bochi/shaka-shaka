@@ -497,10 +497,24 @@ export default class App extends React.Component {
   }
 
   makePile(seed) {
-    const glyphs = this.pileGlyphs().slice(-130); // 上限は新しい側を残す
     const W = this.screenW(), H = this.screenH();
     const r = this.calcR(W, H);
     const d = r * 2, font = Math.round(r * 1.6);
+    // 振って変わった形が保存されていればそれを背景にも使う（勝手に整列しない）
+    let saved = this._pileLayout;
+    if (saved && saved.length) {
+      // 山が減っていたら（睡眠・ゴミ箱）古い側から間引いて量を合わせる
+      const target = this.pileGlyphs().length;
+      if (saved.length > target) saved = saved.slice(saved.length - target);
+      return saved.slice(0, 130).map(sp => ({
+        e: sp.g,
+        x: Math.round(sp.x * W - r),
+        y: Math.round(H - sp.y * H - r),
+        r2: Math.round(((sp.a || 0) * 180) / Math.PI),
+        s: font,
+      }));
+    }
+    const glyphs = this.pileGlyphs().slice(-130); // 上限は新しい側を残す
     let s = seed; const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
     const cols = Math.max(1, Math.floor(W / d)), out = [];
     const n = glyphs.length;
@@ -819,6 +833,11 @@ export default class App extends React.Component {
   PR = 18;
   componentDidMount() {
     initShakaSound();
+    // 前回の山の散らばり（振って変わった形）を復元
+    try {
+      const s = localStorage.getItem('shaka_pile_layout');
+      if (s) this._pileLayout = JSON.parse(s);
+    } catch (e) { /* ignore */ }
     // 旧本番と同じ外部フック（デバッグ・検証用）
     window.__importEvents = (items) => this.importEvents(items);
     this._unwatch = watchAuth((user) => {
@@ -872,19 +891,29 @@ export default class App extends React.Component {
     const newCount = marks.filter(m => m.isNew).length;
     const oldCount = marks.length - newCount;
     const perRow = Math.max(1, Math.floor(W / (2 * r)));
+    // 前回保存した散らばり（振って変わった形）。今日の山のときだけ使う
+    let saved = (this.state.dayOffset === 0 && this._pileLayout && this._pileLayout.length) ? this._pileLayout : null;
+    // 山が減っていたら古い側から間引いて既存分と揃える
+    if (saved && saved.length > oldCount) saved = saved.slice(saved.length - oldCount);
     marks.forEach((m, idx) => {
       const glyph = m.g;
       const isNew = idx >= oldCount;
-      let x, y;
+      let x, y, angle = 0;
       if (isNew) {
         x = r + Math.random() * (W - 2 * r);
         y = -r - Math.random() * (H * 0.6);
+      } else if (saved && saved[idx]) {
+        // 保存した位置・角度を復元（勝手に整列し直さない）
+        x = Math.max(r, Math.min(W - r, saved[idx].x * W));
+        y = Math.max(r, Math.min(H - r, saved[idx].y * H));
+        angle = saved[idx].a || 0;
       } else {
         const row = Math.floor(idx / perRow), col = idx % perRow;
         x = r + col * (2 * r) + (Math.random() - 0.5) * r * 0.5;
         y = H - r - row * (2 * r * 0.92) + (Math.random() - 0.5) * r * 0.3;
       }
       const body = Bodies.circle(x, y, r, { restitution: 0.35, friction: 0.05, frictionAir: 0.01, density: 0.001 });
+      if (angle) Matter.Body.setAngle(body, angle);
       World.add(this.engine.world, body);
       const d = document.createElement('div');
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))';
@@ -936,7 +965,28 @@ export default class App extends React.Component {
     }
     this.freezeMotion();
   }
-  freezeMotion() { if (!this.runner || !this._running) return; this._running = false; Matter.Runner.stop(this.runner); }
+  /* 山の散らばりを保存（振って変わった形を維持する）。今日の山のときだけ */
+  _savePileLayout() {
+    if (this.state.dayOffset !== 0) return;
+    if (!this.bodies || !this.bodies.length) return;
+    const el = document.getElementById('shakacase');
+    const rect = el ? el.getBoundingClientRect() : null;
+    const W = (rect && rect.width) || 350, H = (rect && rect.height) || 700;
+    const layout = this.bodies.map(({ body, el: d }) => ({
+      g: d.textContent,
+      x: Math.max(0, Math.min(1, body.position.x / W)),
+      y: Math.max(0, Math.min(1, body.position.y / H)),
+      a: Math.round(body.angle * 100) / 100,
+    }));
+    this._pileLayout = layout;
+    try { localStorage.setItem('shaka_pile_layout', JSON.stringify(layout)); } catch (e) { /* ignore */ }
+  }
+  freezeMotion() {
+    if (!this.runner || !this._running) return;
+    this._running = false;
+    Matter.Runner.stop(this.runner);
+    this._savePileLayout();
+  }
   resumeMotion() { if (!this.engine || this._running) return; this._running = true; Matter.Runner.run(this.runner, this.engine); if (!this._phys) this._startLoop(); }
   setMotion = (on) => {
     if (this.state.homeMotion === on) return;
@@ -1057,6 +1107,7 @@ export default class App extends React.Component {
     }
   }
   stopPhysics() {
+    if (this.engine) this._savePileLayout(); // 画面を離れるときの形を覚えておく
     this._phys = false; this._running = false; clearTimeout(this._settleT);
     if (this._raf) cancelAnimationFrame(this._raf);
     if (this.runner) Matter.Runner.stop(this.runner);
