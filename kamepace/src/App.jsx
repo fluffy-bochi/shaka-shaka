@@ -112,19 +112,55 @@ export default class App extends React.Component {
       else { try { localStorage.setItem('shaka_guest', JSON.stringify(serialize(data))); } catch (e) { /* ignore */ } }
     }, 0);
   }
+  /* ゲスト用サンプル: 大学生の1日。毎日その日の日付で作り直す（いつ開いても同じ1日が見える） */
+  guestSamples() {
+    const t = todayStr();
+    const S = (from, to, title, glyph, min, delta, slot) => ({
+      from, to, title, act: guessAct(title), mood: '🙂', delta, exp: false,
+      date: t, glyph, min, slot, sample: true,
+    });
+    return [
+      S('07:40', '08:10', '通学（電車バス）', '🚃', 30, 5, 'asa'),
+      S('09:00', '10:30', '講義（聞く中心）', '📖', 90, 10, 'am'),
+      S('10:40', '11:40', '自習', '📚', 60, 9, 'am'),
+      S('13:00', '14:00', 'レポート・課題', '📝', 60, 9, 'pm'),
+      S('14:10', '15:10', 'グループワーク', '👥', 60, 10, 'pm'),
+      S('18:00', '20:00', 'バイト接客', '🙋', 120, 26, 'yoru'),
+      S('21:00', '21:30', '帰宅（電車バス）', '🚃', 30, 5, 'yoru'),
+      S('21:40', '22:40', 'ゲーム', '🎮', 60, -7, 'yoru'),
+    ];
+  }
+  /* 日付が変わっていたらサンプルを今日ぶんに作り直す（当日中の編集は保持＝旧本番と同じ） */
+  refreshGuestSamples(data) {
+    const t = todayStr();
+    if (data.sampleDay === t) return { data, changed: false };
+    const removed = (data.entries || []).filter(e => e.sample);
+    const kept = (data.entries || []).filter(e => !e.sample);
+    // 消えるサンプルの正の疲労ぶんは consumed からも引く（翌日のサンプルが埋もれないように）
+    const removedPos = removed.reduce((a, e) => a + (e.delta > 0 && !e.exp ? (e.planned ? (e.dropped || 0) : e.delta) : 0), 0);
+    return {
+      data: {
+        ...data,
+        entries: sortEntries([...kept, ...this.guestSamples()]),
+        consumed: Math.max(0, (data.consumed || 0) - removedPos),
+        sampleDay: t,
+      },
+      changed: true,
+    };
+  }
   loadGuest() {
     let g = null;
     try { const s = localStorage.getItem('shaka_guest'); if (s) g = JSON.parse(s); } catch (e) { /* ignore */ }
-    const data = deserialize(g);
+    const { data, changed } = this.refreshGuestSamples(deserialize(g));
     this.set({ ...data, booted: true });
+    if (changed) { this._pileLayout = null; this.save(); }
     setTimeout(() => this.advancePlans(), 0); // アプリを閉じている間に進んだ予定をキャッチアップ
-    // はじめてのゲスト（記録がまだ無い）には、開くたびにチュートリアルを自動表示。
+    // 自分の記録がまだ無いゲストには、開くたびにチュートリアルを自動表示（サンプルは記録に数えない）。
     // ログアウトで戻ってきた同一セッションでは出さない（起動時の1回だけ判定）
     if (!this._autoTutChecked) {
       this._autoTutChecked = true;
-      const hasData = (data.entries && data.entries.length > 0)
-        || (data.collected && data.collected.length > 0)
-        || (data.consumed || 0) > 0;
+      const hasData = (data.entries || []).some(e => !e.sample)
+        || (data.collected && data.collected.length > 0);
       if (!hasData) setTimeout(() => { if (!this.state.tutorial && !this.state.user) this.startTutorial(); }, 400);
     }
   }
