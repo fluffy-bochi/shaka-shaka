@@ -18,6 +18,7 @@ import {
   cloudSave, loadUserData, fetchGoogleData, jpError,
 } from './firebase';
 import { initShakaSound, attachCollisionSound } from './sound';
+import { appendGlyph } from './fluent';
 import Home from './screens/Home';
 import Record from './screens/Record';
 import Sleep from './screens/Sleep';
@@ -1060,9 +1061,9 @@ export default class App extends React.Component {
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))';
       d.style.width = d.style.height = (2 * r) + 'px';
       d.style.fontSize = Math.round(r * 1.6) + 'px';
-      d.textContent = glyph;
+      appendGlyph(d, glyph, Math.round(r * 1.9));
       el.appendChild(d);
-      this.bodies.push({ body, el: d });
+      this.bodies.push({ body, el: d, glyph });
     });
     this.negBodies = [];
     this.runner = Runner.create();
@@ -1113,8 +1114,8 @@ export default class App extends React.Component {
     const el = document.getElementById('shakacase');
     const rect = el ? el.getBoundingClientRect() : null;
     const W = (rect && rect.width) || 350, H = (rect && rect.height) || 700;
-    const layout = this.bodies.map(({ body, el: d }) => ({
-      g: d.textContent,
+    const layout = this.bodies.map(({ body, el: d, glyph }) => ({
+      g: glyph || d.textContent,
       x: Math.max(0, Math.min(1, body.position.x / W)),
       y: Math.max(0, Math.min(1, body.position.y / H)),
       a: Math.round(body.angle * 100) / 100,
@@ -1152,9 +1153,10 @@ export default class App extends React.Component {
       World.add(this.engine.world, body);
       const d = document.createElement('div');
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))';
-      d.style.width = d.style.height = (2 * r) + 'px'; d.style.fontSize = Math.round(r * 1.6) + 'px'; d.textContent = g;
+      d.style.width = d.style.height = (2 * r) + 'px'; d.style.fontSize = Math.round(r * 1.6) + 'px';
+      appendGlyph(d, g, Math.round(r * 1.9));
       el.appendChild(d);
-      this.bodies.push({ body, el: d });
+      this.bodies.push({ body, el: d, glyph: g });
     });
     clearTimeout(this._settleT);
     if (!this.state.homeMotion) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
@@ -1182,7 +1184,7 @@ export default class App extends React.Component {
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))';
       d.style.width = d.style.height = (2 * r) + 'px';
       d.style.fontSize = Math.round(r * 1.6) + 'px';
-      d.textContent = g;
+      appendGlyph(d, g, Math.round(r * 1.9));
       el.appendChild(d);
       const neg = { body, el: d, consumed: false, glyph: g };
       this.negBodies.push(neg);
@@ -1219,7 +1221,7 @@ export default class App extends React.Component {
           Matter.World.remove(this.engine.world, neg.body);
           neg.consumed = true;
           this.bodies.splice(pi, 1);
-          collectedAdd.push(neg.glyph, pos.el.textContent); // 使った回復＋消えたプラスの記録
+          collectedAdd.push(neg.glyph, pos.glyph || pos.el.textContent); // 使った回復＋消えたプラスの記録
           hits++;
           // パッと消える＋リングのポップエフェクト
           pos.el.style.transition = 'opacity .15s'; pos.el.style.opacity = '0';
@@ -1336,7 +1338,7 @@ export default class App extends React.Component {
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none';
       d.style.width = d.style.height = itemPx + 'px';
       d.style.fontSize = Math.round(r * 1.6) + 'px';
-      d.textContent = glyph;
+      appendGlyph(d, glyph, Math.round(r * 1.9));
       stackEl.appendChild(d);
       this.collectBodies.push({ body, el: d });
     });

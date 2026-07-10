@@ -1,4 +1,5 @@
 import React from 'react';
+import Emo from '../fluent';
 
 /* 睡眠記録: 背景はホームと同じ #f7f4ec。数値は出さず、絵文字量とラインだけ（CLAUDE.md §D） */
 export default function Sleep({ v }) {
@@ -7,7 +8,7 @@ export default function Sleep({ v }) {
       {/* full-bleed emoji pile */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
         {v.sleepPile.map((p, i) => (
-          <span key={i} style={{ position: 'absolute', left: p.x, bottom: p.y, fontSize: p.s, transform: `rotate(${p.r2}deg)`, opacity: p.op, transition: `opacity .7s ease ${p.delay}`, filter: 'drop-shadow(0 4px 6px rgba(27,27,24,.14))' }}>{p.e}</span>
+          <span key={i} style={{ position: 'absolute', left: p.x, bottom: p.y, fontSize: p.s, transform: `rotate(${p.r2}deg)`, opacity: p.op, transition: `opacity .7s ease ${p.delay}`, filter: 'drop-shadow(0 4px 6px rgba(27,27,24,.14))' }}><Emo e={p.e} size={p.s * 1.2} /></span>
         ))}
       </div>
       {/* falling moons */}

@@ -1,4 +1,5 @@
 import React from 'react';
+import Emo from '../fluent';
 
 const mono = { fontFamily: "'Space Mono',monospace" };
 
@@ -8,7 +9,7 @@ export default function Home({ v }) {
       {/* 背景の積もった絵文字（ボカシ） */}
       <div style={{ position: 'absolute', inset: 0, top: 40, bottom: 64, zIndex: 0, filter: 'blur(1.5px)', pointerEvents: 'none' }}>
         {v.pile.map((p, i) => (
-          <span key={i} style={{ position: 'absolute', left: p.x, bottom: p.y, fontSize: p.s, transform: `rotate(${p.r2}deg)`, filter: 'drop-shadow(0 4px 6px rgba(27,27,24,.14))' }}>{p.e}</span>
+          <span key={i} style={{ position: 'absolute', left: p.x, bottom: p.y, fontSize: p.s, transform: `rotate(${p.r2}deg)`, filter: 'drop-shadow(0 4px 6px rgba(27,27,24,.14))' }}><Emo e={p.e} size={p.s * 1.2} /></span>
         ))}
       </div>
       <div className="nos" style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', padding: '0 0 12px' }}>
