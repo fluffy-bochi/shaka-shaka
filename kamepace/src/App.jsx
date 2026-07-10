@@ -360,6 +360,23 @@ export default class App extends React.Component {
   };
   addRoughAction = (kwIndex, name) => this.selectSearchItem(kwIndex, { name, glyph: '🌀', fh: 6, body: 3, mind: 3, kw: [name] });
   addTotal = (d) => this.set({ searchTotalMin: Math.max(1, Math.round((this.state.searchTotalMin || 30) + d)) });
+  /* キーボード入力: 合計分を直接指定 */
+  setTotalMin = (m) => {
+    const v = Math.max(1, Math.round(Number(m) || 0) || 1);
+    this.set({ searchTotalMin: v });
+  };
+  /* キーボード入力: 行の分を直接指定（他の行の分は維持し、合計を作り直す） */
+  setRowMin = (idx, m) => {
+    const items = this.state.searchCart;
+    const n = items.length;
+    if (!n || idx < 0 || idx >= n) return;
+    const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(1 / n);
+    const total = this.state.searchTotalMin || (n * 30);
+    const mins = fr.map(f => Math.max(1, Math.round(f * total)));
+    mins[idx] = Math.max(1, Math.round(Number(m) || 0) || 1);
+    const newTotal = mins.reduce((a, b) => a + b, 0);
+    this.set({ searchTotalMin: newTotal, searchFracs: mins.map(x => x / newTotal) });
+  };
   onFracDrag = (k) => (e) => {
     if (e.type === 'pointermove' && e.buttons === 0) return;
     const rect = e.currentTarget.parentElement.getBoundingClientRect();
@@ -1052,6 +1069,7 @@ export default class App extends React.Component {
   componentWillUnmount() {
     clearInterval(this._tick); clearInterval(this._planT); clearInterval(this._clockT);
     if (this._unwatch) this._unwatch();
+    if (this._motionOn) window.removeEventListener('devicemotion', this._onDeviceMotion);
     this.stopPhysics(); this.stopCollectPhysics();
   }
 
@@ -1144,11 +1162,21 @@ export default class App extends React.Component {
     };
     this._raf = requestAnimationFrame(loop);
   }
-  /* 固定モードの停止判定: マイナス絵文字が残っている間は動かし続ける */
-  _maybeFreeze() {
+  /* 固定モードの停止判定: マイナス絵文字が残っている間・まだ動いている絵文字がある間は止めない
+     （振りすぎたとき空中で固まらないように、静止を確認してから凍結する） */
+  _maybeFreeze(tries = 0) {
     if (this.state.homeMotion) return;
     if ((this.negBodies || []).some(n => !n.consumed)) {
       this._settleT = setTimeout(() => this._maybeFreeze(), 1000);
+      return;
+    }
+    const moving = (this.bodies || []).some(({ body }) => {
+      const vel = body.velocity;
+      return (vel.x * vel.x + vel.y * vel.y) > 0.08 || Math.abs(body.angularVelocity) > 0.05;
+    });
+    // 30秒粘っても静まらない場合はほぼ静止とみなして止める（引っかかり対策）
+    if (moving && tries < 50) {
+      this._settleT = setTimeout(() => this._maybeFreeze(tries + 1), 600);
       return;
     }
     this.freezeMotion();
@@ -1309,16 +1337,57 @@ export default class App extends React.Component {
     if (caseEl) caseEl.innerHTML = '';
     this.engine = null; this.runner = null; this.bodies = []; this.negBodies = [];
   }
-  shake = () => {
-    if (!this.bodies) return;
-    if (this.state.tutorial === 6 && !this.state.tutFlags.shaken) this.set({ tutFlags: { ...this.state.tutFlags, shaken: true } });
+  /* 絵文字に散らばる勢いを与える（k=強さ） */
+  shakeImpulse(k) {
+    if (!this.bodies || !this.engine) return;
     this.resumeMotion();
     this.bodies.forEach(({ body }) => {
-      Matter.Body.setVelocity(body, { x: (Math.random() - 0.5) * 32, y: -Math.random() * 14 });
+      Matter.Body.setVelocity(body, { x: (Math.random() - 0.5) * 2 * k, y: -Math.random() * k * 0.9 });
       Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.4);
     });
     clearTimeout(this._settleT);
-    if (!this.state.homeMotion) this._settleT = setTimeout(() => { if (!this.state.homeMotion) this.freezeMotion(); }, 2000);
+    if (!this.state.homeMotion) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
+  }
+  shake = () => {
+    if (!this.bodies) return;
+    if (this.state.tutorial === 6 && !this.state.tutFlags.shaken) this.set({ tutFlags: { ...this.state.tutFlags, shaken: true } });
+    this.enableMotion(); // 🔀タップ＝ユーザー操作のタイミングでセンサー許可を取る（iOS）
+    this.shakeImpulse(16);
+  };
+
+  /* ---- スマホの加速度センサーで振る（旧本番 enableMotion/onMotion を移植） ---- */
+  enableMotion() {
+    if (this._motionOn) return;
+    if (typeof DeviceMotionEvent === 'undefined') return; // 非対応端末では何もしない
+    const attach = () => {
+      window.addEventListener('devicemotion', this._onDeviceMotion);
+      this._motionOn = true;
+      this.toast('📳 本体を振ってもシャカシャカできます');
+    };
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      // iOS はユーザー操作起点で許可が必要
+      DeviceMotionEvent.requestPermission()
+        .then(r => { if (r === 'granted') attach(); else this.toast('⚠️ 振動検知の許可が必要です'); })
+        .catch(() => { /* 拒否・非対応は無視 */ });
+    } else {
+      attach();
+    }
+  }
+  _onDeviceMotion = (event) => {
+    const a = event.acceleration || event.accelerationIncludingGravity;
+    if (!a || a.x == null) return;
+    const lm = this._lastMotion;
+    if (lm && lm.x != null) {
+      const d = Math.abs(a.x - lm.x) + Math.abs(a.y - lm.y) + Math.abs(a.z - lm.z);
+      const now = performance.now();
+      // シャカ画面表示中だけ反応（150msスロットルで暴走防止）
+      if (d > 16 && this.state.screen === 'shaka' && (!this._lastSensorShake || now - this._lastSensorShake > 150)) {
+        this._lastSensorShake = now;
+        if (this.state.tutorial === 6 && !this.state.tutFlags.shaken) this.set({ tutFlags: { ...this.state.tutFlags, shaken: true } });
+        this.shakeImpulse(10);
+      }
+    }
+    this._lastMotion = { x: a.x, y: a.y, z: a.z };
   };
 
   /* ---------- collected (ためた回復) tall scroll world ---------- */
@@ -1609,7 +1678,12 @@ export default class App extends React.Component {
       const fat = Math.round(this.effFh(it) * (mins[idx] / 60));
       let timeText = '';
       if (timeMode) { const f = segCursor, t = f + mins[idx] * 60000; timeText = this.tsToHm(f) + '–' + this.tsToHm(t); segCursor = t; }
-      return { color: scPalette[idx % scPalette.length], widthPct: (fr0[idx] * 100) + '%', name: it.name, minText: timeMode ? timeText : this.fmtMin(mins[idx]), fatText: (fat >= 0 ? '+' + fat : '' + fat) };
+      return {
+        color: scPalette[idx % scPalette.length], widthPct: (fr0[idx] * 100) + '%', name: it.name,
+        minText: timeMode ? timeText : this.fmtMin(mins[idx]), fatText: (fat >= 0 ? '+' + fat : '' + fat),
+        rawMin: mins[idx],
+        onSetMin: timeMode ? null : (m) => this.setRowMin(idx, m),
+      };
     });
     const allocHandles = [];
     { let cum = 0; for (let k = 0; k < scCount - 1; k++) { cum += fr0[k]; allocHandles.push({ leftPct: (cum * 100) + '%', onDrag: this.onFracDrag(k) }); } }
@@ -1763,6 +1837,7 @@ export default class App extends React.Component {
       keywordRows, searchGroups,
       moreData, moreFilters, closeMore: this.closeMore,
       searchCartRows, searchCount: scCount, searchTotalText: this.fmtMin(totalMin),
+      searchTotalMinRaw: totalMin, setTotalMin: this.setTotalMin,
       allocSegs, allocHandles,
       confirmMode: st.confirmMode, isTimeMode: timeMode, isDurationMode: !timeMode,
       setDurationMode: () => this.setConfirmMode('duration'), setTimeMode: () => this.setConfirmMode('time'),

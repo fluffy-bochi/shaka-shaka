@@ -3,6 +3,32 @@ import SlotPill from './SlotPill';
 
 const mono = { fontFamily: "'Space Mono',monospace" };
 const msIcon = (size, color, fill = true) => ({ fontFamily: 'Material Symbols Rounded', ...(fill ? { fontVariationSettings: "'FILL' 1" } : {}), fontSize: size, color });
+
+/* 分の表示をタップするとキーボード入力に切り替わる（Enter/フォーカスアウトで確定） */
+function MinEdit({ text, raw, onSet, style }) {
+  const [editing, setEditing] = React.useState(false);
+  const [val, setVal] = React.useState('');
+  if (!onSet) return <span style={style}>{text}</span>;
+  if (!editing) {
+    return (
+      <button onClick={() => { setVal(String(raw)); setEditing(true); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, ...style }}>{text}</button>
+    );
+  }
+  const commit = () => { setEditing(false); onSet(val); };
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+      <input
+        type="number" inputMode="numeric" min="1" autoFocus value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
+        style={{ ...mono, fontSize: 14, fontWeight: 700, width: 58, textAlign: 'center', border: '1.5px solid #1b1b18', borderRadius: 8, outline: 'none', padding: '3px 2px', background: '#fff', color: '#1b1b18' }}
+      />
+      <span style={{ fontSize: 11, color: '#8a8a82' }}>分</span>
+    </span>
+  );
+}
 const sectionLabel = { ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a8a82', padding: '14px 22px 6px' };
 
 export default function Record({ v }) {
@@ -233,7 +259,7 @@ function Confirm({ v }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12 }}>
               <button onClick={v.addTotalM10} style={{ width: 32, height: 32, borderRadius: 9, border: '1.5px solid #e4e1d8', background: '#fff', ...mono, fontSize: 11, fontWeight: 700, color: '#55554e', cursor: 'pointer' }}>-10</button>
               <button onClick={v.addTotalM1} style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid #1b1b18', background: '#fff', fontSize: 17, color: '#1b1b18', cursor: 'pointer' }}>−</button>
-              <span style={{ ...mono, fontSize: 15, fontWeight: 700, minWidth: 60, textAlign: 'center' }}>{v.searchTotalText}</span>
+              <MinEdit text={v.searchTotalText} raw={v.searchTotalMinRaw} onSet={v.setTotalMin} style={{ ...mono, fontSize: 15, fontWeight: 700, minWidth: 60, textAlign: 'center' }} />
               <button onClick={v.addTotalP1} style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid #1b1b18', background: '#fff', fontSize: 17, color: '#1b1b18', cursor: 'pointer' }}>＋</button>
               <button onClick={v.addTotalP10} style={{ width: 32, height: 32, borderRadius: 9, border: '1.5px solid #e4e1d8', background: '#fff', ...mono, fontSize: 11, fontWeight: 700, color: '#55554e', cursor: 'pointer' }}>+10</button>
             </div>
@@ -263,7 +289,7 @@ function Confirm({ v }) {
             <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 2px 9px', borderBottom: '1px solid #f1efe8' }}>
               <span style={{ width: 11, height: 11, borderRadius: 3, background: s.color, flex: '0 0 auto' }} />
               <span style={{ fontSize: 13.5, flex: 1, minWidth: 0 }}>{s.name}</span>
-              <span style={{ ...mono, fontSize: 12, fontWeight: 700, background: '#efece3', borderRadius: 8, padding: '4px 9px' }}>{s.minText}</span>
+              <MinEdit text={s.minText} raw={s.rawMin} onSet={s.onSetMin} style={{ ...mono, fontSize: 12, fontWeight: 700, background: '#efece3', borderRadius: 8, padding: '4px 9px' }} />
               <span style={{ ...mono, fontSize: 12, fontWeight: 700, color: '#f5994e', width: 34, textAlign: 'right' }}>{s.fatText}</span>
             </div>
           ))}
