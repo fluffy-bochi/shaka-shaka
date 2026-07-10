@@ -1099,6 +1099,12 @@ export default class App extends React.Component {
 
   /* ================= matter.js physics ================= */
   PR = 18;
+  /* スイカゲーム風の「硬い」物理: 跳ねない・よく噛む・沈まない */
+  BODY_OPTS = { restitution: 0.12, friction: 0.4, frictionStatic: 0.6, frictionAir: 0.012, density: 0.01, slop: 0.01 };
+  _tuneEngine(engine) {
+    engine.positionIterations = 12; // めり込み解消の反復を増やす（沈み防止の要）
+    engine.velocityIterations = 8;
+  }
   componentDidMount() {
     initShakaSound();
     // 前回の山の散らばり（振って変わった形）を復元
@@ -1153,7 +1159,8 @@ export default class App extends React.Component {
     const r = this.calcR(W, H);
     this.PR = r;
     this.engine = Engine.create();
-    this.engine.world.gravity.y = 1;
+    this.engine.world.gravity.y = 1.2;
+    this._tuneEngine(this.engine);
     attachCollisionSound(this.engine);
     const t = 80;
     World.add(this.engine.world, [
@@ -1191,7 +1198,7 @@ export default class App extends React.Component {
         x = r + col * (2 * r) + (Math.random() - 0.5) * r * 0.5;
         y = H - r - row * (2 * r * 0.92) + (Math.random() - 0.5) * r * 0.3;
       }
-      const body = Bodies.circle(x, y, r, { restitution: 0.35, friction: 0.05, frictionAir: 0.01, density: 0.001 });
+      const body = Bodies.circle(x, y, r, this.BODY_OPTS);
       if (angle) Matter.Body.setAngle(body, angle);
       World.add(this.engine.world, body);
       const d = document.createElement('div');
@@ -1296,7 +1303,7 @@ export default class App extends React.Component {
     this.resumeMotion();
     glyphs.slice(0, 40).forEach(g => {
       const x = r + Math.random() * (W - 2 * r); const y = -r - Math.random() * (H * 0.4);
-      const body = Bodies.circle(x, y, r, { restitution: 0.35, friction: 0.05, frictionAir: 0.01, density: 0.001 });
+      const body = Bodies.circle(x, y, r, this.BODY_OPTS);
       World.add(this.engine.world, body);
       const d = document.createElement('div');
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))';
@@ -1324,7 +1331,7 @@ export default class App extends React.Component {
     glyphs.slice(0, 80).forEach(g => {
       const x = r + Math.random() * (W - 2 * r);
       const y = -r - Math.random() * (H * 0.6);
-      const body = Bodies.circle(x, y, r, { restitution: 0.35, friction: 0.05, frictionAir: 0.01, density: 0.001 });
+      const body = Bodies.circle(x, y, r, this.BODY_OPTS);
       body.isNegative = true;
       World.add(this.engine.world, body);
       const d = document.createElement('div');
@@ -1509,7 +1516,8 @@ export default class App extends React.Component {
     }
     const { Engine, World, Bodies, Runner } = Matter;
     this.collectEngine = Engine.create();
-    this.collectEngine.gravity.y = 1;
+    this.collectEngine.gravity.y = 1.2;
+    this._tuneEngine(this.collectEngine);
     const wt = 140;
     World.add(this.collectEngine.world, [
       Bodies.rectangle(W / 2, worldH + wt / 2, W + wt * 2, wt, { isStatic: true }),
@@ -1520,7 +1528,7 @@ export default class App extends React.Component {
     glyphs.slice(-160).forEach(glyph => {
       const x = r + Math.random() * (W - 2 * r);
       const y = worldH - 60 - Math.random() * (worldH * 0.7);
-      const body = Bodies.circle(x, y, r, { restitution: 0.2, friction: 0.1, frictionAir: 0.02, density: 0.001 });
+      const body = Bodies.circle(x, y, r, this.BODY_OPTS);
       World.add(this.collectEngine.world, body);
       const d = document.createElement('div');
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none';
