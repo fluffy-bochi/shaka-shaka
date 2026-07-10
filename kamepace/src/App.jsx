@@ -5,7 +5,8 @@
 import React from 'react';
 import Matter from 'matter-js';
 import {
-  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT,
+  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT, EMOJI_CHOICES,
+  CAT_ICON_CHOICES, CAT_COLOR_CHOICES, COMPARE_STEPS,
   guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA, DEFAULT_SLOT_HOURS,
 } from './data';
 import {
@@ -50,6 +51,14 @@ export default class App extends React.Component {
     catAddOpen: false,
     newCatName: '',
     newCatIcon: 'category',
+    newCatGlyph: '⭐',
+    /* 行動をつくる（コピー式） */
+    actAddOpen: false,
+    actSrcId: null,
+    actName: '',
+    actGlyph: 'std',
+    actBodyIdx: 2,
+    actMindIdx: 2,
     planDetailId: null,
     planAddOpen: false,
     newPlanName: '',
@@ -98,6 +107,7 @@ export default class App extends React.Component {
       entries: s.entries, tasks: s.tasks, collected: s.collected, collectedSeen: s.collectedSeen,
       templates: s.templates, sortMode: s.sortMode, consumed: s.consumed, sampleDay: s.sampleDay,
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
+      customItems: s.customItems,
       prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
@@ -232,7 +242,12 @@ export default class App extends React.Component {
   timeSpanMin() { const s = this.hmToTs(this.state.startTime), t = this.hmToTs(this.state.endTime); const d = Math.round((t - s) / 60000); return d < 1 ? 1 : d; }
 
   /* ================= categories / plans / search pools ================= */
-  allCats() { return [...CATS, ...(this.state.customCats || [])]; }
+  allCats() {
+    const extra = this.state.customItems || {};
+    return [...CATS, ...(this.state.customCats || [])].map(c => (
+      extra[c.id] && extra[c.id].length ? { ...c, items: [...c.items, ...extra[c.id]] } : c
+    ));
+  }
   allItems() {
     const out = [];
     this.allCats().forEach(c => c.items.forEach(it => out.push({ ...it, color: c.color, catId: c.id })));
@@ -651,18 +666,73 @@ export default class App extends React.Component {
   backToCats = () => this.set({ catId: null });
 
   /* ================= カテゴリ追加 ================= */
-  openCatAdd = () => this.set({ catAddOpen: true, newCatName: '', newCatIcon: 'category' });
+  openCatAdd = () => this.set({ catAddOpen: true, newCatName: '', newCatIcon: 'category', newCatGlyph: '⭐' });
   closeCatAdd = () => this.set({ catAddOpen: false });
   onCatName = (e) => this.set({ newCatName: e.target.value });
   pickCatIcon = (icon) => this.set({ newCatIcon: icon });
+  pickCatGlyph = (g) => this.set({ newCatGlyph: g });
   addCat = () => {
     const name = (this.state.newCatName || '').trim() || '新しいカテゴリ';
     const id = 'cust' + Date.now();
-    const cat = { id, icon: this.state.newCatIcon, color: '#8a7bc4', name, sub: 'じぶんで追加', items: [
-      { id: id + '_a', glyph: '⭐', icon: this.state.newCatIcon, name, last: 'はじめて', fh: 6 },
+    const color = CAT_COLOR_CHOICES[(this.state.customCats || []).length % CAT_COLOR_CHOICES.length];
+    const glyph = this.state.newCatGlyph || '⭐';
+    const cat = { id, icon: this.state.newCatIcon, color, glyph, name, sub: 'じぶんで追加', items: [
+      { id: id + '_a', glyph, icon: this.state.newCatIcon, name, last: '目安 +6/h', fh: 6, body: 3, mind: 3 },
     ] };
     this.set({ customCats: [...(this.state.customCats || []), cat], catAddOpen: false, catId: id });
     this.save();
+  };
+
+  /* ================= 行動をつくる（コピー式・設計書§2） =================
+     コピー元を選ぶ → 「くらべてどう？」（体・心それぞれ5段階）→ 名前・絵文字 → 保存 */
+  openActAdd = () => {
+    const cat = this.allCats().find(c => c.id === this.state.catId);
+    const first = cat && cat.items[0];
+    this.set({ actAddOpen: true, actSrcId: first ? first.id : null, actName: '', actGlyph: 'std', actBodyIdx: 2, actMindIdx: 2 });
+  };
+  closeActAdd = () => this.set({ actAddOpen: false });
+  pickActSrc = (id) => this.set({ actSrcId: id });
+  onActName = (e) => this.set({ actName: e.target.value });
+  pickActGlyph = (g) => this.set({ actGlyph: g });
+  /* コピー元×倍率から新しい行動の（体, 心）を計算 */
+  actAddCalc() {
+    const src = this.state.actSrcId ? this.itemById(this.state.actSrcId) : null;
+    if (!src) return null;
+    const bm = COMPARE_STEPS[this.state.actBodyIdx].m;
+    const mm = COMPARE_STEPS[this.state.actMindIdx].m;
+    const sb = typeof src.body === 'number' ? src.body : Math.abs(src.fh) / 2;
+    const sm = typeof src.mind === 'number' ? src.mind : Math.abs(src.fh) / 2;
+    let body = Math.round(sb * bm);
+    let mind = Math.round(sm * mm);
+    if (body + mind < 1) { if (sm >= sb) mind = 1; else body = 1; }
+    const recover = src.fh < 0;
+    return { src, body, mind, fh: (recover ? -1 : 1) * (body + mind), recover };
+  }
+  addAction = () => {
+    const cat = this.allCats().find(c => c.id === this.state.catId);
+    const calc = this.actAddCalc();
+    if (!cat || !calc) { this.set({ actAddOpen: false }); return; }
+    const name = (this.state.actName || '').trim() || (calc.src.name + 'のコピー');
+    const glyph = this.state.actGlyph === 'std' ? (cat.glyph || calc.src.glyph || '⭐') : this.state.actGlyph;
+    const id = 'act' + Date.now();
+    const item = {
+      id, glyph, icon: calc.src.icon, name,
+      body: calc.body, mind: calc.mind, fh: calc.fh,
+      last: `目安 ${calc.recover ? '−' : '+'}${calc.body + calc.mind}/h`,
+      kw: [...(calc.src.kw || []), name],
+      copiedFrom: calc.src.id,
+    };
+    const customItems = { ...(this.state.customItems || {}) };
+    customItems[cat.id] = [...(customItems[cat.id] || []), item];
+    // 検索からも見つかるように候補プールへ
+    const searchEntry = { name, glyph, fh: calc.fh, body: calc.body, mind: calc.mind, kw: item.kw };
+    this.set({
+      customItems,
+      customActions: [...(this.state.customActions || []), searchEntry],
+      actAddOpen: false,
+    });
+    this.save();
+    this.toast('「' + name + '」をつくりました');
   };
 
   /* ================= 予定 ================= */
@@ -914,7 +984,9 @@ export default class App extends React.Component {
     this.save();
   };
   deleteCustomCat = (id) => {
-    this.set({ customCats: (this.state.customCats || []).filter(c => c.id !== id) });
+    const customItems = { ...(this.state.customItems || {}) };
+    delete customItems[id];
+    this.set({ customCats: (this.state.customCats || []).filter(c => c.id !== id), customItems });
     this.save();
     this.toast('カテゴリを削除しました');
   };
@@ -1702,8 +1774,28 @@ export default class App extends React.Component {
       const on = curPref === o.key;
       return { text: o.text, onPick: () => this.setPref(intItem.name, o.key), border: on ? '#1b1b18' : '#e4e1d8', bg: on ? '#fbfdf0' : '#fff', color: on ? '#1b1b18' : '#55554e', weight: on ? '900' : '700' };
     }) : [];
-    const catIconOpts = ['category', 'pets', 'volunteer_activism', 'self_improvement', 'favorite'];
-    const catIconChoices = catIconOpts.map(ic => ({ icon: ic, onPick: () => this.pickCatIcon(ic), border: st.newCatIcon === ic ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', bg: st.newCatIcon === ic ? '#fbfdf0' : '#fff' }));
+    const catIconChoices = CAT_ICON_CHOICES.map(ic => ({ icon: ic, onPick: () => this.pickCatIcon(ic), border: st.newCatIcon === ic ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', bg: st.newCatIcon === ic ? '#fbfdf0' : '#fff' }));
+    const catGlyphChoices = EMOJI_CHOICES.map(g => ({ g, on: st.newCatGlyph === g, onPick: () => this.pickCatGlyph(g) }));
+
+    /* ---- 行動をつくる（コピー式） ---- */
+    const actCat = activeCat;
+    const actCalc = st.actAddOpen ? this.actAddCalc() : null;
+    const actSrcChoices = (actCat ? actCat.items : []).map(it2 => ({
+      id: it2.id, glyph: it2.glyph, name: it2.name,
+      on: st.actSrcId === it2.id,
+      onPick: () => this.pickActSrc(it2.id),
+    }));
+    const cmpRow = (curIdx, onPick) => COMPARE_STEPS.map((c, i) => ({
+      text: c.label, on: curIdx === i, onPick: () => onPick(i),
+    }));
+    const actBodyOpts = cmpRow(st.actBodyIdx, (i) => this.set({ actBodyIdx: i }));
+    const actMindOpts = cmpRow(st.actMindIdx, (i) => this.set({ actMindIdx: i }));
+    const actStdGlyph = actCat ? (actCat.glyph || '⭐') : '⭐';
+    const actGlyphChoices = [
+      { g: 'std', label: actStdGlyph, sub: '標準', on: st.actGlyph === 'std', onPick: () => this.pickActGlyph('std') },
+      ...EMOJI_CHOICES.map(g => ({ g, label: g, on: st.actGlyph === g, onPick: () => this.pickActGlyph(g) })),
+    ];
+    const actEstText = actCalc ? `${actCalc.recover ? '−' : '+'}${actCalc.body + actCalc.mind}/h（体${actCalc.body} 心${actCalc.mind}）` : '';
     const subItems = (activeCat ? activeCat.items : []).map(t => {
       const e = st.cart[t.id]; const sel = !!e;
       const degTag = (e && e.degIdx != null && t.degLabels)
@@ -1877,8 +1969,11 @@ export default class App extends React.Component {
       degLo: () => this.setDegree(0), degMid: () => this.setDegree(1), degHi: () => this.setDegree(2),
       closeDegree: this.closeDegree, confirmDegree: this.confirmDegree,
       backToCats: this.backToCats,
-      catAddOpen: !!st.catAddOpen, newCatName: st.newCatName || '', catIconChoices,
+      catAddOpen: !!st.catAddOpen, newCatName: st.newCatName || '', catIconChoices, catGlyphChoices,
       openCatAdd: this.openCatAdd, closeCatAdd: this.closeCatAdd, onCatName: this.onCatName, addCat: this.addCat,
+      actAddOpen: !!st.actAddOpen, actSrcChoices, actBodyOpts, actMindOpts, actGlyphChoices, actEstText,
+      actSrcName: actCalc ? actCalc.src.name : '', actName: st.actName || '',
+      openActAdd: this.openActAdd, closeActAdd: this.closeActAdd, onActName: this.onActName, addAction: this.addAction,
       recordSlotName: activeSlot.name, recordSlotEmoji: activeSlot.emoji,
       slotMenuOpen: !!st.slotMenuOpen, toggleSlotMenu: this.toggleSlotMenu,
       slotOptions: SLOTS.map(s => ({ id: s.id, emoji: s.emoji, name: s.name, active: s.id === (st.slotId || this.slotNow()), bg: s.id === (st.slotId || this.slotNow()) ? '#fbfdf0' : '#fff', onPick: () => this.pickSlot(s.id) })),

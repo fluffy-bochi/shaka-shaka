@@ -76,6 +76,7 @@ export function serialize(st) {
     customCats: st.customCats || [],
     customPlans: st.customPlans || [],
     customActions: st.customActions || [],
+    customItems: st.customItems || {},
     prefs: st.prefs || {},
     slotHours: st.slotHours || null,
     hiddenCats: st.hiddenCats || [],
@@ -117,6 +118,7 @@ export function deserialize(data) {
     customCats: Array.isArray(data.customCats) ? data.customCats : [],
     customPlans: Array.isArray(data.customPlans) ? data.customPlans : [],
     customActions: Array.isArray(data.customActions) ? data.customActions : [],
+    customItems: (data.customItems && typeof data.customItems === 'object') ? data.customItems : {},
     prefs: (data.prefs && typeof data.prefs === 'object') ? data.prefs : {},
     slotHours: (Array.isArray(data.slotHours) && data.slotHours.length === 4) ? data.slotHours : null,
     hiddenCats: Array.isArray(data.hiddenCats) ? data.hiddenCats : [],
@@ -132,7 +134,7 @@ export function freshState() {
   return {
     entries: [], tasks: [], sortMode: false,
     collected: [], collectedSeen: 0, templates: {}, consumed: 0, sampleDay: null,
-    customCats: [], customPlans: [], customActions: [], prefs: {},
+    customCats: [], customPlans: [], customActions: [], customItems: {}, prefs: {},
     slotHours: null, hiddenCats: [],
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1,
   };

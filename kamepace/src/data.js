@@ -36,14 +36,14 @@ const act = (id, glyph, icon, name, body, mind, extra = {}) => {
 };
 
 export const CATS = [
-  { id: 'idou', icon: 'directions_subway', color: '#6f8fbf', name: 'いどう', sub: '通勤通学・運転・送迎', items: [
+  { id: 'idou', icon: 'directions_subway', color: '#6f8fbf', glyph: '🚃', name: 'いどう', sub: '通勤通学・運転・送迎', items: [
     act('commute', '🚃', 'directions_subway', '通勤・通学（電車バス）', 5, 4, { kw: ['移動', '電車', '満員電車', 'バス', '地下鉄', '通勤', '通学'] }),
     act('drive', '🚗', 'directions_car', '車の運転', 5, 7, { kw: ['移動', '運転', '車', '渋滞'] }),
     act('pickup', '🚙', 'airport_shuttle', '送迎', 4, 5, { kw: ['移動', '送り', 'お迎え', '子供'] }),
     act('walkmove', '🚶', 'directions_walk', '徒歩移動', 7, 2, { kw: ['移動', '徒歩', '歩き'] }),
     act('bicycle', '🚲', 'directions_bike', '自転車', 8, 2, { kw: ['移動', 'チャリ', 'サイクリング'] }),
   ] },
-  { id: 'work', icon: 'work', color: '#c58b3d', name: '仕事', sub: '会議・デスクワーク・接客・現場', items: [
+  { id: 'work', icon: 'work', color: '#c58b3d', glyph: '💼', name: '仕事', sub: '会議・デスクワーク・接客・現場', items: [
     act('meeting', '💬', 'forum', '会議・打ち合わせ', 3, 7, { kw: ['仕事', '会議', 'ミーティング', 'MTG', '打ち合わせ'] }),
     act('docs', '📝', 'description', 'デスクワーク・資料作成', 4, 6, { kw: ['仕事', '資料', '作業', '事務', 'パソコン'] }),
     act('workcall', '📞', 'call', '電話・通話対応', 2, 6, { kw: ['仕事', '電話', '通話', 'コール'] }),
@@ -52,7 +52,7 @@ export const CATS = [
     act('labor', '🔧', 'construction', '力仕事・現場', 9, 4, { kw: ['仕事', '現場', '力仕事', '肉体労働'] }),
     act('teach', '🧑‍🏫', 'cast_for_education', '教える・指導', 4, 7, { kw: ['仕事', '指導', '研修', '教える'] }),
   ] },
-  { id: 'baito', icon: 'storefront', color: '#d97a6a', name: 'バイト', sub: '接客・レジ・調理・品出し', items: [
+  { id: 'baito', icon: 'storefront', color: '#d97a6a', glyph: '🏪', name: 'バイト', sub: '接客・レジ・調理・品出し', items: [
     act('serve', '🙋', 'support_agent', '接客', 5, 8, { kw: ['仕事', 'バイト', '接客', 'ホール', 'クレーム'] }),
     act('register', '🧾', 'point_of_sale', 'レジ', 5, 6, { kw: ['仕事', 'バイト', 'レジ', '会計'] }),
     act('cookwork', '🍳', 'restaurant', '調理', 7, 5, { kw: ['仕事', 'バイト', '調理', 'キッチン'] }),
@@ -62,7 +62,7 @@ export const CATS = [
     act('tutor', '✏️', 'school', '塾講・指導', 3, 7, { kw: ['仕事', 'バイト', '塾', '家庭教師', '指導'] }),
     act('lightwork', '🗃', 'package_2', '軽作業', 6, 3, { kw: ['仕事', 'バイト', '軽作業', '倉庫', 'ピッキング'] }),
   ] },
-  { id: 'school', icon: 'school', color: '#5b8fd4', name: '授業・学校', sub: '講義・演習・発表・テスト', items: [
+  { id: 'school', icon: 'school', color: '#5b8fd4', glyph: '🏫', name: '授業・学校', sub: '講義・演習・発表・テスト', items: [
     act('lecture', '📖', 'menu_book', '講義（聞く中心）', 2, 5, { kw: ['授業', '講義', '学校', '大学'] }),
     act('seminar', '🔬', 'science', '演習・実習', 4, 6, { kw: ['授業', '演習', '実習', 'ゼミ'] }),
     act('present', '🎤', 'co_present', '発表・プレゼン', 3, 9, { kw: ['授業', '発表', 'プレゼン'] }),
@@ -70,21 +70,21 @@ export const CATS = [
     act('online_class', '💻', 'computer', 'オンライン授業', 2, 4, { kw: ['授業', 'オンライン', 'リモート'] }),
     act('exam', '✍️', 'quiz', 'テスト', 3, 8, { kw: ['授業', 'テスト', '試験', '受験'] }),
   ] },
-  { id: 'study', icon: 'edit_note', color: '#8a7bc4', name: '課題・勉強', sub: 'レポート・テスト勉強・就活', items: [
+  { id: 'study', icon: 'edit_note', color: '#8a7bc4', glyph: '📝', name: '課題・勉強', sub: 'レポート・テスト勉強・就活', items: [
     act('report', '📝', 'edit_note', 'レポート・課題', 3, 6, { kw: ['勉強', '課題', 'レポート', '宿題'] }),
     act('examstudy', '📚', 'menu_book', 'テスト勉強', 3, 6, { kw: ['勉強', 'テスト', '試験', '暗記'] }),
     act('create', '🎨', 'palette', '制作・作品づくり', 4, 6, { kw: ['勉強', '制作', '作品', 'デザイン'] }),
     act('groupwork', '👥', 'group', 'グループワーク', 3, 7, { kw: ['勉強', 'グループ', '共同', 'ゼミ'] }),
     act('jobhunt', '👔', 'badge', '就活・受験', 4, 9, { kw: ['就活', '面接', 'ES', '受験'] }),
   ] },
-  { id: 'club', icon: 'sports_soccer', color: '#58a34d', name: '部活・サークル', sub: '練習・試合・ミーティング', items: [
+  { id: 'club', icon: 'sports_soccer', color: '#58a34d', glyph: '⚽', name: '部活・サークル', sub: '練習・試合・ミーティング', items: [
     act('practice', '⚽', 'sports_soccer', '練習', 8, 4, { kw: ['運動', '部活', 'サークル', '練習'] }),
     act('match', '🏆', 'emoji_events', '試合・大会・本番', 9, 8, { kw: ['運動', '部活', '試合', '大会', '本番', 'ライブ'] }),
     act('clubmtg', '💬', 'forum', 'ミーティング', 2, 5, { kw: ['部活', 'サークル', 'ミーティング'] }),
     act('clubadmin', '📋', 'assignment', '運営・幹部業務', 3, 7, { kw: ['部活', 'サークル', '運営', '幹事'] }),
     act('camp', '🚌', 'directions_bus', '合宿・遠征', 8, 6, { kw: ['部活', '合宿', '遠征', '旅行'] }),
   ] },
-  { id: 'house', icon: 'cleaning_services', color: '#4fa88a', name: '家事・生活', sub: '掃除・料理・育児・手続き', items: [
+  { id: 'house', icon: 'cleaning_services', color: '#4fa88a', glyph: '🧹', name: '家事・生活', sub: '掃除・料理・育児・手続き', items: [
     act('dishes', '🍽', 'local_dining', '皿洗い', 5, 3, { kw: ['家事', '皿洗い', '洗い物', '食器'], after: 1, degree: true, degLabels: ['すくなめ', '多め'], degFh: [5, 8, 11] }),
     act('cleanlaundry', '🧺', 'local_laundry_service', '掃除・洗濯', 6, 2, { kw: ['家事', '掃除', '洗濯', '片付け'], after: 1 }),
     act('cook', '🍳', 'lunch_dining', '料理', 5, 3, { kw: ['家事', '料理', '自炊', 'ごはん'] }),
@@ -93,7 +93,7 @@ export const CATS = [
     act('carework', '🩺', 'medical_services', '介護・看病', 7, 8, { kw: ['家事', '介護', '看病'] }),
     act('errands', '📄', 'receipt_long', '手続き・役所・病院', 4, 6, { kw: ['手続き', '役所', '病院', '銀行', '待ち時間'] }),
   ] },
-  { id: 'talk', icon: 'groups', color: '#b07bc4', name: '対人', sub: '相談・飲み会・イベント', items: [
+  { id: 'talk', icon: 'groups', color: '#b07bc4', glyph: '💬', name: '対人', sub: '相談・飲み会・イベント', items: [
     act('consult', '💬', 'groups', '打ち合わせ・相談', 3, 7, { kw: ['対人', '相談', '打ち合わせ'] }),
     act('privatecall', '📞', 'call', '電話・通話', 2, 6, { kw: ['対人', '電話', '通話'] }),
     act('party', '🍻', 'local_bar', '交流会・飲み会', 5, 7, { kw: ['対人', '飲み会', '交流会', '宴会', 'イベント'] }),
@@ -101,7 +101,7 @@ export const CATS = [
     act('firstmeet', '🤝', 'handshake', '初対面の場', 4, 9, { kw: ['対人', '初対面', '面談', '挨拶'] }),
     act('family', '👪', 'diversity_3', '家族の対応', 3, 6, { kw: ['対人', '家族', '親', '親戚'] }),
   ] },
-  { id: 'rest', icon: 'self_improvement', color: '#7a9a00', name: '休憩・回復', sub: 'お茶・入浴・昼寝・趣味 ・ −回復', items: [
+  { id: 'rest', icon: 'self_improvement', color: '#7a9a00', glyph: '☕', name: '休憩・回復', sub: 'お茶・入浴・昼寝・趣味 ・ −回復', items: [
     act('rest', '☕', 'local_cafe', '休憩・コーヒー', 2, 5, { recover: true, kw: ['休憩', 'お茶', 'カフェ', 'コーヒー', '休む'] }),
     act('meal', '🍙', 'restaurant', '食事', 3, 4, { recover: true, kw: ['休憩', '食事', 'ランチ', 'ごはん'] }),
     act('bath', '🛁', 'bathtub', '入浴', 5, 7, { recover: true, kw: ['休憩', '風呂', 'お風呂', 'サウナ'] }),
@@ -130,6 +130,25 @@ export const PLANS = [
 ];
 
 export const KW_PLACEHOLDERS = ['(例)通勤', '(例)会議 打ち合わせ', '(例)皿洗い', '(例)買い物 スーパー', '(例)ランニング', '(例)休憩 お茶', '(例)資料作成', '(例)入浴', '(例)掃除', '(例)飲み会'];
+
+/* カテゴリ作成で選べるアイコン（Material Symbols Rounded） */
+export const CAT_ICON_CHOICES = [
+  'category', 'pets', 'favorite', 'volunteer_activism', 'self_improvement',
+  'spa', 'palette', 'music_note', 'sports_esports', 'fitness_center',
+  'school', 'menu_book', 'brush', 'local_cafe', 'eco',
+  'rocket_launch', 'savings', 'directions_car', 'medical_services', 'star',
+];
+/* カテゴリ作成時の色（追加順に巡回） */
+export const CAT_COLOR_CHOICES = ['#8a7bc4', '#d97a6a', '#4fa88a', '#c58b3d', '#5b8fd4', '#b07bc4', '#58a34d', '#6f8fbf'];
+
+/* 「くらべてどう？」の5段階（設計書§2: コピー式の行動作成） */
+export const COMPARE_STEPS = [
+  { label: 'かなり楽', m: 0.6 },
+  { label: '少し楽', m: 0.8 },
+  { label: '同じ', m: 1.0 },
+  { label: '少し疲れる', m: 1.2 },
+  { label: 'かなり疲れる', m: 1.5 },
+];
 
 /* 検索候補: カテゴリマスタの全行動＋バリエーション（座れた/立ち等の分岐）。
    body/mind は（体, 心）/h の内訳。fh = 合計 */
