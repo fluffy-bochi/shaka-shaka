@@ -602,7 +602,7 @@ export default class App extends React.Component {
       // 山が減っていたら（睡眠・ゴミ箱）古い側から間引いて量を合わせる
       const target = this.pileGlyphs().length;
       if (saved.length > target) saved = saved.slice(saved.length - target);
-      return saved.slice(0, 130).map(sp => ({
+      return saved.slice(0, 160).map(sp => ({
         e: sp.g,
         x: Math.round(sp.x * W - r),
         y: Math.round(H - sp.y * H - r),
@@ -610,7 +610,7 @@ export default class App extends React.Component {
         s: font,
       }));
     }
-    const glyphs = this.pileGlyphs().slice(-130); // 上限は新しい側を残す
+    const glyphs = this.pileGlyphs().slice(-160); // 上限は新しい側を残す
     let s = seed; const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
     const cols = Math.max(1, Math.floor(W / d)), out = [];
     const n = glyphs.length;
@@ -1038,7 +1038,7 @@ export default class App extends React.Component {
   };
   makeSleepPile() {
     if (this._sleepPile) return this._sleepPile;
-    const glyphs = [...this.pileGlyphs()];
+    const glyphs = this.pileGlyphs().slice(-160);
     let s = 51; const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
     for (let i = glyphs.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = glyphs[i]; glyphs[i] = glyphs[j]; glyphs[j] = t; }
     // ホーム／シャカの山と同じ幾何
@@ -1162,10 +1162,11 @@ export default class App extends React.Component {
       Bodies.rectangle(W + t / 2, H / 2, t, H + t * 2, { isStatic: true }),
     ]);
     this.bodies = [];
-    // 90個上限は新しい側（末尾）を残す — 先頭を残すと新規分が表示から漏れて降ってこない
+    // 表示上限は新しい側（末尾）を残す。画面に収まるのは約100個で、
+    // それを超えたぶんは「あふれて」見える（=頑張りすぎの信号）。
     let marks;
-    if (this.state.dayOffset === 0) marks = this.pileGlyphsMarked().slice(-90);
-    else marks = this.currentBag().slice(-90).map(g => ({ g, isNew: false }));
+    if (this.state.dayOffset === 0) marks = this.pileGlyphsMarked().slice(-160);
+    else marks = this.currentBag().slice(-160).map(g => ({ g, isNew: false }));
     const newCount = marks.filter(m => m.isNew).length;
     const oldCount = marks.length - newCount;
     const perRow = Math.max(1, Math.floor(W / (2 * r)));
@@ -1516,7 +1517,7 @@ export default class App extends React.Component {
       Bodies.rectangle(W + wt / 2, worldH / 2, wt, worldH * 2 + wt, { isStatic: true }),
     ]);
     this.collectBodies = [];
-    glyphs.slice(0, 150).forEach(glyph => {
+    glyphs.slice(-160).forEach(glyph => {
       const x = r + Math.random() * (W - 2 * r);
       const y = worldH - 60 - Math.random() * (worldH * 0.7);
       const body = Bodies.circle(x, y, r, { restitution: 0.2, friction: 0.1, frictionAir: 0.02, density: 0.001 });
