@@ -27,6 +27,7 @@ import MyPage from './screens/MyPage';
 import Nav from './screens/Nav';
 import Trash from './screens/Trash';
 import { SlotTimes, CatsManage, Templates, Sensitivity } from './screens/Settings';
+import Help from './screens/Help';
 
 export default class App extends React.Component {
   state = {
@@ -70,6 +71,8 @@ export default class App extends React.Component {
     /* ---- auth ---- */
     /* ---- 記録の編集（確認画面フローで置き換える対象の entries インデックス） ---- */
     editIdxs: null,
+    /* ヘルプで表示中のペルソナ */
+    helpPersona: 0,
     /* カレンダー枠に行動を入れているとき、その枠のタイトル（テンプレ保存キー） */
     framePlan: null,
     user: null,
@@ -673,6 +676,8 @@ export default class App extends React.Component {
 
   /* ================= マイページの設定サブ画面 ================= */
   goSlotTimes = () => this.set({ screen: 'slotTimes' });
+  goHelp = () => this.set({ screen: 'help' });
+  setHelpPersona = (i) => this.set({ helpPersona: i });
   goCatsManage = () => this.set({ screen: 'catsManage' });
   goTemplates = () => this.set({ screen: 'templates' });
   goSensitivity = () => this.set({ screen: 'sensitivity' });
@@ -1473,14 +1478,16 @@ export default class App extends React.Component {
       isTrash: st.screen === 'trash',
       isSlotTimes: st.screen === 'slotTimes', isCatsManage: st.screen === 'catsManage',
       isTemplates: st.screen === 'templates', isSensitivity: st.screen === 'sensitivity',
+      isHelp: st.screen === 'help', helpPersona: st.helpPersona || 0,
+      goHelp: this.goHelp, setHelpPersona: this.setHelpPersona,
       isCollect: st.screen === 'collect', collectedTotal: this.collectedTotal(),
       goCollect: this.goCollect, finishSleep: this.finishSleep,
       navHomeColor: ['home', 'record', 'sleep'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navHomeFill: ['home', 'record', 'sleep'].includes(st.screen) ? 1 : 0,
       navShakaColor: ['shaka', 'collect'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navShakaFill: ['shaka', 'collect'].includes(st.screen) ? 1 : 0,
-      navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
-      navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity'].includes(st.screen) ? 1 : 0,
+      navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
+      navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help'].includes(st.screen) ? 1 : 0,
       homeDateCaps: formatDateCaps(todayStr()),
       pile: st.screen === 'home' ? this.makePile(7) : [],
       sleepPile: st.screen === 'sleep' ? this.makeSleepPile().map((p, i) => ({
@@ -1589,6 +1596,7 @@ export default class App extends React.Component {
         {v.isCatsManage && <CatsManage v={v} />}
         {v.isTemplates && <Templates v={v} />}
         {v.isSensitivity && <Sensitivity v={v} />}
+        {v.isHelp && <Help v={v} />}
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}

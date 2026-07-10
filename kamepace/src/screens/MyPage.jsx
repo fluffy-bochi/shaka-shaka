@@ -67,6 +67,17 @@ export default function MyPage({ v }) {
             <span style={{ display: 'inline-flex', background: '#eef7cc', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#2f3a00' }}>今日の予定を取り込む</span>
           </button>
         </div>
+        <div style={label}>ヘルプ</div>
+        <div style={card}>
+          <button onClick={v.goHelp} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>📖</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14 }}>ペルソナ別・1日のシミュレーション</div>
+              <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 1 }}>3人の1日で疲労のたまり方を見る</div>
+            </div>
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
+        </div>
         <div style={label}>ひょうじ</div>
         <div style={card}>
           <div style={row(true)}>
