@@ -8,7 +8,11 @@ const mono = { fontFamily: "'Space Mono',monospace" };
 /* pos: カードの位置。下部のボタンを使うステップは 'top'、上部のボタンを使うステップは 'bottom' */
 const STEPS = {
   1: { pos: 'bottom', text: <>まずは記録してみよう。ホームの <b>🌤 午後</b> の「＋記録する」をタップ。<span style={{ color: '#8a8a82' }}>（学生の1日サンプル・午前まで記入済み）</span></> },
-  2: { pos: 'top', text: <>やったことを検索しよう。検索窓をタップして「<b>課題</b>」と入力 → 検索 → 「レポート・課題」を<b>＋</b>（1時間ぶん記録します）</> },
+  2: { text: (f, v) => {
+    if (v.showCart) return <>下の「<b>登録を確認 ›</b>」をタップ</>;
+    if (v.showSub) return <>「<b>レポート・課題</b>」の<b>＋</b>をタップ（1時間ぶん記録します）</>;
+    return <>やったことをカテゴリから選ぼう。「大カテゴリから」の「<b>📝 課題・勉強</b>」をタップ</>;
+  } },
   3: { pos: 'top', text: <>一気に複数も入力できます。「<b>メニューを追加</b>」→ 検索窓に「<b>グループワーク</b>」「<b>バス</b>」「<b>地下鉄</b>」と入れてまとめて検索 → それぞれ<b>＋</b></> },
   4: { pos: 'top', text: (f) => (
     <>程度と時間を調整しよう。
@@ -48,11 +52,11 @@ export default function Tutorial({ v }) {
   const step = STEPS[v.tutorial];
   if (!step) return null;
   const f = v.tutFlags || {};
-  const text = typeof step.text === 'function' ? step.text(f) : step.text;
+  const text = typeof step.text === 'function' ? step.text(f, v) : step.text;
   const showNext = step.done || step.next || (step.nextWhen && step.nextWhen(f));
-  // カード位置: 下部に固定CTAがある検索・確認・睡眠では上、それ以外は下。⇅で手動入替も可
+  // カード位置: 下部に固定CTA（検索・確認・睡眠・カートバー）があるときは上、それ以外は下。⇅で手動入替も可
   const inSearch = v.searchInputOpen || v.searchResultsOpen || v.searchMoreOpen || v.searchConfirmOpen;
-  const autoTop = inSearch || v.isSleep;
+  const autoTop = inSearch || v.isSleep || (v.isRecord && v.showCart);
   const isTop = flip ? !autoTop : autoTop;
   const posStyle = isTop
     ? { top: 'max(46px, calc(env(safe-area-inset-top) + 8px))' }
