@@ -5,7 +5,7 @@
 import React from 'react';
 import Matter from 'matter-js';
 import {
-  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT, EMOJI_CHOICES,
+  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT,
   CAT_ICON_CHOICES, CAT_COLOR_CHOICES, COMPARE_STEPS,
   guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA, DEFAULT_SLOT_HOURS,
 } from './data';
@@ -1787,26 +1787,24 @@ export default class App extends React.Component {
       return { text: o.text, onPick: () => this.setPref(intItem.name, o.key), border: on ? '#1b1b18' : '#e4e1d8', bg: on ? '#fbfdf0' : '#fff', color: on ? '#1b1b18' : '#55554e', weight: on ? '900' : '700' };
     }) : [];
     const catIconChoices = CAT_ICON_CHOICES.map(ic => ({ icon: ic, onPick: () => this.pickCatIcon(ic), border: st.newCatIcon === ic ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', bg: st.newCatIcon === ic ? '#fbfdf0' : '#fff' }));
-    const catGlyphChoices = EMOJI_CHOICES.map(g => ({ g, on: st.newCatGlyph === g, onPick: () => this.pickCatGlyph(g) }));
 
     /* ---- 行動をつくる（コピー式） ---- */
     const actCat = activeCat;
     const actCalc = st.actAddOpen ? this.actAddCalc() : null;
+    const actIsRecover = !!(actCalc && actCalc.recover);
     const actSrcChoices = (actCat ? actCat.items : []).map(it2 => ({
       id: it2.id, glyph: it2.glyph, name: it2.name,
       on: st.actSrcId === it2.id,
       onPick: () => this.pickActSrc(it2.id),
     }));
+    // コピー元が回復系なら「回復の量」で比べる文言に
+    const REC_CMP_LABELS = ['かなり少ない', '少し少ない', '同じ', '少し多い', 'かなり多い'];
     const cmpRow = (curIdx, onPick) => COMPARE_STEPS.map((c, i) => ({
-      text: c.label, on: curIdx === i, onPick: () => onPick(i),
+      text: actIsRecover ? REC_CMP_LABELS[i] : c.label, on: curIdx === i, onPick: () => onPick(i),
     }));
     const actBodyOpts = cmpRow(st.actBodyIdx, (i) => this.set({ actBodyIdx: i }));
     const actMindOpts = cmpRow(st.actMindIdx, (i) => this.set({ actMindIdx: i }));
     const actStdGlyph = actCat ? (actCat.glyph || '⭐') : '⭐';
-    const actGlyphChoices = [
-      { g: 'std', label: actStdGlyph, sub: '標準', on: st.actGlyph === 'std', onPick: () => this.pickActGlyph('std') },
-      ...EMOJI_CHOICES.map(g => ({ g, label: g, on: st.actGlyph === g, onPick: () => this.pickActGlyph(g) })),
-    ];
     const actEstText = actCalc ? `${actCalc.recover ? '−' : '+'}${actCalc.body + actCalc.mind}/h（体${actCalc.body} 心${actCalc.mind}）` : '';
     const subItems = (activeCat ? activeCat.items : []).map(t => {
       const e = st.cart[t.id]; const sel = !!e;
@@ -1981,9 +1979,11 @@ export default class App extends React.Component {
       degLo: () => this.setDegree(0), degMid: () => this.setDegree(1), degHi: () => this.setDegree(2),
       closeDegree: this.closeDegree, confirmDegree: this.confirmDegree,
       backToCats: this.backToCats,
-      catAddOpen: !!st.catAddOpen, newCatName: st.newCatName || '', catIconChoices, catGlyphChoices,
+      catAddOpen: !!st.catAddOpen, newCatName: st.newCatName || '', catIconChoices,
+      newCatGlyph: st.newCatGlyph || '⭐', pickCatGlyph: this.pickCatGlyph,
       openCatAdd: this.openCatAdd, closeCatAdd: this.closeCatAdd, onCatName: this.onCatName, addCat: this.addCat,
-      actAddOpen: !!st.actAddOpen, actSrcChoices, actBodyOpts, actMindOpts, actGlyphChoices, actEstText,
+      actAddOpen: !!st.actAddOpen, actSrcChoices, actBodyOpts, actMindOpts, actEstText, actIsRecover,
+      actGlyph: st.actGlyph, actStdGlyph, pickActGlyph: this.pickActGlyph,
       actSrcName: actCalc ? actCalc.src.name : '', actName: st.actName || '',
       openActAdd: this.openActAdd, closeActAdd: this.closeActAdd, onActName: this.onActName, addAction: this.addAction,
       recordSlotName: activeSlot.name, recordSlotEmoji: activeSlot.emoji,
