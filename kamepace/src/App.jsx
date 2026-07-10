@@ -992,12 +992,18 @@ export default class App extends React.Component {
       }
     }, 160);
     this._planT = setInterval(() => this.advancePlans(), 1000);
+    // シャカ画面のロック画面風時計（旧本番 tickClock 相当）
+    this._clockT = setInterval(() => {
+      const hm = this.tsToHm(Date.now());
+      if (hm !== this.state.clockHm) this.set({ clockHm: hm });
+    }, 1000);
+    this.set({ clockHm: this.tsToHm(Date.now()) });
   }
   componentDidUpdate(prevProps, prevState) {
     if (this.state.tutorial) this.checkTutorial(prevState);
   }
   componentWillUnmount() {
-    clearInterval(this._tick); clearInterval(this._planT);
+    clearInterval(this._tick); clearInterval(this._planT); clearInterval(this._clockT);
     if (this._unwatch) this._unwatch();
     this.stopPhysics(); this.stopCollectPhysics();
   }
@@ -1762,6 +1768,7 @@ export default class App extends React.Component {
       goConfirm: this.goConfirm,
       toggleTemplateToast: this.toggleTemplateToast, shake: this.shake,
       shakaDate: st.dayOffset === 0 ? formatDateShort(todayStr()) : formatDateShort(viewDateStr),
+      clockHm: st.clockHm || this.tsToHm(Date.now()),
       prevDay: this.prevDay, nextDay: this.nextDay,
       prevColor: st.dayOffset <= -3 ? '#d8d5cb' : '#55554e',
       nextColor: st.dayOffset >= 0 ? '#d8d5cb' : '#55554e',
