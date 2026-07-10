@@ -25,14 +25,11 @@ export default function Sleep({ v }) {
         <span style={{ flex: 1, height: 2.5, background: '#1b1b18', borderRadius: 2 }} />
         <span style={{ width: 34, height: 34, borderRadius: '50%', background: '#fff', border: '3px solid #1b1b18', boxShadow: '0 3px 10px rgba(27,27,24,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flex: '0 0 auto' }}>↕</span>
       </div>
-      {/* header */}
-      <div style={{ position: 'relative', zIndex: 4, display: 'flex', alignItems: 'center', gap: 14, padding: '6px 22px 4px' }}>
+      {/* header（右上に回復ボタン。画面下は残量なぞりの邪魔をしない） */}
+      <div style={{ position: 'relative', zIndex: 4, display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 4px 22px' }}>
         <button onClick={v.goHome} style={{ background: 'none', border: 'none', fontSize: 19, color: '#8a8a82', cursor: 'pointer' }}>✕</button>
-        <div style={{ fontSize: 16, fontWeight: 700 }}>🛏 睡眠の記録</div>
-      </div>
-      {/* CTA */}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, padding: '0 16px 18px' }}>
-        <button onClick={v.finishSleep} style={{ width: '100%', border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 16, padding: 16, cursor: 'pointer', boxShadow: '0 8px 24px rgba(27,27,24,.18)' }}>これくらい 回復した</button>
+        <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>🛏 睡眠の記録</div>
+        <button onClick={v.finishSleep} style={{ border: 'none', borderRadius: 999, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 13.5, padding: '9px 18px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(27,27,24,.18)', flex: '0 0 auto' }}>回復</button>
       </div>
     </div>
   );

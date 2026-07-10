@@ -30,9 +30,9 @@ const STEPS = {
   8: { pos: 'bottom', text: <>これから睡眠の記録をするので<b>翌日の朝</b>に移動しました。昨日までの疲労は消えずに持ち越されています</>, next: true },
   9: { pos: 'bottom', text: <>たまった疲労は「<b>睡眠</b>」から消していきます。ホームの 🛏 睡眠カードをタップ</> },
   10: { pos: 'top', text: <>どのくらい休めたか、<b>画面を上下になぞって</b>いまの残り量を決めてください</> },
-  11: { pos: 'top', text: (f) => f.slept
+  11: { text: (f) => f.slept
     ? <>🌙が疲労を消して、消えたぶんは「<b>ためた回復</b>」にたまっていきます</>
-    : <>「<b>これくらい 回復した</b>」を押すと、回復していきます</>,
+    : <>右上の「<b>回復</b>」を押すと、回復していきます</>,
   nextWhen: (f) => f.slept },
   12: { pos: 'bottom', text: (
     <>そのほかにできること:<br />
@@ -54,9 +54,10 @@ export default function Tutorial({ v }) {
   const f = v.tutFlags || {};
   const text = typeof step.text === 'function' ? step.text(f, v) : step.text;
   const showNext = step.done || step.next || (step.nextWhen && step.nextWhen(f));
-  // カード位置: 下部に固定CTA（検索・確認・睡眠・カートバー）があるときは上、それ以外は下。⇅で手動入替も可
+  // カード位置: 下部に固定CTA（検索・確認・カートバー）があるときは上、それ以外は下。⇅で手動入替も可
+  // （睡眠は回復ボタンが右上にあるので下配置）
   const inSearch = v.searchInputOpen || v.searchResultsOpen || v.searchMoreOpen || v.searchConfirmOpen;
-  const autoTop = inSearch || v.isSleep || (v.isRecord && v.showCart);
+  const autoTop = inSearch || (v.isRecord && v.showCart);
   const isTop = flip ? !autoTop : autoTop;
   const posStyle = isTop
     ? { top: 'max(46px, calc(env(safe-area-inset-top) + 8px))' }
