@@ -1,0 +1,121 @@
+html, body { margin: 0; padding: 0; }
+body {
+  background: #f7f4ec;
+  color: #1b1b18;
+  font-family: "Zen Kaku Gothic New", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+* { box-sizing: border-box; }
+::selection { background: #c4f000; color: #2f3a00; }
+.nos::-webkit-scrollbar { display: none; }
+.nos { scrollbar-width: none; }
+button { font-family: inherit; }
+input { font-family: inherit; }
+
+@keyframes drop { 0% { transform: translateY(-16px) rotate(var(--r)); opacity: 0; } 100% { transform: translateY(0) rotate(var(--r)); opacity: 1; } }
+@keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes moonfall { 0% { transform: translateY(0); opacity: 1; } 75% { opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } }
+
+/* マイナス絵文字がプラスを消したときのリングエフェクト */
+@keyframes popfx { 0% { transform: translate(-50%, -50%) scale(.4); opacity: .95; } 100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } }
+.pop-fx {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border: 3px solid #c4f000;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: popfx .4s ease-out forwards;
+}
+
+/* app fills the viewport like the prototype's phone screen */
+#root { min-height: 100dvh; }
+.app-screen {
+  position: relative;
+  isolation: isolate;
+  height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* モバイル: 枠・ロゴ・QRは出さない（アプリ全画面） */
+.shell-head, .shell-side { display: none; }
+
+/* PC表示: プロトタイプと同じスマホ枠＋左上ロゴ＋右にQR */
+@media (min-width: 768px) {
+  body { background: #dcdad2; }
+  .shell {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 26px 34px;
+    position: relative;
+  }
+  .shell-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: absolute;
+    top: 18px;
+    left: 22px;
+  }
+  .shell-head img {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    box-shadow: 0 2px 6px rgba(27,27,24,.18);
+  }
+  .shell-head span {
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: .04em;
+    color: #1b1b18;
+  }
+  .shell-body {
+    display: flex;
+    align-items: center;
+    gap: 44px;
+  }
+  .phone {
+    width: 372px;
+    flex: 0 0 auto;
+    background: #1b1b18;
+    border-radius: 46px;
+    padding: 11px;
+    box-shadow: 0 30px 70px rgba(27,27,24,.28);
+  }
+  .phone .app-screen {
+    width: 350px;
+    height: 812px;
+    max-width: none;
+    border-radius: 36px;
+  }
+  .shell-side { display: block; }
+  .qr-card {
+    background: #fff;
+    border-radius: 18px;
+    padding: 18px 18px 14px;
+    box-shadow: 0 10px 30px rgba(27,27,24,.14);
+    text-align: center;
+  }
+  .qr-card img {
+    width: 132px;
+    height: 132px;
+    image-rendering: pixelated;
+    display: block;
+    margin: 0 auto;
+  }
+  .qr-caption {
+    margin-top: 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .12em;
+    color: #8a8a82;
+  }
+}

@@ -1,0 +1,2025 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>かめペース — プロトタイプ</title>
+<link rel="icon" type="image/png" href="icon/kamepace-icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon/kamepace-icon-180.png">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-title" content="かめペース">
+<meta name="application-name" content="かめペース">
+<meta name="theme-color" content="#dcdad2">
+<link rel="stylesheet" href="design_handoff_fatigue_shaka/styles.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;height:100%}
+  body{font-family:var(--font-ui);background:#dcdad2;display:flex;align-items:flex-start;justify-content:center;min-height:100vh}
+
+  /* phone */
+  .phone{width:100vw;height:100vh;background:transparent;border-radius:0;padding:0;box-shadow:none;position:relative}
+  .stage{position:absolute;inset:0;border-radius:0;overflow:hidden;background:var(--paper)}
+
+  /* スマホ用LPをPCで開いたとき：中央に縦長のスマホ枠、周りに装飾 */
+  .deco{display:none}
+  @media (min-width:760px){
+    body{align-items:center;background:radial-gradient(120% 120% at 50% 0%, #e6e4dc 0%, #d2d0c7 100%)}
+    .phone{width:392px;height:92vh;border-radius:46px;overflow:hidden;
+      box-shadow:0 30px 70px rgba(27,27,24,.28), 0 0 0 10px #1b1b18, 0 0 0 12px #2c2c28}
+    .stage{border-radius:36px}
+  }
+  /* 装飾は左右に余白が取れる広い画面のみ */
+  @media (min-width:1040px){
+    .deco{display:flex;position:fixed;z-index:2;align-items:center}
+    .deco img{display:block}
+    .deco-brand{top:34px;left:44px;gap:14px}
+    .deco-brand img{width:54px;height:54px;border-radius:14px;box-shadow:0 6px 16px rgba(27,27,24,.2)}
+    .deco-title{font-family:var(--font-display,var(--font-ui));font-weight:800;font-size:26px;color:var(--ink,#1b1b18)}
+    /* 右側の余白（スマホ枠の右端〜画面右端）の中央に配置。枠幅392px→半分196px */
+    .deco-qr{left:calc(75% + 98px);top:50%;transform:translate(-50%,-50%);flex-direction:column;gap:10px}
+    .deco-qr img{width:160px;height:160px}
+    .deco-qr-label{font-family:var(--font-mono,monospace);font-size:12px;font-weight:700;letter-spacing:.06em;color:#1b1b18}
+  }
+
+  .flip{position:absolute;inset:0}
+  .face{position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column;transition:opacity .4s ease}
+  .face.front{opacity:1;transform:none;z-index:2}
+  .face.back{opacity:0;transform:none;pointer-events:none;z-index:1}
+  .flip.flipped .face.front{opacity:0;pointer-events:none}
+  .flip.flipped .face.back{opacity:1;pointer-events:auto;z-index:3}
+
+  .statusbar{height:44px;flex:0 0 44px;display:flex;align-items:center;justify-content:space-between;padding:0 26px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--ink);position:relative;z-index:6}
+  .statusbar.light{color:#fff}
+
+  .shaka{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+  .shaka span{position:absolute;filter:drop-shadow(0 5px 7px rgba(27,27,24,.16));transition:bottom .7s cubic-bezier(.2,.8,.3,1), transform .5s ease, opacity .5s ease}
+
+  .physics{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;transition:filter .4s ease}
+  .physics.frosted{filter:blur(2px)}
+  .charm{position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;user-select:none;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.22));transform-origin:center center}
+  .charm img{display:block;width:100%;height:100%;object-fit:contain;}
+  .pop-fx{position:absolute;pointer-events:none;border-radius:50%;border:3px solid var(--lime);animation:popfx .4s ease-out forwards}
+  @keyframes popfx{0%{width:0;height:0;opacity:.9}60%{opacity:.6}100%{width:60px;height:60px;opacity:0;margin:-30px}}
+  .emoji-icon img{display:inline-block;vertical-align:middle;}
+
+  .caps{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+  .tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px;border-radius:var(--r-sm)}
+  .track{height:12px;border-radius:999px;background:var(--surface-sunk);overflow:hidden}
+  .fill{height:100%;border-radius:999px;transition:width .5s ease, background .4s ease}
+
+  .list{flex:1;overflow-y:auto;padding:2px 20px 120px;display:flex;flex-direction:column;gap:9px}
+  .list::-webkit-scrollbar{display:none}
+  .item{display:flex;background:var(--surface);border-radius:var(--r-md);box-shadow:var(--shadow-card);overflow:hidden;cursor:pointer;transition:opacity .3s, transform .12s;animation:pop .3s ease}
+  @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .item:active{transform:scale(.985)}
+  .item .tt{background:var(--ink);color:#fff;padding:9px 11px;font-family:var(--font-mono);min-width:60px;display:flex;flex-direction:column;justify-content:center}
+  .item .tt .f{font-size:12px;font-weight:700}
+  .item .tt .t{font-size:9px;color:var(--ink-3)}
+  .item .bd{flex:1;padding:9px 13px;display:flex;align-items:center;gap:9px;min-width:0}
+  .item .ttl{flex:1;min-width:0;font-size:14px;font-weight:500;display:flex;align-items:flex-start;gap:8px}
+  .item .ttl > img{flex:0 0 auto;margin-top:1px}
+  .ttl-text{flex:1;min-width:0;line-height:1.35;word-break:break-word}
+  .item .mood-face{font-size:22px;filter:drop-shadow(0 3px 4px rgba(27,27,24,.18))}
+  .item .d{font-family:var(--font-mono);font-size:13px;font-weight:700;min-width:34px;text-align:right}
+  .item.exp{opacity:.42}
+  .item.exp .ttl{text-decoration:line-through}
+  .item.planned{background:var(--surface-sunk)}
+  .item.planned .tt{background:var(--ink-3)}
+  .item.planned .ttl{color:var(--ink-3)}
+  .item.planned .mood-face{filter:grayscale(1);opacity:.6}
+  .plan-badge{display:inline-block;font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;color:#fff;background:var(--ink-3);border-radius:5px;padding:2px 6px;margin-right:7px;vertical-align:middle}
+  .list-empty{text-align:center;color:var(--ink-3);font-size:14px;padding:48px 20px;line-height:1.6}
+  .task-head{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--ink-3);margin:18px 2px 4px}
+  .task-row{display:flex;align-items:center;gap:11px;background:var(--surface);border-radius:var(--r-md);box-shadow:var(--shadow-card);padding:12px 14px;cursor:default}
+  .task-check{flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:2px solid var(--line);background:var(--surface);cursor:pointer;padding:0;transition:all .15s}
+  .task-check:active{background:var(--lime);border-color:var(--lime)}
+  .task-ttl{flex:1;font-size:14px;font-weight:500;color:var(--ink)}
+
+  .dnav{width:30px;height:30px;flex:0 0 auto;border:none;background:var(--surface-sunk);color:var(--ink);border-radius:50%;font-size:20px;line-height:1;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0 0 2px}
+  .dnav:active{background:var(--line)}
+  .menu{width:40px;height:40px;background:var(--ink);border-radius:10px;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;cursor:pointer;position:relative;z-index:12}
+  .menu i{width:18px;height:2px;background:#fff;display:block}
+  .menu-dropdown{display:none;position:absolute;right:20px;top:90px;background:var(--ink);border-radius:14px;padding:14px 16px;z-index:11;box-shadow:var(--shadow-pop);align-items:center;gap:10px;min-width:200px}
+  .menu-dropdown.open{display:flex;flex-direction:column;align-items:stretch;gap:12px}
+  .menu-label{font-family:var(--font-mono);font-size:11px;font-weight:700;color:#fff;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+  .menu-slider{flex:1;accent-color:var(--lime);height:4px}
+  .menu-value{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--lime);min-width:32px;text-align:right}
+
+  .btn{font-family:var(--font-ui);font-weight:700;border:none;border-radius:12px;cursor:pointer;font-size:14px}
+  .btn-mono{font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+  .pri{background:var(--lime);color:var(--lime-ink)}
+  .ink{background:var(--ink);color:var(--lime)}
+  .sunk{background:var(--surface-sunk);color:var(--ink-2)}
+  .pink{background:var(--pink);color:#fff}
+
+  .fab{position:absolute;right:18px;bottom:22px;width:60px;height:60px;border-radius:50%;background:var(--lime);color:var(--lime-ink);font-size:30px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-pop);z-index:8;cursor:pointer;border:none;transition:transform .12s}
+  .fab:active{transform:scale(.92)}
+
+  .flipbtn{position:absolute;left:50%;transform:translateX(-50%);bottom:30px;z-index:8;display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:#fff;border:none;border-radius:999px;padding:11px 18px;font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;box-shadow:var(--shadow-pop)}
+  .flipbtn .dot{width:18px;height:18px;border-radius:50%;background:var(--lime);color:var(--lime-ink);display:flex;align-items:center;justify-content:center;font-size:11px}
+
+  .drawer{position:absolute;top:44%;right:0;z-index:7;display:flex;align-items:stretch;transform:translateY(-50%) translateX(calc(100% - 36px));transition:transform .35s cubic-bezier(.6,.02,.2,1)}
+  .drawer.open{transform:translateY(-50%) translateX(0)}
+  .drawer-tab{width:36px;border:none;background:var(--ink);color:#fff;border-radius:16px 0 0 16px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.14em;writing-mode:vertical-rl;text-orientation:upright;padding:14px 0;cursor:pointer}
+  .drawer-body{display:flex;flex-direction:column;gap:8px;background:var(--ink);padding:10px;border-radius:0 0 0 16px}
+  .tool{display:flex;flex-direction:column;align-items:center;gap:3px;background:rgba(255,255,255,.09);border:none;color:#fff;border-radius:12px;padding:9px 14px;font-size:22px;cursor:pointer;transition:background .15s}
+  .tool span{font-family:var(--font-mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+  .tool:active{background:rgba(255,255,255,.2)}
+
+  .scrim{position:absolute;inset:0;background:rgba(20,20,15,.42);z-index:20;opacity:0;pointer-events:none;transition:opacity .3s}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:26px 26px 0 0;z-index:21;transform:translateY(110%);transition:transform .4s cubic-bezier(.6,.02,.2,1);padding:10px 22px 26px;box-shadow:0 -10px 30px rgba(0,0,0,.18);max-height:84%;overflow-y:auto}
+  .sheet.on{transform:translateY(0)}
+  .sheet::-webkit-scrollbar{display:none}
+  .grab{width:42px;height:4px;border-radius:2px;background:var(--line);margin:6px auto 16px}
+
+  .field{margin-bottom:16px}
+  .field > label{display:block;font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:2px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 13px;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;font-family:var(--font-ui)}
+  .chip.sel{border-color:var(--ink);background:var(--ink);color:#fff}
+  .moodrow{display:flex;gap:6px;justify-content:space-between}
+  .moodbtn{flex:1;aspect-ratio:1;border:2px solid var(--line);background:var(--surface);border-radius:14px;font-size:24px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center}
+  .moodbtn.sel{border-color:var(--pink);background:var(--pink-soft);transform:scale(1.05)}
+  .timeinputs{display:flex;align-items:center;gap:10px}
+  .timeinputs input{flex:1;min-width:0;font-family:var(--font-mono);font-size:15px;font-weight:700;border:2px solid var(--line);border-radius:10px;padding:10px 6px;text-align:center;color:var(--ink)}
+  .textinput{width:100%;font-family:var(--font-ui);font-size:15px;font-weight:500;border:2px solid var(--line);border-radius:10px;padding:11px 13px;color:var(--ink);background:var(--surface)}
+  .textinput:focus{outline:none;border-color:var(--ink)}
+  .deltarow{display:flex;align-items:center;gap:10px}
+  .stepbtn{width:44px;height:44px;border:2px solid var(--line);border-radius:12px;background:var(--surface);font-family:var(--font-display);font-weight:800;font-size:22px;color:var(--ink);cursor:pointer;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+  .stepbtn:active{background:var(--surface-sunk)}
+  .numinput{width:74px;min-width:0;font-family:var(--font-display);font-weight:800;font-size:23px;border:2px solid var(--line);border-radius:10px;padding:6px 6px;text-align:center;color:var(--ink)}
+  .numinput:focus{outline:none;border-color:var(--ink)}
+  .emojiprev{margin-left:auto;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .emojiprev .pe{filter:drop-shadow(0 4px 5px rgba(27,27,24,.18));transition:opacity .2s}
+  .emojiprev .pl{font-family:var(--font-mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+  .emojigrid{display:flex;flex-wrap:wrap;gap:2px;margin-top:12px;min-height:28px;transition:opacity .2s}
+  .emojigrid span{font-size:26px;line-height:1;filter:drop-shadow(0 2px 3px rgba(27,27,24,.16))}
+
+  .backwrap{position:absolute;inset:0;background:transparent;display:flex;flex-direction:column}
+  .backwrap .shaka span{filter:drop-shadow(0 5px 8px rgba(27,27,24,.18))}
+  .glasscase{position:absolute;inset:0;border-radius:38px;z-index:2;pointer-events:none;
+    border:3px solid var(--lime);
+    box-shadow: inset 0 2px 1px rgba(255,255,255,.85), inset 0 0 28px rgba(255,255,255,.5), inset 0 -16px 32px rgba(27,27,24,.05), 0 0 0 1px rgba(27,27,24,.06);
+    background: linear-gradient(125deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 24%, rgba(255,255,255,0) 58%, rgba(255,255,255,.30) 74%, rgba(255,255,255,0) 88%);}
+
+  .toast{position:absolute;left:50%;bottom:104px;transform:translateX(-50%) translateY(10px);background:var(--ink);color:#fff;font-size:13px;font-weight:500;padding:10px 16px;border-radius:999px;z-index:30;opacity:0;pointer-events:none;transition:all .3s;font-family:var(--font-ui)}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast .em{margin-right:6px}
+
+  /* ---- achievement (collect) page ---- */
+  .collect{position:absolute;inset:0;z-index:9;background:var(--paper);display:flex;flex-direction:column;color:var(--ink);transform:translateX(100%);transition:transform .35s cubic-bezier(.6,.02,.2,1)}
+  .collect.open{transform:translateX(0)}
+  .collect-head{display:flex;align-items:center;gap:12px;padding:2px 20px 12px}
+  .collect-back{border:none;background:var(--ink);color:#fff;font-family:var(--font-mono);font-size:12px;font-weight:700;border-radius:999px;padding:9px 14px;cursor:pointer}
+  .collect-title{font-size:18px;font-weight:700}
+  .collect-total{margin-left:auto;font-family:var(--font-display);font-weight:800;font-size:26px}
+  .collect-scroll{flex:1;overflow-y:auto;position:relative}
+  .collect-scroll::-webkit-scrollbar{display:none}
+  .collect-stack{position:relative;width:100%}
+  .collect-grid{position:absolute;left:0;right:0;height:0;border-top:1px dashed var(--line);pointer-events:none}
+  .collect-grid span{position:absolute;top:0;transform:translateY(-50%);font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--ink-3);background:var(--paper);padding:0 6px}
+  .collect-grid .lab-l{left:8px}
+  .collect-grid .lab-r{right:8px}
+  .collect-charm{position:absolute;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 4px 5px rgba(27,27,24,.22))}
+  .collect-charm img{width:100%;height:100%;object-fit:contain;pointer-events:none}
+  .collect-empty{position:absolute;left:0;right:0;bottom:40px;display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:14px;text-align:center;padding:0 44px;line-height:1.6}
+
+  /* ---- auth gate ---- */
+  .authgate{position:absolute;inset:0;z-index:100;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:28px}
+  .authgate.hidden{display:none}
+  .authclose{position:absolute;top:18px;right:18px;width:38px;height:38px;border:none;border-radius:50%;background:var(--surface-sunk);color:var(--ink-2);font-size:16px;cursor:pointer;z-index:101}
+  .authguest{margin-top:8px;border:none;background:transparent;color:var(--ink-3);font-family:var(--font-ui);font-size:13px;font-weight:700;text-decoration:underline;cursor:pointer;padding:8px}
+  .authcard{width:100%;max-width:340px;display:flex;flex-direction:column;gap:11px}
+  .authlogo{font-size:26px;font-weight:800;text-align:center}
+  .authsub{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);text-align:center;margin-bottom:8px}
+  .authinput{width:100%;font-family:var(--font-ui);font-size:15px;border:2px solid var(--line);border-radius:12px;padding:13px 14px;color:var(--ink);background:var(--surface)}
+  .authinput:focus{outline:none;border-color:var(--ink)}
+  .authprimary{font-family:var(--font-ui);font-weight:700;border:none;border-radius:12px;cursor:pointer;font-size:15px;padding:14px;background:var(--lime);color:var(--lime-ink)}
+  .authprimary.alt{background:var(--surface-sunk);color:var(--ink-2)}
+  .authprimary:disabled{opacity:.5;cursor:default}
+  .authgoogle{font-family:var(--font-ui);font-weight:700;border:2px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;cursor:pointer;font-size:15px;padding:13px;display:flex;align-items:center;justify-content:center;gap:10px}
+  .authgoogle img{width:18px;height:18px}
+  .authdiv{display:flex;align-items:center;gap:10px;color:var(--ink-3);font-family:var(--font-mono);font-size:11px;margin:2px 0}
+  .authdiv::before,.authdiv::after{content:"";flex:1;height:1px;background:var(--line)}
+  .autherr{color:#d4453a;font-size:12px;min-height:16px;text-align:center;line-height:1.4}
+  .authrow{display:flex;gap:10px}
+  .authrow .authprimary{flex:1}
+
+  /* ---- account sheet ---- */
+  .acct-head{font-size:19px;font-weight:700;margin-bottom:4px}
+  .acct-mail{font-family:var(--font-mono);font-size:12px;color:var(--ink-3);margin-bottom:18px;word-break:break-all}
+  .acct-label{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:0 0 8px}
+  .acct-prov{display:flex;align-items:center;justify-content:space-between;background:var(--surface-sunk);border-radius:12px;padding:12px 14px;margin-bottom:8px;font-size:14px;font-weight:500}
+  .acct-prov .on{color:var(--lime-ink);font-weight:700;font-family:var(--font-mono);font-size:12px}
+  .acct-prov .off{color:var(--ink-3);font-family:var(--font-mono);font-size:12px}
+  .acct-link{width:100%;font-family:var(--font-ui);font-weight:700;border:2px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;cursor:pointer;font-size:14px;padding:12px;margin-top:4px}
+  .acct-set{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+  .menu-acct{width:100%;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);background:var(--lime);border:none;border-radius:10px;padding:10px;cursor:pointer}
+  .menu-seg{display:flex;flex:1;gap:4px;background:rgba(255,255,255,.12);border-radius:9px;padding:3px}
+  .menu-seg-btn{flex:1;border:none;background:transparent;color:#fff;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.04em;padding:6px 4px;border-radius:7px;cursor:pointer}
+  .menu-seg-btn.active{background:var(--lime);color:var(--lime-ink)}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+</head>
+<body>
+<div class="deco deco-brand">
+  <img src="icon/kamepace-icon-512.png" alt="かめペース">
+  <span class="deco-title">かめペース</span>
+</div>
+<div class="deco deco-qr">
+  <img src="qr_kame-pace.png" alt="このアプリへのQRコード">
+  <span class="deco-qr-label">スマホで開く</span>
+</div>
+<div class="phone"><div class="stage">
+
+  <div class="physics frosted" id="physics"></div>
+  <div class="flip" id="flip">
+
+    <div class="face front">
+      <div style="position:relative;z-index:2;display:flex;flex-direction:column;height:100%">
+        <div class="statusbar"><span>9:41</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 20px 10px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <button class="dnav" id="prevDay" aria-label="前の日">‹</button>
+            <div>
+              <div class="caps" id="dateCaps">2026 · JUL 17 · WED</div>
+              <div id="dateLabel" style="font-size:22px;font-weight:700;margin-top:2px">今日のログ</div>
+            </div>
+            <button class="dnav" id="nextDay" aria-label="次の日">›</button>
+          </div>
+          <div class="menu" id="menuBtn"><i></i><i></i><i></i></div>
+          <div class="menu-dropdown" id="menuDropdown">
+            <div style="display:flex;align-items:center;gap:10px;width:100%">
+              <label class="menu-label">ボカシ</label>
+              <input type="range" id="blurSlider" min="0" max="20" value="2" class="menu-slider">
+              <span class="menu-value" id="blurValue">2px</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;width:100%">
+              <label class="menu-label">背景</label>
+              <div class="menu-seg" id="motionSeg">
+                <button type="button" data-v="0" class="menu-seg-btn">固定</button>
+                <button type="button" data-v="1" class="menu-seg-btn">動かす</button>
+              </div>
+            </div>
+            <button class="menu-acct" id="loginBtn">ログイン</button>
+            <button class="menu-acct" id="accountBtn" style="display:none">アカウント</button>
+          </div>
+        </div>
+        <div class="list" id="list" style="padding-top:8px"></div>
+      </div>
+      <button class="fab" id="addBtn">＋</button>
+      <button class="flipbtn" id="toShaka"><span class="dot">⤿</span> シャカシャカを見る</button>
+    </div>
+
+    <div class="face back">
+      <div class="backwrap">
+        <div class="glasscase"></div>
+        <div class="drawer" id="drawer">
+          <button class="drawer-tab" id="drawerTab">道具</button>
+          <div class="drawer-body">
+            <button class="tool" id="shakeBtn">🫨<span>振る</span></button>
+            <button class="tool" id="sortBtn">🧺<span>そろえる</span></button>
+          </div>
+        </div>
+        <div style="position:relative;z-index:3;display:flex;flex-direction:column;height:100%;color:var(--ink);pointer-events:none">
+          <div class="statusbar"><span>9:41</span></div>
+          <div style="padding:18px 26px 0;text-align:center">
+            <div class="caps">ためトリップ・ケース</div>
+            <div id="backClock" style="font-family:var(--font-display);font-weight:800;font-size:76px;line-height:1.02;letter-spacing:.01em">09:41</div>
+          </div>
+          <div style="flex:1"></div>
+        </div>
+      </div>
+      <button class="flipbtn" id="toCollect" style="bottom:78px"><span class="dot">🏆</span> ためた回復を見る</button>
+      <button class="flipbtn" id="toTimeline"><span class="dot">⤾</span> ログに戻る</button>
+    </div>
+  </div>
+
+  <div class="collect" id="collectPage">
+    <div class="statusbar"><span>9:41</span></div>
+    <div class="collect-head">
+      <button class="collect-back" id="collectBack">← もどる</button>
+      <div class="collect-title">ためた回復</div>
+    </div>
+    <div class="collect-scroll" id="collectScroll">
+      <div class="collect-stack" id="collectStack"></div>
+    </div>
+  </div>
+
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="addSheet">
+    <div class="grab"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <span id="addSheetTitle" style="font-size:19px;font-weight:700">やったことを記録</span>
+      <span class="tag ink" style="background:var(--ink);color:var(--lime)">LOG</span>
+    </div>
+
+    <div class="field" id="kindField">
+      <label>種類</label>
+      <div class="chips" id="kindChips">
+        <button type="button" class="chip" data-kind="entry">記録・予定</button>
+        <button type="button" class="chip" data-kind="task">タスク</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>タイトル</label>
+      <input id="tTitle" class="textinput" placeholder="例：チームMTG、企画書づくり…" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label>何をした？</label>
+      <div class="chips" id="actChips"></div>
+    </div>
+
+    <div class="field entry-only">
+      <label>時間</label>
+      <div class="timeinputs"><input id="tFrom" type="time" value="20:00"><span class="caps">→</span><input id="tTo" type="time" value="21:00"></div>
+    </div>
+
+    <div class="field entry-only">
+      <label>気持ち</label>
+      <div class="moodrow" id="moodRow"></div>
+    </div>
+
+    <div class="field" id="deltaField">
+      <label>疲労度の変化</label>
+      <div class="deltarow">
+        <button type="button" id="stepDown" class="stepbtn">−</button>
+        <input id="deltaNum" type="number" min="-100" max="100" value="12" class="numinput">
+        <button type="button" id="stepUp" class="stepbtn">＋</button>
+        <span class="caps">FATIGUE</span>
+      </div>
+      <div class="emojigrid" id="emojiGrid"></div>
+    </div>
+
+    <div class="field" id="sleepField" style="display:none">
+      <label>今、体の疲れはどれくらい残ってる？</label>
+      <div class="deltarow">
+        <input id="remainRange" type="range" min="0" max="100" value="20" class="menu-slider">
+        <input id="remainNum" type="number" min="0" max="100" value="20" class="numinput">
+        <span class="caps">%</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn sunk" style="flex:0 0 90px;padding:14px" id="cancelAdd">やめる</button>
+      <button class="btn pri" style="flex:1;padding:14px;font-size:15px" id="saveAdd">記録する</button>
+    </div>
+    <button class="btn" id="deleteEntry" style="display:none;width:100%;margin-top:10px;padding:13px;background:transparent;color:var(--pink);font-weight:700">この記録を消す</button>
+  </div>
+
+  <div class="sheet" id="detailSheet">
+    <div class="grab"></div>
+    <div id="detailBody"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="sheet" id="accountSheet">
+    <div class="grab"></div>
+    <div id="accountBody"></div>
+  </div>
+
+  <div class="authgate hidden" id="authGate">
+    <button class="authclose" id="authClose" aria-label="閉じる">✕</button>
+    <div class="authcard">
+      <div class="authlogo">疲労シャカシャカ</div>
+      <div class="authsub">ログインすると記録が端末をまたいで同期されます</div>
+      <button class="authgoogle" id="googleBtn">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="">
+        Googleでログイン
+      </button>
+      <div class="authdiv">または</div>
+      <input id="authEmail" class="authinput" type="email" placeholder="メールアドレス" autocomplete="email">
+      <input id="authPass" class="authinput" type="password" placeholder="パスワード（6文字以上）" autocomplete="current-password">
+      <div class="autherr" id="authErr"></div>
+      <div class="authrow">
+        <button class="authprimary alt" id="authSignupBtn">新規登録</button>
+        <button class="authprimary" id="authLoginBtn">ログイン</button>
+      </div>
+      <button class="authguest" id="authGuest">ログインせずに使う（ゲスト）</button>
+    </div>
+  </div>
+
+</div></div>
+
+<script>
+const EMOJI_MAP = {
+  "会議":"💬","通勤":"🚃","レビュー":"💻","作業":"⌨️","資料作成":"✏️","メール":"📧",
+  "勉強":"📚","運動":"🏃","散歩":"🚶","家事":"🧹","育児":"🍼","通話":"📞",
+  "睡眠":"🛌","食事":"🍙","休憩":"☕","昼寝":"😴","ゲーム":"🎮","読書":"📖","入浴":"🛁"
+};
+const ACTIONS = Object.keys(EMOJI_MAP);
+const MOODS = ["😆","🙂","😌","🥲","😩","😢"];
+
+const FLUENT_BASE = "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/";
+const ACT_ASSET = {
+  "会議":  "Speech balloon/3D/speech_balloon_3d.png",
+  "通勤":  "Railway car/3D/railway_car_3d.png",
+  "レビュー":"Laptop/3D/laptop_3d.png",
+  "作業":  "Keyboard/3D/keyboard_3d.png",
+  "資料作成":"Pencil/3D/pencil_3d.png",
+  "メール": "E-mail/3D/e-mail_3d.png",
+  "勉強":  "Books/3D/books_3d.png",
+  "運動":  "Person running/Default/3D/person_running_3d_default.png",
+  "散歩":  "Person walking/Default/3D/person_walking_3d_default.png",
+  "家事":  "Broom/3D/broom_3d.png",
+  "育児":  "Baby bottle/3D/baby_bottle_3d.png",
+  "通話":  "Telephone receiver/3D/telephone_receiver_3d.png",
+  "睡眠":  "Person in bed/Default/3D/person_in_bed_3d_default.png",
+  "食事":  "Rice ball/3D/rice_ball_3d.png",
+  "休憩":  "Hot beverage/3D/hot_beverage_3d.png",
+  "昼寝":  "Sleeping face/3D/sleeping_face_3d.png",
+  "ゲーム": "Video game/3D/video_game_3d.png",
+  "読書":  "Open book/3D/open_book_3d.png",
+  "入浴":  "Bathtub/3D/bathtub_3d.png",
+};
+const MOOD_ASSET = {
+  "😆":"Grinning squinting face/3D/grinning_squinting_face_3d.png",
+  "🙂":"Slightly smiling face/3D/slightly_smiling_face_3d.png",
+  "😌":"Relieved face/3D/relieved_face_3d.png",
+  "🥲":"Smiling face with tear/3D/smiling_face_with_tear_3d.png",
+  "😩":"Weary face/3D/weary_face_3d.png",
+  "😢":"Crying face/3D/crying_face_3d.png",
+};
+const FALLBACK_ASSET = "Sparkles/3D/sparkles_3d.png";
+
+function assetSrc(path){ return FLUENT_BASE + encodeURI(path); }
+function createAssetImg(name, altText, size="100%"){
+  const img=document.createElement("img");
+  img.src = assetSrc(name);
+  img.alt = altText;
+  img.draggable = false;
+  img.decoding = "async";
+  img.loading = "eager";
+  img.style.width = typeof size === "number" ? `${size}px` : size;
+  img.style.height = typeof size === "number" ? `${size}px` : size;
+  img.style.objectFit = "contain";
+  img.style.verticalAlign = "middle";
+  img.style.pointerEvents = "none";
+  img.onerror = ()=>{ if(img.parentNode){ img.parentNode.replaceChild(document.createTextNode(altText), img); } };
+  return img;
+}
+function actIcon(act, size=22){ return createAssetImg(ACT_ASSET[act] || FALLBACK_ASSET, EMOJI_MAP[act] || "✨", size); }
+function moodIcon(mood, size=22){ return MOOD_ASSET[mood] ? createAssetImg(MOOD_ASSET[mood], mood, size) : document.createTextNode(mood); }
+
+function rng(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280;};}
+
+const SEED_ENTRIES = [
+  {from:"07:30",to:"08:00",title:"通勤・満員電車",act:"通勤",mood:"😩",delta:14,exp:false},
+  {from:"09:00",to:"10:30",title:"会議3本",act:"会議",mood:"🥲",delta:18,exp:false},
+  {from:"12:30",to:"13:00",title:"ランチ",act:"食事",mood:"🙂",delta:-12,exp:true},
+  {from:"15:00",to:"17:40",title:"レビュー対応",act:"レビュー",mood:"😌",delta:16,exp:false},
+  {from:"18:30",to:"19:00",title:"散歩",act:"散歩",mood:"🙂",delta:-8,exp:false},
+  {from:"22:00",to:"23:00",title:"明日の資料づくり",act:"資料作成",mood:"🙂",delta:10,exp:false,planned:true,dropped:0},
+];
+const SEED_TASKS = [
+  {srcId:"sample:1",title:"買い出しに行く",done:false,act:"家事",delta:6,mood:"🙂"},
+  {srcId:"sample:2",title:"メールの返信",done:false,act:"メール",delta:4,mood:"🙂"},
+];
+// 達成ページ「ためた回復」のサンプル（回復系＋消した行動）。合計120個ぶん
+const SEED_COLLECTED = [
+  {act:"睡眠", amount:30, ts:1},
+  {act:"会議", amount:16, ts:2},
+  {act:"通勤", amount:14, ts:3},
+  {act:"食事", amount:12, ts:4},
+  {act:"作業", amount:18, ts:5},
+  {act:"休憩", amount:8,  ts:6},
+  {act:"レビュー", amount:16, ts:7},
+  {act:"散歩", amount:6,  ts:8},
+];
+/* ---- date helpers (1日ごとの表示) ---- */
+const MON_ABBR=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const WD_ABBR=["SUN","MON","TUE","WED","THU","FRI","SAT"];
+function pad2(n){ return String(n).padStart(2,"0"); }
+function dateToStr(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+function strToDate(s){ const [y,m,dd]=s.split("-").map(Number); return new Date(y, m-1, dd); }
+function todayStr(){ return dateToStr(new Date()); }
+function shiftDate(s, days){ const d=strToDate(s); d.setDate(d.getDate()+days); return dateToStr(d); }
+function formatDateCaps(s){ const d=strToDate(s); return d.getFullYear()+" · "+MON_ABBR[d.getMonth()]+" "+d.getDate()+" · "+WD_ABBR[d.getDay()]; }
+function dateLabelFor(s){
+  const t=todayStr();
+  if(s===t) return "今日のログ";
+  if(s===shiftDate(t,-1)) return "昨日のログ";
+  if(s===shiftDate(t,1)) return "明日のログ";
+  const d=strToDate(s); return (d.getMonth()+1)+"月"+d.getDate()+"日のログ";
+}
+let viewDate = todayStr();
+
+function freshState(){ return { entries: SEED_ENTRIES.map(e=>({...e, date: todayStr(), sample:true})), sortMode:false, collected: SEED_COLLECTED.map(c=>({...c})), collectedSeen: Date.now(), templates:{}, tasks: SEED_TASKS.map(t=>({...t, date: todayStr(), sample:true})), consumed:0, sampleDay: todayStr() }; }
+// ゲストのサンプル（予定・タスク）は日をまたいだら毎日その日ぶんとして作り直す。
+// ただし当日中はそのゲスト自身の編集を残す（sampleDay が今日ならそのまま）。翌日リセットでOK。
+function refreshGuestSamples(){
+  if(state.sampleDay === todayStr()) return; // すでに今日ぶんに整えてある → 編集を保持
+  state.entries = (state.entries||[]).filter(e=>!e.sample);
+  state.tasks = (state.tasks||[]).filter(t=>!t.sample);
+  SEED_ENTRIES.forEach(e=> state.entries.push({...e, date: todayStr(), sample:true}));
+  SEED_TASKS.forEach(t=> state.tasks.push({...t, date: todayStr(), sample:true}));
+  state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
+  state.sampleDay = todayStr();
+}
+let state = freshState();
+
+/* ---- templates (あすけん方式: 同じ予定は同じ疲労度) ---- */
+function normTitle(t){ return (t||"").trim().replace(/\s+/g," ").toLowerCase(); }
+function getTemplate(title){ const k=normTitle(title); return (state.templates && state.templates[k]) || null; }
+function setTemplate(title, act, delta){
+  const k=normTitle(title);
+  if(!k) return;
+  if(!state.templates) state.templates={};
+  state.templates[k] = { act, delta };
+}
+
+/* ---- planned entries → 時間で割って1個ずつ降らせ、終了で記録に ---- */
+function entryStartTs(e){
+  const d = strToDate(e.date || todayStr());
+  const [hh,mm] = (e.from||"00:00").split(":").map(Number);
+  d.setHours(hh||0, mm||0, 0, 0);
+  return d.getTime();
+}
+function entryEndTs(e){
+  const d = strToDate(e.date || todayStr());
+  const [hh,mm] = (e.to||"00:00").split(":").map(Number);
+  d.setHours(hh||0, mm||0, 0, 0);
+  return d.getTime();
+}
+// 現時点で「降っているべき」個数（from→to を疲労度ぶんに等分。第1個は from+間隔）
+function planUnitsDue(e, now){
+  const N = Math.abs(e.delta);
+  if(N <= 0) return 0;
+  const fromTs = entryStartTs(e), toTs = entryEndTs(e);
+  if(now < fromTs) return 0;
+  if(toTs <= fromTs) return now >= toTs ? N : 0; // 長さ0は終了時に全部
+  const interval = (toTs - fromTs) / N;
+  return Math.max(0, Math.min(N, Math.floor((now - fromTs) / interval)));
+}
+// 予定の進捗を更新：時間が来たぶんだけ降らせる。全部降ったら記録に昇格
+// 予定の進捗を更新（描画はしない）。{changed, negDrops} を返す
+function advancePlans(){
+  const now = Date.now();
+  let changed = false;
+  const negDrops = [];
+  state.entries.forEach(e=>{
+    if(!e.planned) return;
+    const N = Math.abs(e.delta);
+    const due = planUnitsDue(e, now);
+    const cur = e.dropped || 0;
+    if(due > cur){
+      if(e.delta < 0){ for(let i=0;i<(due-cur);i++) negDrops.push(e.act); }
+      e.dropped = due; changed = true;
+    }
+    if((e.dropped||0) >= N){ e.dropped = N; e.planned = false; changed = true; }
+  });
+  return { changed, negDrops };
+}
+// 起動時・追加時のキャッチアップ用（描画は呼び出し側）
+function promoteDuePlans(){ return advancePlans().changed; }
+// 1秒ごとのリアルタイム進行：降ったぶんを反映して落とす
+function tickPlans(){
+  const r = advancePlans();
+  if(r.changed){ renderAll(); save(); }
+  r.negDrops.forEach(act=>dropNegativeParticles(act, 1));
+}
+
+/* ---- Googleカレンダー/ToDo 取り込み（モジュールから呼ばれる） ---- */
+const IMPORT_DEFAULT_DELTA = 10; // テンプレ未登録の予定のデフォルト疲労度
+// タイトルから行動を推測（日本語＋英語＋言い換え）。判定できなければ "" = 中立アイコン
+const ACT_KEYWORDS = [
+  ["資料作成", ["資料作成","資料","スライド","ドキュメント","slide","ppt","企画書","レポート"]],
+  ["会議", ["会議","ミーティング","mtg","meeting","打ち合わせ","打合せ","面談","1on1","商談","朝会","定例"]],
+  ["通勤", ["通勤","出社","退社","移動","commute"]],
+  ["レビュー", ["レビュー","review","確認","チェック","検収"]],
+  ["メール", ["メール","mail","返信","連絡"]],
+  ["勉強", ["勉強","学習","study","研修","セミナー","講座","勉強会","受講"]],
+  ["運動", ["運動","ジム","トレーニング","筋トレ","workout","gym","ランニング","run","ヨガ"]],
+  ["散歩", ["散歩","walk","ウォーキング","お散歩"]],
+  ["家事", ["家事","掃除","洗濯","料理","買い物"]],
+  ["育児", ["育児","子供","こども","保育","送迎","お迎え","送り"]],
+  ["通話", ["通話","電話","call","tel","コール"]],
+  ["睡眠", ["睡眠","就寝","寝る","sleep","お休み"]],
+  ["昼寝", ["昼寝","仮眠","nap"]],
+  ["食事", ["食事","昼食","夕食","朝食","ランチ","lunch","dinner","ディナー","ご飯","ごはん","飲み会","会食","ランチMTG"]],
+  ["休憩", ["休憩","休み","break","コーヒー","カフェ","お茶","ブレイク"]],
+  ["ゲーム", ["ゲーム","game","プレイ"]],
+  ["読書", ["読書","読む","book","リーディング"]],
+  ["入浴", ["入浴","風呂","お風呂","シャワー","bath","sauna","サウナ"]],
+  ["作業", ["作業","タスク","work","実装","開発","コーディング","対応","準備"]],
+];
+function guessAct(title){
+  const t = (title||"").toLowerCase();
+  if(!t) return "";
+  for(const [act, kws] of ACT_KEYWORDS){
+    if(kws.some(k=>t.includes(k.toLowerCase()))) return act;
+  }
+  return ""; // 未分類 → 中立アイコン（タップして設定すればテンプレ学習）
+}
+// items: [{srcId, title, date, from, to}]
+window.__importEvents = function(items){
+  if(!Array.isArray(items)) return 0;
+  const existing = new Set(state.entries.filter(e=>e.srcId).map(e=>e.srcId));
+  let added = 0;
+  items.forEach(it=>{
+    if(!it || !it.srcId || existing.has(it.srcId)) return; // 重複防止
+    const tmpl = getTemplate(it.title);
+    const act = tmpl ? tmpl.act : guessAct(it.title);
+    const delta = tmpl ? tmpl.delta : IMPORT_DEFAULT_DELTA;
+    const date = it.date || todayStr();
+    const from = it.from || "00:00";
+    const to = it.to || "23:59";
+    const planned = entryEndTs({date, to}) > Date.now();
+    state.entries.push({ from, to, title: it.title||"(無題)", act, mood:"🙂", delta, exp:false, date, planned, dropped:0, srcId: it.srcId, needsSetup: !tmpl });
+    existing.add(it.srcId);
+    added++;
+  });
+  if(added){
+    state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
+    promoteDuePlans();
+    renderAll();
+    save();
+  }
+  return added;
+};
+
+// ToDo（Google Tasks）は entries とは別に state.tasks に入れ、TASKリストに縦表示
+window.__importTasks = function(items){
+  if(!Array.isArray(items)) return 0;
+  if(!Array.isArray(state.tasks)) state.tasks = [];
+  const existing = new Set(state.tasks.map(t=>t.srcId));
+  let added = 0;
+  items.forEach(it=>{
+    if(!it || !it.srcId || existing.has(it.srcId)) return;
+    state.tasks.push({ srcId: it.srcId, title: it.title||"(無題)", done:false, date: todayStr() });
+    existing.add(it.srcId);
+    added++;
+  });
+  if(added){ renderAll(); save(); }
+  return added;
+};
+
+// タスクにチェック → チェックした時刻の記録として entries に入れ、絵文字を降らせる
+function checkTask(srcId){
+  const t = (state.tasks||[]).find(x=>x.srcId===srcId);
+  if(!t || t.done) return;
+  t.done = true;
+  const now = new Date();
+  const hhmm = pad2(now.getHours())+":"+pad2(now.getMinutes());
+  const tmpl = getTemplate(t.title);
+  const act = t.act || (tmpl ? tmpl.act : guessAct(t.title));
+  const delta = (typeof t.delta === "number") ? t.delta : (tmpl ? tmpl.delta : IMPORT_DEFAULT_DELTA);
+  const mood = t.mood || "🙂";
+  state.entries.push({
+    from: hhmm, to: hhmm, title: t.title,
+    act, mood, delta,
+    exp:false, date: todayStr(), planned:false, srcId: "taskdone:"+srcId, needsSetup: !tmpl && typeof t.delta!=="number"
+  });
+  state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
+  renderAll();
+  showBack();          // シャカシャカ画面で絵文字が降ってくる
+  setTimeout(()=>{
+    if(delta < 0){
+      dropNegativeParticles(act, Math.abs(delta));
+      toast(EMOJI_MAP[act]||"✨", "タスク完了（回復 "+delta+"）");
+    } else {
+      shakePhysics(16);
+      toast(EMOJI_MAP[act]||"✨", "タスク完了（+"+delta+"）");
+    }
+  }, 400);
+  save();
+}
+
+function fatigue(){
+  let f = 0;
+  state.entries.forEach(e=>{
+    if(e.exp || e.date!==viewDate) return;
+    if(e.planned){ const n=e.dropped||0; f += (e.delta>=0 ? n : -n); } // 予定は降ったぶんだけ
+    else f += e.delta;
+  });
+  return Math.max(0, Math.min(100, Math.round(f)));
+}
+
+function fillColor(v){
+  if(v<40) return "var(--fatigue-0)";
+  if(v<70) return "var(--fatigue-40)";
+  if(v<100) return "var(--fatigue-70)";
+  return "var(--fatigue-100)";
+}
+function msg(v){
+  const yohaku = Math.max(0,100-v);
+  if(v>=100) return "満杯。今日はここまで、休もう。";
+  if(v>85) return `余白 ${yohaku}% — そろそろ休もう`;
+  if(v>60) return `余白 ${yohaku}% — 詰め込みすぎ注意`;
+  if(v>30) return `余白 ${yohaku}% — いいペース`;
+  return `余白 ${yohaku}% — まだいける`;
+}
+function backMsg(v){
+  if(v>=100) return "ケースが満杯。眠って空にしよう。";
+  if(v>85) return "そろそろ振って、休む合図。";
+  if(v>50) return "ほどよく積もってきた。";
+  return "まだ余白たっぷり。";
+}
+
+const { Engine, World, Bodies, Body, Runner, Events } = Matter;
+const physicsEl = document.getElementById("physics");
+
+/* ---- ぶつかった時の効果音（シャカシャカ） ---- */
+const SHAKA_POOL_SIZE = 5;       // 同時に重ねて鳴らせる数
+const SHAKA_MIN_SPEED = 4.2;     // この相対速度未満の接触は鳴らさない（積もって接しているだけ＝無音）
+const SHAKA_COOLDOWN = 45;       // 連続発音の最小間隔(ms)。シャカっとした粒立ちに
+const shakaPool = [];
+let shakaPoolIdx = 0;
+let shakaUnlocked = false;
+let lastShakaPlay = 0;
+(function initShakaSound(){
+  for(let i=0;i<SHAKA_POOL_SIZE;i++){
+    const a = new Audio("sound/syakasyaka.mp3");
+    a.preload = "auto";
+    a.volume = 0;
+    shakaPool.push(a);
+  }
+})();
+// モバイルは初回ユーザー操作で音声を解錠する必要がある
+function unlockShakaSound(){
+  if(shakaUnlocked) return;
+  shakaUnlocked = true;
+  shakaPool.forEach(a=>{
+    a.play().then(()=>{ a.pause(); a.currentTime = 0; }).catch(()=>{});
+  });
+}
+window.addEventListener("pointerdown", unlockShakaSound, {once:false});
+window.addEventListener("touchstart", unlockShakaSound, {once:false});
+function playShaka(speed){
+  const now = performance.now();
+  if(now - lastShakaPlay < SHAKA_COOLDOWN) return;
+  lastShakaPlay = now;
+  const a = shakaPool[shakaPoolIdx];
+  shakaPoolIdx = (shakaPoolIdx + 1) % SHAKA_POOL_SIZE;
+  // 衝突の強さで音量を調整（弱い接触は控えめ、激しい衝突はくっきり）
+  const v = clamp((speed - SHAKA_MIN_SPEED) / 14, 0.15, 1);
+  try{
+    a.volume = v;
+    a.currentTime = 0;
+    const p = a.play();
+    if(p && p.catch) p.catch(()=>{});
+  }catch(e){}
+}
+let currentPhysRadius = 18;
+let currentPhysFont = 30;
+const PHYS_BOUNCE = 0.35;
+const PHYS_FRICTION = 0.05;
+const PHYS_FRICTION_AIR = 0.014;
+const PHYS_DENSITY = 0.001;
+let engine, runner;
+let physicsBodies = [];
+let physicsWalls = [];
+let physicsStarted = false;
+let physicsRunning = false;
+
+function updatePhysicsSize(){
+  const rect = physicsEl.getBoundingClientRect();
+  if(rect.width <= 0 || rect.height <= 0) return;
+  // 100個で画面全体を埋める: 面積 / (100 * π) * パッキング率
+  const area = rect.width * rect.height;
+  const r = Math.sqrt(area * 0.6 / (100 * Math.PI));
+  currentPhysRadius = Math.max(12, Math.min(r, 60));
+  currentPhysFont = Math.round(currentPhysRadius * 1.6);
+}
+
+function clamp(value, min, max){
+  return Math.max(min, Math.min(max, value));
+}
+
+function buildPhysics(){
+  if(engine) return;
+  engine = Engine.create();
+  engine.gravity.y = 0.5;
+  engine.gravity.x = 0;
+  // 絵文字どうしが「ぶつかった瞬間」だけ音を鳴らす。
+  // collisionStart は新しく接触し始めた時だけ発火するので、積もって接しているだけの粒は対象外。
+  // さらに相対速度のしきい値で、そっと触れただけ／落ち着いた山の微振動は無音にする。
+  Events.on(engine, "collisionStart", (ev)=>{
+    for(const pair of ev.pairs){
+      const a = pair.bodyA, b = pair.bodyB;
+      // 壁との衝突は対象外。絵文字（円ボディ）どうしだけ。
+      if(a.isStatic || b.isStatic) continue;
+      const dvx = a.velocity.x - b.velocity.x;
+      const dvy = a.velocity.y - b.velocity.y;
+      const relSpeed = Math.sqrt(dvx*dvx + dvy*dvy);
+      if(relSpeed >= SHAKA_MIN_SPEED){
+        playShaka(relSpeed);
+        break; // 1フレームに1回で十分（重なりすぎ防止）
+      }
+    }
+  });
+  runner = Runner.create();
+  Runner.run(runner, engine);
+  physicsRunning = true;
+  updatePhysicsSize();
+  buildPhysicsWalls();
+  physicsStarted = true;
+  requestAnimationFrame(renderPhysics);
+}
+
+function buildPhysicsWalls(){
+  if(!engine) return;
+  physicsWalls.forEach(w=>World.remove(engine.world, w));
+  physicsWalls = [];
+  const rect = physicsEl.getBoundingClientRect();
+  const W = rect.width;
+  const H = rect.height;
+  const t = 80;
+  physicsWalls.push(Bodies.rectangle(W/2, H + t/2, W + t*2, t, {isStatic:true}));
+  physicsWalls.push(Bodies.rectangle(W/2, -t/2, W + t*2, t, {isStatic:true}));
+  physicsWalls.push(Bodies.rectangle(-t/2, H/2, t, H + t*2, {isStatic:true}));
+  physicsWalls.push(Bodies.rectangle(W + t/2, H/2, t, H + t*2, {isStatic:true}));
+  World.add(engine.world, physicsWalls);
+}
+
+// プラスの絵文字の総数（日付に関わらず全部）。予定は降ったぶんだけ数える。
+function pilePositiveTotal(){
+  let n = 0;
+  state.entries.forEach(e=>{
+    if(e.delta > 0 && !e.exp){
+      n += e.planned ? (e.dropped||0) : e.delta;
+    }
+  });
+  return n;
+}
+function createPileBag(){
+  // 山は日付に関わらず全部持ち越す。減るのはマイナス（回復）の絵文字がぶつかったときだけ。
+  const bag = [];
+  state.entries.forEach(e=>{
+    if(e.delta > 0 && !e.exp){
+      const n = e.planned ? (e.dropped||0) : e.delta; // 予定は降ったぶんだけ積む
+      for(let i=0;i<n;i++) bag.push(e.act);
+    }
+  });
+  // マイナスの絵文字で消したぶん（回復）を古い順に差し引く
+  const consumed = Math.min(state.consumed||0, bag.length);
+  return bag.slice(consumed);
+}
+
+function createPhysicsParticle(act){
+  updatePhysicsSize();
+  const rect = physicsEl.getBoundingClientRect();
+  const x = currentPhysRadius + Math.random() * (rect.width - 2 * currentPhysRadius);
+  const y = currentPhysRadius + Math.random() * (rect.height * 0.5);
+  const body = Bodies.circle(x, y, currentPhysRadius, {
+    restitution: PHYS_BOUNCE,
+    friction: PHYS_FRICTION,
+    frictionAir: PHYS_FRICTION_AIR,
+    density: PHYS_DENSITY,
+  });
+  body.act = act;
+  body.emoji = EMOJI_MAP[act] || "✨";
+  World.add(engine.world, body);
+  const el = document.createElement("div");
+  el.className = "charm";
+  el.style.width = el.style.height = `${currentPhysRadius*2}px`;
+  const img = actIcon(act, currentPhysRadius*2);
+  el.appendChild(img);
+  physicsEl.appendChild(el);
+  physicsBodies.push({body, el});
+}
+
+function removePhysicsParticle(){
+  const particle = physicsBodies.pop();
+  if(!particle) return;
+  World.remove(engine.world, particle.body);
+  particle.el.remove();
+}
+
+function syncPhysics(){
+  buildPhysics();
+  buildPhysicsWalls();
+  const bag = createPileBag();
+  const target = Math.min(100, bag.length);
+  while(physicsBodies.length < target) createPhysicsParticle(bag[physicsBodies.length] || "");
+  while(physicsBodies.length > target) removePhysicsParticle();
+}
+
+/* ---- negative (recovery) particles ---- */
+let negBodies = []; // {body, el, consumed}
+
+function dropNegativeParticles(act, count){
+  buildPhysics();
+  updatePhysicsSize();
+  const rect = physicsEl.getBoundingClientRect();
+  for(let i=0;i<count;i++){
+    const x = currentPhysRadius + Math.random() * (rect.width - 2 * currentPhysRadius);
+    const y = currentPhysRadius + Math.random() * (rect.height * 0.5);
+    const body = Bodies.circle(x, y, currentPhysRadius, {
+      restitution: PHYS_BOUNCE,
+      friction: PHYS_FRICTION,
+      frictionAir: PHYS_FRICTION_AIR,
+      density: PHYS_DENSITY,
+    });
+    body.isNegative = true;
+    World.add(engine.world, body);
+    const el = document.createElement("div");
+    el.className = "charm";
+    el.style.width = el.style.height = `${currentPhysRadius*2}px`;
+    const img = actIcon(act, currentPhysRadius*2);
+    el.appendChild(img);
+    physicsEl.appendChild(el);
+    const neg = {body, el, consumed:false, act};
+    negBodies.push(neg);
+    setTimeout(()=>{
+      if(!neg.consumed){
+        neg.consumed = true;
+        el.style.transition = "opacity .4s";
+        el.style.opacity = "0";
+        World.remove(engine.world, body);
+        setTimeout(()=>el.remove(), 400);
+      }
+    }, 30000);
+  }
+}
+
+function checkNegativeCollisions(){
+  let didCollect=false;
+  for(let ni=negBodies.length-1;ni>=0;ni--){
+    const neg = negBodies[ni];
+    if(neg.consumed) continue;
+    const np = neg.body.position;
+    for(let pi=physicsBodies.length-1;pi>=0;pi--){
+      const pos = physicsBodies[pi];
+      const pp = pos.body.position;
+      const dx = np.x - pp.x, dy = np.y - pp.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if(dist < currentPhysRadius * 2){
+        const cx = (pp.x + np.x) / 2, cy = (pp.y + np.y) / 2;
+        World.remove(engine.world, pos.body);
+        World.remove(engine.world, neg.body);
+        neg.consumed = true;
+        physicsBodies.splice(pi, 1);
+        addCollected(neg.act, 1);          // 使った回復の絵文字（食事・休憩など）
+        addCollected(pos.body.act, 1);     // 回復で弾かれて消えたプラスの記録（作業など）
+        // マイナスで消したぶんを永続化（山を再構築しても戻らないように）
+        state.consumed = Math.min((state.consumed||0) + 1, pilePositiveTotal());
+        didCollect = true;
+        // パッと消える
+        pos.el.style.transition = "opacity .15s";
+        pos.el.style.opacity = "0";
+        neg.el.style.transition = "opacity .15s";
+        neg.el.style.opacity = "0";
+        // ポップエフェクト（リングがぱっと広がる）
+        const fx = document.createElement("div");
+        fx.className = "pop-fx";
+        fx.style.left = cx + "px";
+        fx.style.top = cy + "px";
+        physicsEl.appendChild(fx);
+        setTimeout(()=>{ pos.el.remove(); neg.el.remove(); fx.remove(); }, 400);
+        break;
+      }
+    }
+  }
+  negBodies = negBodies.filter(n=>!n.consumed);
+  if(didCollect) save();
+  // clean up negatives that fell off screen after 5s with no collision
+}
+
+function renderPhysics(){
+  if(!physicsStarted || !physicsRunning) return;
+  physicsBodies.forEach(({body,el})=>{
+    el.style.transform = `translate(${body.position.x - currentPhysRadius}px, ${body.position.y - currentPhysRadius}px) rotate(${body.angle}rad)`;
+  });
+  negBodies.forEach(({body,el,consumed})=>{
+    if(!consumed) el.style.transform = `translate(${body.position.x - currentPhysRadius}px, ${body.position.y - currentPhysRadius}px) rotate(${body.angle}rad)`;
+  });
+  if(negBodies.length > 0) checkNegativeCollisions();
+  requestAnimationFrame(renderPhysics);
+}
+
+window.addEventListener('resize', ()=>{
+  if(engine){
+    updatePhysicsSize();
+    buildPhysicsWalls();
+  }
+});
+
+function shakePhysics(power=16){
+  if(!engine) return;
+  physicsBodies.forEach(({body})=>{
+    Body.setVelocity(body, {
+      x:(Math.random()-0.5)*power*2,
+      y:0
+    });
+    Body.setAngularVelocity(body, (Math.random()-0.5)*0.3);
+  });
+}
+
+function settlePhysics(){
+  if(!engine) return;
+  physicsBodies.forEach(({body})=>{
+    Body.setVelocity(body, {x:0, y:0});
+  });
+}
+
+/* ---- home background motion (動かす / 固定) ---- */
+let homeMotion = (function(){ try{ return localStorage.getItem("shaka_home_motion")==="1"; }catch(e){ return false; } })();
+let settleTimer = null;
+function pausePhysics(){
+  if(runner) Runner.stop(runner);
+  physicsRunning = false;
+}
+function resumePhysics(){
+  if(!engine || !runner) return;
+  if(!physicsRunning){
+    Runner.run(runner, engine);
+    physicsRunning = true;
+    requestAnimationFrame(renderPhysics);
+  }
+}
+// ホーム=固定なら演算を止めて軽くする。シャカシャカ画面では常に動かす。
+function updateMotionState(){
+  if(!engine) return;
+  clearTimeout(settleTimer);
+  const onBack = flip.classList.contains("flipped");
+  if(onBack || homeMotion){
+    resumePhysics();
+  } else {
+    // 少し落ち着かせてから静止
+    resumePhysics();
+    settleTimer = setTimeout(()=>{
+      if(!flip.classList.contains("flipped") && !homeMotion) pausePhysics();
+    }, 1400);
+  }
+}
+
+function renderList(){
+  const list = document.getElementById("list");
+  list.innerHTML="";
+  let shown=0;
+  state.entries.forEach((e,i)=>{
+    if((e.date||"")!==viewDate) return; // 表示中の日だけ
+    shown++;
+    const item=document.createElement("div");
+    item.className="item"+(e.exp?" exp":"")+(e.planned?" planned":"");
+    const sign=e.delta>=0?"+":"−";
+    const col=e.delta>=0?"var(--ink-2)":"var(--lime-ink)";
+    const tt=document.createElement("div"); tt.className="tt";
+    tt.innerHTML = `<span class="f">${e.from}</span><span class="t">${e.to}</span>`;
+    const bd=document.createElement("div"); bd.className="bd";
+    const ttl=document.createElement("span"); ttl.className="ttl";
+    const icon = actIcon(e.act);
+    icon.style.width = icon.style.height = "22px";
+    ttl.appendChild(icon);
+    const ttlText=document.createElement("span"); ttlText.className="ttl-text";
+    if(e.planned){
+      const badge=document.createElement("span"); badge.className="plan-badge"; badge.textContent="予定";
+      ttlText.appendChild(badge);
+    }
+    ttlText.appendChild(document.createTextNode(`${e.title||e.act}`));
+    ttl.appendChild(ttlText);
+    const faceSpan=document.createElement("span"); faceSpan.className="mood-face";
+    faceSpan.appendChild(moodIcon(e.mood));
+    const d=document.createElement("span"); d.className="d";
+    d.style.color = e.planned ? "var(--ink-3)" : col;
+    d.textContent = e.planned ? `${e.dropped||0}/${Math.abs(e.delta)}` : `${sign}${Math.abs(e.delta)}`;
+    bd.appendChild(ttl);
+    bd.appendChild(faceSpan);
+    bd.appendChild(d);
+    item.appendChild(tt);
+    item.appendChild(bd);
+    item.onclick=()=>openEdit(i);
+    list.appendChild(item);
+  });
+  if(shown===0){
+    const empty=document.createElement("div");
+    empty.className="list-empty";
+    empty.textContent="この日の記録はまだありません。";
+    list.appendChild(empty);
+  }
+  // TASK（ToDo）セクション：予定の下に縦に表示（今日のみ）
+  if(viewDate===todayStr()){
+    const openTasks=(state.tasks||[]).filter(t=>!t.done);
+    if(openTasks.length){
+      const head=document.createElement("div"); head.className="task-head"; head.textContent="TASK";
+      list.appendChild(head);
+      openTasks.forEach(t=>{
+        const row=document.createElement("div"); row.className="task-row";
+        const cb=document.createElement("button"); cb.className="task-check"; cb.setAttribute("aria-label","完了にする");
+        cb.onclick=(ev)=>{ ev.stopPropagation(); checkTask(t.srcId); };
+        const ttl=document.createElement("span"); ttl.className="task-ttl"; ttl.textContent=t.title;
+        row.appendChild(cb); row.appendChild(ttl);
+        list.appendChild(row);
+      });
+    }
+  }
+}
+
+function renderHeaderDate(){
+  const caps=document.getElementById("dateCaps");
+  const label=document.getElementById("dateLabel");
+  if(caps) caps.textContent=formatDateCaps(viewDate);
+  if(label) label.textContent=dateLabelFor(viewDate);
+}
+
+function tickClock(){
+  const d=new Date();
+  const hh=String(d.getHours()).padStart(2,"0");
+  const mm=String(d.getMinutes()).padStart(2,"0");
+  const bc=document.getElementById("backClock");
+  if(bc) bc.textContent=hh+":"+mm;
+  document.querySelectorAll(".statusbar span:first-child").forEach(s=>s.textContent=d.getHours()+":"+mm);
+}
+
+function renderAll(){
+  renderHeaderDate();
+  renderList();
+  syncPhysics();
+  tickClock();
+  updateMotionState();
+}
+
+document.getElementById("prevDay").onclick=()=>{ viewDate=shiftDate(viewDate,-1); state.sortMode=false; renderAll(); };
+document.getElementById("nextDay").onclick=()=>{ viewDate=shiftDate(viewDate, 1); state.sortMode=false; renderAll(); };
+
+let blurAmount=2;
+const flip=document.getElementById("flip");
+const faceFront=document.querySelector(".face.front");
+const faceBack=document.querySelector(".face.back");
+function showBack(){
+  flip.classList.add("flipped");
+  faceFront.style.cssText="opacity:0;pointer-events:none;z-index:1";
+  faceBack.style.cssText="opacity:1;pointer-events:auto;z-index:3";
+  physicsEl.classList.remove("frosted");
+  physicsEl.style.filter="none";
+  updateMotionState();
+}
+function showFront(){
+  flip.classList.remove("flipped");
+  faceBack.style.cssText="opacity:0;pointer-events:none;z-index:1";
+  faceFront.style.cssText="opacity:1;pointer-events:auto;z-index:2";
+  physicsEl.classList.add("frosted");
+  physicsEl.style.filter=`blur(${blurAmount}px)`;
+  updateMotionState();
+}
+document.getElementById("toShaka").onclick=()=>{ state.sortMode=false; showBack(); };
+document.getElementById("toTimeline").onclick=()=>{ document.getElementById("drawer").classList.remove("open"); showFront(); };
+
+document.getElementById("drawerTab").onclick=()=>document.getElementById("drawer").classList.toggle("open");
+
+/* ---- menu dropdown ---- */
+const menuBtn=document.getElementById("menuBtn");
+const menuDropdown=document.getElementById("menuDropdown");
+menuBtn.onclick=()=>menuDropdown.classList.toggle("open");
+document.addEventListener("click",(e)=>{
+  if(!menuBtn.contains(e.target)&&!menuDropdown.contains(e.target)) menuDropdown.classList.remove("open");
+});
+document.getElementById("blurSlider").oninput=(e)=>{
+  blurAmount=+e.target.value;
+  document.getElementById("blurValue").textContent=blurAmount+"px";
+  physicsEl.style.filter=physicsEl.classList.contains("frosted")?`blur(${blurAmount}px)`:"none";
+};
+
+/* ---- 背景の動き 固定/動かす ---- */
+const motionSeg=document.getElementById("motionSeg");
+function paintMotionSeg(){
+  motionSeg.querySelectorAll(".menu-seg-btn").forEach(b=>{
+    b.classList.toggle("active", (b.dataset.v==="1")===homeMotion);
+  });
+}
+motionSeg.querySelectorAll(".menu-seg-btn").forEach(b=>{
+  b.onclick=()=>{
+    homeMotion = b.dataset.v==="1";
+    try{ localStorage.setItem("shaka_home_motion", homeMotion?"1":"0"); }catch(e){}
+    paintMotionSeg();
+    updateMotionState();
+  };
+});
+paintMotionSeg();
+
+
+let motionOn=false;
+let lastMotion={x:null,y:null,z:null};
+function enableMotion(){
+  if(motionOn) return;
+  if(typeof DeviceMotionEvent==='undefined'){
+    toast("⚠️","この端末では振動検知が使えません。");
+    return;
+  }
+  const attach = ()=>{
+    window.addEventListener('devicemotion', onMotion);
+    motionOn=true;
+    toast("📳","本体振動を検知するようにしました");
+  };
+  if(typeof DeviceMotionEvent.requestPermission==='function'){
+    DeviceMotionEvent.requestPermission().then(result=>{
+      if(result==='granted') attach();
+      else toast("⚠️","振動検知の許可が必要です。");
+    }).catch(()=>toast("⚠️","振動検知の許可取得に失敗しました。"));
+  } else {
+    attach();
+  }
+}
+function onMotion(event){
+  const a = event.acceleration || event.accelerationIncludingGravity;
+  if(!a || a.x==null) return;
+  if(lastMotion.x!=null){
+    const d = Math.abs(a.x-lastMotion.x)+Math.abs(a.y-lastMotion.y)+Math.abs(a.z-lastMotion.z);
+    if(d > 16) shakePhysics(10);
+  }
+  lastMotion = {x:a.x, y:a.y, z:a.z};
+}
+function performShake(){
+  state.sortMode=false;
+  syncPhysics();
+  shakePhysics(16);
+  toast("🫨","シャカシャカ…");
+}
+
+document.getElementById("shakeBtn").onclick=()=>{ enableMotion(); performShake(); };
+document.getElementById("sortBtn").onclick=()=>{ state.sortMode=true; settlePhysics(); toast("🧺","きれいにそろえた"); };
+
+let toastT;
+function toast(em,txt){
+  const t=document.getElementById("toast");
+  t.innerHTML=`<span class="em">${em}</span>${txt}`;
+  t.classList.add("on"); clearTimeout(toastT);
+  toastT=setTimeout(()=>t.classList.remove("on"),1600);
+}
+
+const scrim=document.getElementById("scrim"), addSheet=document.getElementById("addSheet");
+let sel={title:"",act:"会議",mood:"🥲",delta:12};
+let editIndex=null; // null=新規追加 / 数値=その entry を編集中
+function buildAddSheet(){
+  const ac=document.getElementById("actChips"); ac.innerHTML="";
+  ACTIONS.forEach(a=>{
+    const c=document.createElement("button");
+    c.className="chip"+(a===sel.act?" sel":"");
+    c.appendChild(actIcon(a,18));
+    c.appendChild(document.createTextNode(` ${a}`));
+    c.onclick=()=>{sel.act=a;buildAddSheet();}; ac.appendChild(c);
+  });
+  const mr=document.getElementById("moodRow"); mr.innerHTML="";
+  MOODS.forEach(m=>{
+    const b=document.createElement("button");
+    b.className="moodbtn"+(m===sel.mood?" sel":"");
+    b.appendChild(moodIcon(m,22));
+    b.onclick=()=>{sel.mood=m;buildAddSheet();}; mr.appendChild(b);
+  });
+  document.getElementById("deltaNum").value=sel.delta;
+  // 睡眠だけ「残量」を入力する専用UIに切り替える（記録の新規追加時のみ）
+  const isSleep = sel.act==="睡眠" && addKind!=='task' && editIndex==null;
+  document.getElementById("deltaField").style.display = isSleep ? "none" : "";
+  document.getElementById("sleepField").style.display = isSleep ? "" : "none";
+  if(isSleep){
+    if(sel.remain==null) sel.remain = 20;
+    document.getElementById("remainNum").value = sel.remain;
+    document.getElementById("remainRange").value = sel.remain;
+  }
+  updateGrid();
+}
+function updateGrid(){
+  const grid=document.getElementById("emojiGrid");
+  grid.innerHTML="";
+  const count = Math.abs(sel.delta);
+  for(let i=0;i<count;i++){
+    const span=document.createElement("span");
+    const icon = actIcon(sel.act,22);
+    span.appendChild(icon);
+    grid.appendChild(span);
+  }
+  grid.style.opacity=sel.delta>=0?1:.25;
+}
+let addKind='entry'; // 'entry'（記録・予定） / 'task'
+const kindChips=document.getElementById("kindChips");
+function paintKind(){
+  kindChips.querySelectorAll(".chip").forEach(c=>c.classList.toggle("sel", c.dataset.kind===addKind));
+  const isTask = addKind==='task';
+  document.querySelectorAll("#addSheet .entry-only").forEach(el=>el.style.display = isTask ? "none" : "");
+  document.getElementById("saveAdd").textContent = isTask ? "タスクを追加" : "記録する";
+  document.getElementById("addSheetTitle").textContent = isTask ? "タスクを追加" : "やったことを記録";
+  document.getElementById("tTitle").placeholder = isTask ? "例：請求書を送る、買い物…" : "例：チームMTG、企画書づくり…";
+}
+kindChips.querySelectorAll(".chip").forEach(c=>{
+  c.onclick=()=>{ addKind=c.dataset.kind; paintKind(); };
+});
+function openAdd(){
+  editIndex=null;
+  addKind='entry';
+  sel={title:"",act:"会議",mood:"🥲",delta:12};
+  document.getElementById("tTitle").value="";
+  document.getElementById("tFrom").value="20:00";
+  document.getElementById("tTo").value="21:00";
+  document.getElementById("kindField").style.display="";
+  document.getElementById("deleteEntry").style.display="none";
+  paintKind();
+  buildAddSheet(); scrim.classList.add("on"); addSheet.classList.add("on");
+}
+function openEdit(i){
+  const e=state.entries[i];
+  if(!e) return;
+  editIndex=i;
+  addKind='entry';
+  sel={title:e.title||"", act:e.act, mood:e.mood, delta:e.delta};
+  document.getElementById("tTitle").value=e.title||"";
+  document.getElementById("tFrom").value=e.from||"00:00";
+  document.getElementById("tTo").value=e.to||"00:00";
+  document.getElementById("kindField").style.display="none"; // 編集中は種類変更なし
+  document.querySelectorAll("#addSheet .entry-only").forEach(el=>el.style.display="");
+  document.getElementById("addSheetTitle").textContent= e.planned ? "予定を編集" : "記録を編集";
+  document.getElementById("saveAdd").textContent="保存する";
+  const del=document.getElementById("deleteEntry");
+  del.style.display="block"; del.textContent= e.planned ? "この予定を消す" : "この記録を消す";
+  buildAddSheet(); scrim.classList.add("on"); addSheet.classList.add("on");
+}
+function closeSheets(){ editIndex=null; scrim.classList.remove("on"); addSheet.classList.remove("on"); document.getElementById("detailSheet").classList.remove("on"); document.getElementById("accountSheet").classList.remove("on"); }
+document.getElementById("addBtn").onclick=openAdd;
+document.getElementById("cancelAdd").onclick=closeSheets;
+document.getElementById("deleteEntry").onclick=()=>{
+  if(editIndex==null) return;
+  const wasPlanned=state.entries[editIndex] && state.entries[editIndex].planned;
+  state.entries.splice(editIndex,1);
+  editIndex=null;
+  closeSheets(); renderAll(); save();
+  toast("🧹", wasPlanned ? "予定を消した" : "消した");
+};
+scrim.onclick=closeSheets;
+
+document.getElementById("tTitle").oninput=(e)=>{
+  const t=e.target.value;
+  const tmpl=getTemplate(t); // 同じタイトルの登録済みテンプレを自動適用
+  if(tmpl){ sel.act=tmpl.act; sel.delta=tmpl.delta; buildAddSheet(); return; }
+  const found=ACTIONS.find(a=>t.includes(a));
+  if(found && found!==sel.act){ sel.act=found; buildAddSheet(); }
+};
+document.getElementById("stepUp").onclick=()=>{ sel.delta=Math.min(100,sel.delta+1); document.getElementById("deltaNum").value=sel.delta; updateGrid(); };
+document.getElementById("stepDown").onclick=()=>{ sel.delta=Math.max(-100,sel.delta-1); document.getElementById("deltaNum").value=sel.delta; updateGrid(); };
+document.getElementById("deltaNum").oninput=(e)=>{ sel.delta=Math.max(-100,Math.min(100,Math.round(+e.target.value||0))); updateGrid(); };
+document.getElementById("remainRange").oninput=(e)=>{ sel.remain=Math.max(0,Math.min(100,Math.round(+e.target.value||0))); document.getElementById("remainNum").value=sel.remain; };
+document.getElementById("remainNum").oninput=(e)=>{ sel.remain=Math.max(0,Math.min(100,Math.round(+e.target.value||0))); document.getElementById("remainRange").value=sel.remain; };
+document.getElementById("saveAdd").onclick=()=>{
+  const from=document.getElementById("tFrom").value, to=document.getElementById("tTo").value;
+  const title=(document.getElementById("tTitle").value||"").trim() || sel.act;
+  const delta=sel.delta;
+
+  // ---- タスクとして追加（新規時のみ）----
+  if(editIndex==null && addKind==='task'){
+    const tt=(document.getElementById("tTitle").value||"").trim();
+    if(!tt){ toast("⚠️","タスク名を入れてください"); return; }
+    if(!Array.isArray(state.tasks)) state.tasks=[];
+    setTemplate(tt, sel.act, sel.delta); // タスクもテンプレ学習
+    state.tasks.push({ srcId:"local:"+Date.now()+":"+Math.random().toString(36).slice(2,7), title:tt, done:false, act:sel.act, delta:sel.delta, mood:sel.mood, date: todayStr() });
+    closeSheets(); renderAll(); save();
+    toast("📝","タスクを追加した");
+    return;
+  }
+
+  // ---- 編集モード：既存の entry を更新 ----
+  if(editIndex!=null){
+    const e=state.entries[editIndex];
+    if(e){
+      e.from=from; e.to=to; e.title=title; e.act=sel.act; e.mood=sel.mood; e.delta=delta;
+      e.planned = entryEndTs({date:e.date||viewDate, to}) > Date.now();
+      if(e.planned){ e.dropped = planUnitsDue(e, Date.now()); } // 時間・疲労度の変更を反映
+      setTemplate(title, sel.act, delta); // 編集内容もテンプレに反映
+      e.needsSetup = false;
+    }
+    editIndex=null;
+    state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
+    closeSheets(); renderAll(); save();
+    toast("✏️","更新した");
+    return;
+  }
+
+  if(sel.act==="睡眠"){
+    // 睡眠は「残量」を指定。全消しにせず、今シャカシャカ画面にある山との差分だけ回復させる
+    // （山は日付をまたいで持ち越すので、今日ぶんの fatigue() ではなく山の実数で計算する）
+    const cur = createPileBag().length;
+    const remain = Math.max(0, Math.round(sel.remain ?? 20));
+    const recover = Math.max(0, cur - remain);
+    state.entries.push({from,to,title,act:"睡眠",mood:sel.mood,delta:-recover,exp:false,date:viewDate});
+    state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
+    state.sortMode=false;
+    closeSheets(); renderAll(); showBack(); save();
+    setTimeout(()=>{
+      if(recover>0) dropNegativeParticles("睡眠", recover); // 睡眠絵文字（マイナス）が降ってくる
+      toast("🛌", recover>0 ? `眠った。疲れを${remain}まで減らした` : `眠った。疲れは${remain}のまま`);
+    }, 400);
+    return;
+  }
+  // テンプレ学習（同じタイトルは次回から同じ疲労度に自動）
+  setTemplate(title, sel.act, delta);
+
+  // 記録時点で終了時刻が今より先なら「予定（グレー）」、過ぎていれば即「記録」
+  const planned = entryEndTs({date:viewDate, to}) > Date.now();
+  state.entries.push({from,to,title,act:sel.act,mood:sel.mood,delta,exp:false,date:viewDate,planned,dropped:0});
+  state.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||a.from.localeCompare(b.from));
+  closeSheets();
+  if(planned){
+    promoteDuePlans(); // 開始時刻を既に過ぎていれば、その分だけ降らせておく
+    renderAll();
+    save();
+    toast("🗓️","予定を追加した（時間どおり1個ずつ記録）");
+    return;
+  }
+  renderAll();
+  showBack();
+  setTimeout(()=>{
+    if(delta < 0){
+      dropNegativeParticles(sel.act, Math.abs(delta));
+      toast(EMOJI_MAP[sel.act]||"✨", "回復した（"+delta+"）");
+    } else {
+      shakePhysics(16);
+      toast(EMOJI_MAP[sel.act]||"✨", "記録した（+"+delta+"）");
+    }
+  }, 400);
+  save();
+};
+
+
+/* ---- achievement (collect) page ---- */
+const COLLECT_UNIT = 100; // メモリ1目盛り＝画面の高さ（単位は後で変更可）
+
+function addCollected(act, amount){
+  if(!Array.isArray(state.collected)) state.collected = [];
+  const amt = Math.max(0, Math.round(amount || 0));
+  if(amt <= 0) return;
+  state.collected.push({ act, amount: amt, ts: Date.now() });
+}
+function collectTotal(){
+  return (state.collected||[]).reduce((s,c)=>s + Math.max(0, Math.round(c.amount||0)), 0);
+}
+function collectUnits(){
+  // イベントを1個ずつに展開（消えた古い順 → 底から積む）
+  const arr = [];
+  (state.collected||[]).forEach(c=>{
+    const n = Math.max(0, Math.round(c.amount||0));
+    for(let i=0;i<n;i++) arr.push({ act:c.act, ts:c.ts||0 });
+  });
+  return arr;
+}
+const COLLECT_MAX = 500; // 物理ボディ数の上限（多すぎると重いため）
+let collectEngine=null, collectRunner=null, collectBodies=[], collectRAF=null, collectActive=false, collectDropT=null;
+
+function clearCollectPhysics(){
+  collectActive=false;
+  if(collectRAF){ cancelAnimationFrame(collectRAF); collectRAF=null; }
+  if(collectDropT){ clearTimeout(collectDropT); collectDropT=null; }
+  if(collectRunner){ Runner.stop(collectRunner); collectRunner=null; }
+  if(collectEngine){ World.clear(collectEngine.world,false); Engine.clear(collectEngine); collectEngine=null; }
+  collectBodies=[];
+}
+
+function renderCollect(){
+  const scroll = document.getElementById("collectScroll");
+  const stack  = document.getElementById("collectStack");
+  clearCollectPhysics();
+  stack.innerHTML = "";
+
+  let units = collectUnits();
+  if(units.length > COLLECT_MAX) units = units.slice(units.length - COLLECT_MAX); // 直近を優先
+  const total = units.length;
+
+  const W  = scroll.clientWidth;
+  const Hv = scroll.clientHeight;
+  const itemPx = Math.max(20, (currentPhysRadius || 18) * 2); // ホーム/シャカと同サイズ
+  const r = itemPx/2;
+  // 約 COLLECT_UNIT 個で1画面ぶん積もる（シャカシャカと同じ密度）
+  const screens = Math.max(1, Math.ceil(total / COLLECT_UNIT) + 1);
+  const worldH = Math.max(Hv, screens * Hv);
+  stack.style.height = worldH + "px";
+
+  // メモリ線（画面の高さごと＝100, 200, 300 …）左右にラベル
+  const levels = Math.ceil(worldH / Hv);
+  for(let k=1; k<=levels; k++){
+    const y = worldH - k * Hv;
+    if(y < -2) continue;
+    const line = document.createElement("div");
+    line.className = "collect-grid";
+    line.style.top = y + "px";
+    const ll = document.createElement("span"); ll.className="lab-l"; ll.textContent = k * COLLECT_UNIT;
+    const lr = document.createElement("span"); lr.className="lab-r"; lr.textContent = k * COLLECT_UNIT;
+    line.appendChild(ll); line.appendChild(lr);
+    stack.appendChild(line);
+  }
+
+  if(total === 0){
+    const em = document.createElement("div");
+    em.className = "collect-empty";
+    em.textContent = "まだ何も。食事・休憩・睡眠で回復すると、ここに積もっていきます。";
+    stack.appendChild(em);
+    scroll.scrollTop = Math.max(0, worldH - Hv);
+    return;
+  }
+
+  // --- physics world (シャカシャカと同じ挙動・振らない) ---
+  collectEngine = Engine.create();
+  collectEngine.gravity.y = 1;
+  collectEngine.gravity.x = 0;
+  const wt = 140;
+  World.add(collectEngine.world, [
+    Bodies.rectangle(W/2, worldH + wt/2, W + wt*2, wt, {isStatic:true}), // 床
+    Bodies.rectangle(-wt/2, worldH/2, wt, worldH*2 + wt, {isStatic:true}), // 左壁
+    Bodies.rectangle(W + wt/2, worldH/2, wt, worldH*2 + wt, {isStatic:true}), // 右壁
+  ]);
+
+  function spawn(u, x, y){
+    const body = Bodies.circle(x, y, r, {restitution:0.2, friction:0.1, frictionAir:0.02, density:0.001});
+    World.add(collectEngine.world, body);
+    const el = document.createElement("div");
+    el.className = "collect-charm";
+    el.style.width = el.style.height = itemPx + "px";
+    el.appendChild(actIcon(u.act, itemPx));
+    stack.appendChild(el);
+    collectBodies.push({body, el});
+  }
+
+  const seen = state.collectedSeen || 0;
+  const olds = [], news = [];
+  units.forEach(u=>{ (u.ts > seen ? news : olds).push(u); });
+
+  // 既に積もっていた分（前回まで）: 床付近に並べて事前に落ち着かせる
+  const cols = Math.max(1, Math.floor(W / itemPx));
+  olds.forEach((u, idx)=>{
+    const col = idx % cols, row = Math.floor(idx / cols);
+    const sx = Math.min(W - r, Math.max(r, r + col*itemPx + (row%2 ? itemPx*0.5 : 0)));
+    const sy = worldH - r - 2 - row * (itemPx*0.92);
+    spawn(u, sx, sy);
+  });
+  for(let s=0; s<360; s++){ Engine.update(collectEngine, 1000/60); } // 静かに沈める
+
+  // 一度描画して積もった状態に
+  collectBodies.forEach(({body,el})=>{
+    el.style.transform = `translate(${body.position.x - r}px, ${body.position.y - r}px) rotate(${body.angle}rad)`;
+  });
+
+  // 山の頂上を求めてスクロール位置に
+  let pileTop = worldH;
+  collectBodies.forEach(({body})=>{ pileTop = Math.min(pileTop, body.position.y - r); });
+  if(collectBodies.length === 0) pileTop = worldH;
+  scroll.scrollTop = Math.max(0, pileTop - Hv*0.4);
+
+  // ライブ開始
+  collectActive = true;
+  collectRunner = Runner.create();
+  Runner.run(collectRunner, collectEngine);
+  const loop = ()=>{
+    if(!collectActive) return;
+    collectBodies.forEach(({body,el})=>{
+      el.style.transform = `translate(${body.position.x - r}px, ${body.position.y - r}px) rotate(${body.angle}rad)`;
+    });
+    collectRAF = requestAnimationFrame(loop);
+  };
+  collectRAF = requestAnimationFrame(loop);
+
+  // 新しく消えた分を、消えた順に上から1つずつ落とす
+  const dropFromY = Math.max(r + 2, pileTop - Hv*0.7);
+  let ni = 0;
+  function dropNext(){
+    if(!collectActive || ni >= news.length) return;
+    spawn(news[ni], r + Math.random()*(W - 2*r), dropFromY);
+    ni++;
+    collectDropT = setTimeout(dropNext, 110);
+  }
+  if(news.length) collectDropT = setTimeout(dropNext, 250);
+
+  // 「見た」記録 → 次回はこれより後の分だけ降る
+  state.collectedSeen = Date.now();
+  save();
+}
+
+function openCollect(){
+  pausePhysics();          // 裏のホーム/シャカ演算は止めて軽くする
+  renderCollect();
+  document.getElementById("collectPage").classList.add("open");
+}
+function closeCollect(){
+  document.getElementById("collectPage").classList.remove("open");
+  clearCollectPhysics();
+  updateMotionState();     // 元の画面の動き設定に戻す
+}
+document.getElementById("toCollect").onclick = openCollect;
+document.getElementById("collectBack").onclick = closeCollect;
+
+/* ---- persistence (cloud via Firebase, wired below) ---- */
+function save(){
+  if(window.__loggedIn){ if(window.__cloudSave) window.__cloudSave(state); }
+  else { try{ localStorage.setItem("shaka_guest", JSON.stringify(window.__serialize(state))); }catch(e){} } // ゲストは端末内に保存
+}
+
+// ---- 保存フォーマット（親子構造）----
+// users/{uid} ドキュメント内を「日にち → 予定・行動(entries)・task」の入れ子で持つ。
+// 日付は親キーになるので、各 entry/task からは date を取り除く。
+// ためた回復(collected)・テンプレ等は日をまたぐ“ユーザー単位”のデータなのでトップに置く。
+window.__serialize = function(st){
+  const days = {};
+  const bucket = (d)=>{ if(!days[d]) days[d] = { entries:[], tasks:[] }; return days[d]; };
+  (st.entries||[]).forEach(e=>{
+    const { date, ...rest } = e;
+    bucket(date || todayStr()).entries.push(rest);
+  });
+  (st.tasks||[]).forEach(t=>{
+    const { date, ...rest } = t;
+    bucket(date || todayStr()).tasks.push(rest);
+  });
+  return {
+    schema: 2,
+    days,
+    collected: st.collected || [],     // ユーザーごとにためる回復（日付をまたぐプール）
+    collectedSeen: st.collectedSeen || 0,
+    templates: st.templates || {},
+    sortMode: !!st.sortMode,
+    consumed: st.consumed || 0,        // マイナスで消した山のぶん（日付をまたいで持ち越す）
+    sampleDay: st.sampleDay || null,   // ゲストのサンプルを整えた日（当日は編集を保持）
+    updatedAt: Date.now()
+  };
+};
+
+// Bridge for the Firebase module script (loaded after this script).
+// Called when a user logs in: applies their cloud data (or a fresh
+// starter state for new users) and renders the app.
+window.__applyState = function(data){
+  viewDate = todayStr();
+  let loaded = null;
+  if(data && data.days && typeof data.days === "object"){
+    // 新フォーマット（日にち→entries/tasks の親子構造）
+    const entries = [], tasks = [];
+    Object.keys(data.days).forEach(d=>{
+      const day = data.days[d] || {};
+      (day.entries||[]).forEach(e=>entries.push({...e, date: d}));
+      (day.tasks||[]).forEach(t=>tasks.push({...t, date: d}));
+    });
+    loaded = { entries, tasks };
+  } else if(data && Array.isArray(data.entries)){
+    // 旧フォーマット（フラット）→ 自動で新フォーマットへ移行
+    loaded = {
+      entries: data.entries.map(e=>({...e, date: e.date || todayStr()})),
+      tasks: Array.isArray(data.tasks) ? data.tasks.map(t=>({...t, date: t.date || todayStr()})) : []
+    };
+  }
+  if(loaded){
+    state = {
+      entries: loaded.entries,
+      tasks: loaded.tasks,
+      sortMode: !!(data.sortMode),
+      collected: Array.isArray(data.collected) ? data.collected.map(c=>({...c})) : [],
+      collectedSeen: typeof data.collectedSeen === "number" ? data.collectedSeen : 0,
+      templates: (data.templates && typeof data.templates === "object") ? data.templates : {},
+      consumed: typeof data.consumed === "number" ? data.consumed : 0,
+      sampleDay: data.sampleDay || null
+    };
+  } else {
+    state = freshState();
+  }
+  const promoted = promoteDuePlans(); // アプリを閉じている間に終了した予定を記録化
+  renderAll();
+  if(promoted) save();
+};
+window.__getState = function(){ return state; };
+
+setInterval(()=>{
+  tickClock();
+  tickPlans(); // 予定を時間どおりに1個ずつ降らせ、終了で記録化
+}, 1000);
+tickClock();
+</script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+  import {
+    getAuth, onAuthStateChanged, signOut,
+    GoogleAuthProvider, signInWithPopup,
+    signInWithEmailAndPassword, createUserWithEmailAndPassword,
+    EmailAuthProvider, linkWithCredential, linkWithPopup, reauthenticateWithPopup
+  } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+  import {
+    initializeFirestore, persistentLocalCache, doc, getDoc, setDoc
+  } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDY69_fbIy9rcWUSj6tLc5kMq6bb3nlYzI",
+    authDomain: "do-our-best-in-moderation-tool.firebaseapp.com",
+    projectId: "do-our-best-in-moderation-tool",
+    storageBucket: "do-our-best-in-moderation-tool.firebasestorage.app",
+    messagingSenderId: "323614318907",
+    appId: "1:323614318907:web:5ee2ead7150a7d3743d71e",
+    measurementId: "G-J0ETSC15KT"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  // オフラインでも直近データを表示できるようローカルキャッシュを有効化
+  const db = initializeFirestore(app, { localCache: persistentLocalCache() });
+  const googleProvider = new GoogleAuthProvider();
+  // カレンダー/ToDo取り込み用（読み取り権限つき）。ログインとは分けて、連携時だけ許可を求める
+  const calendarProvider = new GoogleAuthProvider();
+  calendarProvider.addScope("https://www.googleapis.com/auth/calendar.readonly");
+  calendarProvider.addScope("https://www.googleapis.com/auth/tasks.readonly");
+  let googleAccessToken = null;
+
+  const $ = (id)=>document.getElementById(id);
+  const gate = $("authGate");
+  const errBox = $("authErr");
+
+  /* ---- error messages (日本語) ---- */
+  function jpError(code){
+    switch(code){
+      case "auth/invalid-email": return "メールアドレスの形式が正しくありません。";
+      case "auth/missing-password": return "パスワードを入力してください。";
+      case "auth/weak-password": return "パスワードは6文字以上にしてください。";
+      case "auth/email-already-in-use": return "このメールアドレスは既に登録済みです。「ログイン」を試してください。";
+      case "auth/invalid-credential":
+      case "auth/wrong-password":
+      case "auth/user-not-found": return "メールアドレスまたはパスワードが違います。";
+      case "auth/popup-closed-by-user": return "ログイン画面が閉じられました。";
+      case "auth/popup-blocked": return "ポップアップがブロックされました。ブラウザの設定をご確認ください。";
+      case "auth/credential-already-in-use": return "このログイン方法は既に別のアカウントで使われています。";
+      case "auth/account-exists-with-different-credential":
+        return "このメールは別のログイン方法で登録済みです。先にその方法でログインし、設定から連携してください。";
+      case "auth/network-request-failed": return "通信エラーです。接続を確認してください。";
+      default: return "エラーが発生しました（"+code+"）。";
+    }
+  }
+  function showErr(e){ errBox.textContent = jpError((e&&e.code)||""); }
+  function clearErr(){ errBox.textContent = ""; }
+  function setBusy(b){
+    ["googleBtn","authLoginBtn","authSignupBtn"].forEach(id=>{ const el=$(id); if(el) el.disabled=b; });
+  }
+
+  /* ---- login actions ---- */
+  $("googleBtn").onclick = async ()=>{
+    clearErr(); setBusy(true);
+    try { await signInWithPopup(auth, googleProvider); }
+    catch(e){ showErr(e); }
+    finally { setBusy(false); }
+  };
+  $("authLoginBtn").onclick = async ()=>{
+    clearErr(); setBusy(true);
+    try { await signInWithEmailAndPassword(auth, $("authEmail").value.trim(), $("authPass").value); }
+    catch(e){ showErr(e); }
+    finally { setBusy(false); }
+  };
+  $("authSignupBtn").onclick = async ()=>{
+    clearErr(); setBusy(true);
+    try { await createUserWithEmailAndPassword(auth, $("authEmail").value.trim(), $("authPass").value); }
+    catch(e){ showErr(e); }
+    finally { setBusy(false); }
+  };
+  $("authPass").addEventListener("keydown",(e)=>{ if(e.key==="Enter") $("authLoginBtn").click(); });
+
+  /* ---- Firestore sync ---- */
+  function userDoc(){ return doc(db, "users", auth.currentUser.uid); }
+  let saveTimer = null;
+  window.__cloudSave = function(st){
+    if(!auth.currentUser) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(()=>{
+      // ユーザーごと（users/{uid}）に「日にち→予定・行動／task」の親子構造で保存
+      const payload = window.__serialize ? window.__serialize(st) : st;
+      setDoc(userDoc(), payload).catch(err=>console.warn("[shaka] save failed", err));
+    }, 600);
+  };
+
+  async function loadUserData(){
+    try {
+      const snap = await getDoc(userDoc());
+      if(snap.exists()){
+        window.__applyState(snap.data());
+      } else {
+        // 新規ユーザー: 初期データを作成して保存
+        window.__applyState(null);
+        window.__cloudSave(window.__getState());
+      }
+    } catch(err){
+      console.warn("[shaka] load failed", err);
+      window.__applyState(null);
+    }
+  }
+
+  /* ---- ログイン/ゲストの切替（ログインはハンバーガーメニューから） ---- */
+  function updateMenuAuth(loggedIn){
+    $("loginBtn").style.display = loggedIn ? "none" : "block";
+    $("accountBtn").style.display = loggedIn ? "block" : "none";
+  }
+  function loadGuest(){
+    let g = null;
+    try{ const s = localStorage.getItem("shaka_guest"); if(s) g = JSON.parse(s); }catch(e){}
+    window.__loggedIn = false;
+    window.__applyState(g); // データ無しなら freshState のサンプルが表示される
+    refreshGuestSamples();  // サンプルの予定・タスクを今日の日付で作り直す（毎日表示されるように）
+    promoteDuePlans();      // 開始時刻を過ぎているサンプル予定はそのぶん降らせておく
+    renderAll();
+    save();
+  }
+  // メニューの「ログイン」→ ログイン画面を開く
+  $("loginBtn").onclick = ()=>{ $("menuDropdown").classList.remove("open"); clearErr(); gate.classList.remove("hidden"); };
+  // ログイン画面を閉じる / ゲストのまま使う
+  $("authClose").onclick = ()=> gate.classList.add("hidden");
+  $("authGuest").onclick = ()=> gate.classList.add("hidden");
+
+  onAuthStateChanged(auth, (user)=>{
+    if(user){
+      clearErr();
+      $("authPass").value = "";
+      gate.classList.add("hidden");
+      window.__loggedIn = true;
+      updateMenuAuth(true);
+      loadUserData();
+    } else {
+      // 未ログイン＝ゲスト。画面はブロックせずサンプル/端末内データを表示
+      gate.classList.add("hidden");
+      updateMenuAuth(false);
+      loadGuest();
+    }
+  });
+
+  /* ---- account sheet (link providers / logout) ---- */
+  function openSheet(){
+    $("scrim").classList.add("on");
+    $("accountSheet").classList.add("on");
+  }
+  function closeSheet(){
+    $("scrim").classList.remove("on");
+    $("accountSheet").classList.remove("on");
+  }
+
+  /* ---- Google Calendar / Tasks import ---- */
+  function pad2m(n){ return String(n).padStart(2,"0"); }
+  function hm(d){ return pad2m(d.getHours())+":"+pad2m(d.getMinutes()); }
+  function ymd(d){ return d.getFullYear()+"-"+pad2m(d.getMonth()+1)+"-"+pad2m(d.getDate()); }
+  function sameDay(a,b){ return ymd(a)===ymd(b); }
+
+  async function ensureGoogleToken(){
+    if(googleAccessToken) return googleAccessToken;
+    const u = auth.currentUser;
+    if(!u) return null;
+    const hasGoogle = u.providerData.some(p=>p.providerId==="google.com");
+    // Googleログイン済みなら再認証、メール/パスワードのみなら連携してトークン取得
+    const result = hasGoogle
+      ? await reauthenticateWithPopup(u, calendarProvider)
+      : await linkWithPopup(u, calendarProvider);
+    const cred = GoogleAuthProvider.credentialFromResult(result);
+    googleAccessToken = (cred && cred.accessToken) || null;
+    return googleAccessToken;
+  }
+
+  async function fetchCalendarToday(token){
+    const start = new Date(); start.setHours(0,0,0,0);
+    const end = new Date(); end.setHours(23,59,59,999);
+    const url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+      + "?timeMin=" + encodeURIComponent(start.toISOString())
+      + "&timeMax=" + encodeURIComponent(end.toISOString())
+      + "&singleEvents=true&orderBy=startTime";
+    const res = await fetch(url, { headers:{ Authorization:"Bearer "+token } });
+    if(!res.ok) throw new Error("calendar "+res.status);
+    const data = await res.json();
+    return (data.items||[])
+      .filter(ev=>ev.status!=="cancelled")
+      .map(ev=>{
+        const allDay = !(ev.start && ev.start.dateTime);
+        const s = ev.start && (ev.start.dateTime || (ev.start.date ? ev.start.date+"T00:00:00" : null));
+        const e = ev.end && (ev.end.dateTime || (ev.end.date ? ev.end.date+"T00:00:00" : null));
+        const sd = s ? new Date(s) : new Date();
+        const ed = e ? new Date(e) : sd;
+        return {
+          srcId: "cal:"+ev.id,
+          title: ev.summary || "(無題の予定)",
+          date: ymd(sd),
+          from: allDay ? "00:00" : hm(sd),
+          to:   allDay ? "23:59" : hm(ed)
+        };
+      });
+  }
+
+  async function fetchTasksToday(token){
+    const url = "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks?showCompleted=false&maxResults=100";
+    const res = await fetch(url, { headers:{ Authorization:"Bearer "+token } });
+    if(!res.ok) throw new Error("tasks "+res.status);
+    const data = await res.json();
+    const now = new Date();
+    return (data.items||[])
+      .filter(t=>t.due && sameDay(new Date(t.due), now)) // 今日が期限のToDo
+      .map(t=>({
+        srcId: "task:"+t.id,
+        title: t.title || "(無題のToDo)",
+        date: ymd(now),
+        from: "00:00",
+        to: "23:59" // 時刻が無いので終日扱い → 1日の終わりに自動記録
+      }));
+  }
+
+  async function syncGoogleData(){
+    try {
+      window.__toast && window.__toast("⏳","取り込み中…");
+      const token = await ensureGoogleToken();
+      if(!token){ window.__toast && window.__toast("⚠️","Google連携が必要です"); return; }
+      const [cal, tasks] = await Promise.all([
+        fetchCalendarToday(token).catch(e=>{ console.warn("[shaka] calendar", e); return []; }),
+        fetchTasksToday(token).catch(e=>{ console.warn("[shaka] tasks", e); return []; })
+      ]);
+      const nCal = window.__importEvents ? window.__importEvents(cal) : 0;
+      const nTask = window.__importTasks ? window.__importTasks(tasks) : 0;
+      const n = nCal + nTask;
+      window.__toast && window.__toast("🗓️", n>0 ? "予定"+nCal+"件・ToDo"+nTask+"件" : "新しい予定はなし");
+    } catch(e){
+      console.warn("[shaka] sync failed", e);
+      window.__toast && window.__toast("⚠️", "取り込み失敗: "+jpError((e&&e.code)||""));
+    }
+  }
+
+  window.__renderAccount = function(){
+    const u = auth.currentUser;
+    if(!u) return;
+    const providers = u.providerData.map(p=>p.providerId);
+    const hasGoogle = providers.includes("google.com");
+    const hasPassword = providers.includes("password");
+    const body = $("accountBody");
+    body.innerHTML = "";
+
+    const head = document.createElement("div");
+    head.className = "acct-head"; head.textContent = "アカウント";
+    const mail = document.createElement("div");
+    mail.className = "acct-mail"; mail.textContent = u.email || "（メール未設定）";
+    body.appendChild(head); body.appendChild(mail);
+
+    const label = document.createElement("div");
+    label.className = "acct-label"; label.textContent = "ログイン方法";
+    body.appendChild(label);
+
+    body.appendChild(provRow("Google", hasGoogle));
+    body.appendChild(provRow("メール＋パスワード", hasPassword));
+
+    // カレンダー / ToDo 取り込み
+    const syncLabel = document.createElement("div");
+    syncLabel.className = "acct-label"; syncLabel.style.marginTop = "16px";
+    syncLabel.textContent = "Googleカレンダー / ToDo";
+    body.appendChild(syncLabel);
+    const syncBtn = document.createElement("button");
+    syncBtn.className = "acct-link"; syncBtn.textContent = "今日の予定/ToDoを取り込む";
+    syncBtn.onclick = async ()=>{ closeSheet(); await syncGoogleData(); };
+    body.appendChild(syncBtn);
+
+    if(!hasGoogle){
+      const b = document.createElement("button");
+      b.className = "acct-link"; b.textContent = "Googleアカウントを連携";
+      b.onclick = async ()=>{
+        try {
+          await linkWithPopup(u, googleProvider);
+          window.__toast && window.__toast("🔗","Googleを連携しました");
+          window.__renderAccount();
+        } catch(e){ window.__toast && window.__toast("⚠️", jpError((e&&e.code)||"")); }
+      };
+      body.appendChild(b);
+    }
+
+    if(!hasPassword){
+      const wrap = document.createElement("div");
+      wrap.className = "acct-set";
+      const note = document.createElement("div");
+      note.className = "acct-label";
+      note.style.marginTop = "10px";
+      note.textContent = "メール＋パスワードを追加";
+      const em = document.createElement("input");
+      em.className = "authinput"; em.type = "email"; em.placeholder = "メールアドレス";
+      em.value = u.email || "";
+      const pw = document.createElement("input");
+      pw.className = "authinput"; pw.type = "password"; pw.placeholder = "パスワード（6文字以上）";
+      const b = document.createElement("button");
+      b.className = "acct-link"; b.textContent = "パスワードを設定";
+      b.onclick = async ()=>{
+        try {
+          const cred = EmailAuthProvider.credential(em.value.trim(), pw.value);
+          await linkWithCredential(u, cred);
+          window.__toast && window.__toast("🔗","パスワードを設定しました");
+          window.__renderAccount();
+        } catch(e){ window.__toast && window.__toast("⚠️", jpError((e&&e.code)||"")); }
+      };
+      wrap.appendChild(note); wrap.appendChild(em); wrap.appendChild(pw); wrap.appendChild(b);
+      body.appendChild(wrap);
+    }
+
+    const out = document.createElement("button");
+    out.className = "btn sunk";
+    out.style.cssText = "width:100%;padding:14px;margin-top:22px";
+    out.textContent = "ログアウト";
+    out.onclick = async ()=>{ closeSheet(); await signOut(auth); };
+    body.appendChild(out);
+  };
+
+  function provRow(name, on){
+    const row = document.createElement("div");
+    row.className = "acct-prov";
+    const n = document.createElement("span"); n.textContent = name;
+    const s = document.createElement("span");
+    s.className = on ? "on" : "off";
+    s.textContent = on ? "連携済み" : "未連携";
+    row.appendChild(n); row.appendChild(s);
+    return row;
+  }
+
+  $("accountBtn").onclick = ()=>{
+    $("menuDropdown").classList.remove("open");
+    window.__renderAccount();
+    openSheet();
+  };
+
+  // toast bridge (main script defines toast())
+  window.__toast = (em,txt)=>{ if(window.toast) window.toast(em,txt); };
+</script>
+</body>
+</html>

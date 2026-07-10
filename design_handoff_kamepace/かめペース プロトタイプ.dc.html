@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&amp;family=Space+Mono:wght@400;700&amp;family=Archivo:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<style>
+  html,body{margin:0;padding:0}
+  body{background:#dcdad2;color:#1b1b18;font-family:"Zen Kaku Gothic New",system-ui,sans-serif;-webkit-font-smoothing:antialiased;display:flex;align-items:center;justify-content:center;min-height:100vh}
+  *{box-sizing:border-box}
+  ::selection{background:#c4f000;color:#2f3a00}
+  .nos::-webkit-scrollbar{display:none}
+  .nos{scrollbar-width:none}
+  @keyframes drop{0%{transform:translateY(-16px) rotate(var(--r));opacity:0}100%{transform:translateY(0) rotate(var(--r));opacity:1}}
+  @keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+  @keyframes moonfall{0%{transform:translateY(0);opacity:1}75%{opacity:1}100%{transform:translateY(760px);opacity:0}}
+  button{font-family:inherit}
+</style>
+</helmet>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#f7f4ec"></rect>
+    <rect x="26" y="26" width="48" height="48" rx="12" fill="#c4f000"></rect>
+    <text x="50" y="52" font-size="26" text-anchor="middle" dominant-baseline="central">🐢</text>
+  </svg>
+</template>
+
+<div style="padding:26px;display:flex;flex-direction:column;align-items:center;gap:14px">
+  <div style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8a8a82">かめペース · さわれるプロトタイプ</div>
+  <div style="width:372px;background:#1b1b18;border-radius:46px;padding:11px;box-shadow:0 30px 70px rgba(27,27,24,.28)">
+    <div style="position:relative;isolation:isolate;height:812px;border-radius:36px;overflow:hidden;display:flex;flex-direction:column;background:{{ screenBg }}">
+
+      <!-- status bar (spacer) -->
+      <div style="height:40px;flex:0 0 40px;z-index:5"></div>
+
+      <!-- ============ HOME ============ -->
+      <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+        <div style="position:absolute;inset:0;top:40px;bottom:64px;z-index:0;filter:blur(1.5px);pointer-events:none">
+          <sc-for list="{{ pile }}" as="p" hint-placeholder-count="0">
+            <span style="position:absolute;left:{{ p.x }}px;bottom:{{ p.y }}px;font-size:{{ p.s }}px;transform:rotate({{ p.r2 }}deg);filter:drop-shadow(0 4px 6px rgba(27,27,24,.14))">{{ p.e }}</span>
+          </sc-for>
+        </div>
+        <div class="nos" style="position:relative;z-index:1;flex:1;overflow-y:auto;padding:0 0 12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 18px 8px 16px">
+            <div><div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.12em;color:#8a8a82">2026 · JUL 5 · SUN</div><div style="font-weight:700;font-size:16px;line-height:1.25;margin-top:1px">今日のログ</div></div>
+            <button onClick="{{ goMypage }}" style="width:38px;height:38px;background:rgba(255,255,255,.85);border:none;border-radius:11px;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:20px;color:#55554e;cursor:pointer">person</button>
+          </div>
+          <!-- sleep card -->
+          <button onClick="{{ goSleep }}" style="display:block;width:auto;text-align:left;background:#fff;border:none;border-radius:16px;padding:13px 14px;margin:0 16px 10px;box-shadow:0 1px 3px rgba(27,27,24,.05);cursor:pointer;left:0;right:0;width:calc(100% - 32px)">
+            <div style="display:flex;align-items:center;gap:10px"><span style="font-size:15px">🛏</span><span style="font-size:13px;font-weight:700;flex:1;text-align:left">睡眠</span><span style="font-family:'Space Mono',monospace;font-size:10px;color:#8a8a82">回復</span><span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#7a9a00">−52</span></div>
+          </button>
+          <!-- slots -->
+          <sc-for list="{{ slots }}" as="s" hint-placeholder-count="4">
+            <div style="background:#fff;border-radius:18px;margin:0 16px 12px;box-shadow:0 1px 3px rgba(27,27,24,.06);overflow:hidden">
+              <div style="display:flex;align-items:center;gap:13px;padding:13px 15px 12px">
+                <div style="position:relative;width:42px;height:42px;flex:0 0 auto;border-radius:50%;background:{{ s.circleBg }};display:flex;align-items:center;justify-content:center;font-size:20px">{{ s.emoji }}
+                  <sc-if value="{{ s.hasRecords }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:-1px;right:-2px;width:17px;height:17px;border-radius:50%;background:#c4f000;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:10px;color:#2f3a00">check</span></sc-if>
+                </div>
+                <span style="font-size:15px;font-weight:800;flex:1;color:{{ s.nameColor }}">{{ s.name }}</span>
+                <span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#f5994e">{{ s.sumText }}</span>
+              </div>
+              <sc-if value="{{ s.hasRecords }}" hint-placeholder-val="{{ false }}">
+                <div style="border-top:1px solid #f1efe8">
+                  <sc-for list="{{ s.groups }}" as="g" hint-placeholder-count="1">
+                    <div style="display:flex;align-items:flex-start;gap:11px;padding:9px 15px;border-bottom:1px solid #f1efe8">
+                      <span style="font-size:15px;flex:0 0 auto;margin-top:1px">{{ g.glyph }}</span>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:12.5px;font-weight:700;color:#1b1b18;line-height:1.4">
+                          <sc-if value="{{ g.planned }}" hint-placeholder-val="{{ false }}"><span style="display:inline-block;font-family:'Space Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.04em;color:#fff;background:#a5a39a;border-radius:5px;padding:1px 6px;margin-right:6px;vertical-align:middle">予定</span></sc-if>{{ g.title }}
+                        </div>
+                        <sc-if value="{{ g.hasSub }}" hint-placeholder-val="{{ false }}"><div style="font-family:'Space Mono',monospace;font-size:10px;color:#b4b2a8;margin-top:1px">{{ g.subText }}</div></sc-if>
+                      </div>
+                      <span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:{{ g.fatColor }};flex:0 0 auto;white-space:nowrap;margin-top:1px">{{ g.fatText }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <button onClick="{{ s.onAdd }}" style="display:flex;width:100%;align-items:center;justify-content:center;gap:6px;padding:9px 0;border:none;background:#fff;cursor:pointer;font-size:12px;font-weight:700;color:#7a9a00">
+                <span style="font-family:'Material Symbols Rounded';font-size:16px">add</span>記録する
+              </button>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- ============ RECORD ============ -->
+      <sc-if value="{{ isRecord }}" hint-placeholder-val="{{ false }}">
+        <div style="position:relative;display:flex;flex-direction:column;flex:1;min-height:0;background:#fff">
+          <!-- STEP 1 : 大カテゴリ -->
+          <sc-if value="{{ showCats }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+              <div style="display:flex;align-items:center;gap:14px;padding:6px 18px 12px 22px">
+                <button onClick="{{ goHome }}" style="background:none;border:none;font-size:19px;color:#8a8a82;cursor:pointer">✕</button>
+                <div style="font-size:16px;font-weight:700;flex:1">記録</div>
+                <div style="position:relative;flex:0 0 auto">
+                  <button onClick="{{ toggleSlotMenu }}" style="display:flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #e4e1d8;border-radius:999px;padding:7px 10px 7px 13px;cursor:pointer;box-shadow:0 1px 2px rgba(27,27,24,.06)"><span style="font-size:15px">{{ recordSlotEmoji }}</span><span style="font-size:13px;font-weight:700;color:#1b1b18">{{ recordSlotName }}</span><span style="font-family:'Material Symbols Rounded';font-size:18px;color:#8a8a82">expand_more</span></button>
+                  <sc-if value="{{ slotMenuOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;right:0;top:calc(100% + 6px);z-index:14;background:#fff;border:1px solid #efece3;border-radius:14px;box-shadow:0 12px 28px rgba(27,27,24,.2);padding:6px;min-width:138px">
+                      <sc-for list="{{ slotOptions }}" as="o" hint-placeholder-count="4">
+                        <button onClick="{{ o.onPick }}" style="display:flex;width:100%;align-items:center;gap:9px;background:{{ o.bg }};border:none;border-radius:10px;padding:9px 11px;cursor:pointer;text-align:left"><span style="font-size:16px">{{ o.emoji }}</span><span style="flex:1;font-size:13.5px;font-weight:700;color:#1b1b18">{{ o.name }}</span><sc-if value="{{ o.active }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:#7a9a00">check</span></sc-if></button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+              <div style="padding:0 16px">
+                <button onClick="{{ openSearch }}" style="display:flex;width:100%;align-items:center;gap:9px;background:#efece3;border:none;border-radius:12px;padding:11px 13px;cursor:pointer;text-align:left"><span style="font-family:'Material Symbols Rounded';font-size:19px;color:#8a8a82">search</span><span style="font-size:14px;color:#a5a39a">なにをした？（例：皿洗い、会議）</span></button>
+              </div>
+              <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8a8a82;padding:14px 22px 6px">予定から</div>
+              <div style="padding:0 0 2px">
+                <sc-for list="{{ plans }}" as="p" hint-placeholder-count="2">
+                  <button onClick="{{ p.onOpen }}" style="display:flex;width:100%;text-align:left;align-items:center;gap:13px;padding:10px 22px;border:none;border-bottom:1px solid #f1efe8;background:#fff;cursor:pointer">
+                    <span style="width:26px;text-align:center;flex:0 0 auto;font-size:19px">📋</span>
+                    <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:#1b1b18">{{ p.name }}</div><div style="font-family:'Space Mono',monospace;font-size:11px;color:#9d9b91;margin-top:1px">{{ p.meta }}</div></div>
+                    <span style="font-size:16px;color:#c9c7bf">›</span>
+                  </button>
+                </sc-for>
+                <button onClick="{{ openPlanAdd }}" style="display:flex;width:calc(100% - 32px);margin:12px 16px 2px;align-items:center;justify-content:center;gap:7px;border:1.5px dashed #d8d5cb;border-radius:12px;padding:12px 0;font-size:13px;font-weight:700;color:#8a8a82;background:#fff;cursor:pointer"><span style="font-family:'Material Symbols Rounded';font-size:18px">calendar_add_on</span>予定をつくる</button>
+              </div>
+              <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8a8a82;padding:14px 22px 6px">大カテゴリから</div>
+              <div class="nos" style="flex:1;overflow-y:auto;padding:0 0 10px">
+                <sc-for list="{{ cats }}" as="c" hint-placeholder-count="6">
+                  <button onClick="{{ c.onSelect }}" style="display:flex;width:100%;text-align:left;align-items:center;gap:13px;padding:10px 22px;border:none;border-bottom:1px solid #f1efe8;background:#fff;cursor:pointer">
+                    <span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:22px;width:26px;text-align:center;flex:0 0 auto;color:{{ c.color }}">{{ c.icon }}</span>
+                    <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:#1b1b18">{{ c.name }}</div><div style="font-family:'Space Mono',monospace;font-size:11px;color:#9d9b91;margin-top:1px">{{ c.sub }}</div></div>
+                    <span style="font-size:16px;color:#c9c7bf">›</span>
+                  </button>
+                </sc-for>
+                <button onClick="{{ openCatAdd }}" style="display:flex;width:calc(100% - 32px);margin:14px 16px 0;align-items:center;justify-content:center;gap:7px;border:1.5px dashed #d8d5cb;border-radius:12px;padding:12px 0;font-size:13px;font-weight:700;color:#8a8a82;background:#fff;cursor:pointer">＋ 大カテゴリを追加</button>
+              </div>
+            </div>
+          </sc-if>
+          <!-- 検索：複数キーワード入力（記録2）-->
+          <sc-if value="{{ searchInputOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+              <div style="display:flex;align-items:center;gap:14px;padding:6px 22px 10px">
+                <button onClick="{{ closeSearch }}" style="background:none;border:none;font-size:19px;color:#8a8a82;cursor:pointer">‹</button>
+                <div style="font-size:16px;font-weight:700;flex:1">記録</div>
+                <div style="position:relative;flex:0 0 auto">
+                  <button onClick="{{ toggleSlotMenu }}" style="display:flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #e4e1d8;border-radius:999px;padding:7px 10px 7px 13px;cursor:pointer;box-shadow:0 1px 2px rgba(27,27,24,.06)"><span style="font-size:15px">{{ recordSlotEmoji }}</span><span style="font-size:13px;font-weight:700;color:#1b1b18">{{ recordSlotName }}</span><span style="font-family:'Material Symbols Rounded';font-size:18px;color:#8a8a82">expand_more</span></button>
+                  <sc-if value="{{ slotMenuOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;right:0;top:calc(100% + 6px);z-index:14;background:#fff;border:1px solid #efece3;border-radius:14px;box-shadow:0 12px 28px rgba(27,27,24,.2);padding:6px;min-width:138px">
+                      <sc-for list="{{ slotOptions }}" as="o" hint-placeholder-count="4">
+                        <button onClick="{{ o.onPick }}" style="display:flex;width:100%;align-items:center;gap:9px;background:{{ o.bg }};border:none;border-radius:10px;padding:9px 11px;cursor:pointer;text-align:left"><span style="font-size:16px">{{ o.emoji }}</span><span style="flex:1;font-size:13.5px;font-weight:700;color:#1b1b18">{{ o.name }}</span><sc-if value="{{ o.active }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:#7a9a00">check</span></sc-if></button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:11px;margin:0 16px;background:#f0f6d8;border-radius:14px;padding:12px 14px">
+                <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#7a9a00;flex:0 0 auto">manage_search</span>
+                <div style="font-size:12.5px;font-weight:700;line-height:1.5;color:#4a5a00">一度に10件までまとめて検索できます<div style="font-size:11px;font-weight:400;color:#7a8a3a;margin-top:2px">やったことを思い出しながら書き出してOK</div></div>
+              </div>
+              <div class="nos" style="flex:1;overflow-y:auto;padding:12px 16px 8px;display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ keywordRows }}" as="k" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:9px;background:#efece3;border-radius:12px;padding:2px 12px">
+                    <span style="font-family:'Material Symbols Rounded';font-size:19px;color:#8a8a82;flex:0 0 auto">search</span>
+                    <input value="{{ k.val }}" onInput="{{ k.onInput }}" placeholder="{{ k.placeholder }}" style="flex:1;min-width:0;background:none;border:none;outline:none;font-family:'Zen Kaku Gothic New',sans-serif;font-size:15px;color:#1b1b18;padding:11px 0">
+                    <sc-if value="{{ k.hasVal }}" hint-placeholder-val="{{ false }}"><button onClick="{{ k.onClear }}" style="width:26px;height:26px;border-radius:50%;border:none;background:#c9c7bf;color:#fff;font-size:13px;cursor:pointer;flex:0 0 auto;display:flex;align-items:center;justify-content:center">✕</button></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="flex:0 0 auto;padding:8px 16px 22px">
+                <button onClick="{{ runSearch }}" style="width:100%;border:none;border-radius:14px;background:{{ searchBtnBg }};color:{{ searchBtnColor }};font-weight:700;font-size:16px;padding:16px;cursor:pointer">検索</button>
+              </div>
+            </div>
+          </sc-if>
+          <!-- 検索：類似結果（記録3）-->
+          <sc-if value="{{ searchResultsOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+              <div style="display:flex;align-items:center;gap:14px;padding:6px 22px 8px">
+                <button onClick="{{ openSearch }}" style="background:none;border:none;font-size:19px;color:#8a8a82;cursor:pointer">‹</button>
+                <div style="font-size:16px;font-weight:700;flex:1">近いものをえらぶ</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;margin:0 16px 4px;background:#e9f0ff;border-radius:12px;padding:10px 13px">
+                <span style="font-family:'Material Symbols Rounded';font-size:18px;color:#6f8fbf;flex:0 0 auto">help</span>
+                <div style="flex:1;font-size:12px;font-weight:700;color:#3a5a8f">見つからない時は「もっと見る」から</div>
+              </div>
+              <div class="nos" style="flex:1;overflow-y:auto;padding:6px 0 8px">
+                <sc-for list="{{ searchGroups }}" as="g" hint-placeholder-count="2">
+                  <div style="margin-bottom:4px">
+                    <div style="display:flex;align-items:center;gap:8px;padding:10px 20px 8px"><span style="font-size:14px;font-weight:900;flex:1">{{ g.kw }}</span><span style="font-family:'Space Mono',monospace;font-size:12px;color:#8a8a82">{{ g.countText }}</span></div>
+                    <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:center;gap:12px;margin:0 16px 8px;background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 1px 3px rgba(27,27,24,.06)">
+                        <span style="font-size:19px;flex:0 0 auto">{{ it.glyph }}</span>
+                        <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:700;line-height:1.4">{{ it.name }}</div><div style="font-family:'Space Mono',monospace;font-size:11px;color:#f5994e;margin-top:2px">目安 {{ it.fatText }}/h</div></div>
+                        <button onClick="{{ it.onAdd }}" style="width:34px;height:34px;border-radius:50%;border:none;background:#c4f000;color:#2f3a00;font-size:19px;font-weight:700;cursor:pointer;flex:0 0 auto;display:flex;align-items:center;justify-content:center">＋</button>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ g.noHit }}" hint-placeholder-val="{{ false }}">
+                      <div style="margin:0 16px 8px;background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(27,27,24,.06)">
+                        <div style="font-size:12.5px;color:#8a8a82;line-height:1.5">「{{ g.kw }}」に近い候補が見つかりませんでした。どちらで記録する？</div>
+                        <button onClick="{{ g.onAddNew }}" style="display:flex;width:100%;align-items:center;gap:10px;margin-top:10px;border:1.5px solid #1b1b18;border-radius:12px;padding:11px 13px;background:#fff;cursor:pointer;text-align:left"><span style="font-family:'Material Symbols Rounded';font-size:21px;color:#7a9a00;flex:0 0 auto">add_circle</span><span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:700">「{{ g.kw }}」を新しく登録</span><span style="display:block;font-size:11px;color:#9d9b91;margin-top:1px">次回から候補に出ます</span></span></button>
+                        <button onClick="{{ g.onAddRough }}" style="display:flex;width:100%;align-items:center;gap:10px;margin-top:8px;border:1.5px solid #e4e1d8;border-radius:12px;padding:11px 13px;background:#fff;cursor:pointer;text-align:left"><span style="font-family:'Material Symbols Rounded';font-size:21px;color:#8a8a82;flex:0 0 auto">bolt</span><span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:700">だいたいで登録</span><span style="display:block;font-size:11px;color:#9d9b91;margin-top:1px">きまった目安の疲労で記録（あとで調整）</span></span></button>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ g.hasMore }}" hint-placeholder-val="{{ false }}">
+                      <button onClick="{{ g.onMore }}" style="display:flex;width:100%;align-items:center;justify-content:flex-end;gap:6px;padding:0 22px 10px;border:none;background:none;font-size:13px;font-weight:700;color:#7a9a00;cursor:pointer">もっと見る ›</button>
+                    </sc-if>
+                    <div style="height:1px;background:#efece3;margin:0 16px 8px"></div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="flex:0 0 auto;padding:8px 16px 22px">
+                <button onClick="{{ goSearchConfirm }}" style="width:100%;border:none;border-radius:14px;background:#1b1b18;color:#fff;font-weight:700;font-size:15px;padding:15px;cursor:pointer">えらび終えた · 登録を確認 ›</button>
+              </div>
+            </div>
+          </sc-if>
+          <!-- 検索：もっと見る（記録4）-->
+          <sc-if value="{{ searchMoreOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+              <div style="display:flex;align-items:center;gap:14px;padding:6px 20px 8px">
+                <button onClick="{{ closeMore }}" style="background:none;border:none;font-size:19px;color:#8a8a82;cursor:pointer">‹</button>
+                <div style="font-size:16px;font-weight:700;flex:1">{{ moreData.kw }}</div>
+                <span style="font-family:'Space Mono',monospace;font-size:12px;color:#8a8a82">{{ moreData.countText }}</span>
+              </div>
+              <div class="nos" style="display:flex;gap:8px;overflow-x:auto;padding:2px 16px 8px">
+                <sc-for list="{{ moreFilters }}" as="f" hint-placeholder-count="3">
+                  <button onClick="{{ f.onPick }}" style="flex:0 0 auto;border:1.5px solid {{ f.border }};background:{{ f.bg }};color:{{ f.color }};border-radius:999px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">{{ f.text }}</button>
+                </sc-for>
+              </div>
+              <div class="nos" style="flex:1;overflow-y:auto;padding:4px 0 8px">
+                <sc-for list="{{ moreData.items }}" as="it" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:center;gap:12px;margin:0 16px 8px;background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 1px 3px rgba(27,27,24,.06)">
+                    <span style="font-size:19px;flex:0 0 auto">{{ it.glyph }}</span>
+                    <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:700;line-height:1.4">{{ it.name }}</div><div style="font-family:'Space Mono',monospace;font-size:11px;color:#f5994e;margin-top:2px">目安 {{ it.fatText }}/h</div></div>
+                    <button onClick="{{ it.onAdd }}" style="width:34px;height:34px;border-radius:50%;border:none;background:#c4f000;color:#2f3a00;font-size:19px;font-weight:700;cursor:pointer;flex:0 0 auto;display:flex;align-items:center;justify-content:center">＋</button>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <!-- 検索：登録を確認＋時間の割り振り（記録5）-->
+          <sc-if value="{{ searchConfirmOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;flex:1;min-height:0;background:#f7f4ec">
+              <div style="display:flex;align-items:center;gap:14px;padding:6px 20px 10px">
+                <button onClick="{{ backFromConfirm }}" style="background:none;border:none;font-size:19px;color:#8a8a82;cursor:pointer">‹</button>
+                <div style="font-size:16px;font-weight:700;flex:1">登録を確認</div>
+                <div style="position:relative;flex:0 0 auto">
+                  <button onClick="{{ toggleSlotMenu }}" style="display:flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #e4e1d8;border-radius:999px;padding:7px 10px 7px 13px;cursor:pointer;box-shadow:0 1px 2px rgba(27,27,24,.06)"><span style="font-size:15px">{{ recordSlotEmoji }}</span><span style="font-size:13px;font-weight:700;color:#1b1b18">{{ recordSlotName }}</span><span style="font-family:'Material Symbols Rounded';font-size:18px;color:#8a8a82">expand_more</span></button>
+                  <sc-if value="{{ slotMenuOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;right:0;top:calc(100% + 6px);z-index:14;background:#fff;border:1px solid #efece3;border-radius:14px;box-shadow:0 12px 28px rgba(27,27,24,.2);padding:6px;min-width:138px">
+                      <sc-for list="{{ slotOptions }}" as="o" hint-placeholder-count="4">
+                        <button onClick="{{ o.onPick }}" style="display:flex;width:100%;align-items:center;gap:9px;background:{{ o.bg }};border:none;border-radius:10px;padding:9px 11px;cursor:pointer;text-align:left"><span style="font-size:16px">{{ o.emoji }}</span><span style="flex:1;font-size:13.5px;font-weight:700;color:#1b1b18">{{ o.name }}</span><sc-if value="{{ o.active }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:#7a9a00">check</span></sc-if></button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+              <div class="nos" style="flex:1;overflow-y:auto;padding:2px 16px 8px">
+                <sc-for list="{{ searchCartRows }}" as="r" hint-placeholder-count="2">
+                  <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:14px;padding:11px 12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(27,27,24,.05)">
+                    <button onClick="{{ r.onRemove }}" style="width:26px;height:26px;border:none;background:none;font-size:17px;color:#c9c7bf;cursor:pointer;flex:0 0 auto">✕</button>
+                    <span style="font-size:17px;flex:0 0 auto">{{ r.glyph }}</span>
+                    <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:700;line-height:1.4">{{ r.name }}</div><div style="font-family:'Space Mono',monospace;font-size:10.5px;color:#f5994e;margin-top:1px">{{ r.fatText }}</div></div>
+                    <button onClick="{{ r.onIntensity }}" style="border:1.5px solid #c4de52;background:#fbfdf0;border-radius:10px;padding:7px 11px;font-size:11.5px;font-weight:700;color:#4a5a00;cursor:pointer;flex:0 0 auto;max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.intensityText }}</button>
+                  </div>
+                </sc-for>
+                <button onClick="{{ addMoreMenu }}" style="display:flex;width:100%;align-items:center;justify-content:center;gap:8px;background:#fff;border:none;border-radius:14px;padding:14px 0;font-size:14px;font-weight:700;color:#7a9a00;cursor:pointer;box-shadow:0 1px 3px rgba(27,27,24,.05)"><span style="font-family:'Material Symbols Rounded';font-size:20px">add_circle</span>メニューを追加</button>
+                <div style="margin-top:12px;background:#fff;border-radius:16px;padding:15px;box-shadow:0 1px 3px rgba(27,27,24,.05)">
+                  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                    <span style="font-size:13px;font-weight:700">時間の割り振り</span>
+                    <div style="display:flex;gap:0;background:#efece3;border-radius:10px;padding:3px">
+                      <button onClick="{{ setDurationMode }}" style="border:none;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;background:{{ durTabBg }};color:{{ durTabColor }}">所要時間</button>
+                      <button onClick="{{ setTimeMode }}" style="border:none;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;background:{{ timeTabBg }};color:{{ timeTabColor }}">時刻</button>
+                    </div>
+                  </div>
+                  <sc-if value="{{ isDurationMode }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px">
+                      <button onClick="{{ addTotalM10 }}" style="width:32px;height:32px;border-radius:9px;border:1.5px solid #e4e1d8;background:#fff;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#55554e;cursor:pointer">-10</button>
+                      <button onClick="{{ addTotalM1 }}" style="width:32px;height:32px;border-radius:50%;border:1.5px solid #1b1b18;background:#fff;font-size:17px;color:#1b1b18;cursor:pointer">−</button>
+                      <span style="font-family:'Space Mono',monospace;font-size:15px;font-weight:700;min-width:60px;text-align:center">{{ searchTotalText }}</span>
+                      <button onClick="{{ addTotalP1 }}" style="width:32px;height:32px;border-radius:50%;border:1.5px solid #1b1b18;background:#fff;font-size:17px;color:#1b1b18;cursor:pointer">＋</button>
+                      <button onClick="{{ addTotalP10 }}" style="width:32px;height:32px;border-radius:9px;border:1.5px solid #e4e1d8;background:#fff;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#55554e;cursor:pointer">+10</button>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ isTimeMode }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
+                      <input type="time" value="{{ startTime }}" onInput="{{ onStartTime }}" style="flex:1;min-width:0;font-family:'Space Mono',monospace;font-size:15px;font-weight:700;border:1.5px solid #e4e1d8;border-radius:10px;padding:9px 8px;text-align:center;color:#1b1b18;background:#fff">
+                      <span style="color:#8a8a82;font-size:14px">→</span>
+                      <input type="time" value="{{ endTime }}" onInput="{{ onEndTime }}" style="flex:1;min-width:0;font-family:'Space Mono',monospace;font-size:15px;font-weight:700;border:1.5px solid #e4e1d8;border-radius:10px;padding:9px 8px;text-align:center;color:#1b1b18;background:#fff">
+                    </div>
+                    <div style="font-size:11px;color:#6f8fbf;margin-top:7px;line-height:1.5">終了が先の時刻なら「予定」として時間どおりに1個ずつ記録されます（index.html と同じ）</div>
+                  </sc-if>
+                  <div style="position:relative;height:38px;margin-top:14px;touch-action:none">
+                    <div style="position:absolute;inset:0;display:flex;border-radius:11px;overflow:hidden">
+                      <sc-for list="{{ allocSegs }}" as="s" hint-placeholder-count="2"><div style="width:{{ s.widthPct }};background:{{ s.color }}"></div></sc-for>
+                    </div>
+                    <sc-for list="{{ allocHandles }}" as="h" hint-placeholder-count="1">
+                      <div onPointerDown="{{ h.onDrag }}" onPointerMove="{{ h.onDrag }}" style="position:absolute;top:-4px;bottom:-4px;left:{{ h.leftPct }};width:28px;margin-left:-14px;z-index:2;display:flex;align-items:center;justify-content:center;cursor:ew-resize;touch-action:none"><span style="width:8px;height:34px;border-radius:5px;background:#fff;border:2px solid #1b1b18;box-shadow:0 2px 6px rgba(27,27,24,.3)"></span></div>
+                    </sc-for>
+                  </div>
+                  <sc-for list="{{ allocSegs }}" as="s" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:center;gap:10px;padding:10px 2px 9px;border-bottom:1px solid #f1efe8"><span style="width:11px;height:11px;border-radius:3px;background:{{ s.color }};flex:0 0 auto"></span><span style="font-size:13.5px;flex:1;min-width:0">{{ s.name }}</span><span style="font-family:'Space Mono',monospace;font-size:12px;font-weight:700;background:#efece3;border-radius:8px;padding:4px 9px">{{ s.minText }}</span><span style="font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:#f5994e;width:34px;text-align:right">{{ s.fatText }}</span></div>
+                  </sc-for>
+                  <div style="font-size:11px;color:#b4b2a8;margin-top:8px">つまみを左右にドラッグで配分を変更（1分単位）。強度チップで体感を調整</div>
+                </div>
+              </div>
+              <div style="flex:0 0 auto;padding:10px 16px 22px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 4px 9px"><span style="font-size:12px;color:#8a8a82">合計 {{ searchTotalText }}</span><span style="font-family:'Space Mono',monospace;font-size:15px;font-weight:700">{{ searchTotalFatText }}</span></div>
+                <button onClick="{{ commitSearch }}" style="width:100%;border:none;border-radius:14px;background:#c4f000;color:#2f3a00;font-weight:700;font-size:16px;padding:16px;cursor:pointer">{{ commitLabel }}</button>
+              </div>
+            </div>
+          </sc-if>
+          <!-- STEP 2 : 小カテゴリ -->
+          <sc-if value="{{ showSub }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+              <div style="display:flex;align-items:center;gap:14px;padding:6px 22px 12px">
+                <button onClick="{{ backToCats }}" style="background:none;border:none;font-size:19px;color:#8a8a82;cursor:pointer">‹</button>
+                <span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:22px;color:{{ subColor }};flex:0 0 auto">{{ subIcon }}</span>
+                <div style="font-size:16px;font-weight:700;flex:1">{{ subName }}</div>
+                <div style="position:relative;flex:0 0 auto">
+                  <button onClick="{{ toggleSlotMenu }}" style="display:flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #e4e1d8;border-radius:999px;padding:6px 9px 6px 11px;cursor:pointer;box-shadow:0 1px 2px rgba(27,27,24,.06)"><span style="font-size:14px">{{ recordSlotEmoji }}</span><span style="font-size:12.5px;font-weight:700;color:#1b1b18">{{ recordSlotName }}</span><span style="font-family:'Material Symbols Rounded';font-size:17px;color:#8a8a82">expand_more</span></button>
+                  <sc-if value="{{ slotMenuOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;right:0;top:calc(100% + 6px);z-index:14;background:#fff;border:1px solid #efece3;border-radius:14px;box-shadow:0 12px 28px rgba(27,27,24,.2);padding:6px;min-width:138px">
+                      <sc-for list="{{ slotOptions }}" as="o" hint-placeholder-count="4">
+                        <button onClick="{{ o.onPick }}" style="display:flex;width:100%;align-items:center;gap:9px;background:{{ o.bg }};border:none;border-radius:10px;padding:9px 11px;cursor:pointer;text-align:left"><span style="font-size:16px">{{ o.emoji }}</span><span style="flex:1;font-size:13.5px;font-weight:700;color:#1b1b18">{{ o.name }}</span><sc-if value="{{ o.active }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:#7a9a00">check</span></sc-if></button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+              <div class="nos" style="flex:1;overflow-y:auto;padding:2px 0 8px">
+                <sc-for list="{{ subItems }}" as="t" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:13px;padding:9px 22px;border-bottom:1px solid #f1efe8;background:{{ t.rowBg }}">
+                    <span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:22px;width:26px;text-align:center;flex:0 0 auto;color:{{ t.color }}">{{ t.icon }}</span>
+                    <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:{{ t.weight }};color:#1b1b18">{{ t.name }}{{ t.degreeTag }}</div><div style="font-family:'Space Mono',monospace;font-size:11px;color:#9d9b91;margin-top:1px">{{ t.last }}</div></div>
+                    <button onClick="{{ t.onTap }}" style="width:30px;height:30px;border-radius:50%;border:{{ t.btnBorder }};background:{{ t.btnBg }};display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex:0 0 auto;cursor:pointer;color:{{ t.btnColor }}">{{ t.btnLabel }}</button>
+                  </div>
+                </sc-for>
+                <div style="display:flex;align-items:center;justify-content:center;gap:7px;margin:14px 16px 0;border:1.5px dashed #d8d5cb;border-radius:12px;padding:11px 0;font-size:12.5px;font-weight:700;color:#8a8a82">＋ にているものをコピーして作る</div>
+              </div>
+            </div>
+          </sc-if>
+          <!-- shared cart bar -->
+          <sc-if value="{{ showCart }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:0 0 auto;padding:10px 14px 22px">
+              <div style="background:#1b1b18;border-radius:18px;padding:10px 10px 10px 18px;display:flex;align-items:center;gap:12px">
+                <div style="white-space:nowrap"><div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.1em;color:#9a9a90">{{ cartMeta }}</div><div style="font-family:'Space Mono',monospace;font-size:16px;font-weight:700;color:#fff">目安 {{ cartFatText }}</div></div>
+                <button onClick="{{ goConfirm }}" style="flex:1;border:none;border-radius:12px;background:#c4f000;color:#2f3a00;font-weight:700;font-size:15px;padding:14px 0;cursor:pointer">登録を確認 ›</button>
+              </div>
+            </div>
+          </sc-if>
+          <!-- 程度 popup -->
+          <sc-if value="{{ degreeOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;z-index:5;background:rgba(27,27,24,.45);display:flex;align-items:center;justify-content:center;padding:0 18px">
+              <div style="width:100%;background:#fff;border-radius:22px;padding:16px 20px 20px;box-shadow:0 24px 60px rgba(27,27,24,.35)">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;text-align:center;font-size:15px;font-weight:900;padding-left:28px">程度をえらぶ</div>
+                  <button onClick="{{ closeDegree }}" style="width:28px;height:28px;background:none;border:none;font-size:18px;color:#55554e;cursor:pointer;flex:0 0 auto">✕</button>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;background:#f7f4ec;border-radius:14px;padding:12px 14px;margin-top:14px">
+                  <span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:21px;color:{{ degreeColor }};flex:0 0 auto">{{ degreeIcon }}</span>
+                  <div style="flex:1;min-width:0;font-size:14.5px;font-weight:900">{{ degreeName }}</div>
+                </div>
+                <div style="background:#c4f000;border-radius:14px;padding:12px 14px;margin-top:10px;text-align:center">
+                  <span style="display:inline-block;background:#fff;border-radius:999px;padding:3px 12px;font-size:11px;font-weight:900;color:#2f3a00">疲労の目安</span>
+                  <div style="font-family:'Space Mono',monospace;font-size:15px;font-weight:700;color:#2f3a00;margin-top:5px">{{ degreePaceText }}</div>
+                </div>
+                <div style="font-size:12px;font-weight:700;margin-top:14px;color:#55554e">{{ degreeQuestion }}</div>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                  <button onClick="{{ degLo }}" style="flex:1;text-align:center;border:{{ degBorderLo }};background:{{ degBgLo }};border-radius:13px;padding:11px 0;font-size:12.5px;font-weight:{{ degWeightLo }};cursor:pointer">すくなめ</button>
+                  <button onClick="{{ degMid }}" style="flex:1;text-align:center;border:{{ degBorderMid }};background:{{ degBgMid }};border-radius:13px;padding:11px 0;font-size:12.5px;font-weight:{{ degWeightMid }};cursor:pointer">ふつう</button>
+                  <button onClick="{{ degHi }}" style="flex:1;text-align:center;border:{{ degBorderHi }};background:{{ degBgHi }};border-radius:13px;padding:11px 0;font-size:12.5px;font-weight:{{ degWeightHi }};cursor:pointer">多め</button>
+                </div>
+                <div style="font-size:11px;color:#b4b2a8;margin-top:12px;line-height:1.7;text-align:center">えらんだ程度で次回から履歴に出ます</div>
+                <div style="display:flex;gap:10px;margin-top:14px">
+                  <button onClick="{{ closeDegree }}" style="flex:1;border:2px solid #e4e1d8;border-radius:13px;background:#fff;color:#55554e;font-weight:700;font-size:14px;padding:14px 0;cursor:pointer">スキップ</button>
+                  <button onClick="{{ confirmDegree }}" style="flex:1.5;border:none;border-radius:13px;background:#c4f000;color:#2f3a00;font-weight:700;font-size:14px;padding:14px 0;cursor:pointer">カートに入れる</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+          <!-- 大カテゴリ追加 popup -->
+          <sc-if value="{{ catAddOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;z-index:6;background:rgba(27,27,24,.45);display:flex;align-items:center;justify-content:center;padding:0 18px">
+              <div style="width:100%;background:#fff;border-radius:22px;padding:16px 20px 20px;box-shadow:0 24px 60px rgba(27,27,24,.35)">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;text-align:center;font-size:15px;font-weight:900;padding-left:28px">大カテゴリを追加</div>
+                  <button onClick="{{ closeCatAdd }}" style="width:28px;height:28px;background:none;border:none;font-size:18px;color:#55554e;cursor:pointer;flex:0 0 auto">✕</button>
+                </div>
+                <div style="font-size:12px;font-weight:700;margin-top:14px;color:#55554e">なまえ</div>
+                <input value="{{ newCatName }}" onInput="{{ onCatName }}" placeholder="例：ペットのこと" style="width:100%;margin-top:8px;background:#efece3;border:none;border-radius:12px;padding:12px 14px;font-family:'Zen Kaku Gothic New',sans-serif;font-size:15px;font-weight:700;color:#1b1b18;box-sizing:border-box">
+                <div style="font-size:12px;font-weight:700;margin-top:14px;color:#55554e">アイコン</div>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                  <sc-for list="{{ catIconChoices }}" as="ic" hint-placeholder-count="5">
+                    <button onClick="{{ ic.onPick }}" style="width:44px;height:44px;border-radius:12px;border:{{ ic.border }};background:{{ ic.bg }};display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:21px;color:#55554e">{{ ic.icon }}</span></button>
+                  </sc-for>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:18px">
+                  <button onClick="{{ closeCatAdd }}" style="flex:1;border:2px solid #e4e1d8;border-radius:13px;background:#fff;color:#55554e;font-weight:700;font-size:14px;padding:14px 0;cursor:pointer">キャンセル</button>
+                  <button onClick="{{ addCat }}" style="flex:1.5;border:none;border-radius:13px;background:#c4f000;color:#2f3a00;font-weight:700;font-size:14px;padding:14px 0;cursor:pointer">作る</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+          <!-- 強度をえらぶ popup（分量入力＝行動の強度・記録5-2）-->
+          <sc-if value="{{ intensityOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;z-index:8;background:rgba(27,27,24,.45);display:flex;align-items:center;justify-content:center;padding:0 18px">
+              <div style="width:100%;background:#fff;border-radius:22px;padding:16px 20px 20px;box-shadow:0 24px 60px rgba(27,27,24,.35)">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;text-align:center;font-size:15px;font-weight:900;padding-left:28px">強度をえらぶ</div>
+                  <button onClick="{{ closeIntensity }}" style="width:28px;height:28px;background:none;border:none;font-size:18px;color:#55554e;cursor:pointer;flex:0 0 auto">✕</button>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;background:#f7f4ec;border-radius:14px;padding:12px 14px;margin-top:14px"><span style="font-size:20px;flex:0 0 auto">{{ intensityGlyph }}</span><div style="flex:1;min-width:0;font-size:14px;font-weight:900;line-height:1.4">{{ intensityName }}</div></div>
+                <div style="background:#c4f000;border-radius:14px;padding:11px 14px;margin-top:10px;text-align:center"><span style="display:inline-block;background:#fff;border-radius:999px;padding:3px 12px;font-size:11px;font-weight:900;color:#2f3a00">この記録の疲労</span><div style="font-family:'Space Mono',monospace;font-size:16px;font-weight:700;color:#2f3a00;margin-top:5px">{{ intensityFatText }}</div></div>
+                <sc-for list="{{ intQuestions }}" as="q" hint-placeholder-count="2">
+                  <div style="font-size:12px;font-weight:700;margin-top:14px;color:#55554e">{{ q.label }}</div>
+                  <div style="display:flex;gap:8px;margin-top:8px">
+                    <sc-for list="{{ q.opts }}" as="o" hint-placeholder-count="3">
+                      <button onClick="{{ o.onPick }}" style="flex:1;text-align:center;border:1.5px solid {{ o.border }};background:{{ o.bg }};color:{{ o.color }};border-radius:12px;padding:11px 0;font-size:12.5px;font-weight:{{ o.weight }};cursor:pointer">{{ o.text }}</button>
+                    </sc-for>
+                  </div>
+                </sc-for>
+                <button onClick="{{ closeIntensity }}" style="width:100%;margin-top:18px;border:none;border-radius:13px;background:#1b1b18;color:#fff;font-weight:700;font-size:15px;padding:14px 0;cursor:pointer">OK</button>
+              </div>
+            </div>
+          </sc-if>
+          <!-- 予定 詳細 popup（カレンダー式） -->
+          <sc-if value="{{ planDetailOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;z-index:6;background:rgba(27,27,24,.45);display:flex;align-items:flex-end;justify-content:center">
+              <div style="width:100%;background:#fff;border-radius:22px 22px 0 0;padding:16px 18px 20px;box-shadow:0 -12px 40px rgba(27,27,24,.3)">
+                <div style="display:flex;align-items:center;gap:11px">
+                  <span style="width:40px;height:40px;border-radius:12px;background:#eaf5c9;display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto">📋</span>
+                  <div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:900">{{ planDetailName }}</div><div style="font-family:'Space Mono',monospace;font-size:10.5px;color:#8a8a82;margin-top:2px">{{ recordSlotEmoji }} {{ recordSlotName }} · {{ planDetailMeta }}</div></div>
+                  <button onClick="{{ closePlan }}" style="width:28px;height:28px;background:none;border:none;font-size:18px;color:#55554e;cursor:pointer;flex:0 0 auto">✕</button>
+                </div>
+                <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8a8a82;margin:16px 2px 6px">この予定にふくまれる行動</div>
+                <div style="border:1px solid #f1efe8;border-radius:14px;overflow:hidden">
+                  <sc-for list="{{ planTasks }}" as="t" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:11px;padding:11px 13px;border-bottom:1px solid #f1efe8"><span style="font-size:16px">{{ t.glyph }}</span><span style="flex:1;font-size:14px;font-weight:700">{{ t.name }}</span><span style="font-family:'Space Mono',monospace;font-size:11.5px;color:#8a8a82">{{ t.minText }}</span><span style="font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:#f5994e;width:34px;text-align:right">{{ t.fatText }}</span></div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;margin-top:14px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#6f8fbf">event_available</span>
+                  <div style="flex:1;font-size:12.5px;font-weight:700;line-height:1.4">Googleカレンダーにも同期<div style="font-size:10.5px;font-weight:400;color:#9d9b91">予定＋ふくまれる行動をそのまま反映</div></div>
+                  <button onClick="{{ togglePlanSync }}" style="width:44px;height:26px;border-radius:999px;border:none;background:{{ planSyncBg }};position:relative;cursor:pointer;flex:0 0 auto"><span style="position:absolute;top:3px;left:{{ planSyncDot }};width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span></button>
+                </div>
+                <button onClick="{{ recordThisPlan }}" style="width:100%;margin-top:16px;border:none;border-radius:14px;background:#c4f000;color:#2f3a00;font-weight:700;font-size:15px;padding:15px 0;cursor:pointer">この予定を記録 · <span style="font-family:'Space Mono',monospace">{{ planDetailFat }}</span></button>
+              </div>
+            </div>
+          </sc-if>
+          <!-- 予定 作成 popup -->
+          <sc-if value="{{ planAddOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;z-index:7;background:rgba(27,27,24,.45);display:flex;align-items:flex-end;justify-content:center">
+              <div class="nos" style="width:100%;max-height:92%;overflow-y:auto;background:#fff;border-radius:22px 22px 0 0;padding:16px 18px 20px;box-shadow:0 -12px 40px rgba(27,27,24,.3)">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;text-align:center;font-size:15px;font-weight:900;padding-left:28px">予定をつくる</div>
+                  <button onClick="{{ closePlanAdd }}" style="width:28px;height:28px;background:none;border:none;font-size:18px;color:#55554e;cursor:pointer;flex:0 0 auto">✕</button>
+                </div>
+                <div style="font-size:12px;font-weight:700;margin-top:14px;color:#55554e">予定の名前</div>
+                <input value="{{ newPlanName }}" onInput="{{ onPlanName }}" placeholder="例：通勤・ジム・買い出し" style="width:100%;margin-top:8px;background:#efece3;border:none;border-radius:12px;padding:12px 14px;font-family:'Zen Kaku Gothic New',sans-serif;font-size:15px;font-weight:700;color:#1b1b18;box-sizing:border-box">
+                <div style="font-size:12px;font-weight:700;margin-top:16px;color:#55554e">ふくめる行動をえらぶ</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+                  <sc-for list="{{ planItemChoices }}" as="it" hint-placeholder-count="6">
+                    <button onClick="{{ it.onToggle }}" style="display:flex;align-items:center;gap:6px;border:{{ it.border }};background:{{ it.bg }};border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:700;cursor:pointer"><span>{{ it.glyph }}</span>{{ it.name }}<span style="font-family:'Space Mono',monospace;color:{{ it.markColor }}">{{ it.mark }}</span></button>
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;margin-top:16px;background:#f7f4ec;border-radius:12px;padding:11px 13px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#6f8fbf">event_available</span>
+                  <div style="flex:1;font-size:12.5px;font-weight:700">Googleカレンダーと同期</div>
+                  <button onClick="{{ togglePlanSync }}" style="width:44px;height:26px;border-radius:999px;border:none;background:{{ planSyncBg }};position:relative;cursor:pointer;flex:0 0 auto"><span style="position:absolute;top:3px;left:{{ planSyncDot }};width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span></button>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:18px">
+                  <button onClick="{{ closePlanAdd }}" style="flex:1;border:2px solid #e4e1d8;border-radius:13px;background:#fff;color:#55554e;font-weight:700;font-size:14px;padding:14px 0;cursor:pointer">キャンセル</button>
+                  <button onClick="{{ addPlan }}" style="flex:1.5;border:none;border-radius:13px;background:#c4f000;color:#2f3a00;font-weight:700;font-size:14px;padding:14px 0;cursor:pointer">つくる</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- ============ CONFIRM ============ -->
+      <sc-if value="{{ isConfirm }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;flex:1;min-height:0;background:#f7f4ec">
+          <div style="display:flex;align-items:center;gap:14px;padding:6px 20px 10px">
+            <button onClick="{{ backToRecord }}" style="background:none;border:none;font-size:19px;color:#8a8a82;cursor:pointer">‹</button>
+            <div style="font-size:16px;font-weight:700;flex:1">登録を確認</div>
+            <span style="font-family:'Space Mono',monospace;font-size:12px;color:#8a8a82;white-space:nowrap">{{ recordSlotEmoji }} {{ recordSlotName }}</span>
+          </div>
+          <div class="nos" style="flex:1;overflow-y:auto;padding:2px 0 8px">
+            <div style="margin:4px 16px 12px;background:#fff;border-radius:18px;padding:16px;box-shadow:0 1px 3px rgba(27,27,24,.05)">
+              <div style="font-size:13px;font-weight:700">この枠に使った時間</div>
+              <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin-top:12px">
+                <button onClick="{{ decHours }}" style="width:40px;height:40px;border-radius:50%;border:1.5px solid #1b1b18;background:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;color:#1b1b18;cursor:pointer">−</button>
+                <span style="display:flex;align-items:baseline;gap:4px"><span style="font-family:'Archivo',sans-serif;font-weight:800;font-size:38px;line-height:1">{{ hoursText }}</span></span>
+                <button onClick="{{ incHours }}" style="width:40px;height:40px;border-radius:50%;border:1.5px solid #1b1b18;background:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;color:#1b1b18;cursor:pointer">＋</button>
+              </div>
+              <div style="text-align:center;font-size:11.5px;color:#b4b2a8;margin-top:8px">＋－は15分ごと。だいたいでOK、あとから変えられます</div>
+            </div>
+            <div style="margin:0 16px 12px;background:#fff;border-radius:18px;padding:16px;box-shadow:0 1px 3px rgba(27,27,24,.05)">
+              <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:13px;font-weight:700">時間の割り振り</span><span style="font-family:'Space Mono',monospace;font-size:11px;color:#8a8a82">等分</span></div>
+              <div style="display:flex;height:36px;border-radius:10px;overflow:hidden;margin-top:12px">
+                <sc-for list="{{ allocList }}" as="a" hint-placeholder-count="3">
+                  <div style="width:{{ a.pct }};background:{{ a.color }}"></div>
+                </sc-for>
+              </div>
+              <sc-for list="{{ allocList }}" as="a" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:11px;padding:12px 2px 11px;border-bottom:1px solid #f1efe8"><span style="font-size:15px">{{ a.glyph }}</span><span style="font-size:14px;flex:1">{{ a.name }}</span><span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;background:#efece3;border-radius:8px;padding:4px 10px">{{ a.hoursText }}</span><span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#f5994e;width:38px;text-align:right">{{ a.fatText }}</span></div>
+              </sc-for>
+              <div style="font-size:11px;color:#b4b2a8;margin-top:8px">行をタップで詳細設定（体・心・混雑など）</div>
+            </div>
+            <button onClick="{{ toggleTemplateToast }}" style="width:calc(100% - 32px);margin:0 16px;display:flex;align-items:center;justify-content:center;gap:8px;border:1.5px solid #1b1b18;border-radius:13px;padding:13px 0;font-size:13px;font-weight:700;background:#fff;cursor:pointer">💾 この組み合わせをテンプレに保存</button>
+          </div>
+          <div style="flex:0 0 auto;padding:10px 16px 22px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 4px 9px"><span style="font-size:12px;color:#8a8a82">合計 {{ hoursText }}</span><span style="font-family:'Space Mono',monospace;font-size:15px;font-weight:700">{{ confirmFatText }}</span></div>
+            <button onClick="{{ commit }}" style="width:100%;border:none;border-radius:14px;background:#c4f000;color:#2f3a00;font-weight:700;font-size:16px;padding:16px;cursor:pointer">きろくする</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ SLEEP (residual / full-screen slider) ============ -->
+      <sc-if value="{{ isSleep }}" hint-placeholder-val="{{ false }}">
+        <div style="position:relative;flex:1;min-height:0;background:#f7f4ec;overflow:hidden">
+          <!-- full-bleed emoji pile -->
+          <div style="position:absolute;inset:0;z-index:1;pointer-events:none">
+            <sc-for list="{{ sleepPile }}" as="p" hint-placeholder-count="0">
+              <span style="position:absolute;left:{{ p.x }}px;bottom:{{ p.y }}px;font-size:{{ p.s }}px;transform:rotate({{ p.r2 }}deg);opacity:{{ p.op }};transition:opacity .7s ease {{ p.delay }};filter:drop-shadow(0 4px 6px rgba(27,27,24,.14))">{{ p.e }}</span>
+            </sc-for>
+          </div>
+          <!-- falling moons -->
+          <sc-if value="{{ sleepAnim }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;z-index:3;pointer-events:none">
+              <sc-for list="{{ moons }}" as="m" hint-placeholder-count="0">
+                <span style="position:absolute;left:{{ m.x }}%;top:-40px;font-size:30px;animation:moonfall 1.1s ease-in {{ m.delay }} forwards">🌙</span>
+              </sc-for>
+            </div>
+          </sc-if>
+          <!-- drag layer (full screen) -->
+          <div onPointerDown="{{ onSleepDrag }}" onPointerMove="{{ onSleepDrag }}" style="position:absolute;inset:0;z-index:2;touch-action:none;cursor:ns-resize"></div>
+          <!-- residual line -->
+          <div style="position:absolute;left:0;right:0;bottom:{{ residualPct }};z-index:3;pointer-events:none;display:flex;align-items:center;gap:9px;padding:0 12px;transition:bottom .1s linear">
+            <span style="flex:1;height:2.5px;background:#1b1b18;border-radius:2px"></span>
+            <span style="width:34px;height:34px;border-radius:50%;background:#fff;border:3px solid #1b1b18;box-shadow:0 3px 10px rgba(27,27,24,.3);display:flex;align-items:center;justify-content:center;font-size:13px;flex:0 0 auto">↕</span>
+          </div>
+          <!-- header -->
+          <div style="position:relative;z-index:4;display:flex;align-items:center;gap:14px;padding:6px 22px 4px">
+            <button onClick="{{ goHome }}" style="background:none;border:none;font-size:19px;color:#8a8a82;cursor:pointer">✕</button>
+            <div style="font-size:16px;font-weight:700">🛏 睡眠の記録</div>
+          </div>
+          <!-- CTA -->
+          <div style="position:absolute;left:0;right:0;bottom:0;z-index:4;padding:0 16px 18px">
+            <button onClick="{{ finishSleep }}" style="width:100%;border:none;border-radius:14px;background:#c4f000;color:#2f3a00;font-weight:700;font-size:16px;padding:16px;cursor:pointer;box-shadow:0 8px 24px rgba(27,27,24,.18)">これくらい 回復した</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ SHAKA ============ -->
+      <sc-if value="{{ isShaka }}" hint-placeholder-val="{{ false }}">
+        <div id="shakacase" style="position:absolute;left:0;right:0;top:40px;bottom:64px;z-index:0;overflow:hidden"></div>
+        <div style="position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:6px 20px 0">
+          <button onClick="{{ goHome }}" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.85);border:none;display:flex;align-items:center;justify-content:center;font-size:16px;color:#55554e;cursor:pointer">✕</button>
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.85);border-radius:999px;padding:6px 10px">
+            <button onClick="{{ prevDay }}" style="background:none;border:none;font-size:14px;color:{{ prevColor }};cursor:pointer;padding:2px 6px">‹</button>
+            <span style="font-family:'Space Mono',monospace;font-size:12px;font-weight:700">{{ shakaDate }}</span>
+            <button onClick="{{ nextDay }}" style="background:none;border:none;font-size:14px;color:{{ nextColor }};cursor:pointer;padding:2px 6px">›</button>
+          </div>
+          <button onClick="{{ shake }}" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.85);border:none;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer">🔀</button>
+        </div>
+        <div style="flex:1"></div>
+        <button onClick="{{ goCollect }}" style="position:absolute;left:50%;transform:translateX(-50%);bottom:90px;z-index:2;background:#1b1b18;color:#fff;border:none;border-radius:999px;padding:11px 18px;font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:8px;cursor:pointer"><span style="width:18px;height:18px;border-radius:50%;background:#c4f000;color:#2f3a00;display:flex;align-items:center;justify-content:center;font-size:11px">🏆</span>ためた回復を見る</button>
+      </sc-if>
+
+      <!-- ============ COLLECTED (accumulated recovery) ============ -->
+      <sc-if value="{{ isCollect }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;flex:1;min-height:0;background:#f7f4ec">
+          <div style="display:flex;align-items:center;gap:12px;padding:4px 20px 10px">
+            <button onClick="{{ goShaka }}" style="background:none;border:none;font-size:13px;font-weight:700;color:#55554e;cursor:pointer">← もどる</button>
+            <div style="font-size:15px;font-weight:900;flex:1">ためた回復</div>
+            <span style="font-family:'Archivo',sans-serif;font-weight:800;font-size:20px">{{ collectedTotal }}</span>
+          </div>
+          <div id="collectscroll" class="nos" style="flex:1;overflow-y:auto;position:relative">
+            <div id="collectstack" style="position:relative;width:100%"></div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ MYPAGE ============ -->
+      <sc-if value="{{ isMypage }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;flex:1;min-height:0;background:#f7f4ec">
+          <div style="display:flex;align-items:center;gap:12px;padding:4px 20px 12px">
+            <button onClick="{{ goHome }}" style="background:none;border:none;font-size:19px;color:#8a8a82;cursor:pointer">‹</button>
+            <div style="font-size:16px;font-weight:700">マイページ</div>
+          </div>
+          <div class="nos" style="flex:1;overflow-y:auto;padding:0 16px 24px">
+            <div style="display:flex;align-items:center;gap:13px;background:#fff;border-radius:16px;padding:14px 15px;box-shadow:0 1px 3px rgba(27,27,24,.05)">
+              <div style="width:48px;height:48px;flex:0 0 auto;border-radius:13px;background:#c4f000;display:flex;align-items:center;justify-content:center;font-size:26px">🐢</div>
+              <div style="min-width:0;flex:1"><div style="font-size:15px;font-weight:900">ユナ</div><div style="font-family:'Space Mono',monospace;font-size:10.5px;color:#8a8a82;margin-top:2px">yuna@example.com</div></div>
+              <span style="display:inline-flex;align-items:center;gap:5px;background:#eef7cc;border-radius:999px;padding:5px 10px;font-size:10.5px;font-weight:700;color:#2f3a00;flex:0 0 auto">🔗 Google</span>
+            </div>
+            <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8a8a82;margin:18px 6px 8px">きろく</div>
+            <div style="background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(27,27,24,.05);overflow:hidden">
+              <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-bottom:1px solid #f1efe8"><span style="font-size:16px">🕘</span><span style="flex:1;font-size:14px">枠のじかん</span><span style="font-size:16px;color:#c9c7bf">›</span></div>
+              <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-bottom:1px solid #f1efe8"><span style="font-size:16px">🏷</span><span style="flex:1;font-size:14px">カテゴリの管理</span><span style="font-size:16px;color:#c9c7bf">›</span></div>
+              <div style="display:flex;align-items:center;gap:11px;padding:13px 15px"><span style="font-size:16px">📋</span><span style="flex:1;font-size:14px">テンプレート</span><span style="font-family:'Space Mono',monospace;font-size:11.5px;color:#8a8a82">4件</span><span style="font-size:16px;color:#c9c7bf">›</span></div>
+            </div>
+            <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8a8a82;margin:18px 6px 8px">つかれの計算</div>
+            <div style="background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(27,27,24,.05);overflow:hidden">
+              <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-bottom:1px solid #f1efe8"><span style="font-size:16px">💪</span><span style="flex:1;font-size:14px">疲れやすさの調整</span><span style="font-family:'Space Mono',monospace;font-size:11.5px;color:#8a8a82">体×1.2 ・ 心×1.0</span><span style="font-size:16px;color:#c9c7bf">›</span></div>
+              <div style="display:flex;align-items:center;gap:11px;padding:13px 15px"><span style="font-size:16px">📅</span><span style="flex:1;font-size:14px">Googleカレンダー</span><span style="display:inline-flex;background:#eef7cc;border-radius:999px;padding:4px 10px;font-size:10.5px;font-weight:700;color:#2f3a00">連携済み</span></div>
+            </div>
+            <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8a8a82;margin:18px 6px 8px">ひょうじ</div>
+            <div style="background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(27,27,24,.05);overflow:hidden">
+              <div style="display:flex;align-items:center;gap:11px;padding:13px 15px">
+                <span style="font-size:16px">🌀</span>
+                <div style="flex:1;min-width:0"><div style="font-size:14px">背景のシャカ</div><div style="font-family:'Space Mono',monospace;font-size:10.5px;color:#8a8a82;margin-top:1px">絵文字を動かすか固定するか</div></div>
+                <div style="display:flex;gap:0;background:#efece3;border-radius:10px;padding:3px;flex:0 0 auto">
+                  <button onClick="{{ setMotionFixed }}" style="border:none;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;background:{{ motionFixedBg }};color:{{ motionFixedColor }}">固定</button>
+                  <button onClick="{{ setMotionMove }}" style="border:none;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;background:{{ motionMoveBg }};color:{{ motionMoveColor }}">動かす</button>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:18px;text-align:center;font-size:12px;color:#8a8a82;font-weight:700">ログアウト</div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- toast -->
+      <sc-if value="{{ showToast }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:50%;transform:translateX(-50%);bottom:88px;z-index:9;background:#1b1b18;color:#fff;border-radius:999px;padding:11px 20px;font-size:12.5px;font-weight:700;box-shadow:0 10px 24px rgba(27,27,24,.3);white-space:nowrap;animation:pop .25s ease">{{ toastText }}</div>
+      </sc-if>
+
+      <!-- persistent bottom nav -->
+      <div style="position:relative;z-index:6;flex:0 0 64px;display:flex;align-items:stretch;background:#fff;border-top:1px solid #efece3">
+        <button onClick="{{ goShaka }}" style="flex:1;background:none;border:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:700;color:{{ navShakaColor }};cursor:pointer"><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' {{ navShakaFill }};font-size:23px">blur_on</span>シャカ</button>
+        <button onClick="{{ goHome }}" style="flex:1;background:none;border:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:700;color:{{ navHomeColor }};cursor:pointer"><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' {{ navHomeFill }};font-size:23px">home</span>ホーム</button>
+        <button onClick="{{ goMypage }}" style="flex:1;background:none;border:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:700;color:{{ navMypageColor }};cursor:pointer"><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' {{ navMypageFill }};font-size:23px">person</span>マイページ</button>
+      </div>
+
+    </div>
+  </div>
+  <div style="font-size:11.5px;color:#8a8a82;max-width:372px;text-align:center;line-height:1.7">枠の <b style="color:#55554e">＋</b> から記録 → タスクを <b style="color:#55554e">⊕</b> → 登録を確認 → きろくする。ホームに戻ると背景の絵文字が増えます。下タブで <b style="color:#55554e">シャカ・マイページ</b>、睡眠カードで <b style="color:#55554e">残量の記録</b>へ。</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    screen: 'home',
+    slotId: null,
+    catId: null,
+    cart: {},
+    degreeItem: null,
+    degreeIdx: 1,
+    hours: 3,
+    residual: 15,
+    dayOffset: 0,
+    shakeSeed: 21,
+    toast: null,
+    sleepTrim: 0,
+    catAddOpen: false,
+    newCatName: '',
+    newCatIcon: 'category',
+    customCats: [],
+    customPlans: [],
+    planDetailId: null,
+    planAddOpen: false,
+    newPlanName: '',
+    newPlanTasks: [],
+    planSync: true,
+    searchStep: null,
+    keywords: [''],
+    searchCart: [],
+    resolvedIdx: [],
+    moreKw: null,
+    moreFilter: 0,
+    intensityId: null,
+    customActions: [],
+    searchTotalMin: 30,
+    searchFracs: [],
+    confirmOrigin: 'search',
+    confirmMode: 'duration',
+    startTime: '',
+    endTime: '',
+    homeMotion: false,
+    slotMenuOpen: false,
+    collected: Component.buildCollected(),
+    slots: [
+      { id: 'asa', emoji: '🌅', name: '朝', records: [
+        { plan: '通勤', name: '徒歩', glyph: '🚶', min: 8, fat: 2 },
+        { plan: '通勤', name: '電車', glyph: '🚃', min: 25, fat: 6 },
+        { plan: '通勤', name: 'バス', glyph: '🚌', min: 12, fat: 3 },
+      ] },
+      { id: 'am', emoji: '☀️', name: '午前', records: [
+        { name: '会議', glyph: '💬', min: 60, fat: 10 },
+        { name: '資料作成', glyph: '📝', min: 120, fat: 12 },
+      ] },
+      { id: 'pm', emoji: '🌤', name: '午後', records: [] },
+      { id: 'yoru', emoji: '🌙', name: '夜', records: [] },
+    ],
+  };
+
+  static buildCollected() {
+    const parts = [['🌙', 36], ['☕', 22], ['🛁', 14], ['🧹', 12], ['📝', 10], ['💬', 10], ['🛒', 8]];
+    const arr = [];
+    parts.forEach(([g, n]) => { for (let i = 0; i < n; i++) arr.push(g); });
+    return arr;
+  }
+
+  CATS = [
+    { id: 'idou', icon: 'directions_subway', color: '#6f8fbf', name: 'いどう', sub: '通勤・運転・送迎', items: [
+      { id: 'commute', glyph: '🚃', icon: 'directions_subway', name: '通勤', last: '前回 0.5h ・ +4', fh: 8 },
+      { id: 'drive', glyph: '🚗', icon: 'directions_car', name: '運転', last: '前回 1h ・ +7', fh: 7 },
+    ] },
+    { id: 'work', icon: 'work', color: '#c58b3d', name: 'しごと・学業', sub: '会議・資料・集中作業', items: [
+      { id: 'meeting', glyph: '💬', icon: 'forum', name: '会議', last: '前回 1h ・ +10', fh: 10 },
+      { id: 'docs', glyph: '📝', icon: 'description', name: '資料作成', last: '前回 2h ・ +12', fh: 6 },
+      { id: 'focus', glyph: '⌨️', icon: 'computer', name: '集中作業', last: '前回 1h ・ +8', fh: 8 },
+    ] },
+    { id: 'house', icon: 'cleaning_services', color: '#4fa88a', name: '家事', sub: '皿洗い・掃除・洗濯・買い物', items: [
+      { id: 'dishes', glyph: '🍽', icon: 'local_dining', name: '皿洗い', last: '前回 0.5h ・ +4', fh: 8, after: 1, degree: true, degLabels: ['すくなめ', '多め'], degFh: [5, 8, 11] },
+      { id: 'clean', glyph: '🧹', icon: 'mop', name: '掃除', last: '前回 0.5h ・ +3', fh: 6, after: 1 },
+      { id: 'laundry', glyph: '🧺', icon: 'local_laundry_service', name: '洗濯', last: '前回 0.5h ・ +3', fh: 6, after: 1 },
+      { id: 'shop', glyph: '🛒', icon: 'shopping_basket', name: '買い物', last: '前回 0.5h ・ +3', fh: 6 },
+    ] },
+    { id: 'talk', icon: 'groups', color: '#b07bc4', name: '対人・イベント', sub: '打ち合わせ・飲み会', items: [
+      { id: 'talk', glyph: '💬', icon: 'groups', name: '打ち合わせ', last: '前回 1h ・ +9', fh: 9 },
+    ] },
+    { id: 'rest', icon: 'self_improvement', color: '#7a9a00', name: '休憩・回復', sub: 'お茶・入浴・昼寝・ストレッチ ・ −回復', items: [
+      { id: 'rest', glyph: '☕', icon: 'local_cafe', name: '休憩・お茶', last: '前回 0.5h ・ −4', fh: -8 },
+      { id: 'bath', glyph: '🛁', icon: 'bathtub', name: '入浴', last: '前回 0.5h ・ −6', fh: -12 },
+      { id: 'nap', glyph: '😴', icon: 'bedtime', name: '昼寝・仮眠', last: '前回 0.5h ・ −10', fh: -20 },
+      { id: 'stretch', glyph: '🧘', icon: 'self_improvement', name: 'ストレッチ・ヨガ', last: '前回 0.5h ・ −5', fh: -10 },
+      { id: 'breathe', glyph: '🌿', icon: 'spa', name: '深呼吸・瞑想', last: '前回 10分 ・ −3', fh: -8 },
+      { id: 'nature', glyph: '🌳', icon: 'park', name: 'ぼーっとする', last: '前回 15分 ・ −4', fh: -8 },
+    ] },
+  ];
+  PLANS = [
+    { id: 'commute', name: '通勤', tasks: [
+      { glyph: '🚶', name: '徒歩', min: 8, fat: 2 },
+      { glyph: '🚃', name: '電車', min: 25, fat: 6 },
+      { glyph: '🚌', name: 'バス', min: 12, fat: 3 },
+    ] },
+    { id: 'gym', name: 'ジム', tasks: [
+      { glyph: '🏃', name: 'ランニング', min: 30, fat: 12 },
+      { glyph: '🏋️', name: '筋トレ', min: 30, fat: 14 },
+    ] },
+  ];
+  allPlans() { return [...this.PLANS, ...(this.state.customPlans || [])]; }
+  planById(id) { return this.allPlans().find(p => p.id === id); }
+  planMeta(p) {
+    const min = p.tasks.reduce((a, t) => a + (t.min || 0), 0);
+    const fat = p.tasks.reduce((a, t) => a + (t.fat || 0), 0);
+    return { min, fat, minText: this.fmtMin(min), fatText: (fat >= 0 ? '+' + fat : '' + fat), metaText: p.tasks.length + '件 · ' + this.fmtMin(min) };
+  }
+  allItems() {
+    const out = [];
+    this.allCats().forEach(c => c.items.forEach(it => out.push({ ...it, color: c.color, catId: c.id })));
+    return out;
+  }
+  allCats() { return [...this.CATS, ...(this.state.customCats || [])]; }
+  itemById(id) { return this.allItems().find(t => t.id === id); }
+
+  KW_PLACEHOLDERS = ['(例)通勤', '(例)会議 打ち合わせ', '(例)皿洗い', '(例)買い物 スーパー', '(例)ランニング', '(例)休憩 お茶', '(例)資料作成', '(例)入浴', '(例)掃除', '(例)飲み会'];
+  SEARCH_DB = [
+    { name: '通勤（電車・座れた）', glyph: '🚃', fh: 5, kw: ['通勤', '電車', '移動'] },
+    { name: '通勤（電車・立ち）', glyph: '🚃', fh: 8, kw: ['通勤', '電車', '移動'] },
+    { name: '通勤（バス）', glyph: '🚌', fh: 6, kw: ['通勤', 'バス', '移動'] },
+    { name: '通勤（徒歩）', glyph: '🚶', fh: 7, kw: ['通勤', '徒歩', '移動', '散歩'] },
+    { name: '通勤（自転車）', glyph: '🚲', fh: 9, kw: ['通勤', '自転車', '移動'] },
+    { name: '運転（街中）', glyph: '🚗', fh: 8, kw: ['運転', '車', '移動'] },
+    { name: '会議', glyph: '💬', fh: 10, kw: ['会議', 'ミーティング', '打ち合わせ', '仕事'] },
+    { name: 'オンライン会議', glyph: '💻', fh: 8, kw: ['会議', 'オンライン', '仕事'] },
+    { name: '資料作成', glyph: '📝', fh: 6, kw: ['資料', '作成', '仕事', '書類'] },
+    { name: '集中作業', glyph: '⌨️', fh: 8, kw: ['集中', '作業', '仕事'] },
+    { name: 'メール返信', glyph: '📧', fh: 4, kw: ['メール', '返信', '仕事'] },
+    { name: '皿洗い', glyph: '🍽', fh: 8, kw: ['皿洗い', '家事', '洗い物', '食器'] },
+    { name: '掃除機がけ', glyph: '🧹', fh: 7, kw: ['掃除', '家事', '掃除機'] },
+    { name: '洗濯', glyph: '🧺', fh: 6, kw: ['洗濯', '家事'] },
+    { name: '買い物', glyph: '🛒', fh: 6, kw: ['買い物', '家事', '買い出し', 'スーパー'] },
+    { name: '料理', glyph: '🍳', fh: 7, kw: ['料理', '家事', '自炊'] },
+    { name: '打ち合わせ', glyph: '💬', fh: 9, kw: ['打ち合わせ', '対人', '会議'] },
+    { name: '飲み会', glyph: '🍻', fh: 11, kw: ['飲み会', '対人', 'イベント'] },
+    { name: 'ランニング', glyph: '🏃', fh: 12, kw: ['ランニング', '運動', 'ジョギング', '走る'] },
+    { name: '筋トレ', glyph: '🏋️', fh: 14, kw: ['筋トレ', '運動', 'ジム', 'トレーニング'] },
+    { name: 'ヨガ', glyph: '🧘', fh: 5, kw: ['ヨガ', '運動', 'ストレッチ'] },
+    { name: '休憩・お茶', glyph: '☕', fh: -8, kw: ['休憩', 'お茶', 'カフェ', 'コーヒー', '休む'] },
+    { name: '入浴', glyph: '🛁', fh: -6, kw: ['入浴', '風呂', 'お風呂'] },
+    { name: '昼寝', glyph: '😴', fh: -10, kw: ['昼寝', '仮眠', '寝る', '休む'] },
+  ];
+  searchPool() { return this.SEARCH_DB.concat(this.state.customActions || []); }
+  searchHits(kw) {
+    const q = (kw || '').toLowerCase().trim();
+    return this.searchPool().filter(e => e.name.toLowerCase().includes(q) || (e.kw || []).some(t => t.toLowerCase().includes(q) || q.includes(t.toLowerCase())));
+  }
+  searchDB(kw) { const h = this.searchHits(kw); return h.length ? h : [{ name: kw, glyph: '⭐', fh: 6, kw: [kw] }]; }
+  intensityQuestions(item) {
+    const kw = item.kw || []; const nm = item.name || '';
+    const has = (t) => kw.includes(t) || nm.includes(t);
+    if (has('通勤') || has('移動') || has('電車') || has('バス') || has('運転') || has('自転車')) {
+      return [
+        { key: 'crowd', label: '混み具合', opts: ['すいてた', 'ふつう', '混雑'], mult: [0.8, 1, 1.3] },
+        { key: 'seat', label: '座れた？', opts: ['座れた', '立ち'], mult: [0.85, 1.15] },
+      ];
+    }
+    if (has('仕事') || has('会議') || has('作業') || has('資料')) {
+      return [
+        { key: 'len', label: '長さ', opts: ['短め', 'ふつう', '長め'], mult: [0.8, 1, 1.3] },
+        { key: 'stress', label: '気疲れ', opts: ['少ない', 'ふつう', '多い'], mult: [0.85, 1, 1.25] },
+      ];
+    }
+    if (has('家事')) return [{ key: 'amount', label: '量', opts: ['すこし', 'ふつう', 'たくさん'], mult: [0.8, 1, 1.3] }];
+    if (has('運動')) return [{ key: 'intensity', label: '強度', opts: ['軽め', 'ふつう', 'ハード'], mult: [0.8, 1, 1.4] }];
+    return [{ key: 'deg', label: '程度', opts: ['すくなめ', 'ふつう', '多め'], mult: [0.75, 1, 1.3] }];
+  }
+  effFh(item) {
+    const qs = this.intensityQuestions(item); let m = 1;
+    (item.picks || []).forEach((p, idx) => { if (qs[idx] && qs[idx].mult[p] != null) m *= qs[idx].mult[p]; });
+    return item.fh * m;
+  }
+  intensitySummary(item) {
+    const qs = this.intensityQuestions(item);
+    return (item.picks || []).map((p, idx) => qs[idx] ? qs[idx].opts[p] : '').filter(Boolean).join('・');
+  }
+  remainingKw(resolved) {
+    return this.state.keywords.map((k, i) => ({ k: (k || '').trim(), i })).filter(x => x.k && !resolved.includes(x.i));
+  }
+  searchGroupsData() {
+    return this.remainingKw(this.state.resolvedIdx).map(({ k, i }) => { const res = this.searchHits(k); return { i, kw: k, count: res.length, items: res, noHit: res.length === 0 }; });
+  }
+  openSearch = () => this.set({ searchStep: 'input', keywords: Array(10).fill(''), searchCart: [], resolvedIdx: [], moreKw: null });
+  closeSearch = () => this.set({ searchStep: null });
+  setKeyword = (i, val) => {
+    const k = [...this.state.keywords]; k[i] = val;
+    if (i === k.length - 1 && val.trim() && k.length < 10) k.push('');
+    this.set({ keywords: k });
+  };
+  clearKeyword = (i) => { const k = [...this.state.keywords]; if (k.length > 1) k.splice(i, 1); else k[0] = ''; this.set({ keywords: k }); };
+  runSearch = () => { if (!this.state.keywords.some(k => (k || '').trim())) return; this.set({ searchStep: 'results', resolvedIdx: [] }); };
+  goSearchConfirm = () => { if (this.state.searchCart.length) this.set({ searchStep: 'confirm', confirmOrigin: 'search' }); };
+  setConfirmMode = (mode) => {
+    if (mode === 'time' && this.state.confirmMode !== 'time') {
+      const now = new Date();
+      const startHm = this.pad2(now.getHours()) + ':' + this.pad2(now.getMinutes());
+      const endHm = this.tsToHm(now.getTime() + (this.state.searchTotalMin || 30) * 60000);
+      this.set({ confirmMode: 'time', startTime: startHm, endTime: endHm });
+    } else { this.set({ confirmMode: mode }); }
+  };
+  onStartTime = (e) => this.set({ startTime: e.target.value });
+  onEndTime = (e) => this.set({ endTime: e.target.value });
+  backFromConfirm = () => {
+    if (this.state.confirmOrigin === 'search') this.set({ searchStep: 'results' });
+    else if (this.state.confirmOrigin === 'cat') this.set({ searchStep: null });
+    else this.set({ searchStep: null, searchCart: [], catId: null, cart: {} });
+  };
+  selectSearchItem = (kwIndex, item) => {
+    const picks = this.intensityQuestions(item).map(q => Math.floor(q.opts.length / 2));
+    const id = 'sc' + Date.now() + Math.floor(Math.random() * 1000);
+    const cart = [...this.state.searchCart, { id, name: item.name, glyph: item.glyph, fh: item.fh, kw: item.kw, picks }];
+    const resolved = kwIndex == null ? this.state.resolvedIdx : [...this.state.resolvedIdx, kwIndex];
+    const remaining = this.remainingKw(resolved);
+    const n = cart.length;
+    this.set({ searchCart: cart, resolvedIdx: resolved, moreKw: null, searchStep: remaining.length ? 'results' : 'confirm', searchTotalMin: n * 30, searchFracs: Array(n).fill(1 / n) });
+  };
+  addNewAction = (kwIndex, name) => {
+    const item = { name, glyph: '⭐', fh: 6, kw: [name] };
+    this.setState(s => ({ customActions: [...(s.customActions || []), item] }));
+    this.selectSearchItem(kwIndex, item);
+  };
+  addRoughAction = (kwIndex, name) => this.selectSearchItem(kwIndex, { name, glyph: '🌀', fh: 6, kw: [name] });
+  addTotal = (d) => this.set({ searchTotalMin: Math.max(1, Math.round((this.state.searchTotalMin || 30) + d)) });
+  onFracDrag = (k) => (e) => {
+    if (e.type === 'pointermove' && e.buttons === 0) return;
+    const rect = e.currentTarget.parentElement.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const fr = [...(this.state.searchFracs || [])];
+    if (k + 1 >= fr.length) return;
+    const total = this.state.searchTotalMin || 30;
+    const minF = 1 / total;
+    let before = 0; for (let j = 0; j < k; j++) before += fr[j];
+    const pairSum = fr[k] + fr[k + 1];
+    let nk = Math.max(minF, Math.min(pairSum - minF, frac - before));
+    fr[k] = nk; fr[k + 1] = pairSum - nk;
+    this.set({ searchFracs: fr });
+  };
+  openMore = (kwIndex, kw) => this.set({ searchStep: 'more', moreKw: { i: kwIndex, kw }, moreFilter: 0 });
+  closeMore = () => this.set({ searchStep: 'results' });
+  setMoreFilter = (f) => this.set({ moreFilter: f });
+  removeSearchItem = (id) => { const cart = this.state.searchCart.filter(x => x.id !== id); const n = cart.length; this.set({ searchCart: cart, searchTotalMin: Math.max(1, n * 30), searchFracs: n ? Array(n).fill(1 / n) : [] }); };
+  addMoreMenu = () => this.set({ searchStep: 'input', keywords: Array(10).fill(''), resolvedIdx: [] });
+  openIntensity = (id) => this.set({ intensityId: id });
+  closeIntensity = () => this.set({ intensityId: null });
+  setIntensityPick = (qIdx, optIdx) => {
+    const cart = this.state.searchCart.map(it => {
+      if (it.id !== this.state.intensityId) return it;
+      const picks = [...(it.picks || [])]; picks[qIdx] = optIdx; return { ...it, picks };
+    });
+    this.set({ searchCart: cart });
+  };
+  commitSearch = () => {
+    const items = this.state.searchCart;
+    if (!items.length) { this.set({ searchStep: null }); return; }
+    const n = items.length;
+    const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(1 / n);
+    const timeMode = this.state.confirmMode === 'time';
+    const totalMin = timeMode ? this.timeSpanMin() : (this.state.searchTotalMin || (n * 30));
+    const mins = fr.map(f => Math.max(1, Math.round(f * totalMin)));
+    const d = totalMin - mins.reduce((a, b) => a + b, 0); mins[n - 1] = Math.max(1, mins[n - 1] + d);
+    const now = Date.now();
+    let cursor = timeMode ? this.hmToTs(this.state.startTime) : now;
+    const recs = items.map((t, i) => {
+      const fat = Math.round(this.effFh(t) * (mins[i] / 60));
+      const rec = { name: t.name, glyph: t.glyph, min: mins[i], fat, _new: true };
+      if (t.plan) rec.plan = t.plan;
+      if (t.after) rec.after = Math.round(t.after * (mins[i] / 60));
+      if (timeMode) {
+        const fromTs = cursor, toTs = cursor + mins[i] * 60000;
+        rec.from = this.tsToHm(fromTs); rec.to = this.tsToHm(toTs); cursor = toTs;
+        if (toTs > now) { rec.planned = true; rec.dropped = this.planUnitsDue(rec.from, rec.to, Math.abs(fat), now); rec._new = rec.dropped > 0; }
+      }
+      return rec;
+    });
+    const slots = this.state.slots.map(s => s.id === this.state.slotId ? { ...s, records: [...s.records, ...recs] } : s);
+    const anyImmediate = recs.some(r => !r.planned);
+    this.set({ slots, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', toast: anyImmediate ? 'きろくしました' : '予定を追加した（時間どおりに記録）' });
+    if (anyImmediate) {
+      this.stopPhysics();
+      requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
+    }
+    clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1800);
+  };
+
+  r2(x) { return Math.round(x * 2) / 2; }
+  fmtH(x) { return (Math.round(x * 10) / 10).toString(); }
+  fmtMin(m) { m = Math.round(m); if (m < 60) return m + '分'; const h = Math.floor(m / 60), r = m % 60; return r ? h + '時間' + r + '分' : h + '時間'; }
+  groupRecords(records) {
+    const out = []; const planIdx = {};
+    records.forEach(r => {
+      const target = Math.abs(r.fat);
+      const soFar = r.planned ? (r.dropped || 0) : target;
+      const signedSoFar = (r.fat >= 0 ? 1 : -1) * soFar;
+      const isPlanned = !!r.planned && (r.dropped || 0) < target;
+      if (r.plan) {
+        if (planIdx[r.plan] == null) { planIdx[r.plan] = out.length; out.push({ glyph: '📋', title: r.plan, _signed: 0, _planned: false, _count: 0, isPlan: true }); }
+        const g = out[planIdx[r.plan]];
+        g._signed += signedSoFar; g._count += 1; if (isPlanned) g._planned = true;
+      } else {
+        out.push({ glyph: r.glyph, title: r.name + (r.after ? ' ⏰' : ''), subText: '', hasSub: false, planned: isPlanned,
+          fatText: isPlanned ? ((r.dropped || 0) + '/' + target) : (r.fat >= 0 ? '+' + r.fat : '' + r.fat),
+          fatColor: isPlanned ? '#a5a39a' : '#f5994e' });
+      }
+    });
+    out.forEach(g => { if (g.isPlan) { g.subText = g._count + '件のタスク'; g.hasSub = true; g.planned = g._planned; g.fatText = (g._signed >= 0 ? '+' + g._signed : '' + g._signed); g.fatColor = g._planned ? '#a5a39a' : '#f5994e'; } });
+    return out;
+  }
+
+  // same formula as the reference build: size so ~100 items fill the container at 60% packing
+  calcR(w, h) {
+    const area = Math.max(1, w) * Math.max(1, h);
+    const r = Math.sqrt(area * 0.6 / (100 * Math.PI));
+    return Math.max(12, Math.min(r, 60));
+  }
+
+  makePile(count, seed) {
+    const glyphs = this.pileGlyphs();
+    const r = this.calcR(350, 708);
+    const d = r * 2, font = Math.round(r * 1.6);
+    let s = seed, rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    const cols = Math.max(1, Math.floor(350 / d)), out = [];
+    const n = Math.min(glyphs.length, 130);
+    for (let i = 0; i < n; i++) {
+      const row = Math.floor(i / cols), col = i % cols;
+      const x = Math.round(col * d + (row % 2 ? d / 2 : 0) + (rng() - 0.5) * (d * 0.35));
+      out.push({
+        e: glyphs[i % glyphs.length],
+        x: Math.max(-8, Math.min(350 - d + 8, x)),
+        y: Math.max(-6, Math.round(row * d * 0.82 + (rng() - 0.5) * (d * 0.25))),
+        r2: Math.round((rng() - 0.5) * 54),
+        s: font,
+      });
+    }
+    return out;
+  }
+  makePileSeeded(count, seed) {
+    // generic emoji pile independent of records (shaka / residual demo)
+    const EMO = ['💬','🚃','⌨️','📝','📧','🧹','🏃','☕','🍙','📚','🛒','📞'];
+    let s = seed, rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    const size = 40, cols = 8, out = [];
+    for (let i = 0; i < count; i++) {
+      const row = Math.floor(i / cols), col = i % cols;
+      const x = Math.round(col * size + (row % 2 ? size / 2 : 0) + (rng() - 0.5) * 14);
+      out.push({ e: EMO[Math.floor(rng() * EMO.length)], x: Math.max(-8, Math.min(316, x)), y: Math.max(-6, Math.round(row * 33 + (rng() - 0.5) * 10)), r2: Math.round((rng() - 0.5) * 54), s: Math.round(30 + rng() * 9) });
+    }
+    return out;
+  }
+  pileGlyphs() {
+    // positive fatigue as glyphs, then subtract recovery so 休憩・後から回復・睡眠 visibly remove emoji
+    const pos = [];
+    let recover = 0, afterRec = 0;
+    this.state.slots.forEach(s => s.records.forEach(r => {
+      if (r.fat > 0) { const n = r.planned ? (r.dropped || 0) : r.fat; for (let i = 0; i < n; i++) pos.push(r.glyph); }
+      else if (r.fat < 0) { recover += r.planned ? (r.dropped || 0) : -r.fat; }
+      if (r.after) afterRec += r.after;
+    }));
+    const trim = recover + afterRec + (this.state.sleepTrim || 0);
+    // remove from the end (most recent) — net can't go below 0
+    return trim > 0 ? pos.slice(0, Math.max(0, pos.length - trim)) : pos;
+  }
+  // glyphs tagged old/new so only newly-recorded ones fall from the top
+  pileGlyphsMarked() {
+    const pos = []; let recover = 0, afterRec = 0;
+    this.state.slots.forEach(s => s.records.forEach(r => {
+      if (r.fat > 0) { const n = r.planned ? (r.dropped || 0) : r.fat; for (let i = 0; i < n; i++) pos.push({ g: r.glyph, isNew: !!r._new }); }
+      else if (r.fat < 0) { recover += r.planned ? (r.dropped || 0) : -r.fat; }
+      if (r.after) afterRec += r.after;
+    }));
+    const trim = recover + afterRec + (this.state.sleepTrim || 0);
+    const kept = trim > 0 ? pos.slice(0, Math.max(0, pos.length - trim)) : pos;
+    const old = kept.filter(x => !x.isNew), nw = kept.filter(x => x.isNew);
+    return [...old, ...nw]; // new ones last → they spawn from the top
+  }
+  clearNewFlags() {
+    if (!this.state.slots.some(s => s.records.some(r => r._new))) return;
+    const slots = this.state.slots.map(s => ({ ...s, records: s.records.map(r => r._new ? { ...r, _new: false } : r) }));
+    this.set({ slots });
+  }
+
+  cartItems() { return this.allItems().filter(t => this.state.cart[t.id]); }
+
+  /* past days: glyph bags (emoji count = fatigue, no numbers shown) */
+  DAYS = [
+    { label: 'JUL 5 · SUN' },
+    { label: 'JUL 4 · SAT', bag: { '💬': 22, '🚃': 8, '📝': 12, '⌨️': 16, '🧹': 6, '☕': 0 } },
+    { label: 'JUL 3 · FRI', bag: { '🚃': 8, '⌨️': 10, '🛒': 4, '🍙': 3, '📞': 5 } },
+    { label: 'JUL 2 · THU', bag: { '💬': 18, '📝': 10, '🏃': 7, '🧹': 5, '🚃': 8, '📧': 9 } },
+  ];
+  currentBag() {
+    const off = -this.state.dayOffset; // 0..3
+    if (off === 0) return this.pileGlyphs();
+    const bag = this.DAYS[off] && this.DAYS[off].bag ? this.DAYS[off].bag : {};
+    const g = [];
+    Object.keys(bag).forEach(k => { for (let i = 0; i < bag[k]; i++) g.push(k); });
+    return g;
+  }
+  rebuildPhysics() {
+    this.stopPhysics();
+    requestAnimationFrame(() => {
+      const el = document.getElementById('shakacase');
+      if (el && !this.engine) this.startPhysics(el);
+    });
+  }
+  prevDay = () => { if (this.state.dayOffset <= -3) return; this.set({ dayOffset: this.state.dayOffset - 1 }); this.rebuildPhysics(); };
+  nextDay = () => { if (this.state.dayOffset >= 0) return; this.set({ dayOffset: this.state.dayOffset + 1 }); this.rebuildPhysics(); };
+
+  set(patch) { this.setState(patch); }
+  goHome = () => this.set({ screen: 'home' });
+  goShaka = () => { this.set({ screen: 'shaka' }); requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el && !this.engine) this.startPhysics(el); }); };
+  goMypage = () => this.set({ screen: 'mypage' });
+  goSleep = () => this.set({ screen: 'sleep' });
+  openRecord(id) { this.set({ slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null }); }
+  toggleSlotMenu = () => this.set({ slotMenuOpen: !this.state.slotMenuOpen });
+  pickSlot = (id) => this.set({ slotId: id, slotMenuOpen: false });
+  selectCat = (id) => this.set({ catId: id });
+  openCatAdd = () => this.set({ catAddOpen: true, newCatName: '', newCatIcon: 'category' });
+  closeCatAdd = () => this.set({ catAddOpen: false });
+  onCatName = (e) => this.set({ newCatName: e.target.value });
+  pickCatIcon = (icon) => this.set({ newCatIcon: icon });
+  addCat = () => {
+    const name = (this.state.newCatName || '').trim() || '新しいカテゴリ';
+    const id = 'cust' + Date.now();
+    const cat = { id, icon: this.state.newCatIcon, color: '#8a7bc4', name, sub: 'じぶんで追加', items: [
+      { id: id + '_a', glyph: '⭐', icon: this.state.newCatIcon, name: name, last: 'はじめて', fh: 6 },
+    ] };
+    this.set({ customCats: [...(this.state.customCats || []), cat], catAddOpen: false, catId: id });
+  };
+  planToConfirm(plan) {
+    const totalMin = plan.tasks.reduce((a, t) => a + (t.min || 0), 0) || plan.tasks.length * 30;
+    const cart = plan.tasks.map((t, i) => { const fh = t.min ? (t.fat * 60 / t.min) : t.fat; return { id: 'scp' + Date.now() + i, name: t.name, glyph: t.glyph, fh, kw: [plan.name, t.name], picks: [], plan: plan.name }; });
+    const fracs = plan.tasks.map(t => (t.min || 30) / totalMin);
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: totalMin, searchFracs: fracs, planDetailId: null, planAddOpen: false, confirmOrigin: 'plan' });
+  }
+  openPlan = (id) => { const p = this.planById(id); if (p) this.planToConfirm(p); };
+  closePlan = () => this.set({ planDetailId: null });
+  recordPlan = (id) => {
+    const plan = this.planById(id);
+    if (!plan) { this.set({ planDetailId: null }); return; }
+    const recs = plan.tasks.map(t => ({ plan: plan.name, name: t.name, glyph: t.glyph, min: t.min || 0, fat: t.fat || 0, _new: true }));
+    const slots = this.state.slots.map(s => s.id === this.state.slotId ? { ...s, records: [...s.records, ...recs] } : s);
+    this.set({ slots, screen: 'shaka', dayOffset: 0, planDetailId: null, cart: {}, catId: null, toast: this.state.planSync ? '記録 ＋ カレンダーに同期' : 'きろくしました' });
+    this.stopPhysics();
+    requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
+    clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1700);
+  };
+  openPlanAdd = () => this.set({ planAddOpen: true, newPlanName: '', newPlanTasks: [] });
+  closePlanAdd = () => this.set({ planAddOpen: false });
+  onPlanName = (e) => this.set({ newPlanName: e.target.value });
+  togglePlanTask = (id) => {
+    const cur = this.state.newPlanTasks || [];
+    this.set({ newPlanTasks: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] });
+  };
+  togglePlanSync = () => this.set({ planSync: !this.state.planSync });
+  addPlan = () => {
+    const name = (this.state.newPlanName || '').trim() || '新しい予定';
+    const picks = (this.state.newPlanTasks || []);
+    const tasks = picks.map(id => { const it = this.itemById(id); return { glyph: it.glyph, name: it.name, min: 15, fat: Math.max(1, Math.round(Math.abs(it.fh) * 0.25)) * (it.fh < 0 ? -1 : 1) }; });
+    if (!tasks.length) tasks.push({ glyph: '⭐', name: name, min: 30, fat: 6 });
+    const id = 'plan' + Date.now();
+    const plan = { id, name, tasks };
+    this.set({ customPlans: [...(this.state.customPlans || []), plan], planAddOpen: false });
+    this.planToConfirm(plan);
+  };
+  backToCats = () => this.set({ catId: null });
+  tapItem = (item) => {
+    if (this.state.cart[item.id]) { const c = { ...this.state.cart }; delete c[item.id]; this.set({ cart: c }); return; }
+    if (item.degree) { this.set({ degreeItem: item.id, degreeIdx: 1 }); return; }
+    this.set({ cart: { ...this.state.cart, [item.id]: { degIdx: null } } });
+  };
+  setDegree = (i) => this.set({ degreeIdx: i });
+  closeDegree = () => this.set({ degreeItem: null });
+  confirmDegree = () => {
+    const id = this.state.degreeItem;
+    this.set({ cart: { ...this.state.cart, [id]: { degIdx: this.state.degreeIdx } }, degreeItem: null });
+  };
+  cartFh(item) { const e = this.state.cart[item.id]; if (e && e.degIdx != null && item.degFh) return item.degFh[e.degIdx]; return item.fh; }
+  goConfirm = () => {
+    const items = this.cartItems();
+    if (!items.length) return;
+    const durOf = (t) => (t.fh < 0 || t.id === 'shop') ? 30 : 60;
+    const totalMin = items.reduce((a, t) => a + durOf(t), 0);
+    const cart = items.map((t, i) => ({ id: 'scc' + Date.now() + i, name: t.name, glyph: t.glyph, fh: this.cartFh(t), kw: [t.name], picks: [], after: t.after || 0 }));
+    const fracs = items.map(t => durOf(t) / totalMin);
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: totalMin, searchFracs: fracs, confirmOrigin: 'cat' });
+  };
+  backToRecord = () => this.set({ screen: 'record' });
+  incHours = () => this.set({ hours: Math.min(12, this.state.hours + 0.25) });
+  decHours = () => this.set({ hours: Math.max(0.0833, this.state.hours - 0.25) });
+  commit = () => {
+    const items = this.cartItems();
+    if (!items.length) { this.goHome(); return; }
+    const per = this.state.hours / items.length;
+    const recs = items.map(t => ({ name: t.name, glyph: t.glyph, min: Math.round(per * 60), fat: Math.round(this.cartFh(t) * per), after: t.after ? Math.round(t.after * per) : 0, _new: true }));
+    const slots = this.state.slots.map(s => s.id === this.state.slotId ? { ...s, records: [...s.records, ...recs] } : s);
+    this.set({ slots, screen: 'shaka', dayOffset: 0, catId: null, cart: {}, toast: 'きろくしました' });
+    this.stopPhysics();
+    requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
+    clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1600);
+  };
+  toggleTemplateToast = () => {
+    this.set({ toast: 'テンプレに保存しました' });
+    clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1600);
+  };
+  onResidual = (e) => this.set({ residual: parseInt(e.target.value, 10) });
+  onSleepDrag = (e) => {
+    if (this.state.sleepAnim) return;
+    if (e.type === 'pointermove' && e.buttons === 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const N = this.sleepCount();
+    const frac = 1 - (e.clientY - rect.top) / rect.height;
+    const r = Math.max(0, Math.min(N, Math.round(frac * N)));
+    this.set({ residual: r });
+  };
+  yesterdayGlyphs() {
+    // literally yesterday's shaka contents: JUL 4 · SAT bag
+    const bag = (this.DAYS[1] && this.DAYS[1].bag) ? this.DAYS[1].bag : {};
+    const g = [];
+    Object.keys(bag).forEach(k => { for (let i = 0; i < bag[k]; i++) g.push(k); });
+    return g;
+  }
+  makeSleepPile() {
+    if (this._sleepPile) return this._sleepPile;
+    const glyphs = this.yesterdayGlyphs();
+    let s = 51, rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    for (let i = glyphs.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = glyphs[i]; glyphs[i] = glyphs[j]; glyphs[j] = t; }
+    // identical geometry to the home / shaka pile so all three screens match
+    const r = this.calcR(350, 708);
+    const d = r * 2, font = Math.round(r * 1.6);
+    const cols = Math.max(1, Math.floor(350 / d)), out = [];
+    const N = glyphs.length || 64;
+    for (let i = 0; i < N; i++) {
+      const row = Math.floor(i / cols), col = i % cols;
+      const x = Math.round(col * d + (row % 2 ? d / 2 : 0) + (rng() - 0.5) * (d * 0.35));
+      out.push({
+        e: glyphs[i],
+        x: Math.max(-8, Math.min(350 - d + 8, x)),
+        y: Math.max(-6, Math.round(row * d * 0.82 + (rng() - 0.5) * (d * 0.25))),
+        r2: Math.round((rng() - 0.5) * 54),
+        s: font,
+      });
+    }
+    this._sleepPile = out; this._sleepN = N; this._sleepD = d; this._sleepCols = cols;
+    return out;
+  }
+  sleepCount() { this.makeSleepPile(); return this._sleepN; }
+
+  /* ---------- matter.js physics for the shaka case ---------- */
+  PR = 18;
+  componentDidMount() {
+    this._tick = setInterval(() => {
+      const shakaEl = document.getElementById('shakacase');
+      const collectStack = document.getElementById('collectstack');
+      const collectScroll = document.getElementById('collectscroll');
+      if (this.state.screen === 'shaka') {
+        if (shakaEl && !this.engine) this.startPhysics(shakaEl);
+        if (this.collectEngine) this.stopCollectPhysics();
+      } else if (this.state.screen === 'collect') {
+        if (collectStack && collectScroll && !this.collectEngine) this.startCollectPhysics(collectStack, collectScroll);
+        if (this.engine) this.stopPhysics();
+      } else {
+        if (this.engine) this.stopPhysics();
+        if (this.collectEngine) this.stopCollectPhysics();
+      }
+    }, 160);
+    this._planT = setInterval(() => this.advancePlans(), 1000);
+  }
+  componentWillUnmount() { clearInterval(this._tick); clearInterval(this._planT); this.stopPhysics(); this.stopCollectPhysics(); }
+
+  /* ---------- clock-time / planned progression (index.html と統一) ---------- */
+  pad2(n) { return String(n).padStart(2, '0'); }
+  hmToTs(hm) { const [h, m] = (hm || '0:0').split(':').map(Number); const d = new Date(); d.setHours(h || 0, m || 0, 0, 0); return d.getTime(); }
+  tsToHm(ts) { const d = new Date(ts); return this.pad2(d.getHours()) + ':' + this.pad2(d.getMinutes()); }
+  timeSpanMin() { const s = this.hmToTs(this.state.startTime), t = this.hmToTs(this.state.endTime); let d = Math.round((t - s) / 60000); return d < 1 ? 1 : d; }
+  planUnitsDue(fromHm, toHm, N, now) {
+    if (N <= 0) return 0;
+    const f = this.hmToTs(fromHm), t = this.hmToTs(toHm);
+    if (now < f) return 0;
+    if (t <= f) return now >= t ? N : 0;
+    const iv = (t - f) / N;
+    return Math.max(0, Math.min(N, Math.floor((now - f) / iv)));
+  }
+  advancePlans() {
+    const now = Date.now(); let changed = false; const drops = [];
+    const slots = this.state.slots.map(s => ({ ...s, records: s.records.map(r => {
+      if (!r.planned) return r;
+      const N = Math.abs(r.fat); const due = this.planUnitsDue(r.from, r.to, N, now); let nr = r;
+      if (due > (r.dropped || 0)) { const add = due - (r.dropped || 0); if (r.fat > 0) { for (let i = 0; i < add; i++) drops.push(r.glyph); } nr = { ...r, dropped: due }; changed = true; }
+      if ((nr.dropped || 0) >= N) { nr = { ...nr, planned: false, dropped: N }; changed = true; }
+      return nr;
+    }) }));
+    if (changed) { this.set({ slots }); if (this.state.screen === 'shaka' && drops.length) this.addFallingBodies(drops); }
+  }
+
+  startPhysics(el) {
+    const M = window.Matter;
+    if (!M || !el || this.engine) return;
+    const rect = el.getBoundingClientRect();
+    const W = rect.width || 350, H = rect.height || 700;
+    const r = this.calcR(W, H);
+    this.PR = r;
+    const { Engine, World, Bodies, Body, Runner } = M;
+    this.M = M;
+    this.engine = Engine.create();
+    this.engine.world.gravity.y = 1;
+    const t = 80;
+    World.add(this.engine.world, [
+      Bodies.rectangle(W / 2, H + t / 2, W + t * 2, t, { isStatic: true }),
+      Bodies.rectangle(-t / 2, H / 2, t, H + t * 2, { isStatic: true }),
+      Bodies.rectangle(W + t / 2, H / 2, t, H + t * 2, { isStatic: true }),
+    ]);
+    this.bodies = [];
+    let marks;
+    if (this.state.dayOffset === 0) marks = this.pileGlyphsMarked().slice(0, 90);
+    else marks = this.currentBag().slice(0, 90).map(g => ({ g, isNew: false }));
+    const newCount = marks.filter(m => m.isNew).length;
+    const oldCount = marks.length - newCount;
+    const perRow = Math.max(1, Math.floor(W / (2 * r)));
+    marks.forEach((m, idx) => {
+      const glyph = m.g;
+      const isNew = idx >= oldCount;
+      let x, y;
+      if (isNew) {
+        x = r + Math.random() * (W - 2 * r);
+        y = -r - Math.random() * (H * 0.6);
+      } else {
+        const row = Math.floor(idx / perRow), col = idx % perRow;
+        x = r + col * (2 * r) + (Math.random() - 0.5) * r * 0.5;
+        y = H - r - row * (2 * r * 0.92) + (Math.random() - 0.5) * r * 0.3;
+      }
+      const body = Bodies.circle(x, y, r, { restitution: 0.35, friction: 0.05, frictionAir: 0.01, density: 0.001 });
+      World.add(this.engine.world, body);
+      const d = document.createElement('div');
+      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))';
+      d.style.width = d.style.height = (2 * r) + 'px';
+      d.style.fontSize = Math.round(r * 1.6) + 'px';
+      d.textContent = glyph;
+      el.appendChild(d);
+      this.bodies.push({ body, el: d });
+    });
+    this.runner = Runner.create();
+    Runner.run(this.runner, this.engine);
+    this._running = true;
+    if (newCount > 0) { clearTimeout(this._newT); this._newT = setTimeout(() => this.clearNewFlags(), 2600); }
+    this._startLoop();
+    // 固定モードなら落下が落ち着いてから演算を止める（絵文字は積もったまま静止）
+    clearTimeout(this._settleT);
+    if (!this.state.homeMotion) this._settleT = setTimeout(() => { if (!this.state.homeMotion) this.freezeMotion(); }, 2000);
+  }
+  _startLoop() {
+    this._phys = true;
+    const loop = () => {
+      if (!this._phys) return;
+      const rr = this.PR;
+      this.bodies.forEach(({ body, el }) => {
+        el.style.transform = `translate(${body.position.x - rr}px, ${body.position.y - rr}px) rotate(${body.angle}rad)`;
+      });
+      this._raf = requestAnimationFrame(loop);
+    };
+    this._raf = requestAnimationFrame(loop);
+  }
+  freezeMotion() { if (!this.runner || !this.M || !this._running) return; this._running = false; this.M.Runner.stop(this.runner); }
+  resumeMotion() { if (!this.engine || !this.M || this._running) return; this._running = true; this.M.Runner.run(this.runner, this.engine); if (!this._phys) this._startLoop(); }
+  setMotion = (on) => {
+    if (this.state.homeMotion === on) return;
+    this.set({ homeMotion: on });
+    if (this.state.screen === 'shaka') {
+      if (on) { clearTimeout(this._settleT); this.resumeMotion(); }
+      else this.freezeMotion();
+    }
+  };
+  addFallingBodies(glyphs) {
+    if (!this.engine || !this.M) return;
+    const { World, Bodies } = this.M;
+    const el = document.getElementById('shakacase'); if (!el) return;
+    const rect = el.getBoundingClientRect(); const W = rect.width || 350, H = rect.height || 700; const r = this.PR;
+    this.resumeMotion();
+    glyphs.slice(0, 40).forEach(g => {
+      const x = r + Math.random() * (W - 2 * r); const y = -r - Math.random() * (H * 0.4);
+      const body = Bodies.circle(x, y, r, { restitution: 0.35, friction: 0.05, frictionAir: 0.01, density: 0.001 });
+      World.add(this.engine.world, body);
+      const d = document.createElement('div');
+      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))';
+      d.style.width = d.style.height = (2 * r) + 'px'; d.style.fontSize = Math.round(r * 1.6) + 'px'; d.textContent = g;
+      el.appendChild(d);
+      this.bodies.push({ body, el: d });
+    });
+    clearTimeout(this._settleT);
+    if (!this.state.homeMotion) this._settleT = setTimeout(() => { if (!this.state.homeMotion) this.freezeMotion(); }, 2000);
+  }
+  stopPhysics() {
+    this._phys = false; this._running = false; clearTimeout(this._settleT);
+    if (this._raf) cancelAnimationFrame(this._raf);
+    if (this.runner && this.M) this.M.Runner.stop(this.runner);
+    if (this.engine && this.M) { this.M.World.clear(this.engine.world); this.M.Engine.clear(this.engine); }
+    if (this.bodies) this.bodies.forEach(({ el }) => el.remove());
+    const caseEl = document.getElementById('shakacase');
+    if (caseEl) caseEl.innerHTML = '';
+    this.engine = null; this.runner = null; this.bodies = [];
+  }
+  shake = () => {
+    if (!this.M || !this.bodies) return;
+    const Body = this.M.Body;
+    this.bodies.forEach(({ body }) => {
+      Body.setVelocity(body, { x: (Math.random() - 0.5) * 32, y: -Math.random() * 14 });
+      Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.4);
+    });
+  };
+
+  /* ---------- collected (ためた回復) tall scroll world ---------- */
+  goCollect = () => {
+    this.set({ screen: 'collect' });
+    requestAnimationFrame(() => {
+      const stackEl = document.getElementById('collectstack');
+      const scrollEl = document.getElementById('collectscroll');
+      if (stackEl && scrollEl && !this.collectEngine) this.startCollectPhysics(stackEl, scrollEl);
+    });
+  };
+  finishSleep = () => {
+    if (this.state.sleepAnim) return;
+    const recovered = Math.max(0, this.sleepCount() - this.state.residual);
+    let s = 7; const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    const moons = Array.from({ length: Math.min(recovered, 45) }, (_, i) => ({ x: Math.round(rng() * 86 + 2), delay: (i * 0.03).toFixed(2) + 's' }));
+    this.set({ sleepAnim: true, moons });
+    const add = Array.from({ length: Math.min(recovered, 60) }, () => '🌙');
+    setTimeout(() => this.set({ collected: [...this.state.collected, ...add], sleepTrim: (this.state.sleepTrim || 0) + recovered, screen: 'home', sleepAnim: false, moons: [] }), 1900);
+  };
+  startCollectPhysics(stackEl, scrollEl) {
+    const M = window.Matter;
+    if (!M || !stackEl || !scrollEl || this.collectEngine) return;
+    const W = scrollEl.clientWidth || 350, Hv = scrollEl.clientHeight || 700;
+    const r = this.calcR(W, Hv), itemPx = r * 2;
+    const UNIT = 100;
+    const total = this.state.collected.length;
+    const screens = Math.max(1, Math.ceil(total / UNIT) + 1);
+    const worldH = Math.max(Hv, screens * Hv);
+    stackEl.style.height = worldH + 'px';
+    const levels = Math.ceil(worldH / Hv);
+    for (let k = 1; k <= levels; k++) {
+      const y = worldH - k * Hv;
+      if (y < -2) continue;
+      const line = document.createElement('div');
+      line.style.cssText = `position:absolute;left:0;right:0;top:${y}px;border-top:1px dashed #e4e1d8`;
+      stackEl.appendChild(line);
+    }
+    if (total === 0) {
+      const em = document.createElement('div');
+      em.style.cssText = 'position:absolute;left:24px;right:24px;bottom:24px;font-size:12.5px;line-height:1.8;color:#b4b2a8;text-align:center';
+      em.textContent = 'まだ何も。睡眠・休憩で回復すると、ここに積もっていきます。';
+      stackEl.appendChild(em);
+      scrollEl.scrollTop = Math.max(0, worldH - Hv);
+      return;
+    }
+    const { Engine, World, Bodies, Runner } = M;
+    this.collectEngine = Engine.create();
+    this.collectEngine.gravity.y = 1;
+    const wt = 140;
+    World.add(this.collectEngine.world, [
+      Bodies.rectangle(W / 2, worldH + wt / 2, W + wt * 2, wt, { isStatic: true }),
+      Bodies.rectangle(-wt / 2, worldH / 2, wt, worldH * 2 + wt, { isStatic: true }),
+      Bodies.rectangle(W + wt / 2, worldH / 2, wt, worldH * 2 + wt, { isStatic: true }),
+    ]);
+    this.collectBodies = [];
+    this.state.collected.slice(0, 150).forEach(glyph => {
+      const x = r + Math.random() * (W - 2 * r);
+      const y = worldH - 60 - Math.random() * (worldH * 0.7);
+      const body = Bodies.circle(x, y, r, { restitution: 0.2, friction: 0.1, frictionAir: 0.02, density: 0.001 });
+      World.add(this.collectEngine.world, body);
+      const d = document.createElement('div');
+      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none';
+      d.style.width = d.style.height = itemPx + 'px';
+      d.style.fontSize = Math.round(r * 1.6) + 'px';
+      d.textContent = glyph;
+      stackEl.appendChild(d);
+      this.collectBodies.push({ body, el: d });
+    });
+    this.collectRunner = Runner.create();
+    Runner.run(this.collectRunner, this.collectEngine);
+    this._collectPhys = true;
+    const loop = () => {
+      if (!this._collectPhys) return;
+      this.collectBodies.forEach(({ body, el }) => {
+        el.style.transform = `translate(${body.position.x - r}px, ${body.position.y - r}px) rotate(${body.angle}rad)`;
+      });
+      this._collectRaf = requestAnimationFrame(loop);
+    };
+    this._collectRaf = requestAnimationFrame(loop);
+    scrollEl.scrollTop = Math.max(0, worldH - Hv);
+  }
+  stopCollectPhysics() {
+    this._collectPhys = false;
+    if (this._collectRaf) cancelAnimationFrame(this._collectRaf);
+    if (this.collectRunner && window.Matter) window.Matter.Runner.stop(this.collectRunner);
+    if (this.collectEngine && window.Matter) { window.Matter.World.clear(this.collectEngine.world); window.Matter.Engine.clear(this.collectEngine); }
+    if (this.collectBodies) this.collectBodies.forEach(({ el }) => el.remove());
+    const stackEl = document.getElementById('collectstack');
+    if (stackEl) stackEl.innerHTML = '';
+    this.collectEngine = null; this.collectRunner = null; this.collectBodies = [];
+  }
+
+  renderVals() {
+    const st = this.state;
+    const slots = st.slots.map(s => {
+      const sum = s.records.reduce((a, r) => a + (r.planned ? (r.fat >= 0 ? 1 : -1) * (r.dropped || 0) : r.fat), 0);
+      const empty = s.records.length === 0;
+      return {
+        id: s.id, emoji: s.emoji, name: s.name,
+        empty, hasRecords: !empty,
+        sumText: empty ? '' : (sum >= 0 ? '+' + sum : '' + sum),
+        circleBg: empty ? '#eef0e6' : '#eaf5c9',
+        nameColor: empty ? '#8a8a82' : '#1b1b18',
+        records: s.records.map(r => ({ glyph: r.glyph, name: r.name, hoursText: this.fmtMin(r.min || 0), afterTag: r.after ? ' ⏰' : '' })),
+        groups: this.groupRecords(s.records),
+        onAdd: () => this.openRecord(s.id),
+      };
+    });
+
+    const activeCat = this.allCats().find(c => c.id === st.catId);
+    const cats = this.allCats().map(c => ({ name: c.name, sub: c.sub, icon: c.icon, color: c.color, onSelect: () => this.selectCat(c.id) }));
+    const plans = this.allPlans().map(p => { const m = this.planMeta(p); return { name: p.name, meta: m.metaText, onOpen: () => this.openPlan(p.id) }; });
+    const detailPlan = st.planDetailId ? this.planById(st.planDetailId) : null;
+    const detailMeta = detailPlan ? this.planMeta(detailPlan) : null;
+    const planTasks = detailPlan ? detailPlan.tasks.map(t => ({ glyph: t.glyph, name: t.name, minText: this.fmtMin(t.min || 0), fatText: (t.fat >= 0 ? '+' + t.fat : '' + t.fat) })) : [];
+    const planItemChoices = this.allItems().map(it => { const on = (st.newPlanTasks || []).includes(it.id); return { name: it.name, glyph: it.glyph, onToggle: () => this.togglePlanTask(it.id), border: on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', bg: on ? '#fbfdf0' : '#fff', mark: on ? '✓' : '＋', markColor: on ? '#2f3a00' : '#8a8a82' }; });
+
+    /* ---- 検索フロー（記録2〜5）---- */
+    const ss = st.searchStep;
+    const scPalette = ['#6f8fbf', '#c58b3d', '#4fa88a', '#b07bc4', '#d97a6a', '#7a9a00'];
+    const fatOf = (fh) => { const v = Math.round(fh * 0.5); return v >= 0 ? '+' + v : '' + v; };
+    const keywordRows = st.keywords.map((val, i) => ({
+      val, i,
+      onInput: (e) => this.setKeyword(i, e.target.value),
+      onClear: () => this.clearKeyword(i),
+      hasVal: !!(val && val.trim()),
+      placeholder: this.KW_PLACEHOLDERS[i % this.KW_PLACEHOLDERS.length],
+    }));
+    const canSearch = st.keywords.some(k => (k || '').trim());
+    const searchGroups = this.searchGroupsData().map(g => ({
+      i: g.i, kw: g.kw, noHit: g.noHit, countText: g.noHit ? '見つかりません' : g.count + '件',
+      onMore: () => this.openMore(g.i, g.kw), hasMore: g.count > 5,
+      onAddNew: () => this.addNewAction(g.i, g.kw), onAddRough: () => this.addRoughAction(g.i, g.kw),
+      items: g.items.slice(0, 5).map(it => ({ name: it.name, glyph: it.glyph, fatText: fatOf(it.fh), onAdd: () => this.selectSearchItem(g.i, it) })),
+    }));
+    const mk = st.moreKw;
+    let moreData = { kw: '', countText: '', items: [] };
+    if (mk) {
+      const res = this.searchDB(mk.kw);
+      moreData = { kw: mk.kw, countText: res.length + '件', items: res.map(it => ({ name: it.name, glyph: it.glyph, fatText: fatOf(it.fh), onAdd: () => this.selectSearchItem(mk.i, it) })) };
+    }
+    const moreFilters = ['おすすめ順', 'からだ', 'こころ'].map((t, idx) => { const on = st.moreFilter === idx; return { text: t, onPick: () => this.setMoreFilter(idx), border: on ? '#c4f000' : '#cfe08a', bg: on ? '#c4f000' : '#fff', color: on ? '#2f3a00' : '#7a9a00' }; });
+    const scItems = st.searchCart;
+    const scCount = scItems.length;
+    const fr0 = (st.searchFracs && st.searchFracs.length === scCount && scCount) ? st.searchFracs : Array(scCount).fill(scCount ? 1 / scCount : 0);
+    const timeMode = st.confirmMode === 'time';
+    const totalMin = timeMode ? this.timeSpanMin() : (st.searchTotalMin || (scCount * 30) || 30);
+    const mins = fr0.map(f => Math.max(1, Math.round(f * totalMin)));
+    if (mins.length) { const d = totalMin - mins.reduce((a, b) => a + b, 0); mins[mins.length - 1] = Math.max(1, mins[mins.length - 1] + d); }
+    const searchCartRows = scItems.map((it, idx) => {
+      const fat = Math.round(this.effFh(it) * (mins[idx] / 60));
+      return {
+        id: it.id, name: it.name, glyph: it.glyph,
+        intensityText: this.intensitySummary(it) || '強度',
+        fatText: (fat >= 0 ? '+' + fat : '' + fat),
+        onRemove: () => this.removeSearchItem(it.id),
+        onIntensity: () => this.openIntensity(it.id),
+      };
+    });
+    let segCursor = timeMode ? this.hmToTs(st.startTime) : 0;
+    const allocSegs = scItems.map((it, idx) => {
+      const fat = Math.round(this.effFh(it) * (mins[idx] / 60));
+      let timeText = '';
+      if (timeMode) { const f = segCursor, t = f + mins[idx] * 60000; timeText = this.tsToHm(f) + '–' + this.tsToHm(t); segCursor = t; }
+      return { color: scPalette[idx % scPalette.length], widthPct: (fr0[idx] * 100) + '%', name: it.name, minText: timeMode ? timeText : this.fmtMin(mins[idx]), fatText: (fat >= 0 ? '+' + fat : '' + fat) };
+    });
+    const allocHandles = [];
+    { let cum = 0; for (let k = 0; k < scCount - 1; k++) { cum += fr0[k]; allocHandles.push({ leftPct: (cum * 100) + '%', onDrag: this.onFracDrag(k) }); } }
+    const searchTotalFat = scItems.reduce((a, it, idx) => a + Math.round(this.effFh(it) * (mins[idx] / 60)), 0);
+    const intItem = st.intensityId ? scItems.find(x => x.id === st.intensityId) : null;
+    const intQuestions = intItem ? this.intensityQuestions(intItem).map((q, qi) => ({
+      label: q.label,
+      opts: q.opts.map((o, oi) => { const on = (intItem.picks || [])[qi] === oi; return { text: o, onPick: () => this.setIntensityPick(qi, oi), border: on ? '#1b1b18' : '#e4e1d8', bg: on ? '#fbfdf0' : '#fff', color: on ? '#1b1b18' : '#55554e', weight: on ? '900' : '700' }; }),
+    })) : [];
+    const intFat = intItem ? Math.round(this.effFh(intItem) * ((mins[scItems.indexOf(intItem)] || 30) / 60)) : 0;
+    const catIconOpts = ['category', 'pets', 'volunteer_activism', 'self_improvement', 'favorite'];
+    const catIconChoices = catIconOpts.map(ic => ({ icon: ic, onPick: () => this.pickCatIcon(ic), border: st.newCatIcon === ic ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', bg: st.newCatIcon === ic ? '#fbfdf0' : '#fff' }));
+    const subItems = (activeCat ? activeCat.items : []).map(t => {
+      const e = st.cart[t.id]; const sel = !!e;
+      const degTag = (e && e.degIdx != null && t.degLabels)
+        ? ('（' + [t.degLabels[0], 'ふつう', t.degLabels[1]][e.degIdx] + '）') : '';
+      return {
+        icon: t.icon, color: activeCat.color, name: t.name,
+        degreeTag: degTag, last: t.last,
+        weight: sel ? '700' : '400',
+        rowBg: sel ? '#fbfdf0' : 'transparent',
+        btnBorder: sel ? 'none' : '1.5px solid #1b1b18',
+        btnBg: sel ? '#c4f000' : 'transparent',
+        btnColor: sel ? '#2f3a00' : '#1b1b18',
+        btnLabel: sel ? '✓' : '＋',
+        onTap: () => this.tapItem({ ...t, color: activeCat.color }),
+      };
+    });
+    const degItem = st.degreeItem ? this.itemById(st.degreeItem) : null;
+    const degCat = degItem ? this.CATS.find(c => c.items.some(x => x.id === degItem.id)) : null;
+    const degFh = degItem && degItem.degFh ? degItem.degFh[st.degreeIdx] : 0;
+    const degOn = (i) => st.degreeIdx === i;
+
+    const items = this.cartItems();
+    const count = items.length;
+    const per = count ? st.hours / count : 0;
+    const palette = ['#b07bc4', '#c58b3d', '#6f8fbf', '#4fa88a', '#d97a6a', '#7a9a00'];
+    const allocList = items.map((t, i) => {
+      const fat = Math.round(this.cartFh(t) * per);
+      return {
+        name: t.name, glyph: t.glyph, color: palette[i % palette.length],
+        pct: (100 / count) + '%',
+        hoursText: this.fmtMin(per * 60),
+        fatText: (fat >= 0 ? '+' + fat : '' + fat),
+      };
+    });
+    const confirmFat = items.reduce((a, t) => a + Math.round(this.cartFh(t) * per), 0);
+    const cartFat = items.reduce((a, t) => a + Math.round(this.cartFh(t) * (this.cartFh(t) < 0 || t.id === 'shop' ? 0.5 : 1)), 0);
+
+    const sleepN = this.sleepCount();
+    const recovered = Math.max(0, sleepN - st.residual);
+
+    const activeSlot = st.slots.find(s => s.id === st.slotId) || { emoji: '', name: '' };
+
+    return {
+      screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
+      isHome: st.screen === 'home', isRecord: st.screen === 'record', isConfirm: st.screen === 'confirm',
+      isSleep: st.screen === 'sleep', isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
+      isCollect: st.screen === 'collect', collectedTotal: st.collected.length,
+      goCollect: this.goCollect, finishSleep: this.finishSleep,
+      navHomeColor: ['home', 'record', 'confirm', 'sleep'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
+      navHomeFill: ['home', 'record', 'confirm', 'sleep'].includes(st.screen) ? 1 : 0,
+      navShakaColor: ['shaka', 'collect'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
+      navShakaFill: ['shaka', 'collect'].includes(st.screen) ? 1 : 0,
+      navMypageColor: st.screen === 'mypage' ? '#1b1b18' : '#8a8a82',
+      navMypageFill: st.screen === 'mypage' ? 1 : 0,
+      pile: this.makePile(0, 7),
+      sleepPile: this.makeSleepPile().map((p, i) => ({
+        ...p,
+        op: i < st.residual ? 1 : (st.sleepAnim ? 0 : 0.82),
+        delay: st.sleepAnim ? (0.35 + (i % 12) * 0.07).toFixed(2) + 's' : '0s'
+      })),
+      moons: st.moons || [],
+      sleepAnim: !!st.sleepAnim,
+      residualPct: (Math.ceil(st.residual / (this._sleepCols || 6)) * (this._sleepD || 58) * 0.82 + 6).toFixed(0) + 'px',
+      onSleepDrag: this.onSleepDrag,
+      physRef: this.physRef,
+      slots,
+      plans,
+      planDetailOpen: !!detailPlan, planDetailName: detailPlan ? detailPlan.name : '', planDetailMeta: detailMeta ? detailMeta.metaText : '', planDetailFat: detailMeta ? detailMeta.fatText : '', planTasks,
+      recordThisPlan: () => this.recordPlan(st.planDetailId),
+      openPlan: this.openPlan, closePlan: this.closePlan, openPlanAdd: this.openPlanAdd, closePlanAdd: this.closePlanAdd,
+      planAddOpen: !!st.planAddOpen, newPlanName: st.newPlanName || '', onPlanName: this.onPlanName, addPlan: this.addPlan,
+      planItemChoices, togglePlanSync: this.togglePlanSync, planSync: !!st.planSync,
+      planSyncBg: st.planSync ? '#c4f000' : '#e4e1d8', planSyncDot: st.planSync ? '22px' : '3px',
+      searchInputOpen: ss === 'input', searchResultsOpen: ss === 'results', searchMoreOpen: ss === 'more', searchConfirmOpen: ss === 'confirm',
+      openSearch: this.openSearch, closeSearch: this.closeSearch, runSearch: this.runSearch, goSearchConfirm: this.goSearchConfirm, canSearch,
+      searchBtnBg: canSearch ? '#c4f000' : '#e4e1d8', searchBtnColor: canSearch ? '#2f3a00' : '#a5a39a',
+      keywordRows, searchGroups,
+      moreData, moreFilters, closeMore: this.closeMore,
+      searchCartRows, searchCount: scCount, searchTotalText: this.fmtMin(totalMin),
+      allocSegs, allocHandles,
+      confirmMode: st.confirmMode, isTimeMode: timeMode, isDurationMode: !timeMode,
+      setDurationMode: () => this.setConfirmMode('duration'), setTimeMode: () => this.setConfirmMode('time'),
+      durTabBg: timeMode ? '#fff' : '#1b1b18', durTabColor: timeMode ? '#8a8a82' : '#fff',
+      timeTabBg: timeMode ? '#1b1b18' : '#fff', timeTabColor: timeMode ? '#fff' : '#8a8a82',
+      startTime: st.startTime, endTime: st.endTime, onStartTime: this.onStartTime, onEndTime: this.onEndTime,
+      commitLabel: (timeMode && this.hmToTs(st.endTime) > Date.now()) ? '予定を追加' : 'きろくする',
+      homeMotion: st.homeMotion, setMotionFixed: () => this.setMotion(false), setMotionMove: () => this.setMotion(true),
+      motionFixedBg: st.homeMotion ? '#fff' : '#1b1b18', motionFixedColor: st.homeMotion ? '#8a8a82' : '#fff',
+      motionMoveBg: st.homeMotion ? '#1b1b18' : '#fff', motionMoveColor: st.homeMotion ? '#fff' : '#8a8a82',
+      addTotalM1: () => this.addTotal(-1), addTotalP1: () => this.addTotal(1), addTotalM10: () => this.addTotal(-10), addTotalP10: () => this.addTotal(10),
+      searchTotalFatText: (searchTotalFat >= 0 ? '+' + searchTotalFat : '' + searchTotalFat),
+      addMoreMenu: this.addMoreMenu, commitSearch: this.commitSearch, backFromConfirm: this.backFromConfirm,
+      intensityOpen: !!intItem, intensityName: intItem ? intItem.name : '', intensityGlyph: intItem ? intItem.glyph : '',
+      intensityFatText: (intFat >= 0 ? '+' + intFat : '' + intFat), intQuestions, closeIntensity: this.closeIntensity,
+      cats, showCats: st.screen === 'record' && !st.catId && !st.searchStep,
+      showSub: st.screen === 'record' && !!st.catId && !st.searchStep,
+      subItems, subName: activeCat ? activeCat.name : '', subIcon: activeCat ? activeCat.icon : 'category', subColor: activeCat ? activeCat.color : '#8a8a82',
+      degreeOpen: !!st.degreeItem,
+      degreeName: degItem ? degItem.name : '', degreeIcon: degItem ? degItem.icon : '', degreeColor: degCat ? degCat.color : '#4fa88a',
+      degreeQuestion: degItem && degItem.degLabels ? (degItem.degLabels[0] + ' / ' + degItem.degLabels[1] + '？') : '程度',
+      degreePaceText: degItem ? ((degItem.fh >= 0 ? '+' + degItem.fh : degItem.fh) + ' /h → ' + (degFh >= 0 ? '+' + Math.round(degFh * 0.5) : Math.round(degFh * 0.5))) : '',
+      degBorderLo: degOn(0) ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', degBgLo: degOn(0) ? '#fbfdf0' : '#fff', degWeightLo: degOn(0) ? '900' : '700',
+      degBorderMid: degOn(1) ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', degBgMid: degOn(1) ? '#fbfdf0' : '#fff', degWeightMid: degOn(1) ? '900' : '700',
+      degBorderHi: degOn(2) ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', degBgHi: degOn(2) ? '#fbfdf0' : '#fff', degWeightHi: degOn(2) ? '900' : '700',
+      degLo: () => this.setDegree(0), degMid: () => this.setDegree(1), degHi: () => this.setDegree(2),
+      closeDegree: this.closeDegree, confirmDegree: this.confirmDegree,
+      backToCats: this.backToCats,
+      catAddOpen: !!st.catAddOpen, newCatName: st.newCatName || '', catIconChoices,
+      openCatAdd: this.openCatAdd, closeCatAdd: this.closeCatAdd, onCatName: this.onCatName, addCat: this.addCat,
+      recordSlotName: activeSlot.name, recordSlotEmoji: activeSlot.emoji,
+      slotMenuOpen: !!st.slotMenuOpen, toggleSlotMenu: this.toggleSlotMenu,
+      slotOptions: st.slots.map(s => ({ id: s.id, emoji: s.emoji, name: s.name, active: s.id === st.slotId, bg: s.id === st.slotId ? '#fbfdf0' : '#fff', onPick: () => this.pickSlot(s.id) })),
+      showCart: count > 0,
+      cartMeta: count + '件 · ' + this.fmtMin(items.reduce((a, t) => a + (this.cartFh(t) < 0 || t.id === 'shop' ? 0.5 : 1), 0) * 60),
+      cartFatText: (cartFat >= 0 ? '+' + cartFat : '' + cartFat),
+      hoursText: this.fmtMin(st.hours * 60),
+      allocList,
+      confirmFatText: (confirmFat >= 0 ? '+' + confirmFat : '' + confirmFat),
+      residual: st.residual,
+      residualFill: Math.round(20 + (st.residual / 67) * 150) + 'px',
+      recoveredText: '−' + recovered,
+      recoveredAbs: recovered,
+      goHome: this.goHome, goShaka: this.goShaka, goMypage: this.goMypage, goSleep: this.goSleep,
+      goConfirm: this.goConfirm, backToRecord: this.backToRecord,
+      incHours: this.incHours, decHours: this.decHours, commit: this.commit,
+      toggleTemplateToast: this.toggleTemplateToast, onResidual: this.onResidual, shake: this.shake,
+      shakaDate: this.DAYS[-st.dayOffset] ? this.DAYS[-st.dayOffset].label : '',
+      prevDay: this.prevDay, nextDay: this.nextDay,
+      prevColor: st.dayOffset <= -3 ? '#d8d5cb' : '#55554e',
+      nextColor: st.dayOffset >= 0 ? '#d8d5cb' : '#55554e',
+      showToast: !!st.toast, toastText: st.toast || '',
+    };
+  }
+}
+</script>
+</body>
+</html>
