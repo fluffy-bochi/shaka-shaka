@@ -28,6 +28,7 @@ import Collect from './screens/Collect';
 import MyPage from './screens/MyPage';
 import Nav from './screens/Nav';
 import Trash from './screens/Trash';
+import BuffLog from './screens/BuffLog';
 import { SlotTimes, CatsManage, Templates, Sensitivity } from './screens/Settings';
 import Help from './screens/Help';
 import Tutorial from './screens/Tutorial';
@@ -127,7 +128,7 @@ export default class App extends React.Component {
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
       prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats,
-      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs,
+      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
     };
@@ -184,6 +185,7 @@ export default class App extends React.Component {
     this.set({ ...data, booted: true });
     if (changed) { this._pileLayout = null; this.save(); }
     setTimeout(() => this.advancePlans(), 0); // アプリを閉じている間に進んだ予定をキャッチアップ
+    setTimeout(() => this.sweepExpiredBuffs(), 0);
     // 初回はオンボーディング（9問）→ 記録のないゲストはそのあとチュートリアル。
     // ログアウトで戻ってきた同一セッションでは出さない（起動時の1回だけ判定）
     if (!this._autoTutChecked) {
@@ -374,13 +376,31 @@ export default class App extends React.Component {
   ];
   toggleBuff = (id) => {
     const cur = this.buffEntries();
-    if (cur.some(x => x.id === id)) {
-      this.set({ activeBuffs: cur.filter(x => x.id !== id) });
+    const en = cur.find(x => x.id === id);
+    if (en) {
+      // オフ = 履歴に確定（endは今日）
+      this.set({ activeBuffs: cur.filter(x => x.id !== id), buffLog: this.pushBuffLog(en, todayStr()) });
       this.save();
     } else {
       this.openBuffCfg(id); // ONにするときはタイトル・期間を設定
     }
   };
+  /* 履歴へ確定。同じ from/id の既存ログは更新（重複防止） */
+  pushBuffLog(en, end) {
+    const log = (this.state.buffLog || []).filter(l => !(l.id === en.id && l.from === en.from));
+    return [...log, { id: en.id, title: en.title, from: en.from || todayStr(), end, key: en.key }];
+  }
+  /* 期限切れになったバフを履歴へ移す（起動時に1回） */
+  sweepExpiredBuffs() {
+    const t = todayStr();
+    const raw = (this.state.activeBuffs || []).map(x => (typeof x === 'string' ? { id: x, title: null, until: null, key: 'none' } : x));
+    const expired = raw.filter(x => x && x.until && x.until < t);
+    if (!expired.length) return;
+    let log = this.state.buffLog || [];
+    expired.forEach(en => { log = [...log.filter(l => !(l.id === en.id && l.from === en.from)), { id: en.id, title: en.title, from: en.from || en.until, end: en.until, key: en.key }]; });
+    this.set({ activeBuffs: raw.filter(x => !(x.until && x.until < t)), buffLog: log });
+    this.save();
+  }
   openBuffCfg = (id) => {
     const b = BUFFS.find(x => x.id === id);
     const existing = this.buffEntries().find(x => x.id === id);
@@ -400,7 +420,8 @@ export default class App extends React.Component {
     const until = period.days == null ? null : shiftDate(todayStr(), period.days);
     const b = BUFFS.find(x => x.id === id);
     const title = (this.state.buffCfgTitle || '').trim() || (b ? b.name : '');
-    const entry = { id, title, until, key: period.key };
+    const prev = this.buffEntries().find(x => x.id === id);
+    const entry = { id, title, until, key: period.key, from: (prev && prev.from) || todayStr() };
     const rest = this.buffEntries().filter(x => x.id !== id);
     this.set({ activeBuffs: [...rest, entry], buffCfgId: null });
     this.save();
@@ -669,6 +690,7 @@ export default class App extends React.Component {
 
   /* ================= home / pile（疲労は日をまたいで持ち越す） ================= */
   r2(x) { return Math.round(x * 2) / 2; }
+  fmtMD(d) { if (!d) return ''; const p = d.split('-'); return parseInt(p[1], 10) + '/' + parseInt(p[2], 10); }
   fmtMin(m) { m = Math.round(m); if (m < 60) return m + '分'; const h = Math.floor(m / 60), r = m % 60; return r ? h + '時間' + r + '分' : h + '時間'; }
   groupRecords(records) {
     const out = []; const planIdx = {};
@@ -1009,6 +1031,7 @@ export default class App extends React.Component {
     this.toast('ゴミ箱に移動しました');
   };
   goTrash = () => this.set({ screen: 'trash' });
+  goBuffLog = () => this.set({ screen: 'buffLog' });
 
   /* ================= オンボーディング =================
      初回起動（onboardDone が立っていない）で表示する9問ウィザード。
@@ -2115,7 +2138,7 @@ export default class App extends React.Component {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
       isHome: st.screen === 'home', isRecord: st.screen === 'record',
       isSleep: st.screen === 'sleep', isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
-      isTrash: st.screen === 'trash',
+      isTrash: st.screen === 'trash', isBuffLog: st.screen === 'buffLog',
       isSlotTimes: st.screen === 'slotTimes', isCatsManage: st.screen === 'catsManage',
       isTemplates: st.screen === 'templates', isSensitivity: st.screen === 'sensitivity',
       isHelp: st.screen === 'help', helpPersona: st.helpPersona || 0,
@@ -2140,8 +2163,8 @@ export default class App extends React.Component {
       navHomeFill: ['home', 'record', 'sleep'].includes(st.screen) ? 1 : 0,
       navShakaColor: ['shaka', 'collect'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navShakaFill: ['shaka', 'collect'].includes(st.screen) ? 1 : 0,
-      navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
-      navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help'].includes(st.screen) ? 1 : 0,
+      navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
+      navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? 1 : 0,
       homeDateCaps: formatDateCaps(todayStr()),
       pile: st.screen === 'home' ? this.makePile(7) : [],
       sleepPile: st.screen === 'sleep' ? this.makeSleepPile().map((p, i) => ({
@@ -2252,6 +2275,17 @@ export default class App extends React.Component {
           onEdit: en ? () => this.openBuffCfg(b.id) : null,
         };
       }),
+      goBuffLog: this.goBuffLog,
+      buffLogActive: this.buffEntries().map(en => {
+        const b = BUFFS.find(x => x.id === en.id) || {};
+        return { key: en.id + (en.from || ''), glyph: b.glyph, name: en.title || b.name, kind: b.kind,
+          period: (en.from ? this.fmtMD(en.from) : '') + ' 〜 ' + (en.until ? this.fmtMD(en.until) : 'ずっと') };
+      }),
+      buffLogPast: [...(st.buffLog || [])].reverse().map((l, i) => {
+        const b = BUFFS.find(x => x.id === l.id) || {};
+        return { key: 'log' + i, glyph: b.glyph, name: l.title || b.name, kind: b.kind,
+          period: this.fmtMD(l.from) + ' 〜 ' + this.fmtMD(l.end) };
+      }),
       buffCfgOpen: !!st.buffCfgId,
       buffCfgGlyph: st.buffCfgId ? (BUFFS.find(b => b.id === st.buffCfgId) || {}).glyph : '',
       buffCfgPreset: st.buffCfgId ? (BUFFS.find(b => b.id === st.buffCfgId) || {}).name : '',
@@ -2291,6 +2325,7 @@ export default class App extends React.Component {
         {v.isCollect && <Collect v={v} />}
         {v.isMypage && <MyPage v={v} />}
         {v.isTrash && <Trash v={v} />}
+        {v.isBuffLog && <BuffLog v={v} />}
         {v.isSlotTimes && <SlotTimes v={v} />}
         {v.isCatsManage && <CatsManage v={v} />}
         {v.isTemplates && <Templates v={v} />}

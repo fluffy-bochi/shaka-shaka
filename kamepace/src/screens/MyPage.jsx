@@ -46,6 +46,11 @@ export default function MyPage({ v }) {
             {v.templateRows.length > 0 && <span style={{ ...mono, fontSize: 11.5, color: '#8a8a82' }}>{v.templateRows.length}件</span>}
             <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
           </button>
+          <button onClick={v.goBuffLog} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>🎭</span>
+            <span style={{ flex: 1, fontSize: 14 }}>調子の記録（バフ・デバフ）</span>
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
           <button onClick={v.goTrash} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
             <span style={{ fontSize: 16 }}>🗑</span>
             <span style={{ flex: 1, fontSize: 14 }}>ゴミ箱</span>
