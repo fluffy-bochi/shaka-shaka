@@ -31,6 +31,7 @@ import Trash from './screens/Trash';
 import { SlotTimes, CatsManage, Templates, Sensitivity } from './screens/Settings';
 import Help from './screens/Help';
 import Tutorial from './screens/Tutorial';
+import Onboard from './screens/Onboard';
 
 export default class App extends React.Component {
   state = {
@@ -84,6 +85,9 @@ export default class App extends React.Component {
     editIdxs: null,
     /* ヘルプで表示中のペルソナ */
     helpPersona: 0,
+    /* オンボーディング（1..9） */
+    obStep: 1,
+    obSel: {},
     /* 操作チュートリアル（0=オフ、1〜12=ステップ）。実データは退避して終了時に復元 */
     tutorial: 0,
     tutFlags: {},
@@ -109,6 +113,7 @@ export default class App extends React.Component {
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
       prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats,
+      onboardDone: s.onboardDone, profile: s.profile,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
     };
@@ -165,13 +170,18 @@ export default class App extends React.Component {
     this.set({ ...data, booted: true });
     if (changed) { this._pileLayout = null; this.save(); }
     setTimeout(() => this.advancePlans(), 0); // アプリを閉じている間に進んだ予定をキャッチアップ
-    // 自分の記録がまだ無いゲストには、開くたびにチュートリアルを自動表示（サンプルは記録に数えない）。
+    // 初回はオンボーディング（9問）→ 記録のないゲストはそのあとチュートリアル。
     // ログアウトで戻ってきた同一セッションでは出さない（起動時の1回だけ判定）
     if (!this._autoTutChecked) {
       this._autoTutChecked = true;
       const hasData = (data.entries || []).some(e => !e.sample)
         || (data.collected && data.collected.length > 0);
-      if (!hasData) setTimeout(() => { if (!this.state.tutorial && !this.state.user) this.startTutorial(); }, 400);
+      if (!data.onboardDone) {
+        this._tutorialAfterOnboard = !hasData;
+        setTimeout(() => { if (!this.state.user) this.set({ screen: 'onboard', obStep: 1, obSel: {} }); }, 200);
+      } else if (!hasData) {
+        setTimeout(() => { if (!this.state.tutorial && !this.state.user) this.startTutorial(); }, 400);
+      }
     }
   }
   async loadCloud() {
@@ -185,6 +195,7 @@ export default class App extends React.Component {
         this.save();
       }
       setTimeout(() => this.advancePlans(), 0);
+      if (!this.state.onboardDone) setTimeout(() => this.set({ screen: 'onboard', obStep: 1, obSel: {} }), 200);
     } catch (err) {
       console.warn('[kamepace] load failed', err);
       this.set({ booted: true });
@@ -858,6 +869,56 @@ export default class App extends React.Component {
     this.toast('ゴミ箱に移動しました');
   };
   goTrash = () => this.set({ screen: 'trash' });
+
+  /* ================= オンボーディング =================
+     初回起動（onboardDone が立っていない）で表示する9問ウィザード。
+     職業→カテゴリの初期表示、疲れやすさ4問→個人係数に反映 */
+  COEF_BY_LABEL = {
+    'とても疲れやすい': 1.2, '疲れやすい': 1.1, 'ふつう': 1.0, '疲れにくい': 0.9, 'とても疲れにくい': 0.8,
+    'とても回復しやすい': 1.2, '回復しやすい': 1.1, '回復しにくい': 0.9, 'とても回復しにくい': 0.8,
+  };
+  OCC_HIDDEN = {
+    '学生': ['work', 'house'],
+    '会社員（デスクワーク）': ['baito', 'school', 'study', 'club'],
+    '立ち仕事・接客': ['baito', 'school', 'study', 'club'],
+    '医療・介護': ['baito', 'school', 'study', 'club'],
+    '主婦・主夫': ['work', 'baito', 'school', 'study', 'club'],
+    'その他': [],
+  };
+  obPick = (k, val) => {
+    const obSel = { ...this.state.obSel, [k]: val };
+    this.set({ obSel });
+    // 選択したら少し待って自動で次へ（あすけん式）
+    clearTimeout(this._obT);
+    this._obT = setTimeout(() => { if (this.state.obStep < 9) this.set({ obStep: this.state.obStep + 1 }); }, 260);
+  };
+  obNext = () => { if (this.state.obStep < 9) this.set({ obStep: this.state.obStep + 1 }); };
+  obBack = () => { if (this.state.obStep > 1) this.set({ obStep: this.state.obStep - 1 }); };
+  skipOnboard = () => this.applyOnboard(true);
+  finishOnboard = () => this.applyOnboard(false);
+  applyOnboard(skipped) {
+    const sel = this.state.obSel || {};
+    const coef = (label) => this.COEF_BY_LABEL[label] || 1;
+    const patch = {
+      onboardDone: true,
+      profile: { age: sel.age || null, gender: sel.gender || null, occupation: sel.occupation || null },
+      screen: 'home', obStep: 1,
+    };
+    if (!skipped) {
+      patch.bodyFatCoef = coef(sel.bodyFat);
+      patch.bodyRecCoef = coef(sel.bodyRec);
+      patch.mindFatCoef = coef(sel.mindFat);
+      patch.mindRecCoef = coef(sel.mindRec);
+      if (sel.occupation && this.OCC_HIDDEN[sel.occupation]) patch.hiddenCats = this.OCC_HIDDEN[sel.occupation];
+    }
+    this.set(patch);
+    this.save();
+    // 自分の記録がまだ無いゲストは、続けてチュートリアルへ
+    if (this._tutorialAfterOnboard) {
+      this._tutorialAfterOnboard = false;
+      setTimeout(() => { if (!this.state.tutorial && !this.state.user) this.startTutorial(); }, 450);
+    }
+  }
 
   /* ================= 操作チュートリアル =================
      実データを退避 → 学生の1日サンプルで実際のUIを操作して学ぶ → 終了/スキップで復元 */
@@ -1915,6 +1976,18 @@ export default class App extends React.Component {
       isTemplates: st.screen === 'templates', isSensitivity: st.screen === 'sensitivity',
       isHelp: st.screen === 'help', helpPersona: st.helpPersona || 0,
       goHelp: this.goHelp, setHelpPersona: this.setHelpPersona,
+      isOnboard: st.screen === 'onboard',
+      obStep: st.obStep || 1, obSel: st.obSel || {},
+      obPick: this.obPick, obNext: this.obNext, obBack: this.obBack,
+      skipOnboard: this.skipOnboard, finishOnboard: this.finishOnboard,
+      redoOnboard: () => this.set({ screen: 'onboard', obStep: 1, obSel: {} }),
+      obSummary: [
+        { icon: '💼', label: '職業・活動', value: (st.obSel && st.obSel.occupation) || '—' },
+        { icon: '💪', label: '体の疲れやすさ', value: (st.obSel && st.obSel.bodyFat) || 'ふつう' },
+        { icon: '💪', label: '体の回復しやすさ', value: (st.obSel && st.obSel.bodyRec) || 'ふつう' },
+        { icon: '🧠', label: '心の疲れやすさ', value: (st.obSel && st.obSel.mindFat) || 'ふつう' },
+        { icon: '🧠', label: '心の回復しやすさ', value: (st.obSel && st.obSel.mindRec) || 'ふつう' },
+      ],
       tutorial: st.tutorial, tutFlags: st.tutFlags,
       startTutorial: this.startTutorial, endTutorial: this.endTutorial, tutNext: this.tutNext,
       isCollect: st.screen === 'collect', collectedTotal: this.collectedTotal(),
@@ -2029,6 +2102,8 @@ export default class App extends React.Component {
       <div className="app-screen" ref={this._screenRef} style={{ background: v.screenBg }}>
         {/* status bar spacer */}
         <div style={{ height: 'max(40px, env(safe-area-inset-top))', flex: '0 0 auto', zIndex: 5 }} />
+        {v.isOnboard && <Onboard v={v} />}
+        {!v.isOnboard && <>
         {v.isHome && <Home v={v} />}
         {v.isRecord && <Record v={v} />}
         {v.isSleep && <Sleep v={v} />}
@@ -2046,6 +2121,7 @@ export default class App extends React.Component {
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}
         <Nav v={v} />
+        </>}
       </div>
     );
   }

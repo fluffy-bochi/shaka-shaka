@@ -77,6 +77,14 @@ export default function MyPage({ v }) {
             </div>
             <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
           </button>
+          <button onClick={v.redoOnboard} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>🐢</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14 }}>はじめの質問をやりなおす</div>
+              <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 1 }}>職業・疲れやすさの設定（約1分）</div>
+            </div>
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
           <button onClick={v.goHelp} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
             <span style={{ fontSize: 16 }}>📖</span>
             <div style={{ flex: 1, minWidth: 0 }}>

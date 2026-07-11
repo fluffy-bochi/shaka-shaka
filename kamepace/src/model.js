@@ -80,6 +80,8 @@ export function serialize(st) {
     prefs: st.prefs || {},
     slotHours: st.slotHours || null,
     hiddenCats: st.hiddenCats || [],
+    onboardDone: !!st.onboardDone,
+    profile: st.profile || null,
     bodyFatCoef: st.bodyFatCoef || 1,
     mindFatCoef: st.mindFatCoef || 1,
     bodyRecCoef: st.bodyRecCoef || 1,
@@ -122,6 +124,8 @@ export function deserialize(data) {
     prefs: (data.prefs && typeof data.prefs === 'object') ? data.prefs : {},
     slotHours: (Array.isArray(data.slotHours) && data.slotHours.length === 4) ? data.slotHours : null,
     hiddenCats: Array.isArray(data.hiddenCats) ? data.hiddenCats : [],
+    onboardDone: !!data.onboardDone,
+    profile: (data.profile && typeof data.profile === 'object') ? data.profile : null,
     // 体・心それぞれの個人係数。旧1軸フィールド(fatigueCoef/recoverCoef)からの移行も受ける
     bodyFatCoef: typeof data.bodyFatCoef === 'number' ? data.bodyFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
     mindFatCoef: typeof data.mindFatCoef === 'number' ? data.mindFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
@@ -136,6 +140,7 @@ export function freshState() {
     collected: [], collectedSeen: 0, templates: {}, consumed: 0, sampleDay: null,
     customCats: [], customPlans: [], customActions: [], customItems: {}, prefs: {},
     slotHours: null, hiddenCats: [],
+    onboardDone: false, profile: null,
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1,
   };
 }
