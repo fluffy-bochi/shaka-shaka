@@ -84,8 +84,8 @@ function BuffSheet({ v }) {
         {v.buffChoices.filter(b => b.kind === kind).map((b, i, arr) => (
           <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 13px', borderBottom: i < arr.length - 1 ? '1px solid #f1efe8' : 'none', background: b.on ? '#fbfdf0' : '#fff' }}>
             <Emo e={b.glyph} size={26} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700 }}>{b.name}</div>
+            <div onClick={b.onEdit || undefined} style={{ flex: 1, minWidth: 0, cursor: b.onEdit ? 'pointer' : 'default' }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700 }}>{b.name}{b.onEdit && <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 13, color: '#8a8a82', marginLeft: 5, verticalAlign: 'middle' }}>edit</span>}</div>
               <div style={{ fontSize: 10.5, color: '#9d9b91', marginTop: 1 }}>{b.desc}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                 {b.effects.map((e, ei) => (
@@ -112,6 +112,31 @@ function BuffSheet({ v }) {
         {section('debuff', 'デバフ（つらい状態）')}
         {section('buff', 'バフ（いい状態）')}
       </div>
+      {v.buffCfgOpen && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
+          <div style={{ width: '100%', background: '#fff', borderRadius: 22, padding: '16px 20px 20px', boxShadow: '0 24px 60px rgba(27,27,24,.35)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>
+                <Emo e={v.buffCfgGlyph} size={22} />{v.buffCfgPreset}
+              </div>
+              <button onClick={v.closeBuffCfg} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>タイトル（じぶんの言葉でOK）</div>
+            <input value={v.buffCfgTitle} onChange={v.onBuffCfgTitle} placeholder="例：就活しんどい期" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
+            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>期間</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 8 }}>
+              {v.buffCfgPeriods.map(pp => (
+                <button key={pp.key} onClick={pp.onPick} style={{ border: pp.on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: pp.on ? '#fbfdf0' : '#fff', borderRadius: 999, padding: '8px 14px', fontSize: 12.5, fontWeight: pp.on ? 900 : 700, cursor: 'pointer' }}>{pp.label}</button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 10, lineHeight: 1.6 }}>期間が終わると自動でオフになります（「ずっと」は手動でオフ）</div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button onClick={v.closeBuffCfg} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>キャンセル</button>
+              <button onClick={v.saveBuffCfg} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>オンにする</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

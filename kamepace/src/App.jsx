@@ -93,6 +93,9 @@ export default class App extends React.Component {
     tplName: '',
     /* いまの調子（バフ・デバフ）シート */
     buffOpen: false,
+    buffCfgId: null,
+    buffCfgTitle: '',
+    buffCfgKey: 'none',
     /* 検索で見つからない→新しくつくる */
     newActOpen: false,
     newActKwIndex: null,
@@ -346,18 +349,60 @@ export default class App extends React.Component {
     }
     return base * m;
   }
-  /* バフ・デバフ（いまの調子）の合成倍率 */
+  /* バフ・デバフ（いまの調子）。要素は {id, title, until(YYYY-MM-DD|null), key}。
+     旧形式（idの文字列）も受ける。期限切れは自動で無効 */
+  buffEntries() {
+    const t = todayStr();
+    return (this.state.activeBuffs || [])
+      .map(x => (typeof x === 'string' ? { id: x, title: null, until: null, key: 'none' } : x))
+      .filter(x => x && x.id && (!x.until || x.until >= t));
+  }
   buffMult() {
     const out = { bodyFat: 1, mindFat: 1, bodyRec: 1, mindRec: 1 };
-    (this.state.activeBuffs || []).forEach(id => {
-      const b = BUFFS.find(x => x.id === id);
+    this.buffEntries().forEach(en => {
+      const b = BUFFS.find(x => x.id === en.id);
       if (b && b.mult) Object.keys(out).forEach(k => { if (b.mult[k]) out[k] *= b.mult[k]; });
     });
     return out;
   }
+  BUFF_PERIODS = [
+    { key: 'today', label: 'きょうだけ', days: 0 },
+    { key: 'd3', label: '3日間', days: 2 },
+    { key: 'd7', label: '1週間', days: 6 },
+    { key: 'd14', label: '2週間', days: 13 },
+    { key: 'none', label: 'ずっと', days: null },
+  ];
   toggleBuff = (id) => {
-    const cur = this.state.activeBuffs || [];
-    this.set({ activeBuffs: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] });
+    const cur = this.buffEntries();
+    if (cur.some(x => x.id === id)) {
+      this.set({ activeBuffs: cur.filter(x => x.id !== id) });
+      this.save();
+    } else {
+      this.openBuffCfg(id); // ONにするときはタイトル・期間を設定
+    }
+  };
+  openBuffCfg = (id) => {
+    const b = BUFFS.find(x => x.id === id);
+    const existing = this.buffEntries().find(x => x.id === id);
+    this.set({
+      buffCfgId: id,
+      buffCfgTitle: (existing && existing.title) || (b ? b.name : ''),
+      buffCfgKey: (existing && existing.key) || 'none',
+    });
+  };
+  closeBuffCfg = () => this.set({ buffCfgId: null });
+  onBuffCfgTitle = (e) => this.set({ buffCfgTitle: e.target.value });
+  pickBuffCfgKey = (key) => this.set({ buffCfgKey: key });
+  saveBuffCfg = () => {
+    const id = this.state.buffCfgId;
+    if (!id) return;
+    const period = this.BUFF_PERIODS.find(pp => pp.key === this.state.buffCfgKey) || this.BUFF_PERIODS[4];
+    const until = period.days == null ? null : shiftDate(todayStr(), period.days);
+    const b = BUFFS.find(x => x.id === id);
+    const title = (this.state.buffCfgTitle || '').trim() || (b ? b.name : '');
+    const entry = { id, title, until, key: period.key };
+    const rest = this.buffEntries().filter(x => x.id !== id);
+    this.set({ activeBuffs: [...rest, entry], buffCfgId: null });
     this.save();
   };
   openBuffs = () => this.set({ buffOpen: true });
@@ -2189,19 +2234,30 @@ export default class App extends React.Component {
       goHome: this.goHome, goShaka: this.goShaka, goMypage: this.goMypage, goSleep: this.goSleep,
       /* バフ・デバフ */
       buffOpen: !!st.buffOpen, openBuffs: this.openBuffs, closeBuffs: this.closeBuffs,
-      activeBuffGlyphs: (st.activeBuffs || []).map(id => (BUFFS.find(b => b.id === id) || {}).glyph).filter(Boolean),
+      activeBuffGlyphs: this.buffEntries().map(en => (BUFFS.find(b => b.id === en.id) || {}).glyph).filter(Boolean),
       buffChoices: BUFFS.map(b => {
         const eff = [];
         if (b.mult.bodyFat) eff.push('体の疲労 ×' + b.mult.bodyFat);
         if (b.mult.mindFat) eff.push('心の疲労 ×' + b.mult.mindFat);
         if (b.mult.bodyRec) eff.push('体の回復 ×' + b.mult.bodyRec);
         if (b.mult.mindRec) eff.push('心の回復 ×' + b.mult.mindRec);
+        const en = this.buffEntries().find(x => x.id === b.id);
+        const periodText = en ? (en.until ? `${parseInt(en.until.split('-')[1], 10)}/${parseInt(en.until.split('-')[2], 10)}まで` : 'ずっと') : '';
         return {
-          id: b.id, glyph: b.glyph, name: b.name, desc: b.desc, kind: b.kind, effects: eff,
-          on: (st.activeBuffs || []).includes(b.id),
+          id: b.id, glyph: b.glyph, name: (en && en.title) || b.name, presetName: b.name,
+          desc: en ? `${b.name} ・ ${periodText}` : b.desc,
+          kind: b.kind, effects: eff,
+          on: !!en,
           onToggle: () => this.toggleBuff(b.id),
+          onEdit: en ? () => this.openBuffCfg(b.id) : null,
         };
       }),
+      buffCfgOpen: !!st.buffCfgId,
+      buffCfgGlyph: st.buffCfgId ? (BUFFS.find(b => b.id === st.buffCfgId) || {}).glyph : '',
+      buffCfgPreset: st.buffCfgId ? (BUFFS.find(b => b.id === st.buffCfgId) || {}).name : '',
+      buffCfgTitle: st.buffCfgTitle || '', onBuffCfgTitle: this.onBuffCfgTitle,
+      buffCfgPeriods: this.BUFF_PERIODS.map(pp => ({ key: pp.key, label: pp.label, on: st.buffCfgKey === pp.key, onPick: () => this.pickBuffCfgKey(pp.key) })),
+      saveBuffCfg: this.saveBuffCfg, closeBuffCfg: this.closeBuffCfg,
       goConfirm: this.goConfirm,
       toggleTemplateToast: this.toggleTemplateToast, shake: this.shake,
       shakaDate: st.dayOffset === 0 ? formatDateShort(todayStr()) : formatDateShort(viewDateStr),
