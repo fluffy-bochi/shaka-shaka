@@ -113,7 +113,7 @@ export default class App extends React.Component {
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
       prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats,
-      onboardDone: s.onboardDone, profile: s.profile,
+      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
     };
@@ -273,6 +273,12 @@ export default class App extends React.Component {
     return { min, fat, minText: this.fmtMin(min), fatText: (fat >= 0 ? '+' + fat : '' + fat), metaText: p.tasks.length + '件 · ' + this.fmtMin(min) };
   }
   searchPool() { return SEARCH_DB.concat(this.state.customActions || []); }
+  /* 前回つかった時間（行動名ごとに学習）。あれば標準所要時間より優先 */
+  lastMinOf(name) {
+    const m = (this.state.lastMins || {})[normTitle(name)];
+    return (typeof m === 'number' && m > 0) ? m : null;
+  }
+  initialMinOf(item) { return this.lastMinOf(item.name) || item.defMin || 30; }
   searchHits(kw) {
     const q = (kw || '').toLowerCase().trim();
     return this.searchPool().filter(e => e.name.toLowerCase().includes(q) || (e.kw || []).some(t => t.toLowerCase().includes(q) || q.includes(t.toLowerCase())));
@@ -372,7 +378,7 @@ export default class App extends React.Component {
   selectSearchItem = (kwIndex, item) => {
     const picks = this.intensityQuestions(item).map(q => Math.floor(q.opts.length / 2));
     const id = 'sc' + Date.now() + Math.floor(Math.random() * 1000);
-    const cart = [...this.state.searchCart, { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, defMin: item.defMin || 30, kw: item.kw, picks }];
+    const cart = [...this.state.searchCart, { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, defMin: this.initialMinOf(item), kw: item.kw, picks }];
     const resolved = kwIndex == null ? this.state.resolvedIdx : [...this.state.resolvedIdx, kwIndex];
     const remaining = this.remainingKw(resolved);
     // 初期時間は各行動の標準所要時間（defaultMin）の合計・配分もその比率（v3）
@@ -492,6 +498,9 @@ export default class App extends React.Component {
       if (k) templates[k] = { act: e.act, delta: fat };
       return e;
     });
+    // 前回つかった時間を学習（次回の初期値になる）
+    const lastMins = { ...(this.state.lastMins || {}) };
+    items.forEach((t, i) => { const k = normTitle(t.name); if (k) lastMins[k] = mins[i]; });
     // カレンダー枠への記録: 構成をテンプレ保存 → 次回同じタイトルの取り込みで自動適用
     const framePlan = this.state.framePlan;
     if (framePlan) {
@@ -514,7 +523,7 @@ export default class App extends React.Component {
       if (!e.planned && e.delta < 0) { for (let i = 0; i < -e.delta; i++) negGlyphs.push(e.glyph || entryGlyph(e)); }
     });
     this.set({
-      entries, templates, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, toast: toastMsg,
+      entries, templates, lastMins, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, toast: toastMsg,
       // 編集で山が縮んだ場合に consumed が超過しないように
       consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)),
     });
@@ -800,7 +809,7 @@ export default class App extends React.Component {
   goConfirm = () => {
     const items = this.cartItems();
     if (!items.length) return;
-    const durOf = (t) => t.defMin || 30; // 行動ごとの標準所要時間（v3）
+    const durOf = (t) => this.initialMinOf(t); // 前回の時間 > 標準所要時間（v3）
     const totalMin = items.reduce((a, t) => a + durOf(t), 0);
     const cart = items.map((t, i) => {
       // 程度（degFh）で fh が変わる場合は体・心も同じ比率でスケール
@@ -810,7 +819,7 @@ export default class App extends React.Component {
         id: 'scc' + Date.now() + i, name: t.name, glyph: t.glyph, fh: f,
         body: t.body != null ? t.body * ratio : undefined,
         mind: t.mind != null ? t.mind * ratio : undefined,
-        defMin: t.defMin || 30,
+        defMin: this.initialMinOf(t),
         kw: [...(t.kw || []), t.name], picks: [], after: t.after || 0,
       };
     });
@@ -1879,11 +1888,15 @@ export default class App extends React.Component {
     const actEstText = actCalc ? `${actCalc.recover ? '−' : '+'}${actCalc.body + actCalc.mind}/h（体${actCalc.body} 心${actCalc.mind}）` : '';
     const subItems = (activeCat ? activeCat.items : []).map(t => {
       const e = st.cart[t.id]; const sel = !!e;
+      const lm = this.lastMinOf(t.name);
+      const lastText = lm
+        ? `前回 ${t.fh < 0 ? '−' : '+'}${Math.max(1, Math.round(Math.abs(t.fh) * lm / 60))}（${this.fmtMin(lm)}）`
+        : t.last;
       const degTag = (e && e.degIdx != null && t.degLabels)
         ? ('（' + [t.degLabels[0], 'ふつう', t.degLabels[1]][e.degIdx] + '）') : '';
       return {
         id: t.id, icon: t.icon, color: activeCat.color, name: t.name,
-        degreeTag: degTag, last: t.last,
+        degreeTag: degTag, last: lastText,
         weight: sel ? '700' : '400',
         rowBg: sel ? '#fbfdf0' : 'transparent',
         btnBorder: sel ? 'none' : '1.5px solid #1b1b18',
