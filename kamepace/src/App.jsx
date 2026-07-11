@@ -10,7 +10,7 @@ import {
   guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA, DEFAULT_SLOT_HOURS,
 } from './data';
 import {
-  todayStr, shiftDate, formatDateCaps, formatDateShort, pad2, hmToTsOn,
+  todayStr, shiftDate, strToDate, formatDateCaps, formatDateShort, pad2, hmToTsOn,
   entryToRecord, entryGlyph, entryMin, planUnitsDue, entryEndTs,
   serialize, deserialize, freshState, sortEntries, normTitle, getTemplate, baseEntry,
 } from './model';
@@ -33,6 +33,7 @@ import { SlotTimes, CatsManage, Templates, Sensitivity } from './screens/Setting
 import Help from './screens/Help';
 import Tutorial from './screens/Tutorial';
 import Onboard from './screens/Onboard';
+import Cycle from './screens/Cycle';
 
 export default class App extends React.Component {
   state = {
@@ -89,6 +90,8 @@ export default class App extends React.Component {
     /* オンボーディング（1..9） */
     obStep: 1,
     obSel: {},
+    /* 月経周期 設定フォーム（オンボ・マイページ共用） */
+    cycForm: null,
     /* テンプレにまとめる */
     tplOpen: false,
     tplName: '',
@@ -128,7 +131,7 @@ export default class App extends React.Component {
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
       prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats,
-      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog,
+      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
     };
@@ -351,6 +354,31 @@ export default class App extends React.Component {
     }
     return base * m;
   }
+  /* ===== 月経周期（cycle: {last, cycleLen, periodLen, preMult:{bodyFat,mindFat}, periodMult:{...}, preDays}） ===== */
+  cyclePhase() {
+    const c = this.state.cycle;
+    if (!c || !c.enabled || !c.last) return null;
+    const cycleLen = c.cycleLen || 28;
+    const periodLen = c.periodLen || 5;
+    const preDays = c.preDays || 4; // 生理前（PMS）とみなす日数
+    const start = strToDate(c.last).getTime();
+    const now = strToDate(todayStr()).getTime();
+    let day = Math.floor((now - start) / 86400000) % cycleLen;
+    if (day < 0) day += cycleLen;
+    if (day < periodLen) return { phase: 'period', dayInPhase: day + 1 };
+    if (day >= cycleLen - preDays) return { phase: 'pre', dayInPhase: day - (cycleLen - preDays) + 1 };
+    return { phase: 'normal', dayInPhase: 0 };
+  }
+  cycleMult() {
+    const out = { bodyFat: 1, mindFat: 1, bodyRec: 1, mindRec: 1 };
+    const ph = this.cyclePhase();
+    if (!ph) return out;
+    const c = this.state.cycle;
+    const m = ph.phase === 'period' ? (c.periodMult || {}) : ph.phase === 'pre' ? (c.preMult || {}) : {};
+    Object.keys(out).forEach(k => { if (m[k]) out[k] *= m[k]; });
+    return out;
+  }
+
   /* バフ・デバフ（いまの調子）。要素は {id, title, until(YYYY-MM-DD|null), key}。
      旧形式（idの文字列）も受ける。期限切れは自動で無効 */
   buffEntries() {
@@ -365,6 +393,8 @@ export default class App extends React.Component {
       const b = BUFFS.find(x => x.id === en.id);
       if (b && b.mult) Object.keys(out).forEach(k => { if (b.mult[k]) out[k] *= b.mult[k]; });
     });
+    const cm = this.cycleMult();
+    Object.keys(out).forEach(k => { out[k] *= cm[k]; });
     return out;
   }
   BUFF_PERIODS = [
@@ -428,6 +458,40 @@ export default class App extends React.Component {
   };
   openBuffs = () => this.set({ buffOpen: true });
   closeBuffs = () => this.set({ buffOpen: false });
+
+  /* ===== 月経周期の設定フォーム ===== */
+  CYC_STEPS = { none: 1.0, slight: 1.1, some: 1.2, much: 1.35 };
+  defaultCycForm() {
+    const c = this.state.cycle || {};
+    return {
+      last: c.last || todayStr(),
+      cycleLen: c.cycleLen || 28,
+      periodLen: c.periodLen || 5,
+      preDays: c.preDays || 4,
+      preBody: c.preMult ? (c.preMult.bodyFat || 1) : 1.1,
+      preMind: c.preMult ? (c.preMult.mindFat || 1) : 1.2,
+      periodBody: c.periodMult ? (c.periodMult.bodyFat || 1) : 1.25,
+      periodMind: c.periodMult ? (c.periodMult.mindFat || 1) : 1.15,
+    };
+  }
+  openCycle = (fromOnboard) => this.set({ cycForm: this.defaultCycForm(), cycFromOnboard: !!fromOnboard, screen: 'cycle' });
+  onCycField = (k, val) => this.set({ cycForm: { ...this.state.cycForm, [k]: val } });
+  saveCycle = () => {
+    const f = this.state.cycForm || this.defaultCycForm();
+    const cycle = {
+      enabled: true, last: f.last,
+      cycleLen: Math.max(15, Math.min(45, parseInt(f.cycleLen, 10) || 28)),
+      periodLen: Math.max(1, Math.min(10, parseInt(f.periodLen, 10) || 5)),
+      preDays: Math.max(0, Math.min(10, parseInt(f.preDays, 10) || 4)),
+      preMult: { bodyFat: f.preBody, mindFat: f.preMind },
+      periodMult: { bodyFat: f.periodBody, mindFat: f.periodMind },
+    };
+    this.set({ cycle, cycForm: null, screen: this.state.cycFromOnboard ? 'onboard' : 'mypage' });
+    this.save();
+    if (this.state.cycFromOnboard) { this.set({ obStep: 9 }); }
+  };
+  cancelCycle = () => this.set({ cycForm: null, screen: this.state.cycFromOnboard ? 'onboard' : 'mypage' });
+  disableCycle = () => { this.set({ cycle: { ...(this.state.cycle || {}), enabled: false }, cycForm: null, screen: 'mypage' }); this.save(); };
 
   setPref = (name, val) => {
     const k = normTitle(name);
@@ -2144,10 +2208,20 @@ export default class App extends React.Component {
       isHelp: st.screen === 'help', helpPersona: st.helpPersona || 0,
       goHelp: this.goHelp, setHelpPersona: this.setHelpPersona,
       isOnboard: st.screen === 'onboard',
+      isCycle: st.screen === 'cycle',
+      cycForm: st.cycForm || this.defaultCycForm(),
+      cycFromOnboard: !!st.cycFromOnboard,
+      onCycField: this.onCycField, saveCycle: this.saveCycle, cancelCycle: this.cancelCycle, disableCycle: this.disableCycle,
+      cycStrengthOpts: (cur, k) => [
+        { label: '変わらない', v: 1.0 }, { label: '少し', v: 1.1 }, { label: 'まあまあ', v: 1.2 }, { label: 'かなり', v: 1.35 },
+      ].map(o => ({ ...o, on: Math.abs((cur || 1) - o.v) < 0.001, onPick: () => this.onCycField(k, o.v) })),
       obStep: st.obStep || 1, obSel: st.obSel || {},
       obPick: this.obPick, obNext: this.obNext, obBack: this.obBack,
       skipOnboard: this.skipOnboard, finishOnboard: this.finishOnboard,
       redoOnboard: () => this.set({ screen: 'onboard', obStep: 1, obSel: {} }),
+      obIsFemale: (st.obSel && st.obSel.gender) === '女性',
+      openCycleFromOnboard: () => this.openCycle(true),
+      cycleEnabled: !!(st.cycle && st.cycle.enabled),
       obSummary: [
         { icon: '💼', label: '職業・活動', value: (st.obSel && st.obSel.occupation) || '—' },
         { icon: '💪', label: '体の疲れやすさ', value: (st.obSel && st.obSel.bodyFat) || 'ふつう' },
@@ -2276,6 +2350,14 @@ export default class App extends React.Component {
         };
       }),
       goBuffLog: this.goBuffLog,
+      goCycle: () => this.openCycle(false),
+      cycleStatus: (() => {
+        const ph = this.cyclePhase();
+        if (!(st.cycle && st.cycle.enabled)) return '未設定';
+        if (!ph) return '設定済み';
+        return ph.phase === 'period' ? '生理中' : ph.phase === 'pre' ? '生理前' : '通常期';
+      })(),
+      cycPhaseNow: (() => { const ph = this.cyclePhase(); return ph ? ph.phase : null; })(),
       buffLogActive: this.buffEntries().map(en => {
         const b = BUFFS.find(x => x.id === en.id) || {};
         return { key: en.id + (en.from || ''), glyph: b.glyph, name: en.title || b.name, kind: b.kind,
@@ -2317,6 +2399,7 @@ export default class App extends React.Component {
         {/* status bar spacer */}
         <div style={{ height: 'max(40px, env(safe-area-inset-top))', flex: '0 0 auto', zIndex: 5 }} />
         {v.isOnboard && <Onboard v={v} />}
+        {v.isCycle && <Cycle v={v} />}
         {!v.isOnboard && <>
         {v.isHome && <Home v={v} />}
         {v.isRecord && <Record v={v} />}

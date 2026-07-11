@@ -88,6 +88,17 @@ function Done({ v }) {
           </div>
         ))}
       </div>
+      {v.obIsFemale && (
+        <div style={{ width: '100%', marginTop: 16, background: '#fff', borderRadius: 14, padding: '13px 15px', boxShadow: '0 1px 3px rgba(27,27,24,.05)', textAlign: 'left' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 18 }}>🌙</span>
+            <div style={{ flex: 1, fontSize: 13.5, fontWeight: 700 }}>生理の反映</div>
+            {v.cycleEnabled && <span style={{ ...mono, fontSize: 10, fontWeight: 700, background: '#eef7cc', color: '#5a7500', borderRadius: 6, padding: '2px 8px' }}>設定済み</span>}
+          </div>
+          <div style={{ fontSize: 11.5, color: '#8a8a82', marginTop: 6, lineHeight: 1.6 }}>生理前・生理中の疲れやすさを反映できます。あとでマイページからでもOK。</div>
+          <button onClick={v.openCycleFromOnboard} style={{ width: '100%', marginTop: 10, border: '1.5px solid #1b1b18', borderRadius: 12, background: '#fff', color: '#1b1b18', fontWeight: 700, fontSize: 13, padding: '11px 0', cursor: 'pointer' }}>{v.cycleEnabled ? '設定を見直す' : 'いま設定する'}</button>
+        </div>
+      )}
       <div style={{ fontSize: 11.5, color: '#b4b2a8', marginTop: 12 }}>いつでも <b>マイページ</b> から調整できます。</div>
       <button onClick={v.finishOnboard} style={{ width: '100%', marginTop: 18, border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 16, padding: 16, cursor: 'pointer' }}>かめペースをはじめる</button>
     </div>
