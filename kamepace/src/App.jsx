@@ -131,11 +131,11 @@ export default class App extends React.Component {
     });
     return [
       S('07:40', '08:10', '通学（電車バス）', '🚃', 30, 5, 'asa'),
-      S('09:00', '10:30', '講義（聞く中心）', '📖', 90, 10, 'am'),
+      S('09:00', '10:30', '講義（聞く中心）', '📖', 90, 11, 'am'),
       S('10:40', '11:40', '自習', '📚', 60, 9, 'am'),
       S('13:00', '14:00', 'レポート・課題', '📝', 60, 9, 'pm'),
       S('14:10', '15:10', 'グループワーク', '👥', 60, 10, 'pm'),
-      S('18:00', '20:00', 'バイト接客', '🙋', 120, 26, 'yoru'),
+      S('17:30', '20:30', 'バイト接客', '🙋', 180, 39, 'yoru'),
       S('21:00', '21:30', '帰宅（電車バス）', '🚃', 30, 5, 'yoru'),
       S('21:40', '22:40', 'ゲーム', '🎮', 60, -7, 'yoru'),
     ];
@@ -269,6 +269,7 @@ export default class App extends React.Component {
   searchDB(kw) { const h = this.searchHits(kw); return h.length ? h : [{ name: kw, glyph: '⭐', fh: 6, kw: [kw] }]; }
 
   /* ================= 強度チップ（あすけん分量入力相当） ================= */
+  /* 強度チップは時間と独立な密度・心理系のみ（「長さ」「量」は時間で表す = v3） */
   intensityQuestions(item) {
     const kw = item.kw || []; const nm = item.name || '';
     const has = (t) => kw.includes(t) || nm.includes(t);
@@ -280,13 +281,12 @@ export default class App extends React.Component {
     }
     if (has('仕事') || has('会議') || has('作業') || has('資料')) {
       return [
-        { key: 'len', label: '長さ', opts: ['短め', 'ふつう', '長め'], mult: [0.8, 1, 1.3] },
         { key: 'stress', label: '気疲れ', opts: ['少ない', 'ふつう', '多い'], mult: [0.85, 1, 1.25] },
       ];
     }
-    if (has('家事')) return [{ key: 'amount', label: '量', opts: ['すこし', 'ふつう', 'たくさん'], mult: [0.8, 1, 1.3] }];
+    if (has('育児') || has('子供')) return [{ key: 'mood', label: 'きげん', opts: ['ごきげん', 'ふつう', 'ぐずり'], mult: [0.85, 1, 1.3] }];
     if (has('運動')) return [{ key: 'intensity', label: '強度', opts: ['軽め', 'ふつう', 'ハード'], mult: [0.8, 1, 1.4] }];
-    return [{ key: 'deg', label: '程度', opts: ['すくなめ', 'ふつう', '多め'], mult: [0.75, 1, 1.3] }];
+    return [];
   }
   effFh(item) {
     const qs = this.intensityQuestions(item); let m = 1;
@@ -361,19 +361,21 @@ export default class App extends React.Component {
   selectSearchItem = (kwIndex, item) => {
     const picks = this.intensityQuestions(item).map(q => Math.floor(q.opts.length / 2));
     const id = 'sc' + Date.now() + Math.floor(Math.random() * 1000);
-    const cart = [...this.state.searchCart, { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, kw: item.kw, picks }];
+    const cart = [...this.state.searchCart, { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, defMin: item.defMin || 30, kw: item.kw, picks }];
     const resolved = kwIndex == null ? this.state.resolvedIdx : [...this.state.resolvedIdx, kwIndex];
     const remaining = this.remainingKw(resolved);
-    const n = cart.length;
-    this.set({ searchCart: cart, resolvedIdx: resolved, moreKw: null, searchStep: remaining.length ? 'results' : 'confirm', searchTotalMin: n * 30, searchFracs: Array(n).fill(1 / n) });
+    // 初期時間は各行動の標準所要時間（defaultMin）の合計・配分もその比率（v3）
+    const mins = cart.map(c => c.defMin || 30);
+    const total = mins.reduce((a, b) => a + b, 0);
+    this.set({ searchCart: cart, resolvedIdx: resolved, moreKw: null, searchStep: remaining.length ? 'results' : 'confirm', searchTotalMin: total, searchFracs: mins.map(m => m / total) });
   };
   addNewAction = (kwIndex, name) => {
-    const item = { name, glyph: '⭐', fh: 6, body: 3, mind: 3, kw: [name] };
+    const item = { name, glyph: '⭐', fh: 6, body: 3, mind: 3, defMin: 30, kw: [name] };
     this.set({ customActions: [...(this.state.customActions || []), item] });
     this.save();
     this.selectSearchItem(kwIndex, item);
   };
-  addRoughAction = (kwIndex, name) => this.selectSearchItem(kwIndex, { name, glyph: '🌀', fh: 6, body: 3, mind: 3, kw: [name] });
+  addRoughAction = (kwIndex, name) => this.selectSearchItem(kwIndex, { name, glyph: '🌀', fh: 6, body: 3, mind: 3, defMin: 30, kw: [name] });
   addTotal = (d) => this.set({ searchTotalMin: Math.max(1, Math.round((this.state.searchTotalMin || 30) + d)) });
   /* キーボード入力: 合計分を直接指定 */
   setTotalMin = (m) => {
@@ -409,7 +411,12 @@ export default class App extends React.Component {
   openMore = (kwIndex, kw) => this.set({ searchStep: 'more', moreKw: { i: kwIndex, kw }, moreFilter: 0 });
   closeMore = () => this.set({ searchStep: 'results' });
   setMoreFilter = (f) => this.set({ moreFilter: f });
-  removeSearchItem = (id) => { const cart = this.state.searchCart.filter(x => x.id !== id); const n = cart.length; this.set({ searchCart: cart, searchTotalMin: Math.max(1, n * 30), searchFracs: n ? Array(n).fill(1 / n) : [] }); };
+  removeSearchItem = (id) => {
+    const cart = this.state.searchCart.filter(x => x.id !== id);
+    const mins = cart.map(c => c.defMin || 30);
+    const total = Math.max(1, mins.reduce((a, b) => a + b, 0));
+    this.set({ searchCart: cart, searchTotalMin: total, searchFracs: cart.length ? mins.map(m => m / total) : [] });
+  };
   addMoreMenu = () => this.set({ searchStep: 'input', keywords: Array(10).fill(''), resolvedIdx: [] });
   openIntensity = (id) => this.set({ intensityId: id });
   closeIntensity = () => this.set({ intensityId: null });
@@ -715,17 +722,19 @@ export default class App extends React.Component {
     const name = (this.state.actName || '').trim() || (calc.src.name + 'のコピー');
     const glyph = this.state.actGlyph === 'std' ? (cat.glyph || calc.src.glyph || '⭐') : this.state.actGlyph;
     const id = 'act' + Date.now();
+    const defMin = calc.src.defMin || 30;
+    const est = Math.max(1, Math.round((calc.body + calc.mind) * defMin / 60));
     const item = {
       id, glyph, icon: calc.src.icon, name,
-      body: calc.body, mind: calc.mind, fh: calc.fh,
-      last: `目安 ${calc.recover ? '−' : '+'}${calc.body + calc.mind}/h`,
+      body: calc.body, mind: calc.mind, fh: calc.fh, defMin,
+      last: `目安 ${calc.recover ? '−' : '+'}${est}（${this.fmtMin(defMin)}）`,
       kw: [...(calc.src.kw || []), name],
       copiedFrom: calc.src.id,
     };
     const customItems = { ...(this.state.customItems || {}) };
     customItems[cat.id] = [...(customItems[cat.id] || []), item];
     // 検索からも見つかるように候補プールへ
-    const searchEntry = { name, glyph, fh: calc.fh, body: calc.body, mind: calc.mind, kw: item.kw };
+    const searchEntry = { name, glyph, fh: calc.fh, body: calc.body, mind: calc.mind, defMin, kw: item.kw };
     this.set({
       customItems,
       customActions: [...(this.state.customActions || []), searchEntry],
@@ -780,7 +789,7 @@ export default class App extends React.Component {
   goConfirm = () => {
     const items = this.cartItems();
     if (!items.length) return;
-    const durOf = (t) => (t.fh < 0 || t.id === 'shop') ? 30 : 60;
+    const durOf = (t) => t.defMin || 30; // 行動ごとの標準所要時間（v3）
     const totalMin = items.reduce((a, t) => a + durOf(t), 0);
     const cart = items.map((t, i) => {
       // 程度（degFh）で fh が変わる場合は体・心も同じ比率でスケール
@@ -790,6 +799,7 @@ export default class App extends React.Component {
         id: 'scc' + Date.now() + i, name: t.name, glyph: t.glyph, fh: f,
         body: t.body != null ? t.body * ratio : undefined,
         mind: t.mind != null ? t.mind * ratio : undefined,
+        defMin: t.defMin || 30,
         kw: [...(t.kw || []), t.name], picks: [], after: t.after || 0,
       };
     });
@@ -1829,7 +1839,7 @@ export default class App extends React.Component {
 
     const items = this.cartItems();
     const count = items.length;
-    const cartFat = items.reduce((a, t) => a + Math.round(this.cartFh(t) * (this.cartFh(t) < 0 || t.id === 'shop' ? 0.5 : 1)), 0);
+    const cartFat = items.reduce((a, t) => a + Math.round(this.cartFh(t) * ((t.defMin || 30) / 60)), 0);
 
     const sleepN = this.sleepCount();
     const recovered = Math.max(0, sleepN - st.residual);
@@ -1990,7 +2000,7 @@ export default class App extends React.Component {
       slotMenuOpen: !!st.slotMenuOpen, toggleSlotMenu: this.toggleSlotMenu,
       slotOptions: SLOTS.map(s => ({ id: s.id, emoji: s.emoji, name: s.name, active: s.id === (st.slotId || this.slotNow()), bg: s.id === (st.slotId || this.slotNow()) ? '#fbfdf0' : '#fff', onPick: () => this.pickSlot(s.id) })),
       showCart: count > 0,
-      cartMeta: count + '件 · ' + this.fmtMin(items.reduce((a, t) => a + (this.cartFh(t) < 0 || t.id === 'shop' ? 0.5 : 1), 0) * 60),
+      cartMeta: count + '件 · ' + this.fmtMin(items.reduce((a, t) => a + (t.defMin || 30), 0)),
       cartFatText: (cartFat >= 0 ? '+' + cartFat : '' + cartFat),
       residual: st.residual,
       recoveredAbs: recovered,

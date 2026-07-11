@@ -460,7 +460,7 @@ function ActAddPopup({ v }) {
           )}
         </div>
         {/* くらべてどう？（体・心それぞれ。回復系は「回復の量」で比べる） */}
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>「{v.actSrcName}」とくらべて、{v.actIsRecover ? 'からだの回復は？' : 'からだは？'}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>「{v.actSrcName}」と同じ時間やったとして、{v.actIsRecover ? 'からだの回復は？' : 'からだは？'}</div>
         {cmpBtns(v.actBodyOpts)}
         <div style={{ fontSize: 12, fontWeight: 700, marginTop: 12, color: '#55554e' }}>{v.actIsRecover ? 'こころの回復は？' : 'こころは？'}</div>
         {cmpBtns(v.actMindOpts)}
