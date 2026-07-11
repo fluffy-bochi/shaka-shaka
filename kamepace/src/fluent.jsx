@@ -74,6 +74,11 @@ export const FLUENT_MAP = {
   '🧴': 'Lotion bottle/3D/lotion_bottle_3d.png',
   '🪒': 'Razor/3D/razor_3d.png',
   '💇': 'Person getting haircut/Default/3D/person_getting_haircut_3d_default.png',
+  '😵‍💫': 'Face with spiral eyes/3D/face_with_spiral_eyes_3d.png',
+  '😪': 'Sleepy face/3D/sleepy_face_3d.png',
+  '🤕': 'Face with head-bandage/3D/face_with_head-bandage_3d.png',
+  '🌧': 'Cloud with rain/3D/cloud_with_rain_3d.png',
+  '🏖': 'Beach with umbrella/3D/beach_with_umbrella_3d.png',
 };
 
 

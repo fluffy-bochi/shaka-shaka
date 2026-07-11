@@ -224,6 +224,25 @@ export function guessAct(title) {
 }
 export const IMPORT_DEFAULT_DELTA = 10;
 
+/* バフ・デバフ（いまの調子）: 体・心の疲労/回復係数に一時的にかかる倍率。
+   例: 就活が長引いてメンタル消耗中 → 心がもっと疲れやすい */
+export const BUFFS = [
+  { id: 'mental', glyph: '😵‍💫', name: '心がつかれ気味', desc: '就活・人間関係などでメンタル消耗中', kind: 'debuff',
+    mult: { mindFat: 1.25, mindRec: 0.9 } },
+  { id: 'sick', glyph: '🤒', name: '体調がわるい', desc: '風邪ぎみ・だるいなど', kind: 'debuff',
+    mult: { bodyFat: 1.25, bodyRec: 0.9 } },
+  { id: 'sleepless', glyph: '😪', name: '睡眠不足', desc: 'ねむりが足りていない', kind: 'debuff',
+    mult: { bodyFat: 1.15, mindFat: 1.15 } },
+  { id: 'injury', glyph: '🤕', name: 'けが・痛み', desc: '痛みがあって体がつらい', kind: 'debuff',
+    mult: { bodyFat: 1.25 } },
+  { id: 'weather', glyph: '🌧', name: '天気・気圧がしんどい', desc: '雨や低気圧で重い日', kind: 'debuff',
+    mult: { bodyFat: 1.1, mindFat: 1.15 } },
+  { id: 'good', glyph: '✨', name: '調子がいい', desc: 'なんだか軽い！', kind: 'buff',
+    mult: { bodyFat: 0.9, mindFat: 0.9 } },
+  { id: 'holiday', glyph: '🏖', name: '休暇・のんびり期間', desc: '休み中で心に余裕がある', kind: 'buff',
+    mult: { mindFat: 0.85, mindRec: 1.15, bodyRec: 1.1 } },
+];
+
 /* 記録の編集で選べる絵文字（SEARCH_DB・ACT_EMOJI の行動グリフから） */
 export const EMOJI_CHOICES = [
   '🚃', '🚌', '🚶', '🚲', '🚗', '💬', '💻', '📝', '⌨️', '📧',

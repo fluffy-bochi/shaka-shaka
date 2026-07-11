@@ -83,6 +83,7 @@ export function serialize(st) {
     onboardDone: !!st.onboardDone,
     profile: st.profile || null,
     lastMins: st.lastMins || {},
+    activeBuffs: st.activeBuffs || [],
     bodyFatCoef: st.bodyFatCoef || 1,
     mindFatCoef: st.mindFatCoef || 1,
     bodyRecCoef: st.bodyRecCoef || 1,
@@ -128,6 +129,7 @@ export function deserialize(data) {
     onboardDone: !!data.onboardDone,
     profile: (data.profile && typeof data.profile === 'object') ? data.profile : null,
     lastMins: (data.lastMins && typeof data.lastMins === 'object') ? data.lastMins : {},
+    activeBuffs: Array.isArray(data.activeBuffs) ? data.activeBuffs : [],
     // 体・心それぞれの個人係数。旧1軸フィールド(fatigueCoef/recoverCoef)からの移行も受ける
     bodyFatCoef: typeof data.bodyFatCoef === 'number' ? data.bodyFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
     mindFatCoef: typeof data.mindFatCoef === 'number' ? data.mindFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
@@ -142,7 +144,7 @@ export function freshState() {
     collected: [], collectedSeen: 0, templates: {}, consumed: 0, sampleDay: null,
     customCats: [], customPlans: [], customActions: [], customItems: {}, prefs: {},
     slotHours: null, hiddenCats: [],
-    onboardDone: false, profile: null, lastMins: {},
+    onboardDone: false, profile: null, lastMins: {}, activeBuffs: [],
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1,
   };
 }

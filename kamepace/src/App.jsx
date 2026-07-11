@@ -5,7 +5,7 @@
 import React from 'react';
 import Matter from 'matter-js';
 import {
-  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT,
+  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT, BUFFS,
   CAT_ICON_CHOICES, CAT_COLOR_CHOICES, COMPARE_STEPS,
   guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA, DEFAULT_SLOT_HOURS,
 } from './data';
@@ -91,6 +91,8 @@ export default class App extends React.Component {
     /* テンプレにまとめる */
     tplOpen: false,
     tplName: '',
+    /* いまの調子（バフ・デバフ）シート */
+    buffOpen: false,
     /* 検索で見つからない→新しくつくる */
     newActOpen: false,
     newActKwIndex: null,
@@ -122,7 +124,7 @@ export default class App extends React.Component {
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
       prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats,
-      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins,
+      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
     };
@@ -328,12 +330,13 @@ export default class App extends React.Component {
       const mult = item.fh >= 0 ? { dislike: 1.3, like: 0.7 } : { dislike: 0.7, like: 1.3 };
       if (mult[pref]) m *= mult[pref];
     }
-    // 体・心の2軸: 行動の（体, 心）固有値に軸別の個人係数を掛けて合算
+    // 体・心の2軸: 行動の（体, 心）固有値に軸別の個人係数×バフ・デバフを掛けて合算
     // 例) 接客(体5, 心8)・心の疲れやすさ×1.2 → 5×1.0 + 8×1.2 = 14.6/h
     const st = this.state;
     const recover = item.fh < 0;
-    const bc = recover ? (st.bodyRecCoef || 1) : (st.bodyFatCoef || 1);
-    const mc = recover ? (st.mindRecCoef || 1) : (st.mindFatCoef || 1);
+    const bm = this.buffMult();
+    const bc = recover ? (st.bodyRecCoef || 1) * bm.bodyRec : (st.bodyFatCoef || 1) * bm.bodyFat;
+    const mc = recover ? (st.mindRecCoef || 1) * bm.mindRec : (st.mindFatCoef || 1) * bm.mindFat;
     let base;
     if (typeof item.body === 'number' && typeof item.mind === 'number') {
       base = (item.body * bc + item.mind * mc) * (recover ? -1 : 1);
@@ -343,6 +346,23 @@ export default class App extends React.Component {
     }
     return base * m;
   }
+  /* バフ・デバフ（いまの調子）の合成倍率 */
+  buffMult() {
+    const out = { bodyFat: 1, mindFat: 1, bodyRec: 1, mindRec: 1 };
+    (this.state.activeBuffs || []).forEach(id => {
+      const b = BUFFS.find(x => x.id === id);
+      if (b && b.mult) Object.keys(out).forEach(k => { if (b.mult[k]) out[k] *= b.mult[k]; });
+    });
+    return out;
+  }
+  toggleBuff = (id) => {
+    const cur = this.state.activeBuffs || [];
+    this.set({ activeBuffs: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] });
+    this.save();
+  };
+  openBuffs = () => this.set({ buffOpen: true });
+  closeBuffs = () => this.set({ buffOpen: false });
+
   setPref = (name, val) => {
     const k = normTitle(name);
     if (!k) return;
@@ -2167,6 +2187,21 @@ export default class App extends React.Component {
       residual: st.residual,
       recoveredAbs: recovered,
       goHome: this.goHome, goShaka: this.goShaka, goMypage: this.goMypage, goSleep: this.goSleep,
+      /* バフ・デバフ */
+      buffOpen: !!st.buffOpen, openBuffs: this.openBuffs, closeBuffs: this.closeBuffs,
+      activeBuffGlyphs: (st.activeBuffs || []).map(id => (BUFFS.find(b => b.id === id) || {}).glyph).filter(Boolean),
+      buffChoices: BUFFS.map(b => {
+        const eff = [];
+        if (b.mult.bodyFat) eff.push('体の疲労 ×' + b.mult.bodyFat);
+        if (b.mult.mindFat) eff.push('心の疲労 ×' + b.mult.mindFat);
+        if (b.mult.bodyRec) eff.push('体の回復 ×' + b.mult.bodyRec);
+        if (b.mult.mindRec) eff.push('心の回復 ×' + b.mult.mindRec);
+        return {
+          id: b.id, glyph: b.glyph, name: b.name, desc: b.desc, kind: b.kind, effects: eff,
+          on: (st.activeBuffs || []).includes(b.id),
+          onToggle: () => this.toggleBuff(b.id),
+        };
+      }),
       goConfirm: this.goConfirm,
       toggleTemplateToast: this.toggleTemplateToast, shake: this.shake,
       shakaDate: st.dayOffset === 0 ? formatDateShort(todayStr()) : formatDateShort(viewDateStr),
