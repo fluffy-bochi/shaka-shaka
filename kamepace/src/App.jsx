@@ -91,6 +91,12 @@ export default class App extends React.Component {
     /* テンプレにまとめる */
     tplOpen: false,
     tplName: '',
+    /* 検索で見つからない→新しくつくる */
+    newActOpen: false,
+    newActKwIndex: null,
+    newActName: '',
+    newActCatId: null,
+    newActGlyph: 'std',
     /* 操作チュートリアル（0=オフ、1〜12=ステップ）。実データは退避して終了時に復元 */
     tutorial: 0,
     tutFlags: {},
@@ -394,11 +400,51 @@ export default class App extends React.Component {
     const total = mins.reduce((a, b) => a + b, 0);
     this.set({ searchCart: cart, resolvedIdx: resolved, moreKw: null, searchStep: remaining.length ? 'results' : 'confirm', searchTotalMin: total, searchFracs: mins.map(m => m / total) });
   };
+  /* 検索で見つからないとき: タイトル・大カテゴリ・絵文字を選んでつくる */
   addNewAction = (kwIndex, name) => {
-    const item = { name, glyph: '⭐', fh: 6, body: 3, mind: 3, defMin: 30, kw: [name] };
-    this.set({ customActions: [...(this.state.customActions || []), item] });
+    const visible = this.allCats().filter(c => !(this.state.hiddenCats || []).includes(c.id));
+    this.set({
+      newActOpen: true, newActKwIndex: kwIndex, newActName: name,
+      newActCatId: visible[0] ? visible[0].id : null, newActGlyph: 'std',
+    });
+  };
+  closeNewAct = () => this.set({ newActOpen: false });
+  onNewActName = (e) => this.set({ newActName: e.target.value });
+  pickNewActCat = (id) => this.set({ newActCatId: id });
+  pickNewActGlyph = (g) => this.set({ newActGlyph: g });
+  createNewAct = () => {
+    const cat = this.allCats().find(c => c.id === this.state.newActCatId);
+    const name = (this.state.newActName || '').trim();
+    if (!cat || !name) { this.set({ newActOpen: false }); return; }
+    // 疲労の初期値はそのカテゴリの行動の平均（あとで強度・時間で調整できる）
+    const items = cat.items.length ? cat.items : [{ body: 3, mind: 3, fh: 6, defMin: 30 }];
+    const avg = (f) => Math.max(1, Math.round(items.reduce((a, t) => a + Math.abs(f(t) || 0), 0) / items.length));
+    const body = avg(t => t.body != null ? t.body : Math.abs(t.fh) / 2);
+    const mind = avg(t => t.mind != null ? t.mind : Math.abs(t.fh) / 2);
+    const recover = (items[0].fh || 0) < 0;
+    // 時間は中央値（合宿480分のような外れ値に引っ張られないように）
+    const minsSorted = items.map(t => t.defMin || 30).sort((a, b) => a - b);
+    const median = minsSorted[Math.floor((minsSorted.length - 1) / 2)];
+    const defMin = Math.max(5, Math.round(median / 5) * 5);
+    const glyph = this.state.newActGlyph === 'std' ? (cat.glyph || '⭐') : this.state.newActGlyph;
+    const fh = (recover ? -1 : 1) * (body + mind);
+    const est = Math.max(1, Math.round((body + mind) * defMin / 60));
+    const id = 'act' + Date.now();
+    const item = {
+      id, glyph, icon: cat.icon, name, body, mind, fh, defMin,
+      last: `目安 ${recover ? '−' : '+'}${est}（${this.fmtMin(defMin)}）`,
+      kw: [cat.name, name],
+    };
+    const customItems = { ...(this.state.customItems || {}) };
+    customItems[cat.id] = [...(customItems[cat.id] || []), item];
+    const searchEntry = { name, glyph, fh, body, mind, defMin, kw: item.kw };
+    this.set({
+      customItems,
+      customActions: [...(this.state.customActions || []), searchEntry],
+      newActOpen: false,
+    });
     this.save();
-    this.selectSearchItem(kwIndex, item);
+    this.selectSearchItem(this.state.newActKwIndex, item);
   };
   addRoughAction = (kwIndex, name) => this.selectSearchItem(kwIndex, { name, glyph: '🌀', fh: 6, body: 3, mind: 3, defMin: 30, kw: [name] });
   addTotal = (d) => this.set({ searchTotalMin: Math.max(1, Math.round((this.state.searchTotalMin || 30) + d)) });
@@ -2081,6 +2127,14 @@ export default class App extends React.Component {
       addMoreMenu: this.addMoreMenu, commitSearch: this.commitSearch, backFromConfirm: this.backFromConfirm,
       tplOpen: !!st.tplOpen, tplName: st.tplName || '', onTplName: this.onTplName,
       openTplSave: this.openTplSave, saveTpl: this.saveTpl, closeTpl: this.closeTpl,
+      newActOpen: !!st.newActOpen, newActName: st.newActName || '',
+      onNewActName: this.onNewActName, closeNewAct: this.closeNewAct, createNewAct: this.createNewAct,
+      newActGlyph: st.newActGlyph, pickNewActGlyph: this.pickNewActGlyph,
+      newActCatChoices: this.allCats().filter(c => !hiddenCats.includes(c.id)).map(c => ({
+        id: c.id, name: c.name, icon: c.icon, color: c.color,
+        on: st.newActCatId === c.id, onPick: () => this.pickNewActCat(c.id),
+      })),
+      newActStdGlyph: (this.allCats().find(c => c.id === st.newActCatId) || {}).glyph || '⭐',
       intensityOpen: !!intItem, intensityName: intItem ? intItem.name : '', intensityGlyph: intItem ? intItem.glyph : '',
       intensityFatText: (intFat >= 0 ? '+' + intFat : '' + intFat), intQuestions, closeIntensity: this.closeIntensity,
       prefOpts,

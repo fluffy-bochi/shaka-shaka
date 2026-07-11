@@ -46,6 +46,7 @@ export default function Record({ v }) {
       {v.degreeOpen && <DegreePopup v={v} />}
       {v.catAddOpen && <CatAddPopup v={v} />}
       {v.actAddOpen && <ActAddPopup v={v} />}
+      {v.newActOpen && <NewActPopup v={v} />}
       {v.intensityOpen && <IntensityPopup v={v} />}
       {v.planDetailOpen && <PlanDetailPopup v={v} />}
       {v.planAddOpen && <PlanAddPopup v={v} />}
@@ -504,6 +505,62 @@ function ActAddPopup({ v }) {
         <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
           <button onClick={v.closeActAdd} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>キャンセル</button>
           <button onClick={v.addAction} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>つくる</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- 検索で見つからない→行動を新しくつくる popup（タイトル・大カテゴリ・絵文字） ---- */
+function NewActPopup({ v }) {
+  const [catOpen, setCatOpen] = React.useState(false);
+  const cur = v.newActCatChoices.find(c => c.on) || v.newActCatChoices[0];
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 7, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div className="nos" style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: '#fff', borderRadius: '22px 22px 0 0', padding: '16px 18px 20px', boxShadow: '0 -12px 40px rgba(27,27,24,.3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>行動を新しくつくる</div>
+          <button onClick={v.closeNewAct} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
+        </div>
+        {/* タイトル */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>タイトル</div>
+        <input value={v.newActName} onChange={v.onNewActName} placeholder="例：ピアノの練習" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
+        {/* 大カテゴリ（プルダウン） */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>大カテゴリ</div>
+        <div style={{ position: 'relative', marginTop: 8 }}>
+          <button onClick={() => setCatOpen(!catOpen)} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, border: '1.5px solid #e4e1d8', background: '#fff', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}>
+            {cur && <span style={{ ...msIcon(20, cur.color), flex: '0 0 auto' }}>{cur.icon}</span>}
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>{cur ? cur.name : ''}</span>
+            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 19, color: '#8a8a82' }}>{catOpen ? 'expand_less' : 'expand_more'}</span>
+          </button>
+          {catOpen && (
+            <div className="nos" style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)', zIndex: 5, background: '#fff', border: '1px solid #efece3', borderRadius: 14, boxShadow: '0 12px 28px rgba(27,27,24,.2)', padding: 6, maxHeight: 220, overflowY: 'auto' }}>
+              {v.newActCatChoices.map(c => (
+                <button key={c.id} onClick={() => { c.onPick(); setCatOpen(false); }} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: c.on ? '#fbfdf0' : '#fff', border: 'none', borderRadius: 10, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ ...msIcon(19, c.color), flex: '0 0 auto' }}>{c.icon}</span>
+                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: '#1b1b18' }}>{c.name}</span>
+                  {c.on && <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 17, color: '#7a9a00' }}>check</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* 絵文字（カテゴリ標準 or 検索して選ぶ） */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>絵文字</div>
+        <EmojiPicker
+          value={v.newActGlyph === 'std' ? null : v.newActGlyph}
+          onPick={v.pickNewActGlyph}
+          lead={(
+            <button onClick={() => v.pickNewActGlyph('std')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 56, height: 40, borderRadius: 10, border: v.newActGlyph === 'std' ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: v.newActGlyph === 'std' ? '#fbfdf0' : '#fff', cursor: 'pointer', padding: 0, lineHeight: 1 }}>
+              <Emo e={v.newActStdGlyph} size={18} />
+              <span style={{ fontSize: 8.5, fontWeight: 700, color: '#7a9a00', marginTop: 2 }}>標準</span>
+            </button>
+          )}
+        />
+        <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 8, lineHeight: 1.6 }}>疲労のめやすは選んだカテゴリに合わせて自動で決まります（時間・強度・すききらいであとから調整できます）</div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <button onClick={v.closeNewAct} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>キャンセル</button>
+          <button onClick={v.createNewAct} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>つくって記録</button>
         </div>
       </div>
     </div>
