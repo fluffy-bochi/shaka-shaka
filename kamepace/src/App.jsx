@@ -88,6 +88,9 @@ export default class App extends React.Component {
     /* オンボーディング（1..9） */
     obStep: 1,
     obSel: {},
+    /* テンプレにまとめる */
+    tplOpen: false,
+    tplName: '',
     /* 操作チュートリアル（0=オフ、1〜12=ステップ）。実データは退避して終了時に復元 */
     tutorial: 0,
     tutFlags: {},
@@ -265,7 +268,12 @@ export default class App extends React.Component {
     return out;
   }
   itemById(id) { return this.allItems().find(t => t.id === id); }
-  allPlans() { return [...PLANS, ...(this.state.customPlans || [])]; }
+  allPlans() {
+    const tplPlans = Object.entries(this.state.templates || {})
+      .filter(([, t]) => t && Array.isArray(t.tasks) && t.tasks.length)
+      .map(([key, t]) => ({ id: 'tpl:' + key, name: key, tasks: t.tasks }));
+    return [...PLANS, ...(this.state.customPlans || []), ...tplPlans];
+  }
   planById(id) { return this.allPlans().find(p => p.id === id); }
   planMeta(p) {
     const min = p.tasks.reduce((a, t) => a + (t.min || 0), 0);
@@ -472,7 +480,6 @@ export default class App extends React.Component {
     let slotOffset = baseEntries
       .filter(e => e.date === t0 && !e.exp && !e.planned && this.slotOf(e) === slotId)
       .reduce((a, e) => a + entryMin(e), 0);
-    const templates = { ...(this.state.templates || {}) };
     const newEntries = items.map((t, i) => {
       const fat = Math.round(this.effFh(t) * (mins[i] / 60));
       const e = {
@@ -493,37 +500,23 @@ export default class App extends React.Component {
         e.from = this.slotHm(slot, slotOffset); e.to = this.slotHm(slot, slotOffset + mins[i]);
         slotOffset += mins[i];
       }
-      // 同じ予定は同じ疲労度（テンプレ学習 → カレンダー取り込みで使用）
-      const k = normTitle(t.name);
-      if (k) templates[k] = { act: e.act, delta: fat };
       return e;
     });
     // 前回つかった時間を学習（次回の初期値になる）
     const lastMins = { ...(this.state.lastMins || {}) };
     items.forEach((t, i) => { const k = normTitle(t.name); if (k) lastMins[k] = mins[i]; });
-    // カレンダー枠への記録: 構成をテンプレ保存 → 次回同じタイトルの取り込みで自動適用
+    // テンプレは自動保存しない（確認画面の「テンプレにまとめる」ボタンで明示的に保存）
     const framePlan = this.state.framePlan;
-    if (framePlan) {
-      const fk = normTitle(framePlan);
-      if (fk) {
-        templates[fk] = {
-          act: guessAct(framePlan) || '',
-          delta: newEntries.reduce((a, e) => a + (e.delta || 0), 0),
-          tasks: newEntries.map(e => ({ name: e.title, glyph: e.glyph, min: e.min, fat: e.delta })),
-        };
-      }
-    }
     const entries = sortEntries([...baseEntries, ...newEntries]);
     const anyImmediate = newEntries.some(r => !r.planned);
-    const toastMsg = framePlan ? ('きろくして「' + framePlan + '」をテンプレに保存')
-      : isEdit ? 'へんこうしました' : (anyImmediate ? 'きろくしました' : '予定を追加した（時間どおりに記録）');
+    const toastMsg = isEdit ? 'へんこうしました' : (anyImmediate ? 'きろくしました' : '予定を追加した（時間どおりに記録）');
     // マイナス（回復）の記録は山から引かず、そのぶんの絵文字をシャカで降らせて衝突で消す
     const negGlyphs = [];
     newEntries.forEach(e => {
       if (!e.planned && e.delta < 0) { for (let i = 0; i < -e.delta; i++) negGlyphs.push(e.glyph || entryGlyph(e)); }
     });
     this.set({
-      entries, templates, lastMins, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, toast: toastMsg,
+      entries, lastMins, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, toast: toastMsg,
       // 編集で山が縮んだ場合に consumed が超過しないように
       consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)),
     });
@@ -534,6 +527,33 @@ export default class App extends React.Component {
       requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
     }
     clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1800);
+  };
+
+  /* ---- テンプレにまとめる（確認画面の明示ボタン。自動では保存しない） ---- */
+  openTplSave = () => {
+    const first = this.state.searchCart[0];
+    this.set({ tplOpen: true, tplName: this.state.framePlan || (first ? first.name : '') });
+  };
+  closeTpl = () => this.set({ tplOpen: false });
+  onTplName = (e) => this.set({ tplName: e.target.value });
+  saveTpl = () => {
+    const items = this.state.searchCart;
+    if (!items.length) { this.set({ tplOpen: false }); return; }
+    const name = (this.state.tplName || '').trim() || (this.state.framePlan || items[0].name);
+    const k = normTitle(name);
+    if (!k) { this.set({ tplOpen: false }); return; }
+    const n = items.length;
+    const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(1 / n);
+    const timeMode = this.state.confirmMode === 'time';
+    const totalMin = timeMode ? this.timeSpanMin() : (this.state.searchTotalMin || (n * 30));
+    const mins = fr.map(f => Math.max(1, Math.round(f * totalMin)));
+    const d = totalMin - mins.reduce((a, b) => a + b, 0); mins[n - 1] = Math.max(1, mins[n - 1] + d);
+    const tasks = items.map((t, i) => ({ name: t.name, glyph: t.glyph, min: mins[i], fat: Math.round(this.effFh(t) * (mins[i] / 60)) }));
+    const templates = { ...(this.state.templates || {}) };
+    templates[k] = { act: guessAct(name) || '', delta: tasks.reduce((a, t) => a + t.fat, 0), tasks };
+    this.set({ templates, tplOpen: false });
+    this.save();
+    this.toast('「' + name + '」をテンプレにまとめました');
   };
 
   /* ================= home / pile（疲労は日をまたいで持ち越す） ================= */
@@ -2059,6 +2079,8 @@ export default class App extends React.Component {
       addTotalM1: () => this.addTotal(-1), addTotalP1: () => this.addTotal(1), addTotalM10: () => this.addTotal(-10), addTotalP10: () => this.addTotal(10),
       searchTotalFatText: (searchTotalFat >= 0 ? '+' + searchTotalFat : '' + searchTotalFat),
       addMoreMenu: this.addMoreMenu, commitSearch: this.commitSearch, backFromConfirm: this.backFromConfirm,
+      tplOpen: !!st.tplOpen, tplName: st.tplName || '', onTplName: this.onTplName,
+      openTplSave: this.openTplSave, saveTpl: this.saveTpl, closeTpl: this.closeTpl,
       intensityOpen: !!intItem, intensityName: intItem ? intItem.name : '', intensityGlyph: intItem ? intItem.glyph : '',
       intensityFatText: (intFat >= 0 ? '+' + intFat : '' + intFat), intQuestions, closeIntensity: this.closeIntensity,
       prefOpts,

@@ -69,6 +69,11 @@ export const FLUENT_MAP = {
   '🧼': 'Soap/3D/soap_3d.png',
   '🧸': 'Teddy bear/3D/teddy_bear_3d.png',
   '🛏': 'Bed/3D/bed_3d.png',
+  '🪥': 'Toothbrush/3D/toothbrush_3d.png',
+  '💄': 'Lipstick/3D/lipstick_3d.png',
+  '🧴': 'Lotion bottle/3D/lotion_bottle_3d.png',
+  '🪒': 'Razor/3D/razor_3d.png',
+  '💇': 'Person getting haircut/Default/3D/person_getting_haircut_3d_default.png',
 };
 
 
@@ -96,7 +101,9 @@ export const EMOJI_CATALOG = [
   C('🎮', null, 'ゲーム'), C('📱', null, 'スマホ', 'SNS'), C('🧘', null, 'ヨガ', 'ストレッチ', '瞑想'),
   C('🌿', null, 'はっぱ', '深呼吸', '植物'), C('🌳', null, 'き', '木', '公園'), C('🌙', null, 'つき', '月', '睡眠'),
   C('⭐', null, 'ほし', '星'), C('✨', null, 'キラキラ'), C('🏋️', null, 'きんとれ', '筋トレ', 'ジム'),
-  C('🧼', null, 'せっけん', '身じたく'), C('🧸', null, 'ぬいぐるみ', '寝かしつけ'), C('🛏', null, 'ベッド', '睡眠'),
+  C('🧼', null, 'せっけん', '身じたく', '洗顔'), C('🧸', null, 'ぬいぐるみ', '寝かしつけ'), C('🛏', null, 'ベッド', '睡眠'),
+  C('🪥', null, 'はぶらし', '歯磨き'), C('💄', null, 'くちべに', 'メイク', '化粧'), C('🧴', null, 'スキンケア', 'ローション'),
+  C('🪒', null, 'かみそり', 'ひげ'), C('💇', null, 'ヘアカット', '髪', '美容院'),
   // かお
   C('😀', 'Grinning face/3D/grinning_face_3d.png', 'えがお', '笑顔'),
   C('🙂', 'Slightly smiling face/3D/slightly_smiling_face_3d.png', 'にこにこ'),

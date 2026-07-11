@@ -298,7 +298,26 @@ function Confirm({ v }) {
           ))}
           <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 8 }}>つまみを左右にドラッグで配分を変更（1分単位）。強度チップで体感を調整</div>
         </div>
+        <button onClick={v.openTplSave} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, border: '1.5px solid #1b1b18', borderRadius: 13, padding: '13px 0', fontSize: 13, fontWeight: 700, background: '#fff', color: '#1b1b18', cursor: 'pointer' }}>📋 これらをテンプレにまとめる</button>
+        <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 7, textAlign: 'center' }}>まとめると「予定から」とカレンダー取り込みで次回から自動で使えます</div>
       </div>
+      {v.tplOpen && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 9, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
+          <div style={{ width: '100%', background: '#fff', borderRadius: 22, padding: '16px 20px 20px', boxShadow: '0 24px 60px rgba(27,27,24,.35)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>テンプレにまとめる</div>
+              <button onClick={v.closeTpl} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>テンプレの名前</div>
+            <input value={v.tplName} onChange={v.onTplName} placeholder="例：学生相談室、朝のしたく" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
+            <div style={{ fontSize: 11.5, color: '#8a8a82', marginTop: 10, lineHeight: 1.7 }}>いまの行動と時間の組み合わせを保存します。同じ名前の予定をGoogleカレンダーから取り込むと、次回から自動でこの構成が使われます。</div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button onClick={v.closeTpl} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>キャンセル</button>
+              <button onClick={v.saveTpl} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>まとめる</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ flex: '0 0 auto', padding: '10px 16px 22px' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '0 4px 9px' }}>
           <span style={{ fontSize: 12, color: '#8a8a82' }}>合計 {v.searchTotalText}</span>

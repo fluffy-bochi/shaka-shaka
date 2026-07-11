@@ -103,6 +103,14 @@ export const CATS = [
     act('firstmeet', '🤝', 'handshake', '初対面の場', 4, 9, 60, { kw: ['対人', '初対面', '面談', '挨拶'] }),
     act('family', '👪', 'diversity_3', '家族の対応', 3, 6, 30, { kw: ['対人', '家族', '親', '親戚'] }),
   ] },
+  { id: 'grooming', icon: 'face', color: '#d98ba0', glyph: '🧼', name: '身じたく', sub: '洗顔・メイク・着替え', items: [
+    act('washface', '🧼', 'wash', '洗顔・歯みがき', 2, 1, 10, { kw: ['身じたく', '洗顔', '歯磨き', '歯みがき'] }),
+    act('makeup', '💄', 'face_retouching_natural', 'メイク', 2, 4, 20, { kw: ['身じたく', 'メイク', '化粧'] }),
+    act('dressup', '👕', 'checkroom', '着替え', 2, 1, 10, { kw: ['身じたく', '着替え', '服'] }),
+    act('skincare', '🧴', 'sanitizer', 'スキンケア', 1, 2, 10, { kw: ['身じたく', 'スキンケア', '保湿'] }),
+    act('hairset', '💇', 'content_cut', 'ヘアセット', 2, 3, 15, { kw: ['身じたく', '髪', 'ヘアセット', 'ドライヤー'] }),
+    act('shaving', '🪒', 'cut', 'ひげそり', 2, 1, 10, { kw: ['身じたく', 'ひげ', '髭剃り'] }),
+  ] },
   { id: 'rest', icon: 'self_improvement', color: '#7a9a00', glyph: '☕', name: '休憩・回復', sub: 'お茶・入浴・昼寝・趣味 ・ −回復', items: [
     act('rest', '☕', 'local_cafe', '休憩・コーヒー', 2, 5, 15, { recover: true, kw: ['休憩', 'お茶', 'カフェ', 'コーヒー', '休む'] }),
     act('meal', '🍙', 'restaurant', '食事', 3, 4, 30, { recover: true, kw: ['休憩', '食事', 'ランチ', 'ごはん'] }),
