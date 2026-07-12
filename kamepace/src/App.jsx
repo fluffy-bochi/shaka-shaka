@@ -48,6 +48,7 @@ export default class App extends React.Component {
     degreeIdx: 1,
     residual: 0,
     dayOffset: 0,
+    homeDate: todayStr(), // ホームで閲覧中の日付
     toast: null,
     sleepAnim: false,
     moons: [],
@@ -222,10 +223,11 @@ export default class App extends React.Component {
   }
 
   /* ================= derived: entries → slots ================= */
-  todayEntries() { return sortEntries(this.state.entries).filter(e => e.date === todayStr() && !e.exp); }
+  homeDateStr() { return this.state.homeDate || todayStr(); }
+  todayEntries() { const t = this.homeDateStr(); return sortEntries(this.state.entries).filter(e => e.date === t && !e.exp); }
   slotRecords() {
     const out = { asa: [], am: [], pm: [], yoru: [] };
-    const t = todayStr();
+    const t = this.homeDateStr();
     // 編集用に state.entries 内のインデックスを添えて、from 順で各スロットへ
     const rows = this.state.entries
       .map((e, i) => ({ e, i }))
@@ -267,6 +269,11 @@ export default class App extends React.Component {
       .filter(e => this.slotOf(e) === slotId && !e.planned)
       .reduce((a, e) => a + entryMin(e), 0);
   }
+  /* 日付ナビ */
+  homePrevDay = () => this.set({ homeDate: shiftDate(this.homeDateStr(), -1) });
+  homeNextDay = () => this.set({ homeDate: shiftDate(this.homeDateStr(), 1) });
+  setHomeDate = (e) => { const v = e.target.value; if (v) this.set({ homeDate: v }); };
+  goToday = () => this.set({ homeDate: todayStr() });
   hmToTs(hm) { const [h, m] = (hm || '0:0').split(':').map(Number); const d = new Date(); d.setHours(h || 0, m || 0, 0, 0); return d.getTime(); }
   tsToHm(ts) { const d = new Date(ts); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
   timeSpanMin() { const s = this.hmToTs(this.state.startTime), t = this.hmToTs(this.state.endTime); const d = Math.round((t - s) / 60000); return d < 1 ? 1 : d; }
@@ -671,15 +678,22 @@ export default class App extends React.Component {
     const slotId = this.state.slotId || this.slotNow();
     const slot = this.slotDef(slotId);
     let cursor = timeMode ? this.hmToTs(this.state.startTime) : null;
+    // 記録先＝ホームで見ている日付（過去日のつけ忘れ・未来日の下書きにも対応）。
+    // 編集フローは元の記録の日付を維持する
+    let recDate = this.homeDateStr();
+    if (isEdit && Array.isArray(this.state.editIdxs) && this.state.editIdxs.length) {
+      const oe = this.state.entries[this.state.editIdxs[0]];
+      if (oe && oe.date) recDate = oe.date;
+    }
+    const isToday = recDate === todayStr();
     // 通常記録の配置位置: 同スロットの使用済み分（編集中は元の記録を除いて数える）
-    const t0 = todayStr();
     let slotOffset = baseEntries
-      .filter(e => e.date === t0 && !e.exp && !e.planned && this.slotOf(e) === slotId)
+      .filter(e => e.date === recDate && !e.exp && !e.planned && this.slotOf(e) === slotId)
       .reduce((a, e) => a + entryMin(e), 0);
     const newEntries = items.map((t, i) => {
       const fat = Math.round(this.effFh(t) * (mins[i] / 60));
       const e = {
-        ...baseEntry(t.name, fat),
+        ...baseEntry(t.name, fat, recDate),
         glyph: t.glyph, min: mins[i], _new: true,
       };
       // 枠に入れているときは枠タイトルでグループ化（既製の予定経由でも枠が勝つ）
@@ -689,7 +703,8 @@ export default class App extends React.Component {
       if (timeMode) {
         const fromTs = cursor, toTs = cursor + mins[i] * 60000;
         e.from = this.tsToHm(fromTs); e.to = this.tsToHm(toTs); cursor = toTs;
-        if (toTs > now) { e.planned = true; e.dropped = planUnitsDue({ ...e, date: todayStr() }, now); e._new = e.dropped > 0; }
+        // 予定（時間どおりに降る）は今日を見ているときだけ。過去/未来日は即記録
+        if (isToday && toTs > now) { e.planned = true; e.dropped = planUnitsDue({ ...e, date: todayStr() }, now); e._new = e.dropped > 0; }
       } else {
         // 通常記録＝選んだ時間帯の基準時刻に配置（CLAUDE.md §G）
         e.slot = slotId;
@@ -2239,7 +2254,17 @@ export default class App extends React.Component {
       navShakaFill: ['shaka', 'collect'].includes(st.screen) ? 1 : 0,
       navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? 1 : 0,
-      homeDateCaps: formatDateCaps(todayStr()),
+      homeDate: this.homeDateStr(),
+      homeIsToday: this.homeDateStr() === todayStr(),
+      homeDateY: strToDate(this.homeDateStr()).getFullYear(),
+      homeDateM: strToDate(this.homeDateStr()).getMonth() + 1,
+      homeDateD: strToDate(this.homeDateStr()).getDate(),
+      homeDateWd: ['日', '月', '火', '水', '木', '金', '土'][strToDate(this.homeDateStr()).getDay()],
+      homeDateLabel: this.homeDateStr() === todayStr() ? '今日'
+        : this.homeDateStr() === shiftDate(todayStr(), -1) ? '昨日'
+        : this.homeDateStr() === shiftDate(todayStr(), 1) ? '明日' : '',
+      homePrevDay: this.homePrevDay, homeNextDay: this.homeNextDay,
+      setHomeDate: this.setHomeDate, goToday: this.goToday,
       pile: st.screen === 'home' ? this.makePile(7) : [],
       sleepPile: st.screen === 'sleep' ? this.makeSleepPile().map((p, i) => ({
         ...p,

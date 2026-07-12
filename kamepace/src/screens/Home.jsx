@@ -2,6 +2,7 @@ import React from 'react';
 import Emo from '../fluent';
 
 const mono = { fontFamily: "'Space Mono',monospace" };
+const ndBtn = { width: 30, height: 30, background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#55554e', cursor: 'pointer', flex: '0 0 auto', padding: 0 };
 
 export default function Home({ v }) {
   return (
@@ -13,17 +14,39 @@ export default function Home({ v }) {
         ))}
       </div>
       <div className="nos" style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', padding: '0 0 12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 18px 8px 16px' }}>
-          <div>
-            <div style={{ ...mono, fontSize: 9, letterSpacing: '.12em', color: '#8a8a82' }}>{v.homeDateCaps}</div>
-            <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, marginTop: 1 }}>今日のログ</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 14px 8px 12px' }}>
+          {/* 日付ナビ: ‹ 年月日(曜) › 📅 ＋今日に戻る */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
+            <button onClick={v.homePrevDay} aria-label="前の日" style={ndBtn}>
+              <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 22 }}>chevron_left</span>
+            </button>
+            <div style={{ textAlign: 'center', minWidth: 0, flex: '0 1 auto' }}>
+              <div style={{ fontWeight: 800, fontSize: 16, lineHeight: 1.15, whiteSpace: 'nowrap' }}>
+                {v.homeDateM}月{v.homeDateD}日<span style={{ fontSize: 12, fontWeight: 700, color: '#8a8a82', marginLeft: 3 }}>（{v.homeDateWd}）</span>
+              </div>
+              <div style={{ ...mono, fontSize: 9, letterSpacing: '.08em', color: '#8a8a82', marginTop: 1 }}>{v.homeDateY}{v.homeDateLabel ? ' · ' + v.homeDateLabel : ''}</div>
+            </div>
+            <button onClick={v.homeNextDay} aria-label="次の日" style={ndBtn}>
+              <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 22 }}>chevron_right</span>
+            </button>
+            {/* カレンダーから任意の日へ */}
+            <label style={{ ...ndBtn, position: 'relative', cursor: 'pointer' }} aria-label="カレンダーから選ぶ">
+              <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20 }}>calendar_month</span>
+              <input type="date" value={v.homeDate} onChange={v.setHomeDate} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
+            </label>
+            {/* 今日以外を見ているときだけ「今日」に戻るチップ */}
+            {!v.homeIsToday && (
+              <button onClick={v.goToday} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, height: 30, background: '#c4f000', border: 'none', borderRadius: 999, padding: '0 11px', fontSize: 12, fontWeight: 800, color: '#2f3a00', cursor: 'pointer', flex: '0 0 auto' }}>
+                <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 15 }}>today</span>今日
+              </button>
+            )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto', marginLeft: 6 }}>
             {/* いまの調子（バフ・デバフ）バッジ */}
-            <button onClick={v.openBuffs} style={{ display: 'flex', alignItems: 'center', gap: 3, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, padding: '0 10px', cursor: 'pointer' }}>
+            <button onClick={v.openBuffs} style={{ display: 'flex', alignItems: 'center', gap: 3, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, padding: '0 9px', cursor: 'pointer' }}>
               {v.activeBuffGlyphs.length > 0
                 ? v.activeBuffGlyphs.slice(0, 3).map((g, i) => <Emo key={i} e={g} size={20} />)
-                : <span style={{ fontSize: 11, fontWeight: 700, color: '#8a8a82' }}>🎭 調子</span>}
+                : <span style={{ fontSize: 15 }}>🎭</span>}
             </button>
             <button onClick={v.goMypage} style={{ width: 38, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#55554e', cursor: 'pointer' }}>person</button>
           </div>
