@@ -251,6 +251,11 @@ function Confirm({ v }) {
         <button onClick={v.addMoreMenu} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#fff', border: 'none', borderRadius: 14, padding: '14px 0', fontSize: 14, fontWeight: 700, color: '#7a9a00', cursor: 'pointer', boxShadow: '0 1px 3px rgba(27,27,24,.05)' }}>
           <span style={msIcon(20, '#7a9a00', false)}>add_circle</span>メニューを追加
         </button>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
+          <button onClick={v.openTplSave} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', padding: '4px 2px', fontSize: 12.5, fontWeight: 700, color: '#55554e', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+            <span style={msIcon(17, '#55554e', false)}>bookmark_add</span>テンプレートへ
+          </button>
+        </div>
         <div style={{ marginTop: 12, background: '#fff', borderRadius: 16, padding: 15, boxShadow: '0 1px 3px rgba(27,27,24,.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 700 }}>時間の割り振り</span>
@@ -299,8 +304,6 @@ function Confirm({ v }) {
           ))}
           <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 8 }}>つまみを左右にドラッグで配分を変更（1分単位）。強度チップで体感を調整</div>
         </div>
-        <button onClick={v.openTplSave} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, border: '1.5px solid #1b1b18', borderRadius: 13, padding: '13px 0', fontSize: 13, fontWeight: 700, background: '#fff', color: '#1b1b18', cursor: 'pointer' }}>📋 これらをテンプレにまとめる</button>
-        <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 7, textAlign: 'center' }}>まとめると「予定から」とカレンダー取り込みで次回から自動で使えます</div>
       </div>
       {v.tplOpen && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 9, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
