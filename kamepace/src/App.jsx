@@ -5,7 +5,7 @@
 import React from 'react';
 import Matter from 'matter-js';
 import {
-  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT, BUFFS,
+  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT, BUFFS, MOODS, MOOD_STRENGTHS,
   CAT_ICON_CHOICES, CAT_COLOR_CHOICES, COMPARE_STEPS,
   guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA, DEFAULT_SLOT_HOURS,
 } from './data';
@@ -96,6 +96,11 @@ export default class App extends React.Component {
     /* テンプレにまとめる */
     tplOpen: false,
     tplName: '',
+    /* きもち・できごと（時間なしの心イベント） */
+    moodOpen: false,
+    moodId: null,
+    moodStrength: 'b',
+    moodNote: '',
     /* いまの調子（バフ・デバフ）シート */
     buffOpen: false,
     buffCfgId: null,
@@ -462,6 +467,45 @@ export default class App extends React.Component {
     const rest = this.buffEntries().filter(x => x.id !== id);
     this.set({ activeBuffs: [...rest, entry], buffCfgId: null });
     this.save();
+  };
+  /* ===== きもち・できごと ===== */
+  openMood = () => this.set({ moodOpen: true, moodId: null, moodStrength: 'b', moodNote: '' });
+  closeMood = () => this.set({ moodOpen: false });
+  pickMood = (id) => this.set({ moodId: id });
+  pickMoodStrength = (key) => this.set({ moodStrength: key });
+  onMoodNote = (e) => this.set({ moodNote: e.target.value });
+  commitMood = () => {
+    const mood = MOODS.find(m => m.id === this.state.moodId);
+    if (!mood) return;
+    const base = (MOOD_STRENGTHS.find(x => x.key === this.state.moodStrength) || MOOD_STRENGTHS[1]).v;
+    const recover = mood.kind === 'good';
+    const bm = this.buffMult();
+    // 心だけに効く。個人の心係数×バフ×周期を掛ける
+    const coef = recover ? (this.state.mindRecCoef || 1) * bm.mindRec : (this.state.mindFatCoef || 1) * bm.mindFat;
+    const val = Math.max(1, Math.round(base * coef));
+    const delta = recover ? -val : val;
+    const recDate = this.homeDateStr();
+    const slotId = this.state.slotId || this.slotNow();
+    const slot = this.slotDef(slotId);
+    const off = this.slotUsedMin(slotId);
+    const note = (this.state.moodNote || '').trim();
+    const e = {
+      ...baseEntry(note || mood.name, delta, recDate),
+      glyph: mood.glyph, min: 0, mood: 'event', event: true, _new: true,
+      slot: slotId, from: this.slotHm(slot, off), to: this.slotHm(slot, off),
+    };
+    const entries = sortEntries([...this.state.entries, e]);
+    const immediate = delta > 0;
+    this.set({
+      entries, moodOpen: false, moodId: null, moodNote: '',
+      screen: 'shaka', dayOffset: 0,
+      toast: recover ? 'きもちを記録（回復）' : 'きもちを記録',
+    });
+    this.save();
+    this.stopPhysics();
+    if (delta < 0) this._pendingNeg = [...(this._pendingNeg || []), mood.glyph];
+    requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
+    clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1600);
   };
   openBuffs = () => this.set({ buffOpen: true });
   closeBuffs = () => this.set({ buffOpen: false });
@@ -2354,6 +2398,11 @@ export default class App extends React.Component {
       residual: st.residual,
       recoveredAbs: recovered,
       goHome: this.goHome, goShaka: this.goShaka, goMypage: this.goMypage, goSleep: this.goSleep,
+      moodOpen: !!st.moodOpen, openMood: this.openMood, closeMood: this.closeMood, commitMood: this.commitMood,
+      moodNote: st.moodNote || '', onMoodNote: this.onMoodNote,
+      moodChoices: MOODS.map(m => ({ id: m.id, glyph: m.glyph, name: m.name, kind: m.kind, on: st.moodId === m.id, onPick: () => this.pickMood(m.id) })),
+      moodStrengths: MOOD_STRENGTHS.map(x => ({ key: x.key, label: x.label, on: st.moodStrength === x.key, onPick: () => this.pickMoodStrength(x.key) })),
+      moodCanSave: !!st.moodId,
       /* バフ・デバフ */
       buffOpen: !!st.buffOpen, openBuffs: this.openBuffs, closeBuffs: this.closeBuffs,
       activeBuffGlyphs: this.buffEntries().map(en => (BUFFS.find(b => b.id === en.id) || {}).glyph).filter(Boolean),

@@ -224,6 +224,25 @@ export function guessAct(title) {
 }
 export const IMPORT_DEFAULT_DELTA = 10;
 
+/* きもち・できごと（時間をつけずに記録する心のイベント）。
+   ショック系はプラス（心が疲れる）、うれしい系はマイナス（心が回復） */
+export const MOODS = [
+  { id: 'shock', glyph: '😢', name: 'ショックなこと', kind: 'bad' },
+  { id: 'sad', glyph: '😔', name: 'かなしい', kind: 'bad' },
+  { id: 'angry', glyph: '😤', name: 'いらいら・怒り', kind: 'bad' },
+  { id: 'anxious', glyph: '😰', name: '不安・心配', kind: 'bad' },
+  { id: 'happy', glyph: '😊', name: 'うれしい', kind: 'good' },
+  { id: 'love', glyph: '🥰', name: 'しあわせ', kind: 'good' },
+  { id: 'relief', glyph: '😌', name: 'ほっとした', kind: 'good' },
+  { id: 'fun', glyph: '🎉', name: 'たのしかった', kind: 'good' },
+];
+/* 強さ → 心の値 */
+export const MOOD_STRENGTHS = [
+  { key: 'a', label: '少し', v: 3 },
+  { key: 'b', label: 'まあまあ', v: 6 },
+  { key: 'c', label: 'かなり', v: 10 },
+];
+
 /* バフ・デバフ（いまの調子）: 体・心の疲労/回復係数に一時的にかかる倍率。
    例: 就活が長引いてメンタル消耗中 → 心がもっと疲れやすい */
 export const BUFFS = [

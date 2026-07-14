@@ -79,6 +79,11 @@ export const FLUENT_MAP = {
   '🤕': 'Face with head-bandage/3D/face_with_head-bandage_3d.png',
   '🌧': 'Cloud with rain/3D/cloud_with_rain_3d.png',
   '🏖': 'Beach with umbrella/3D/beach_with_umbrella_3d.png',
+  '😢': 'Crying face/3D/crying_face_3d.png',
+  '😔': 'Pensive face/3D/pensive_face_3d.png',
+  '😤': 'Face with steam from nose/3D/face_with_steam_from_nose_3d.png',
+  '😰': 'Anxious face with sweat/3D/anxious_face_with_sweat_3d.png',
+  '😊': 'Smiling face with smiling eyes/3D/smiling_face_with_smiling_eyes_3d.png',
 };
 
 

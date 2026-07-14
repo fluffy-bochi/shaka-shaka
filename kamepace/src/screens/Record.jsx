@@ -47,6 +47,7 @@ export default function Record({ v }) {
       {v.catAddOpen && <CatAddPopup v={v} />}
       {v.actAddOpen && <ActAddPopup v={v} />}
       {v.newActOpen && <NewActPopup v={v} />}
+      {v.moodOpen && <MoodPopup v={v} />}
       {v.intensityOpen && <IntensityPopup v={v} />}
       {v.planDetailOpen && <PlanDetailPopup v={v} />}
       {v.planAddOpen && <PlanAddPopup v={v} />}
@@ -67,6 +68,14 @@ function Cats({ v }) {
         <button onClick={v.openSearch} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: '#efece3', border: 'none', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}>
           <span style={msIcon(19, '#8a8a82', false)}>search</span>
           <span style={{ fontSize: 14, color: '#a5a39a' }}>なにをした？（例：皿洗い、会議）</span>
+        </button>
+        <button onClick={v.openMood} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: '#fff', border: '1.5px solid #e4e1d8', borderRadius: 12, padding: '11px 13px', marginTop: 9, cursor: 'pointer', textAlign: 'left' }}>
+          <span style={{ fontSize: 18 }}>💭</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>きもち・できごと</span>
+            <span style={{ display: 'block', fontSize: 11, color: '#9d9b91', marginTop: 1 }}>ショックなこと・うれしかったことを時間なしで</span>
+          </span>
+          <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
         </button>
       </div>
       <div style={sectionLabel}>予定から</div>
@@ -565,6 +574,43 @@ function NewActPopup({ v }) {
           <button onClick={v.closeNewAct} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>キャンセル</button>
           <button onClick={v.createNewAct} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>つくって記録</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- きもち・できごと popup（時間なしの心イベント） ---- */
+function MoodPopup({ v }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 7, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div className="nos" style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: '#fff', borderRadius: '22px 22px 0 0', padding: '16px 18px 20px', boxShadow: '0 -12px 40px rgba(27,27,24,.3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>きもち・できごと</div>
+          <button onClick={v.closeMood} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
+        </div>
+        <div style={{ fontSize: 11.5, color: '#8a8a82', textAlign: 'center', marginTop: 6, lineHeight: 1.6 }}>時間はつけません。心にだけ効きます</div>
+        {/* きもち選択 */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>どんなきもち？</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+          {v.moodChoices.map(m => (
+            <button key={m.id} onClick={m.onPick} style={{ display: 'flex', alignItems: 'center', gap: 8, border: m.on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: m.on ? '#fbfdf0' : '#fff', borderRadius: 12, padding: '11px 12px', fontSize: 13, fontWeight: m.on ? 900 : 700, color: '#1b1b18', cursor: 'pointer', textAlign: 'left' }}>
+              <Emo e={m.glyph} size={22} />
+              <span style={{ flex: 1, minWidth: 0 }}>{m.name}</span>
+              <span style={{ ...mono, fontSize: 9, background: m.kind === 'bad' ? '#ffe3ef' : '#eef7cc', color: m.kind === 'bad' ? '#a33e6d' : '#5a7500', borderRadius: 5, padding: '2px 6px' }}>{m.kind === 'bad' ? '＋' : '−'}</span>
+            </button>
+          ))}
+        </div>
+        {/* 強さ */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>どれくらい？</div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          {v.moodStrengths.map(x => (
+            <button key={x.key} onClick={x.onPick} style={{ flex: 1, textAlign: 'center', border: x.on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: x.on ? '#fbfdf0' : '#fff', borderRadius: 12, padding: '11px 0', fontSize: 13, fontWeight: x.on ? 900 : 700, cursor: 'pointer' }}>{x.label}</button>
+          ))}
+        </div>
+        {/* ひとこと（手入力・任意） */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>ひとこと（任意）</div>
+        <textarea value={v.moodNote} onChange={v.onMoodNote} placeholder="例：発表がうまくいった／急なキャンセルでへこんだ" rows={2} style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 14, color: '#1b1b18', boxSizing: 'border-box', outline: 'none', resize: 'none', lineHeight: 1.6 }} />
+        <button onClick={v.commitMood} disabled={!v.moodCanSave} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 14, background: v.moodCanSave ? '#c4f000' : '#e4e1d8', color: v.moodCanSave ? '#2f3a00' : '#a5a39a', fontWeight: 700, fontSize: 16, padding: 16, cursor: v.moodCanSave ? 'pointer' : 'default' }}>きろくする</button>
       </div>
     </div>
   );
