@@ -856,11 +856,17 @@ export default class App extends React.Component {
   _screenRef = React.createRef();
   screenW() { const el = this._screenRef.current; return (el && el.clientWidth) || Math.min(480, window.innerWidth || 372); }
   screenH() { const el = this._screenRef.current; return ((el && el.clientHeight) || window.innerHeight || 812) - 104; }
-  // 100個で画面全体を埋めるサイズ（旧本番と同一式）
-  calcR(w, h) {
+  // 100個で画面全体を埋めるサイズ。100を超えたら縮小して画面に収める（あふれ対策）
+  calcR(w, h, count) {
     const area = Math.max(1, w) * Math.max(1, h);
-    const r = Math.sqrt(area * 0.6 / (100 * Math.PI));
-    return Math.max(12, Math.min(r, 60));
+    let r = Math.sqrt(area * 0.6 / (100 * Math.PI));
+    const n = count || 100;
+    if (n > 100) r *= Math.sqrt(100 / n);
+    return Math.max(8, Math.min(r, 60));
+  }
+  /* 今この画面で積む絵文字の数（シャカ・ホーム・睡眠で共通） */
+  pileCount() {
+    return (this.state.dayOffset === 0 ? this.pileGlyphs().length : this.currentBag().length);
   }
 
   /* 積む絵文字（旧本番 createPileBag と同じ考え方）:
@@ -895,9 +901,12 @@ export default class App extends React.Component {
     this.set({ entries });
   }
 
+  /* 積む絵文字の配置（ホーム背景・睡眠画面で共通に使う唯一の生成元）。
+     y は画面下端からの高さ（Sleep/Home は bottom:y で配置）。 */
   makePile(seed) {
     const W = this.screenW(), H = this.screenH();
-    const r = this.calcR(W, H);
+    const count = this.pileCount();
+    const r = this.calcR(W, H, count);
     const d = r * 2, font = Math.round(r * 1.6);
     // 振って変わった形が保存されていればそれを背景にも使う（勝手に整列しない）
     let saved = this._pileLayout;
@@ -959,7 +968,7 @@ export default class App extends React.Component {
   goMypage = () => this.set({ screen: 'mypage' });
   goSleep = () => {
     this._sleepPile = null;
-    const n = this.pileGlyphs().length;
+    const n = this.sleepCount(); // 表示上限(160)を反映した実数
     this.set({ screen: 'sleep', residual: n });
   };
   openRecord(id) { this.set({ slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
@@ -1393,38 +1402,27 @@ export default class App extends React.Component {
     const r = Math.max(0, Math.min(N, Math.round(frac * N)));
     this.set({ residual: r });
   };
+  /* 睡眠画面の山＝ホーム/シャカと完全に同じ配置（makePile）。
+     下から積まれた順（y昇順）に rank を振り、残量ぶんを下から残す演出に使う。 */
   makeSleepPile() {
     if (this._sleepPile) return this._sleepPile;
-    const glyphs = this.pileGlyphs().slice(-160);
-    let s = 51; const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-    for (let i = glyphs.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = glyphs[i]; glyphs[i] = glyphs[j]; glyphs[j] = t; }
-    // ホーム／シャカの山と同じ幾何
-    const W = this.screenW(), H = this.screenH();
-    const r = this.calcR(W, H);
-    const d = r * 2, font = Math.round(r * 1.6);
-    const cols = Math.max(1, Math.floor(W / d)), out = [];
-    const N = glyphs.length;
-    for (let i = 0; i < N; i++) {
-      const row = Math.floor(i / cols), col = i % cols;
-      const x = Math.round(col * d + (row % 2 ? d / 2 : 0) + (rng() - 0.5) * (d * 0.35));
-      out.push({
-        e: glyphs[i],
-        x: Math.max(-8, Math.min(W - d + 8, x)),
-        y: Math.max(-6, Math.round(row * d * 0.82 + (rng() - 0.5) * (d * 0.25))),
-        r2: Math.round((rng() - 0.5) * 54),
-        s: font,
-      });
-    }
-    this._sleepPile = out; this._sleepN = N; this._sleepD = d; this._sleepCols = cols;
-    return out;
+    const pile = this.makePile(7).map(p => ({ ...p }));
+    // y は下端からの高さ。小さい＝下＝先に積まれた
+    const order = pile.map((p, i) => ({ i, y: p.y })).sort((a, b) => a.y - b.y);
+    order.forEach((o, rank) => { pile[o.i].rank = rank; });
+    this._sleepPile = pile;
+    this._sleepN = pile.length;
+    this._sleepYByRank = order.map(o => o.y); // rank→y（ライン位置に使う）
+    this._sleepFont = pile[0] ? pile[0].s : 40;
+    return pile;
   }
   sleepCount() { this.makeSleepPile(); return this._sleepN; }
   finishSleep = () => {
     const recovered = Math.max(0, this.sleepCount() - this.state.residual);
     if (recovered <= 0) { this.set({ screen: 'home' }); return; }
     // 他の回復と同じ: 🌙をシャカに降らせて、プラスの絵文字に触れたぶんだけ消す
-    // （consumed・ためた回復への加算は衝突時に行われる）
-    this._pendingNeg = [...(this._pendingNeg || []), ...Array.from({ length: Math.min(recovered, 80) }, () => '🌙')];
+    // （consumed・ためた回復への加算は衝突時に行われる）。多いときは複数回に分けて降らす
+    this._pendingNeg = [...(this._pendingNeg || []), ...Array.from({ length: Math.min(recovered, 160) }, () => '🌙')];
     this.set({ screen: 'shaka', dayOffset: 0 });
     this.stopPhysics();
     requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
@@ -1515,7 +1513,7 @@ export default class App extends React.Component {
     const { Engine, World, Bodies, Runner } = Matter;
     const rect = el.getBoundingClientRect();
     const W = rect.width || 350, H = rect.height || 700;
-    const r = this.calcR(W, H);
+    const r = this.calcR(W, H, this.pileCount()); // ホーム/睡眠と同じ個数基準で縮小
     this.PR = r;
     this.engine = Engine.create();
     this.engine.world.gravity.y = 1.2;
@@ -1687,7 +1685,7 @@ export default class App extends React.Component {
     const rect = el.getBoundingClientRect();
     const W = rect.width || 350, H = rect.height || 700, r = this.PR;
     this.resumeMotion();
-    glyphs.slice(0, 80).forEach(g => {
+    glyphs.slice(0, 160).forEach(g => {
       const x = r + Math.random() * (W - 2 * r);
       const y = -r - Math.random() * (H * 0.6);
       const body = Bodies.circle(x, y, r, this.BODY_OPTS);
@@ -2310,14 +2308,21 @@ export default class App extends React.Component {
       homePrevDay: this.homePrevDay, homeNextDay: this.homeNextDay,
       setHomeDate: this.setHomeDate, goToday: this.goToday,
       pile: st.screen === 'home' ? this.makePile(7) : [],
+      // 残量ライン（rank）より上の絵文字が消える。ホーム/シャカと同じ配置
       sleepPile: st.screen === 'sleep' ? this.makeSleepPile().map((p, i) => ({
         ...p,
-        op: i < st.residual ? 1 : (st.sleepAnim ? 0 : 0.82),
+        op: p.rank < st.residual ? 1 : (st.sleepAnim ? 0 : 0.82),
         delay: st.sleepAnim ? (0.35 + (i % 12) * 0.07).toFixed(2) + 's' : '0s',
       })) : [],
       moons: st.moons || [],
       sleepAnim: !!st.sleepAnim,
-      residualPct: (Math.ceil(st.residual / (this._sleepCols || 6)) * (this._sleepD || 58) * 0.82 + 6).toFixed(0) + 'px',
+      residualPct: (() => {
+        const arr = this._sleepYByRank || [];
+        if (st.residual <= 0 || !arr.length) return '4px';
+        // 残す絵文字の一番上（rank=residual-1 の粒）の上端にラインを置く
+        const topY = arr[Math.min(st.residual, arr.length) - 1] || 0;
+        return (topY + (this._sleepFont || 40) * 0.65 + 4).toFixed(0) + 'px';
+      })(),
       onSleepDrag: this.onSleepDrag,
       slots,
       plans,
