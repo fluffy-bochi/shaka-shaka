@@ -103,6 +103,7 @@ export default class App extends React.Component {
     moodNote: '',
     /* いまの調子（バフ・デバフ）シート */
     buffOpen: false,
+    buffCheckOpen: false,
     buffCfgId: null,
     buffCfgTitle: '',
     buffCfgKey: 'none',
@@ -137,7 +138,7 @@ export default class App extends React.Component {
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
       prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats,
-      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle,
+      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
     };
@@ -339,6 +340,7 @@ export default class App extends React.Component {
     }
     if (has('育児') || has('子供')) return [{ key: 'mood', label: 'きげん', opts: ['ごきげん', 'ふつう', 'ぐずり'], mult: [0.85, 1, 1.3] }];
     if (has('運動')) return [{ key: 'intensity', label: '強度', opts: ['軽め', 'ふつう', 'ハード'], mult: [0.8, 1, 1.4] }];
+    if (item.symptom) return [{ key: 'level', label: 'つらさ', opts: ['軽い', 'ふつう', '強い'], mult: [0.7, 1, 1.4] }];
     return [];
   }
   effFh(item) {
@@ -402,8 +404,8 @@ export default class App extends React.Component {
   buffMult() {
     const out = { bodyFat: 1, mindFat: 1, bodyRec: 1, mindRec: 1 };
     this.buffEntries().forEach(en => {
-      const b = BUFFS.find(x => x.id === en.id);
-      if (b && b.mult) Object.keys(out).forEach(k => { if (b.mult[k]) out[k] *= b.mult[k]; });
+      const m = en.mult || (BUFFS.find(x => x.id === en.id) || {}).mult;
+      if (m) Object.keys(out).forEach(k => { if (m[k]) out[k] *= m[k]; });
     });
     const cm = this.cycleMult();
     Object.keys(out).forEach(k => { out[k] *= cm[k]; });
@@ -593,7 +595,7 @@ export default class App extends React.Component {
   selectSearchItem = (kwIndex, item) => {
     const picks = this.intensityQuestions(item).map(q => Math.floor(q.opts.length / 2));
     const id = 'sc' + Date.now() + Math.floor(Math.random() * 1000);
-    const cart = [...this.state.searchCart, { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, defMin: this.initialMinOf(item), kw: item.kw, picks }];
+    const cart = [...this.state.searchCart, { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, defMin: this.initialMinOf(item), kw: item.kw, picks, symId: item.id, symptom: item.symptom, buffLv: item.buffLv }];
     const resolved = kwIndex == null ? this.state.resolvedIdx : [...this.state.resolvedIdx, kwIndex];
     const remaining = this.remainingKw(resolved);
     // 初期時間は各行動の標準所要時間（defaultMin）の合計・配分もその比率（v3）
@@ -755,6 +757,8 @@ export default class App extends React.Component {
         e.from = this.slotHm(slot, slotOffset); e.to = this.slotHm(slot, slotOffset + mins[i]);
         slotOffset += mins[i];
       }
+      // 体調・症状: あとで自動デバフ＋後続時間帯へ複製するための情報を残す
+      if (t.symptom && t.symId) { e.symptom = true; e.symId = t.symId; e.level = (t.picks && t.picks[0] != null) ? t.picks[0] : 1; e.buffLv = t.buffLv; }
       return e;
     });
     // 前回つかった時間を学習（次回の初期値になる）
@@ -762,6 +766,9 @@ export default class App extends React.Component {
     items.forEach((t, i) => { const k = normTitle(t.name); if (k) lastMins[k] = mins[i]; });
     // テンプレは自動保存しない（確認画面の「テンプレにまとめる」ボタンで明示的に保存）
     const framePlan = this.state.framePlan;
+    // 体調・症状を記録したら、自動デバフをオン＋その日の後続時間帯にも同じ症状を入れる
+    const sym = this.applySymptomEffects(newEntries, recDate, slotId);
+    if (sym.extraEntries.length) newEntries.push(...sym.extraEntries);
     const entries = sortEntries([...baseEntries, ...newEntries]);
     const anyImmediate = newEntries.some(r => !r.planned);
     const toastMsg = isEdit ? 'へんこうしました' : (anyImmediate ? 'きろくしました' : '予定を追加した（時間どおりに記録）');
@@ -771,7 +778,9 @@ export default class App extends React.Component {
       if (!e.planned && e.delta < 0) { for (let i = 0; i < -e.delta; i++) negGlyphs.push(e.glyph || entryGlyph(e)); }
     });
     this.set({
-      entries, lastMins, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, toast: toastMsg,
+      entries, lastMins, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null,
+      toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
+      activeBuffs: sym.activeBuffs,
       // 編集で山が縮んだ場合に consumed が超過しないように
       consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)),
     });
@@ -783,6 +792,49 @@ export default class App extends React.Component {
     }
     clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1800);
   };
+
+  /* 体調・症状の副作用: 自動デバフのオン＋その日の後続時間帯へ同じ症状を複製 */
+  applySymptomEffects(newEntries, recDate, slotId) {
+    const out = { activeBuffs: this.state.activeBuffs || [], extraEntries: [], buffAdded: null };
+    const symEntries = newEntries.filter(e => e.symptom && e.symId);
+    if (!symEntries.length) return out;
+    let buffs = [...(this.state.activeBuffs || [])];
+    const slotIdx = SLOTS.findIndex(x => x.id === slotId);
+    const seen = new Set();
+    symEntries.forEach(e => {
+      if (seen.has(e.symId)) return;
+      seen.add(e.symId);
+      const lv = e.level != null ? e.level : 1;
+      const mult = (e.buffLv && e.buffLv[lv]) || { bodyFat: 1.2, mindFat: 1.15 };
+      const id = 'sym:' + e.symId;
+      const nm = e.title || e.name;
+      // 自動デバフをオン（既にあれば mult/level を更新）
+      const norm = buffs.map(x => (typeof x === 'string' ? { id: x } : x));
+      const exists = norm.find(x => x.id === id);
+      const entry = { id, title: nm, glyph: e.glyph, mult, symptom: true, symId: e.symId, level: lv, from: recDate, until: null, key: 'symptom' };
+      buffs = norm.filter(x => x.id !== id).concat(entry);
+      if (!exists) out.buffAdded = nm;
+      // 後続の時間帯にも同じ症状を自動で入れる（まだその症状が無い時間帯のみ・当日のみ）
+      if (slotIdx >= 0 && recDate === todayStr()) {
+        for (let k = slotIdx + 1; k < SLOTS.length; k++) {
+          const sd = SLOTS[k];
+          const has = [...this.state.entries, ...newEntries, ...out.extraEntries]
+            .some(x => x.date === recDate && !x.exp && x.symId === e.symId && this.slotOf(x) === sd.id);
+          if (has) continue;
+          const def = this.slotDefs()[k];
+          const min = Math.max(15, Math.round((e.min || 30) * 0.6));
+          const fat = Math.max(1, Math.round((e.delta || 4) * 0.6));
+          out.extraEntries.push({
+            ...baseEntry(nm, fat, recDate),
+            glyph: e.glyph, min, slot: sd.id, symptom: true, symId: e.symId, level: lv, buffLv: e.buffLv, autoSym: true,
+            from: this.slotHm(def, 0), to: this.slotHm(def, min),
+          });
+        }
+      }
+    });
+    out.activeBuffs = buffs;
+    return out;
+  }
 
   /* ---- テンプレにまとめる（確認画面の明示ボタン。自動では保存しない） ---- */
   openTplSave = () => {
@@ -967,10 +1019,27 @@ export default class App extends React.Component {
   goShaka = () => { this.set({ screen: 'shaka' }); requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el && !this.engine) this.startPhysics(el); }); };
   goMypage = () => this.set({ screen: 'mypage' });
   goSleep = () => {
+    // 翌朝＝睡眠記録のタイミングで、続いている調子（バフ・デバフ）をまだ続いているか確認
+    if (this.buffEntries().length && this.state.lastBuffCheck !== todayStr()) {
+      this.set({ buffCheckOpen: true });
+      return;
+    }
+    this._enterSleep();
+  };
+  _enterSleep() {
     this._sleepPile = null;
     const n = this.sleepCount(); // 表示上限(160)を反映した実数
-    this.set({ screen: 'sleep', residual: n });
+    this.set({ screen: 'sleep', residual: n, buffCheckOpen: false });
+  }
+  /* 継続確認シート */
+  buffCheckKeep = (id) => { /* 維持＝何もしない */ void id; };
+  buffCheckEnd = (id) => {
+    const en = this.buffEntries().find(x => x.id === id);
+    const rest = this.buffEntries().filter(x => x.id !== id);
+    this.set({ activeBuffs: rest, buffLog: en ? this.pushBuffLog(en, todayStr()) : this.state.buffLog });
+    this.save();
   };
+  finishBuffCheck = () => { this.set({ lastBuffCheck: todayStr() }); this.save(); this._enterSleep(); };
   openRecord(id) { this.set({ slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
   toggleSlotMenu = () => this.set({ slotMenuOpen: !this.state.slotMenuOpen });
   pickSlot = (id) => this.set({ slotId: id, slotMenuOpen: false });
@@ -1105,7 +1174,8 @@ export default class App extends React.Component {
         body: t.body != null ? t.body * ratio : undefined,
         mind: t.mind != null ? t.mind * ratio : undefined,
         defMin: this.initialMinOf(t),
-        kw: [...(t.kw || []), t.name], picks: [], after: t.after || 0,
+        kw: [...(t.kw || []), t.name], picks: this.intensityQuestions(t).map(q => Math.floor(q.opts.length / 2)),
+        after: t.after || 0, symId: t.id, symptom: t.symptom, buffLv: t.buffLv,
       };
     });
     const fracs = items.map(t => durOf(t) / totalMin);
@@ -2447,6 +2517,19 @@ export default class App extends React.Component {
         return { key: 'log' + i, glyph: b.glyph, name: l.title || b.name, kind: b.kind,
           period: this.fmtMD(l.from) + ' 〜 ' + this.fmtMD(l.end) };
       }),
+      // 症状デバフ（プリセット外・動的）を BuffSheet 上部に表示
+      activeSymptomBuffs: this.buffEntries().filter(en => en.symptom).map(en => ({
+        id: en.id, glyph: en.glyph, name: en.title,
+        level: ['軽い', 'ふつう', '強い'][en.level != null ? en.level : 1],
+        onRemove: () => this.buffCheckEnd(en.id),
+      })),
+      // 翌朝の継続確認
+      buffCheckOpen: !!st.buffCheckOpen,
+      buffCheckRows: this.buffEntries().map(en => {
+        const b = BUFFS.find(x => x.id === en.id) || {};
+        return { id: en.id, glyph: en.glyph || b.glyph, name: en.title || b.name, kind: en.symptom ? 'debuff' : b.kind, onEnd: () => this.buffCheckEnd(en.id) };
+      }),
+      finishBuffCheck: this.finishBuffCheck,
       buffCfgOpen: !!st.buffCfgId,
       buffCfgGlyph: st.buffCfgId ? (BUFFS.find(b => b.id === st.buffCfgId) || {}).glyph : '',
       buffCfgPreset: st.buffCfgId ? (BUFFS.find(b => b.id === st.buffCfgId) || {}).name : '',

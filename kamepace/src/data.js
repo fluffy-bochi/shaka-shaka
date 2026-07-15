@@ -111,6 +111,16 @@ export const CATS = [
     act('hairset', '💇', 'content_cut', 'ヘアセット', 2, 3, 15, { kw: ['身じたく', '髪', 'ヘアセット', 'ドライヤー'] }),
     act('shaving', '🪒', 'cut', 'ひげそり', 2, 1, 10, { kw: ['身じたく', 'ひげ', '髭剃り'] }),
   ] },
+  { id: 'health', icon: 'sick', color: '#d98b5b', glyph: '🤒', name: '体調・症状', sub: '頭痛・腹痛・生理痛・発熱など', items: [
+    act('headache', '🤕', 'sick', '頭痛', 4, 3, 60, { kw: ['体調', '頭痛', 'ずつう', '頭がいたい'], symptom: true, buffLv: [{ bodyFat: 1.1, mindFat: 1.1 }, { bodyFat: 1.2, mindFat: 1.15 }, { bodyFat: 1.35, mindFat: 1.25 }] }),
+    act('stomachache', '😣', 'sick', '腹痛', 4, 2, 60, { kw: ['体調', '腹痛', 'おなかがいたい', '胃痛'], symptom: true, buffLv: [{ bodyFat: 1.1 }, { bodyFat: 1.2 }, { bodyFat: 1.35 }] }),
+    act('cramps', '🩸', 'sick', '生理痛', 5, 3, 120, { kw: ['体調', '生理痛', 'せいりつう'], symptom: true, buffLv: [{ bodyFat: 1.1, mindFat: 1.05 }, { bodyFat: 1.25, mindFat: 1.1 }, { bodyFat: 1.4, mindFat: 1.2 }] }),
+    act('fever', '🤒', 'sick', '発熱', 6, 3, 120, { kw: ['体調', '発熱', 'ねつ', '熱っぽい'], symptom: true, buffLv: [{ bodyFat: 1.15, mindFat: 1.1 }, { bodyFat: 1.3, mindFat: 1.15 }, { bodyFat: 1.5, mindFat: 1.25 }] }),
+    act('nausea', '🤢', 'sick', '吐き気', 4, 3, 60, { kw: ['体調', '吐き気', 'はきけ', '気持ち悪い'], symptom: true, buffLv: [{ bodyFat: 1.1, mindFat: 1.1 }, { bodyFat: 1.2, mindFat: 1.15 }, { bodyFat: 1.35, mindFat: 1.25 }] }),
+    act('sluggish', '😮‍💨', 'sick', 'だるさ・倦怠感', 4, 3, 120, { kw: ['体調', 'だるい', 'けんたい', 'しんどい'], symptom: true, buffLv: [{ bodyFat: 1.1, mindFat: 1.1 }, { bodyFat: 1.2, mindFat: 1.15 }, { bodyFat: 1.3, mindFat: 1.25 }] }),
+    act('cold', '🤧', 'sick', '風邪ぎみ', 5, 3, 120, { kw: ['体調', '風邪', 'かぜ', '鼻水', 'せき'], symptom: true, buffLv: [{ bodyFat: 1.15, mindFat: 1.1 }, { bodyFat: 1.25, mindFat: 1.15 }, { bodyFat: 1.4, mindFat: 1.2 }] }),
+    act('hangover', '🥴', 'sick', '二日酔い', 5, 2, 120, { kw: ['体調', '二日酔い', 'ふつかよい'], symptom: true, buffLv: [{ bodyFat: 1.15 }, { bodyFat: 1.25, mindFat: 1.05 }, { bodyFat: 1.4, mindFat: 1.15 }] }),
+  ] },
   { id: 'rest', icon: 'self_improvement', color: '#7a9a00', glyph: '☕', name: '休憩・回復', sub: 'お茶・入浴・昼寝・趣味 ・ −回復', items: [
     act('rest', '☕', 'local_cafe', '休憩・コーヒー', 2, 5, 15, { recover: true, kw: ['休憩', 'お茶', 'カフェ', 'コーヒー', '休む'] }),
     act('meal', '🍙', 'restaurant', '食事', 3, 4, 30, { recover: true, kw: ['休憩', '食事', 'ランチ', 'ごはん'] }),

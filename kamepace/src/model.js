@@ -86,6 +86,7 @@ export function serialize(st) {
     activeBuffs: st.activeBuffs || [],
     buffLog: st.buffLog || [],
     cycle: st.cycle || null,
+    lastBuffCheck: st.lastBuffCheck || null,
     bodyFatCoef: st.bodyFatCoef || 1,
     mindFatCoef: st.mindFatCoef || 1,
     bodyRecCoef: st.bodyRecCoef || 1,
@@ -134,6 +135,7 @@ export function deserialize(data) {
     activeBuffs: Array.isArray(data.activeBuffs) ? data.activeBuffs : [],
     buffLog: Array.isArray(data.buffLog) ? data.buffLog : [],
     cycle: (data.cycle && typeof data.cycle === 'object') ? data.cycle : null,
+    lastBuffCheck: data.lastBuffCheck || null,
     // 体・心それぞれの個人係数。旧1軸フィールド(fatigueCoef/recoverCoef)からの移行も受ける
     bodyFatCoef: typeof data.bodyFatCoef === 'number' ? data.bodyFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
     mindFatCoef: typeof data.mindFatCoef === 'number' ? data.mindFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
@@ -148,7 +150,7 @@ export function freshState() {
     collected: [], collectedSeen: 0, templates: {}, consumed: 0, sampleDay: null,
     customCats: [], customPlans: [], customActions: [], customItems: {}, prefs: {},
     slotHours: null, hiddenCats: [],
-    onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null,
+    onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null,
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1,
   };
 }

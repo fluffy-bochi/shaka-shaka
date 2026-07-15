@@ -84,6 +84,12 @@ export const FLUENT_MAP = {
   '😤': 'Face with steam from nose/3D/face_with_steam_from_nose_3d.png',
   '😰': 'Anxious face with sweat/3D/anxious_face_with_sweat_3d.png',
   '😊': 'Smiling face with smiling eyes/3D/smiling_face_with_smiling_eyes_3d.png',
+  '😣': 'Persevering face/3D/persevering_face_3d.png',
+  '🩸': 'Drop of blood/3D/drop_of_blood_3d.png',
+  '🤢': 'Nauseated face/3D/nauseated_face_3d.png',
+  '😮‍💨': 'Face exhaling/3D/face_exhaling_3d.png',
+  '🥴': 'Woozy face/3D/woozy_face_3d.png',
+  '🤧': 'Sneezing face/3D/sneezing_face_3d.png',
 };
 
 

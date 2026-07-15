@@ -94,7 +94,30 @@ export default function Home({ v }) {
         ))}
       </div>
       {v.buffOpen && <BuffSheet v={v} />}
+      {v.buffCheckOpen && <BuffCheckSheet v={v} />}
     </>
+  );
+}
+
+/* 翌朝（睡眠記録時）の継続確認: いま続いている調子がまだ続いているか */
+function BuffCheckSheet({ v }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 9, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div className="nos" style={{ width: '100%', maxHeight: '88%', overflowY: 'auto', background: '#fff', borderRadius: '22px 22px 0 0', padding: '16px 18px 22px', boxShadow: '0 -12px 40px rgba(27,27,24,.3)' }}>
+        <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 900 }}>いまの調子、まだ続いてる？</div>
+        <div style={{ fontSize: 11.5, color: '#8a8a82', textAlign: 'center', marginTop: 6, lineHeight: 1.6 }}>おさまったものはオフにします。続いていればそのまま寝てOK</div>
+        <div style={{ marginTop: 14 }}>
+          {v.buffCheckRows.map(b => (
+            <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 11, background: '#fff', border: '1px solid #f1efe8', borderRadius: 14, padding: '11px 13px', marginBottom: 8 }}>
+              <Emo e={b.glyph} size={26} />
+              <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700 }}>{b.name}</span>
+              <button onClick={b.onEnd} style={{ border: '1.5px solid #e4e1d8', background: '#fff', borderRadius: 999, padding: '7px 13px', fontSize: 12, fontWeight: 700, color: '#55554e', cursor: 'pointer' }}>おさまった</button>
+            </div>
+          ))}
+        </div>
+        <button onClick={v.finishBuffCheck} style={{ width: '100%', marginTop: 8, border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 16, padding: 16, cursor: 'pointer' }}>これで睡眠の記録へ</button>
+      </div>
+    </div>
   );
 }
 
@@ -132,6 +155,23 @@ function BuffSheet({ v }) {
           <button onClick={v.closeBuffs} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
         </div>
         <div style={{ fontSize: 11.5, color: '#8a8a82', textAlign: 'center', marginTop: 6, lineHeight: 1.6 }}>オンにしている間、これからの記録の疲労・回復にかかります</div>
+        {v.activeSymptomBuffs.length > 0 && (
+          <React.Fragment>
+            <div style={{ ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a8a82', margin: '14px 2px 6px' }}>体調（記録から自動）</div>
+            <div style={{ border: '1px solid #f1efe8', borderRadius: 14, overflow: 'hidden' }}>
+              {v.activeSymptomBuffs.map((b, i, arr) => (
+                <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 13px', borderBottom: i < arr.length - 1 ? '1px solid #f1efe8' : 'none', background: '#fff' }}>
+                  <Emo e={b.glyph} size={24} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{b.name}</div>
+                    <div style={{ fontSize: 10.5, color: '#9d9b91', marginTop: 1 }}>つらさ：{b.level}</div>
+                  </div>
+                  <button onClick={b.onRemove} style={{ border: '1.5px solid #e4e1d8', background: '#fff', borderRadius: 999, padding: '7px 12px', fontSize: 11.5, fontWeight: 700, color: '#55554e', cursor: 'pointer' }}>おさまった</button>
+                </div>
+              ))}
+            </div>
+          </React.Fragment>
+        )}
         {section('debuff', 'デバフ（つらい状態）')}
         {section('buff', 'バフ（いい状態）')}
       </div>
