@@ -104,6 +104,7 @@ export default class App extends React.Component {
     /* いまの調子（バフ・デバフ）シート */
     buffOpen: false,
     buffCheckOpen: false,
+    symAdjust: null,
     buffCfgId: null,
     buffCfgTitle: '',
     buffCfgKey: 'none',
@@ -766,6 +767,16 @@ export default class App extends React.Component {
     items.forEach((t, i) => { const k = normTitle(t.name); if (k) lastMins[k] = mins[i]; });
     // テンプレは自動保存しない（確認画面の「テンプレにまとめる」ボタンで明示的に保存）
     const framePlan = this.state.framePlan;
+    // 編集で症状のつらさ(level)が変わったら、あとでデバフ倍率の確認を出す
+    let symLevelChange = null;
+    if (isEdit) {
+      items.forEach((t) => {
+        if (t.symptom && t.symId && t._origLevel != null && t.picks && t.picks[0] != null && t.picks[0] !== t._origLevel) {
+          const active = this.buffEntries().find(x => x.id === 'sym:' + t.symId);
+          if (active) symLevelChange = { symId: t.symId, name: t.name, level: t.picks[0], buffLv: t.buffLv };
+        }
+      });
+    }
     // 体調・症状を記録したら、自動デバフをオン＋その日の後続時間帯にも同じ症状を入れる
     const sym = this.applySymptomEffects(newEntries, recDate, slotId);
     if (sym.extraEntries.length) newEntries.push(...sym.extraEntries);
@@ -783,6 +794,8 @@ export default class App extends React.Component {
       activeBuffs: sym.activeBuffs,
       // 編集で山が縮んだ場合に consumed が超過しないように
       consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)),
+      // 症状のつらさが変わったら、デバフの強さも合わせるか確認
+      symAdjust: symLevelChange,
     });
     this.save();
     if (anyImmediate) {
@@ -1040,6 +1053,17 @@ export default class App extends React.Component {
     this.save();
   };
   finishBuffCheck = () => { this.set({ lastBuffCheck: todayStr() }); this.save(); this._enterSleep(); };
+  /* 症状のつらさ変更に合わせてデバフ倍率を更新するか */
+  applySymAdjust = () => {
+    const sa = this.state.symAdjust;
+    if (!sa) return;
+    const mult = (sa.buffLv && sa.buffLv[sa.level]) || { bodyFat: 1.2, mindFat: 1.15 };
+    const buffs = this.buffEntries().map(x => x.id === 'sym:' + sa.symId ? { ...x, mult, level: sa.level } : x);
+    this.set({ activeBuffs: buffs, symAdjust: null });
+    this.save();
+    this.toast('「' + sa.name + '」のデバフも調整しました');
+  };
+  dismissSymAdjust = () => this.set({ symAdjust: null });
   openRecord(id) { this.set({ slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
   toggleSlotMenu = () => this.set({ slotMenuOpen: !this.state.slotMenuOpen });
   pickSlot = (id) => this.set({ slotId: id, slotMenuOpen: false });
@@ -1202,6 +1226,12 @@ export default class App extends React.Component {
       const it = { id: 'sce' + Date.now() + k, name: e.title, glyph: entryGlyph(e), fh, kw: [e.act, e.title].filter(Boolean), picks: [] };
       if (e.plan) it.plan = e.plan;
       if (e.after) it.after = min ? (e.after * 60 / min) : e.after;
+      // 症状: つらさ(level)を強度チップで再編集できるよう引き継ぐ
+      if (e.symptom && e.symId) {
+        it.symId = e.symId; it.symptom = true; it.buffLv = e.buffLv;
+        it.picks = [e.level != null ? e.level : 1];
+        it._origLevel = e.level != null ? e.level : 1;
+      }
       return it;
     });
     const first = entries[idxs[0]], last = entries[idxs[idxs.length - 1]];
@@ -2530,6 +2560,10 @@ export default class App extends React.Component {
         return { id: en.id, glyph: en.glyph || b.glyph, name: en.title || b.name, kind: en.symptom ? 'debuff' : b.kind, onEnd: () => this.buffCheckEnd(en.id) };
       }),
       finishBuffCheck: this.finishBuffCheck,
+      symAdjustOpen: !!st.symAdjust,
+      symAdjustName: st.symAdjust ? st.symAdjust.name : '',
+      symAdjustLevel: st.symAdjust ? ['軽い', 'ふつう', '強い'][st.symAdjust.level] : '',
+      applySymAdjust: this.applySymAdjust, dismissSymAdjust: this.dismissSymAdjust,
       buffCfgOpen: !!st.buffCfgId,
       buffCfgGlyph: st.buffCfgId ? (BUFFS.find(b => b.id === st.buffCfgId) || {}).glyph : '',
       buffCfgPreset: st.buffCfgId ? (BUFFS.find(b => b.id === st.buffCfgId) || {}).name : '',
@@ -2577,6 +2611,18 @@ export default class App extends React.Component {
         {v.isSensitivity && <Sensitivity v={v} />}
         {v.isHelp && <Help v={v} />}
         {v.tutorial > 0 && <Tutorial v={v} />}
+        {v.symAdjustOpen && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 11, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
+            <div style={{ width: '100%', background: '#fff', borderRadius: 22, padding: '18px 20px 20px', boxShadow: '0 24px 60px rgba(27,27,24,.35)' }}>
+              <div style={{ fontSize: 15, fontWeight: 900, textAlign: 'center' }}>デバフの強さも合わせる？</div>
+              <div style={{ fontSize: 12.5, color: '#55554e', textAlign: 'center', marginTop: 10, lineHeight: 1.7 }}>「{v.symAdjustName}」のつらさを<b>{v.symAdjustLevel}</b>に変えました。<br />いまの調子のデバフも同じ強さにしますか？</div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                <button onClick={v.dismissSymAdjust} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>そのまま</button>
+                <button onClick={v.applySymAdjust} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>合わせる</button>
+              </div>
+            </div>
+          </div>
+        )}
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}
