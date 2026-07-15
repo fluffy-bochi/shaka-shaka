@@ -6,8 +6,9 @@ export default function Shaka({ v }) {
   return (
     <>
       <div id="shakacase" style={{ position: 'absolute', left: 0, right: 0, top: 40, bottom: 64, zIndex: 0, overflow: 'hidden' }} />
+      {/* 上部: 日付ピル＋シャッフル（メイン画面なので閉じるボタンは無し） */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 20px 0' }}>
-        <button onClick={v.goHome} style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,.85)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#55554e', cursor: 'pointer' }}>✕</button>
+        <div style={{ width: 34 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,.85)', borderRadius: 999, padding: '6px 10px' }}>
           <button onClick={v.prevDay} style={{ background: 'none', border: 'none', fontSize: 14, color: v.prevColor, cursor: 'pointer', padding: '2px 6px' }}>‹</button>
           <span style={{ ...mono, fontSize: 12, fontWeight: 700 }}>{v.shakaDate}</span>
@@ -20,9 +21,14 @@ export default function Shaka({ v }) {
         <div style={{ fontFamily: "'Archivo',sans-serif", fontWeight: 800, fontSize: 68, lineHeight: 1.02, letterSpacing: '.01em', color: '#1b1b18' }}>{v.clockHm}</div>
       </div>
       <div style={{ flex: 1 }} />
-      <button onClick={v.goCollect} style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 90, zIndex: 2, background: '#1b1b18', color: '#fff', border: 'none', borderRadius: 999, padding: '11px 18px', fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-        <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#c4f000', color: '#2f3a00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>🏆</span>
-        ためた回復を見る
+      {/* 右端の「ためた回復」タブ（画面右辺にくっつく） */}
+      <button onClick={v.goCollect} aria-label="ためた回復" style={{ position: 'absolute', right: 0, top: '46%', transform: 'translateY(-50%)', zIndex: 2, background: '#1b1b18', color: '#fff', border: 'none', borderRadius: '14px 0 0 14px', padding: '11px 9px 11px 11px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', boxShadow: '0 4px 14px rgba(27,27,24,.2)' }}>
+        <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#c4f000', color: '#2f3a00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>🏆</span>
+        <span style={{ ...mono, fontSize: 9, fontWeight: 700, writingMode: 'vertical-rl', letterSpacing: '.1em' }}>ためた</span>
+      </button>
+      {/* 右下の記録ボタン（＋） */}
+      <button onClick={v.goRecordNow} aria-label="記録する" style={{ position: 'absolute', right: 18, bottom: 84, zIndex: 3, width: 58, height: 58, borderRadius: '50%', background: '#c4f000', color: '#2f3a00', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 22px rgba(122,154,0,.4)' }}>
+        <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 30, fontWeight: 700 }}>add</span>
       </button>
     </>
   );

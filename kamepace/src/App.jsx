@@ -37,7 +37,7 @@ import Cycle from './screens/Cycle';
 
 export default class App extends React.Component {
   state = {
-    screen: 'home',
+    screen: 'shaka',
     /* ---- 同期されるデータ（旧本番互換） ---- */
     ...freshState(),
     /* ---- UIステート ---- */
@@ -1030,6 +1030,7 @@ export default class App extends React.Component {
   /* ================= navigation ================= */
   goHome = () => this.set({ screen: 'home' });
   goShaka = () => { this.set({ screen: 'shaka' }); requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el && !this.engine) this.startPhysics(el); }); };
+  goRecordNow = () => this.openRecord(this.slotNow());
   goMypage = () => this.set({ screen: 'mypage' });
   goSleep = () => {
     // 翌朝＝睡眠記録のタイミングで、続いている調子（バフ・デバフ）をまだ続いているか確認
@@ -2389,7 +2390,7 @@ export default class App extends React.Component {
       tutorial: st.tutorial, tutFlags: st.tutFlags,
       startTutorial: this.startTutorial, endTutorial: this.endTutorial, tutNext: this.tutNext,
       isCollect: st.screen === 'collect', collectedTotal: this.collectedTotal(),
-      goCollect: this.goCollect, finishSleep: this.finishSleep,
+      goCollect: this.goCollect, goRecordNow: this.goRecordNow, finishSleep: this.finishSleep,
       navHomeColor: ['home', 'record', 'sleep'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navHomeFill: ['home', 'record', 'sleep'].includes(st.screen) ? 1 : 0,
       navShakaColor: ['shaka', 'collect'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
