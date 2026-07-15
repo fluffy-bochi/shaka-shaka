@@ -139,7 +139,7 @@ export default class App extends React.Component {
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
       prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats,
-      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck,
+      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, mainScreen: s.mainScreen,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
     };
@@ -193,7 +193,7 @@ export default class App extends React.Component {
     let g = null;
     try { const s = localStorage.getItem('shaka_guest'); if (s) g = JSON.parse(s); } catch (e) { /* ignore */ }
     const { data, changed } = this.refreshGuestSamples(deserialize(g));
-    this.set({ ...data, booted: true });
+    this.set({ ...data, booted: true, screen: data.mainScreen || 'shaka' });
     if (changed) { this._pileLayout = null; this.save(); }
     setTimeout(() => this.advancePlans(), 0); // アプリを閉じている間に進んだ予定をキャッチアップ
     setTimeout(() => this.sweepExpiredBuffs(), 0);
@@ -215,7 +215,7 @@ export default class App extends React.Component {
     try {
       const data = await loadUserData();
       if (data) {
-        this.set({ ...deserialize(data), booted: true });
+        { const dd = deserialize(data); this.set({ ...dd, booted: true, screen: dd.mainScreen || 'shaka' }); }
       } else {
         // 新規ユーザー: ゲストデータがあれば引き継いで保存
         this.set({ booted: true });
@@ -1031,6 +1031,7 @@ export default class App extends React.Component {
   goHome = () => this.set({ screen: 'home' });
   goShaka = () => { this.set({ screen: 'shaka' }); requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el && !this.engine) this.startPhysics(el); }); };
   goRecordNow = () => this.openRecord(this.slotNow());
+  setMainScreen = (v) => { this.set({ mainScreen: v }); this.save(); };
   goMypage = () => this.set({ screen: 'mypage' });
   goSleep = () => {
     // 翌朝＝睡眠記録のタイミングで、続いている調子（バフ・デバフ）をまだ続いているか確認
@@ -2457,6 +2458,7 @@ export default class App extends React.Component {
       goSlotTimes: this.goSlotTimes, goCatsManage: this.goCatsManage,
       goTemplates: this.goTemplates, goSensitivity: this.goSensitivity,
       homeMotion: st.homeMotion, setMotionFixed: () => this.setMotion(false), setMotionMove: () => this.setMotion(true),
+      mainScreen: st.mainScreen || 'shaka', setMainShaka: () => this.setMainScreen('shaka'), setMainHome: () => this.setMainScreen('home'),
       motionFixedBg: st.homeMotion ? '#fff' : '#1b1b18', motionFixedColor: st.homeMotion ? '#8a8a82' : '#fff',
       motionMoveBg: st.homeMotion ? '#1b1b18' : '#fff', motionMoveColor: st.homeMotion ? '#fff' : '#8a8a82',
       addTotalM1: () => this.addTotal(-1), addTotalP1: () => this.addTotal(1), addTotalM10: () => this.addTotal(-10), addTotalP10: () => this.addTotal(10),

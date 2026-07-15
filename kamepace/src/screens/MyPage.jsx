@@ -107,6 +107,17 @@ export default function MyPage({ v }) {
         </div>
         <div style={label}>ひょうじ</div>
         <div style={card}>
+          <div style={row()}>
+            <span style={{ fontSize: 16 }}>🚩</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14 }}>さいしょの画面</div>
+              <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 1 }}>アプリを開いたとき出る画面</div>
+            </div>
+            <div style={{ display: 'flex', gap: 0, background: '#efece3', borderRadius: 10, padding: 3, flex: '0 0 auto' }}>
+              <button onClick={v.setMainShaka} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.mainScreen === 'shaka' ? '#1b1b18' : 'transparent', color: v.mainScreen === 'shaka' ? '#fff' : '#8a8a82' }}>シャカ</button>
+              <button onClick={v.setMainHome} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.mainScreen === 'home' ? '#1b1b18' : 'transparent', color: v.mainScreen === 'home' ? '#fff' : '#8a8a82' }}>記録</button>
+            </div>
+          </div>
           <div style={row(true)}>
             <span style={{ fontSize: 16 }}>🌀</span>
             <div style={{ flex: 1, minWidth: 0 }}>
