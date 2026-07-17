@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
-import { todayStr, strToDate, pad2 } from '../model';
+import Emo from '../fluent';
+import { todayStr, strToDate, dateToStr, pad2 } from '../model';
 import {
   buildDay, buildMonth, monthsWithData, nameMap, daySlots, dayChart,
   placeMain, placeSplit, placeNet, GEO_PORT, GEO_LAND,
@@ -9,12 +10,13 @@ const MONO = "'Space Mono', monospace";
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
 
 /* ---------- 小物 ---------- */
+/* 積まれる絵文字はシャカと同じ Fluent 3D（Emo）で描く */
 const Pile = ({ pts, w, fs, ghost }) => pts.map((p, i) => (
   <div key={i} style={{
-    position: 'absolute', width: w, textAlign: 'center', fontSize: fs, lineHeight: 1,
+    position: 'absolute', width: w, display: 'flex', justifyContent: 'center', lineHeight: 1,
     left: p.x, bottom: p.bottom, transform: `rotate(${p.rot}deg)`,
     ...(ghost ? { opacity: 0.3, filter: 'grayscale(.85)' } : { filter: 'drop-shadow(0 1px 1px rgba(27,27,24,.12))' }),
-  }}>{p.e}</div>
+  }}><Emo e={p.e} size={fs} /></div>
 ));
 
 const Glass = () => (<>
@@ -32,7 +34,7 @@ function Chart({ chart }) {
         {chart.items.map((c, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: 2, flex: '0 0 auto', background: c.color }} />
-            <span style={{ fontSize: 12, lineHeight: 1 }}>{c.e}</span>
+            <span style={{ display: 'inline-flex', lineHeight: 1 }}><Emo e={c.e} size={13} /></span>
             <span style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: '#55554e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
             <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: '#1b1b18' }}>×{c.n}</span>
           </div>
@@ -54,7 +56,7 @@ function Timeline({ slots }) {
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {sl.rows.map((r, ri) => (
           <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', borderBottom: '1px solid #f1efe8', opacity: r.ghost ? 0.45 : 1 }}>
-            <span style={{ fontSize: 15, filter: r.ghost ? 'grayscale(.85)' : 'none' }}>{r.glyph}</span>
+            <span style={{ display: 'inline-flex', filter: r.ghost ? 'grayscale(.85)' : 'none' }}><Emo e={r.glyph} size={16} /></span>
             <span style={{ flex: 1, fontSize: 12, fontWeight: 700 }}>{r.name}</span>
             <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: r.rec ? '#7a9a00' : '#e8842c' }}>{r.f}</span>
           </div>
@@ -70,7 +72,7 @@ function Ranking({ title, rows }) {
     {rows.length ? rows.map((r, i) => (
       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', borderBottom: '1px solid #f1efe8' }}>
         <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: '#9d9b91', width: 14, flex: '0 0 auto' }}>{r.rank}</span>
-        <span style={{ fontSize: 15 }}>{r.e}</span>
+        <span style={{ display: 'inline-flex' }}><Emo e={r.e} size={16} /></span>
         <span style={{ flex: 1, fontSize: 12, fontWeight: 700 }}>{r.name}</span>
         <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: r.color }}>×{r.n}</span>
       </div>
@@ -137,7 +139,7 @@ export default function Bookshelf({ v }) {
   const rootRef = useRef(null);
   const [autoLand, setAutoLand] = useState(false);   // 端末の向き（実寸 w>h）
   const [manualOrient, setManualOrient] = useState(null); // 手動: null=自動 / 'land' / 'port'
-  // PC用スマホ枠が出ている時だけ手動回転を許可。実機（スマホ）は物理的な向き(autoLand)に従う
+  // PC用スマホ枠が出ているか（枠の形を変える方式で横にする）。スマホは画面ごと90°回転で横にする
   const [frameMode, setFrameMode] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width:768px) and (min-height:600px)').matches);
   useEffect(() => {
     const mq = window.matchMedia('(min-width:768px) and (min-height:600px)');
@@ -146,13 +148,16 @@ export default function Bookshelf({ v }) {
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
-  const land = (frameMode && manualOrient != null) ? manualOrient === 'land' : autoLand;
+  const land = manualOrient != null ? manualOrient === 'land' : autoLand;
+  // スマホが物理的に縦のまま「横」を選んだ → 画面を90°回転して横向きとして見せる
+  const forceRotate = land && !autoLand && !frameMode;
   const [view, setView] = useState('day');        // 'day' | 'month'
   const [monthYm, setMonthYm] = useState(today.slice(0, 7));
   const [sort, setSort] = useState('date');        // 'date' | 'more' | 'less'
   const [flood, setFlood] = useState('all');       // 'all' | 'over' | 'ok'
   const [favFilter, setFavFilter] = useState(false);
-  const [disp, setDisp] = useState('both');        // 'both' | 'net'（横・日別）
+  const [disp, setDisp] = useState('net');         // 横・日別: 'net'=寝るまえの量(基本) | 'both'=疲労と回復
+  const [pageOpen, setPageOpen] = useState(true);  // 横: 右の「その日」ページの開閉
   const [selKey, setSelKey] = useState(today);
   const [selMonYm, setSelMonYm] = useState(today.slice(0, 7));
   const [sheet, setSheet] = useState(false);
@@ -164,11 +169,11 @@ export default function Bookshelf({ v }) {
 
   /* 向き＝本棚の実寸で判定（縦フレーム=縦持ち, 横に広い=横持ち） */
   useLayoutEffect(() => {
-    const el = rootRef.current; if (!el) return;
-    const update = () => setAutoLand(el.clientWidth > el.clientHeight);
+    // 端末の物理的な向きはビューポートで判定（90°回転表示中の要素サイズに引きずられないように）
+    const update = () => setAutoLand(window.innerWidth > window.innerHeight && !window.matchMedia('(min-width:768px) and (min-height:600px)').matches);
     update();
-    const ro = new ResizeObserver(update); ro.observe(el);
-    return () => ro.disconnect();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
   const RotateBtn = () => (
@@ -184,15 +189,25 @@ export default function Bookshelf({ v }) {
 
   const names = useMemo(() => nameMap(entries), [entries]);
   const months = useMemo(() => monthsWithData(entries), [entries]);
+  /* 睡眠の回復（collected の 🌙）を日別に集計 → 回復列に含める */
+  const sleepMap = useMemo(() => {
+    const m = {};
+    (v.bookCollected || []).forEach((c) => {
+      if (c.glyph !== '🌙' || !c.ts) return;
+      const k = dateToStr(new Date(c.ts));
+      m[k] = (m[k] || 0) + (c.amount || 1);
+    });
+    return m;
+  }, [v.bookCollected]);
 
   /* 日別: 選択月の1日〜末日 */
   const monthDays = useMemo(() => {
     const [y, m] = monthYm.split('-').map(Number);
     const last = new Date(y, m, 0).getDate();
     const arr = [];
-    for (let i = 1; i <= last; i++) arr.push(buildDay(entries, y + '-' + pad2(m) + '-' + pad2(i)));
+    for (let i = 1; i <= last; i++) arr.push(buildDay(entries, y + '-' + pad2(m) + '-' + pad2(i), sleepMap));
     return arr;
-  }, [entries, monthYm]);
+  }, [entries, monthYm, sleepMap]);
 
   const filtered = useMemo(() => {
     let r = monthDays.filter((d) => (flood === 'all' || (flood === 'over') === d.over) && (!favFilter || fav[d.dateStr]));
@@ -218,18 +233,18 @@ export default function Bookshelf({ v }) {
 
   const monthObjs = useMemo(() => months.map((ym) => {
     const [y, m] = ym.split('-').map(Number);
-    const mo = buildMonth(entries, y, m, names);
+    const mo = buildMonth(entries, y, m, names, sleepMap);
     mo.cur = ym === today.slice(0, 7);
     return mo;
-  }), [entries, months, names, today]);
+  }), [entries, months, names, today, sleepMap]);
 
-  const selDay = useMemo(() => buildDay(entries, selKey), [entries, selKey]);
+  const selDay = useMemo(() => buildDay(entries, selKey, sleepMap), [entries, selKey, sleepMap]);
   const selMonth = useMemo(() => {
     const found = monthObjs.find((m) => m.ym === selMonYm);
     if (found) return found;
     const [y, m] = selMonYm.split('-').map(Number);
-    const mo = buildMonth(entries, y, m, names); mo.cur = selMonYm === today.slice(0, 7); return mo;
-  }, [monthObjs, selMonYm, entries, names, today]);
+    const mo = buildMonth(entries, y, m, names, sleepMap); mo.cur = selMonYm === today.slice(0, 7); return mo;
+  }, [monthObjs, selMonYm, entries, names, today, sleepMap]);
 
   const isMonth = view === 'month';
   const footLabel = isMonth ? 'この月を見る' : 'この日を見る';
@@ -237,11 +252,13 @@ export default function Bookshelf({ v }) {
   /* ---------- スクロール位置 ---------- */
   const portRef = useRef(null), landRef = useRef(null);
   const centerToday = (el) => {
+    // 90°回転表示中でも狂わないよう、画面座標でなくレイアウト座標(offsetLeft)で中央へ
     if (!el) return false;
     const t = el.querySelector('[data-today="1"]');
     if (!t) return false;
-    const r = t.getBoundingClientRect(), sr = el.getBoundingClientRect();
-    el.scrollLeft += (r.left + r.width / 2 - sr.left) - sr.width / 2;
+    let x = 0;
+    for (let n = t; n && n !== el; n = n.offsetParent) x += n.offsetLeft;
+    el.scrollLeft = x + t.offsetWidth / 2 - el.clientWidth / 2;
     return true;
   };
   const scrollPortToToday = (el) => {
@@ -303,11 +320,13 @@ export default function Bookshelf({ v }) {
   const FavFilter = ({ round }) => (
     <div onClick={() => setFavFilter((s) => !s)} style={{ cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: MONO, fontSize: 10, fontWeight: 700, border: '1px solid ' + (favFilter ? '#ff5fa2' : '#e3e0d5'), background: favFilter ? '#ff5fa2' : '#fff', color: favFilter ? '#fff' : '#8a8a82', borderRadius: round ? 999 : 8, padding: '4px 9px', userSelect: 'none' }}>付箋の日</div>
   );
-  const DispPill = () => (
-    <div style={{ display: 'flex', gap: 4, flex: '0 0 auto' }}>
-      {[['both', '疲労と回復'], ['net', '寝るまえの量']].map(([k, lb]) => (
-        <div key={k} onClick={() => setDisp(k)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', fontFamily: MONO, fontSize: 10, fontWeight: 700, border: '1px solid #e3e0d5', borderRadius: 999, padding: '4px 8px', background: disp === k ? '#1b1b18' : '#fff', color: disp === k ? '#fff' : '#55554e' }}>{lb}</div>
-      ))}
+  /* 寝るまえの量（基本）⇄ 疲労と回復 のスイッチ */
+  const DispSwitch = () => (
+    <div onClick={() => setDisp(disp === 'net' ? 'both' : 'net')} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none', flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+      <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: disp === 'both' ? '#1b1b18' : '#8a8a82' }}>疲労と回復</span>
+      <span style={{ width: 34, height: 20, borderRadius: 999, background: disp === 'both' ? '#c4f000' : '#e4e1d8', position: 'relative', flex: '0 0 auto', transition: 'background .15s' }}>
+        <span style={{ position: 'absolute', top: 2, left: disp === 'both' ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)', transition: 'left .15s' }} />
+      </span>
     </div>
   );
 
@@ -406,7 +425,7 @@ export default function Bookshelf({ v }) {
           <div style={{ fontSize: 21, fontWeight: 900, marginTop: 2, letterSpacing: '-.01em' }}>がんばりの本棚</div>
           <div style={{ fontSize: 12, color: '#8a8a82', marginTop: 4 }}>下の段ほど最近。今日は本棚の一番下にある。</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-            <Segment /><TodayBtn />{frameMode && <RotateBtn />}{!isMonth && <><MonthSel /><SortSel /></>}
+            <Segment /><TodayBtn /><RotateBtn />{!isMonth && <><MonthSel /><SortSel /></>}
           </div>
         </div>
 
@@ -469,8 +488,13 @@ export default function Bookshelf({ v }) {
   }
 
   /* ======================= 横持ち（3a） ======================= */
+  // forceRotate: 縦のビューポートいっぱいに90°回転して「横向きスマホ」として見せる
+  const rotateStyle = forceRotate ? {
+    position: 'fixed', top: 0, left: 0, width: '100dvh', height: '100dvw',
+    transform: 'rotate(90deg) translateY(-100%)', transformOrigin: 'top left', zIndex: 50,
+  } : null;
   const landscape = (
-    <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec' }}>
+    <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec', ...rotateStyle }}>
       {/* 左レールナビ（上端まで・4つを均等配置） */}
       <div style={{ flex: '0 0 58px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-evenly', padding: '10px 0', background: '#fff', borderRight: '1px solid #efece3' }}>
         {navItems.map((it, i) => (
@@ -483,18 +507,18 @@ export default function Bookshelf({ v }) {
 
       {/* 中央: 棚 */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px 0', flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 1 auto', overflow: 'hidden', textOverflow: 'ellipsis' }}>がんばりの本棚</div>
-          <Segment /><TodayBtn />{frameMode && <RotateBtn />}
-          {!isMonth && <DispPill />}
+        {/* タイトル行（日別/月別・今日・回転を横に）＋その下に残りのボタンを1行で */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '20px 14px 0' }}>
+          <div style={{ fontSize: 21, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 0 auto' }}>がんばりの本棚</div>
+          <Segment /><TodayBtn /><RotateBtn />
         </div>
         {!isMonth && (
-          <div className="nos" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 22px 0', overflowX: 'auto' }}>
-            <MonthSel /><FloodSel /><SortSel /><FavFilter round={false} />
+          <div className="nos" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '14px 14px 0', overflowX: 'auto' }}>
+            <DispSwitch /><MonthSel /><FloodSel /><SortSel /><FavFilter round={false} />
           </div>
         )}
         {!isMonth ? (
-          <div ref={landRef} className="nos" style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+          <div ref={landRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'flex-end', gap: 11, height: '100%', padding: '0 40px' }}>
               {filtered.map((d) => <LandBook key={d.dateStr} day={d} />)}
               <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 14, background: 'linear-gradient(180deg,#4a3120,#241509)', borderRadius: 2, boxShadow: '0 5px 10px rgba(27,27,24,.28)', zIndex: 2 }} />
@@ -510,14 +534,16 @@ export default function Bookshelf({ v }) {
         )}
       </div>
 
-      {/* 右: 本のページ */}
-      <div style={{ position: 'relative', flex: '0 0 clamp(200px, 38%, 300px)', display: 'flex', flexDirection: 'column', padding: '22px 12px 14px 4px' }}>
-        <div style={{ position: 'relative', flex: 1, minHeight: 0, background: '#fffdf8', border: '1px solid #e7e2d3', borderRadius: '10px 16px 16px 10px', boxShadow: '3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 16px 34px rgba(27,27,24,.18)', display: 'flex', flexDirection: 'column' }}>
+      {/* 右: 本のページ（タブで右へスライド収納できる） */}
+      <div style={{ position: 'relative', flex: pageOpen ? '0 0 clamp(226px, 40%, 326px)' : '0 0 26px', transition: 'flex-basis .3s cubic-bezier(.2,.8,.3,1)', minWidth: 0 }}>
+        {/* タブ（開閉ボタン・常に見える） */}
+        <button onClick={() => setPageOpen((o) => !o)} style={{ position: 'absolute', left: 0, top: 26, width: 26, height: 66, background: '#fff', border: 'none', borderRadius: '10px 0 0 10px', boxShadow: '-6px 4px 12px rgba(27,27,24,.12)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer', zIndex: 2, padding: 0 }}>
+          <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 18, color: '#1b1b18' }}>menu_book</span>
+          <span style={{ writingMode: 'vertical-rl', fontSize: 9, fontWeight: 700, color: '#55554e', letterSpacing: '.1em' }}>{isMonth ? 'その月' : 'その日'}</span>
+        </button>
+        {/* ページ本体（閉じると右へスライドして消える） */}
+        <div style={{ position: 'absolute', top: 22, bottom: 14, right: 12, width: 'min(288px, calc(40dvw - 38px))', transform: pageOpen ? 'none' : 'translateX(130%)', transition: 'transform .3s cubic-bezier(.2,.8,.3,1)', background: '#fffdf8', border: '1px solid #e7e2d3', borderRadius: '10px 16px 16px 10px', boxShadow: '3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 16px 34px rgba(27,27,24,.18)', display: 'flex', flexDirection: 'column' }}>
           {!isMonth && fusen(selDay)}
-          <div style={{ position: 'absolute', left: -26, top: 26, width: 26, height: 66, background: '#fff', borderRadius: '10px 0 0 10px', boxShadow: '-6px 4px 12px rgba(27,27,24,.12)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 18, color: '#1b1b18' }}>menu_book</span>
-            <span style={{ writingMode: 'vertical-rl', fontSize: 9, fontWeight: 700, color: '#55554e', letterSpacing: '.1em' }}>{isMonth ? 'その月' : 'その日'}</span>
-          </div>
           <NoteBody {...noteProps} />
           <div style={{ flex: '0 0 auto', padding: '12px 20px', borderTop: '1px solid #f1efe8' }}><div onClick={goDay} style={{ cursor: 'pointer', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 12, padding: 10 }}>{footLabel}</div></div>
         </div>

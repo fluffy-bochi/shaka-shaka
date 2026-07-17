@@ -599,10 +599,10 @@ export default class App extends React.Component {
   onStartTime = (e) => this.set({ startTime: e.target.value });
   onEndTime = (e) => this.set({ endTime: e.target.value });
   backFromConfirm = () => {
-    if (this.state.confirmOrigin === 'edit') this.set({ searchStep: null, searchCart: [], screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', framePlan: null });
-    else if (this.state.confirmOrigin === 'search') this.set({ searchStep: 'results' });
-    else if (this.state.confirmOrigin === 'cat') this.set({ searchStep: null });
-    else this.set({ searchStep: null, searchCart: [], catId: null, cart: {} });
+    // 編集フローだけは編集のキャンセル＝ホームへ
+    if (this.state.confirmOrigin === 'edit') { this.set({ searchStep: null, searchCart: [], screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', framePlan: null }); return; }
+    // それ以外の戻るは「＋メニューを追加」と同じ動き：確認カートの行動は消さず、追加の選択に戻る
+    this.addMoreMenu();
   };
   selectSearchItem = (kwIndex, item) => {
     const picks = this.intensityQuestions(item).map(q => Math.floor(q.opts.length / 2));
@@ -1746,6 +1746,14 @@ export default class App extends React.Component {
   _savePileLayout() {
     if (this.state.dayOffset !== 0) return;
     if (!this.bodies || !this.bodies.length) return;
+    // 落下・散らばりの途中で画面を離れても「宙に浮いた形」を保存しない。
+    // 全員がスリープ（静止）するまで物理を先送りしてから位置を読む（最大4秒ぶん）
+    if (this.engine) {
+      let steps = 0;
+      while (steps < 240 && this.bodies.some(({ body }) => !body.isSleeping)) {
+        Matter.Engine.update(this.engine, 1000 / 60); steps++;
+      }
+    }
     const el = document.getElementById('shakacase');
     const rect = el ? el.getBoundingClientRect() : null;
     const W = (rect && rect.width) || 350, H = (rect && rect.height) || 700;
@@ -2423,7 +2431,7 @@ export default class App extends React.Component {
       navBookFill: st.screen === 'bookshelf' ? 1 : 0,
       goBookshelf: this.goBookshelf,
       goBookDay: (dateStr) => this.set({ screen: 'home', homeDate: dateStr, dayOffset: 0 }),
-      bookEntries: st.entries, bookSlotHours: st.slotHours,
+      bookEntries: st.entries, bookSlotHours: st.slotHours, bookCollected: st.collected,
       bookFav: st.bookFav || {}, bookDiary: st.bookDiary || {},
       setBookFav: this.setBookFav, setBookDiary: this.setBookDiary,
       navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
