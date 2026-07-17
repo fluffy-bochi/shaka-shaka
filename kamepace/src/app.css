@@ -126,12 +126,7 @@ input { font-family: inherit; }
     border-radius: 20px;
     box-shadow: 0 10px 30px rgba(27,27,24,.14);
   }
-  /* 本棚を横向きにしたとき: 端末フレームごと横長スマホの形にし、画面いっぱいへ拡大 */
-  body.kame-book-land .shell-side { display: none; }
-  body.kame-book-land .phone {
-    width: auto;
-    transform: scale(var(--book-land-scale, 1));
-    transform-origin: center center;
-  }
+  /* 本棚を横向きにしたとき: 縦のスマホを回転しただけの等倍サイズ（拡大しない） */
+  body.kame-book-land .phone { width: auto; }
   body.kame-book-land .phone .app-screen { width: 812px; height: 410px; }
 }

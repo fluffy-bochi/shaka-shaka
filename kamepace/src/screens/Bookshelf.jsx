@@ -167,21 +167,10 @@ export default function Bookshelf({ v }) {
       <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 15, color: '#55554e' }}>screen_rotation</span>
     </div>
   );
-  // 横向きのときは端末フレームごと横長スマホの形にし、画面に収まる最大サイズへ拡大（ポップアップ・暗幕なし）
+  // 横向きのときは端末フレームごと横長スマホの形にする（縦と同じ等倍サイズ・ポップアップ/暗幕なし）
   useEffect(() => {
-    const root = document.documentElement;
-    const apply = () => {
-      // 横スマホ（枠込み約834×432）を画面いっぱいまで拡大（縮小はしない）
-      const s = Math.max(1, Math.min(window.innerWidth * 0.96 / 834, window.innerHeight * 0.94 / 432));
-      root.style.setProperty('--book-land-scale', s.toFixed(3));
-    };
     document.body.classList.toggle('kame-book-land', land);
-    if (land) { apply(); window.addEventListener('resize', apply); }
-    return () => {
-      document.body.classList.remove('kame-book-land');
-      window.removeEventListener('resize', apply);
-      root.style.removeProperty('--book-land-scale');
-    };
+    return () => document.body.classList.remove('kame-book-land');
   }, [land]);
 
   const names = useMemo(() => nameMap(entries), [entries]);
@@ -242,10 +231,8 @@ export default function Bookshelf({ v }) {
     if (!el) return false;
     const t = el.querySelector('[data-today="1"]');
     if (!t) return false;
-    // 横向きは .phone に transform: scale がかかるため、画面px差を拡大率で content px に戻す
-    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--book-land-scale')) || 1;
     const r = t.getBoundingClientRect(), sr = el.getBoundingClientRect();
-    el.scrollLeft += ((r.left + r.width / 2 - sr.left) - sr.width / 2) / scale;
+    el.scrollLeft += (r.left + r.width / 2 - sr.left) - sr.width / 2;
     return true;
   };
   const scrollPortToToday = (el) => {
