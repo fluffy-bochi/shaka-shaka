@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&amp;family=Space+Mono:wght@400;700&amp;family=Archivo:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0}
+  body{background:#dcdad2;color:#1b1b18;font-family:"Zen Kaku Gothic New",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  *{box-sizing:border-box}
+  ::selection{background:#c4f000;color:#2f3a00}
+  a{color:#1b1b18}
+  a:hover{color:#7a9a00}
+  .noscroll::-webkit-scrollbar{display:none}
+  .noscroll{scrollbar-width:none}
+  @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+</style>
+</helmet>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#f7f4ec"></rect>
+    <rect x="24" y="22" width="52" height="10" rx="2" fill="#3a2416"></rect>
+    <rect x="24" y="68" width="52" height="10" rx="2" fill="#3a2416"></rect>
+    <rect x="30" y="34" width="9" height="34" rx="2" fill="#e9e6dc" stroke="#1b1b18" stroke-width="1.5"></rect>
+    <rect x="45" y="34" width="9" height="34" rx="2" fill="#e9e6dc" stroke="#1b1b18" stroke-width="1.5"></rect>
+    <rect x="60" y="34" width="9" height="34" rx="2" fill="#eef7cc" stroke="#1b1b18" stroke-width="1.5"></rect>
+  </svg>
+</template>
+
+<section style="padding:48px 56px 0;min-width:1180px">
+  <div style="display:inline-flex;align-items:center;gap:10px;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#8a8a82;margin-bottom:22px"><span style="display:inline-block;width:28px;height:1px;background:#8a8a82"></span>TURN 3 · 2a採用版 — 切り替え・絞り込み・月別</div>
+
+  <!-- ============ 3a : ADOPTED (2a) + toggle + filters + monthly covers ============ -->
+  <div id="3a" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:9px"><a href="#3a" style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;background:#1b1b18;color:#fff;border-radius:6px;padding:3px 8px;text-decoration:none">3a</a><span style="font-size:13px;font-weight:700;color:#55554e">2a採用 — 疲労＆回復⇄寝るまえの量・絞り込み・月別（表紙にためる）</span></div>
+    <sc-if value="{{ ui3.land }}" hint-placeholder-val="{{ true }}">
+    <div style="width:812px;background:#1b1b18;border-radius:46px;padding:11px;box-shadow:0 30px 70px rgba(27,27,24,.28)">
+      <div style="position:relative;height:390px;background:#f7f4ec;border-radius:34px;overflow:hidden;display:flex">
+        <div style="flex:0 0 58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:17px;background:#fff;border-right:1px solid #efece3">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:1px"><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:21px;color:#1b1b18">auto_stories</span><span style="font-size:9px;font-weight:700;color:#1b1b18">本棚</span></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:1px"><span style="font-family:'Material Symbols Rounded';font-size:21px;color:#8a8a82">blur_on</span><span style="font-size:9px;font-weight:700;color:#8a8a82">シャカ</span></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:1px"><span style="font-family:'Material Symbols Rounded';font-size:21px;color:#8a8a82">home</span><span style="font-size:9px;font-weight:700;color:#8a8a82">ホーム</span></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:1px"><span style="font-family:'Material Symbols Rounded';font-size:21px;color:#8a8a82">person</span><span style="font-size:9px;font-weight:700;color:#8a8a82">マイ</span></div>
+        </div>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 0">
+            <div style="font-size:15px;font-weight:900;letter-spacing:-.01em;white-space:nowrap">がんばりの本棚</div>
+            <div style="display:flex;background:#eceadd;border-radius:999px;padding:2px;flex:0 0 auto">
+              <div onClick="{{ ui3.onDay }}" style="cursor:pointer;user-select:none;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border-radius:999px;padding:3px 9px;background:{{ ui3.dayBg }};color:{{ ui3.dayFg }}">日別</div>
+              <div onClick="{{ ui3.onMonth }}" style="cursor:pointer;user-select:none;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border-radius:999px;padding:3px 9px;background:{{ ui3.monBg }};color:{{ ui3.monFg }}">月別</div>
+            </div>
+            <div onClick="{{ ui3.onToday }}" style="cursor:pointer;user-select:none;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#2f3a00;background:#eef7cc;border:1px solid #d9ecab;border-radius:999px;padding:4px 9px">今日</div>
+            <span style="flex:1"></span>
+            <sc-if value="{{ ui3.isDay }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;gap:4px;flex:0 0 auto">
+                <div onClick="{{ ui3.onBoth }}" style="cursor:pointer;user-select:none;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border:1px solid #e3e0d5;border-radius:999px;padding:4px 8px;background:{{ ui3.bothBg }};color:{{ ui3.bothFg }}">疲労と回復</div>
+                <div onClick="{{ ui3.onNet }}" style="cursor:pointer;user-select:none;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border:1px solid #e3e0d5;border-radius:999px;padding:4px 8px;background:{{ ui3.netBg }};color:{{ ui3.netFg }}">寝るまえの量</div>
+              </div>
+            </sc-if>
+            <div onClick="{{ ui3.onRotate }}" title="画面を回転" style="cursor:pointer;user-select:none;width:26px;height:26px;flex:0 0 auto;border-radius:50%;background:#fff;border:1px solid #e3e0d5;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:15px;color:#55554e">screen_rotation</span></div>
+          </div>
+          <sc-if value="{{ ui3.isDay }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;align-items:center;gap:6px;padding:7px 22px 0">
+              <select value="{{ ui3.month }}" onChange="{{ ui3.onMonthSel }}" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#55554e;background:#fff;border:1px solid #e3e0d5;border-radius:8px;padding:4px 5px;outline:none">
+                <option value="5">5月</option>
+                <option value="6">6月</option>
+                <option value="7">7月</option>
+              </select>
+              <select value="{{ ui3.flood }}" onChange="{{ ui3.onFlood }}" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#55554e;background:#fff;border:1px solid #e3e0d5;border-radius:8px;padding:4px 5px;outline:none">
+                <option value="all">すべての日</option>
+                <option value="over">あふれた日</option>
+                <option value="ok">おさまった日</option>
+              </select>
+              <select value="{{ ui3.sort }}" onChange="{{ ui3.onSort }}" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#55554e;background:#fff;border:1px solid #e3e0d5;border-radius:8px;padding:4px 5px;outline:none">
+                <option value="date">日付順</option>
+                <option value="more">多い順</option>
+                <option value="less">少ない順</option>
+              </select>
+              <div onClick="{{ ui3.onFavFilter }}" style="cursor:pointer;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border:1px solid {{ ui3.favBorder }};background:{{ ui3.favBg }};color:{{ ui3.favColor }};border-radius:8px;padding:4px 8px;user-select:none">付箋の日</div>
+            </div>
+            <div id="bookShelf3" class="noscroll" style="flex:1;min-height:0;overflow-x:auto;overflow-y:hidden">
+              <div style="position:relative;display:inline-flex;align-items:flex-end;gap:11px;height:100%;padding:0 40px 0">
+                <sc-for list="{{ books3 }}" as="day" hint-placeholder-count="10">
+                  <div onClick="{{ day.onSel }}" style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding-bottom:16px">
+                    <sc-if value="{{ day.isMon }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#e8b23a;white-space:nowrap;z-index:3">{{ day.wk }}</div></sc-if>
+                    <sc-if value="{{ day.today }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:2px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#2f3a00;background:#c4f000;border-radius:999px;padding:1px 7px;white-space:nowrap;z-index:5">今日</div></sc-if>
+                    <div style="position:relative;width:66px;height:250px;margin-top:20px;background:rgba(255,255,255,.16);border:1px solid rgba(27,27,24,.18);border-radius:4px 4px 2px 2px;overflow:hidden;box-shadow:0 3px 6px rgba(27,27,24,.12)">
+                      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.08));box-shadow:inset -4px 0 6px rgba(27,27,24,.07),inset 2px 0 0 rgba(255,255,255,.45);z-index:2;pointer-events:none"></div><div style="position:absolute;top:0;left:0;right:0;height:9px;background:linear-gradient(90deg,#f1ede3,#fbf9f3 60%,#efe9dd);border-bottom:1px solid rgba(27,27,24,.07);z-index:2"></div>
+                      <div style="position:absolute;top:16px;left:0;right:0;text-align:center;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:#7a786f;z-index:3">{{ day.label }}</div>
+                      <div style="position:absolute;top:31px;left:0;right:0;text-align:center;font-size:11px;font-weight:500;color:#a7a59b;z-index:3">{{ day.wd }}</div>
+                      <sc-if value="{{ day.split3 }}" hint-placeholder-val="{{ true }}">
+                        <div style="position:absolute;top:46px;left:0;width:50%;text-align:center;font-size:8px;font-weight:700;color:#c9c5b8;z-index:3">疲労</div>
+                        <div style="position:absolute;top:46px;right:0;width:50%;text-align:center;font-size:8px;font-weight:700;color:#c9c5b8;z-index:3">回復</div>
+                        <div style="position:absolute;top:58px;bottom:6px;left:50%;width:1px;background:rgba(27,27,24,.12)"></div>
+                        <sc-for list="{{ day.fatHS }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                        <sc-for list="{{ day.fatHG }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                        <sc-for list="{{ day.recHS }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                        <sc-for list="{{ day.recHG }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                      </sc-if>
+                      <sc-if value="{{ day.net3 }}" hint-placeholder-val="{{ false }}">
+                        <sc-for list="{{ day.netS }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:24px;text-align:center;font-size:20px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                      </sc-if>
+                      <sc-if value="{{ day.fav }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:0;right:9px;width:9px;height:20px;background:#ff5fa2;clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%);z-index:3"></div></sc-if>
+                      <sc-if value="{{ day.today }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #c4f000;border-radius:4px 4px 2px 2px;pointer-events:none;z-index:4"></div></sc-if>
+                      <sc-if value="{{ day.sel }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #ff5fa2;border-radius:4px 4px 2px 2px;pointer-events:none;z-index:4"></div></sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="position:absolute;left:0;right:0;bottom:0;height:14px;background:linear-gradient(180deg,#4a3120,#241509);border-radius:2px;box-shadow:0 5px 10px rgba(27,27,24,.28);z-index:2"></div>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ ui3.isMonth }}" hint-placeholder-val="{{ false }}">
+            <div id="bookShelf3m" class="noscroll" style="flex:1;min-height:0;overflow-x:auto;overflow-y:hidden">
+              <div style="position:relative;display:inline-flex;align-items:flex-end;gap:22px;height:100%;padding:0 40px 0">
+                <sc-for list="{{ months3 }}" as="mo" hint-placeholder-count="3">
+                  <div onClick="{{ mo.onSel }}" style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding-bottom:16px">
+                    <sc-if value="{{ mo.cur }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:2px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#2f3a00;background:#c4f000;border-radius:999px;padding:1px 7px;white-space:nowrap;z-index:5">今月</div></sc-if>
+                    <div style="position:relative;width:170px;height:280px;margin-top:20px;background:linear-gradient(180deg,rgba(255,255,255,.6),rgba(255,255,255,.18));border:1px solid rgba(27,27,24,.18);border-radius:4px 10px 10px 4px;overflow:hidden;box-shadow:inset 6px 0 8px rgba(27,27,24,.08),inset 2px 0 0 rgba(255,255,255,.45),0 4px 8px rgba(27,27,24,.14)">
+                      <div style="position:absolute;top:0;bottom:0;left:10px;width:1px;background:rgba(27,27,24,.14)"></div>
+                      <div style="position:absolute;top:10px;left:0;right:0;text-align:center;z-index:2"><span style="font-family:'Space Mono',monospace;font-size:15px;font-weight:700;color:#7a786f;background:rgba(251,249,243,.85);border-radius:6px;padding:1px 8px">{{ mo.label }}</span></div>
+                      <sc-for list="{{ mo.pile }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:13px;text-align:center;font-size:11px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg)">{{ p.e }}</div></sc-for>
+                      <sc-for list="{{ mo.pileG }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:13px;text-align:center;font-size:11px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                      <sc-if value="{{ mo.cur }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #c4f000;border-radius:4px 10px 10px 4px;pointer-events:none"></div></sc-if>
+                      <sc-if value="{{ mo.sel }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #ff5fa2;border-radius:4px 10px 10px 4px;pointer-events:none"></div></sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="position:absolute;left:0;right:0;bottom:0;height:14px;background:linear-gradient(180deg,#4a3120,#241509);border-radius:2px;box-shadow:0 5px 10px rgba(27,27,24,.28);z-index:2"></div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <div style="position:relative;flex:0 0 286px;display:flex;flex-direction:column;padding:22px 14px 14px 4px"><div style="position:relative;flex:1;min-height:0;background:#fffdf8;border:1px solid #e7e2d3;border-radius:10px 16px 16px 10px;box-shadow:3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 16px 34px rgba(27,27,24,.18);display:flex;flex-direction:column">
+          <sc-if value="{{ ui3.isDay }}" hint-placeholder-val="{{ true }}"><div onClick="{{ note.onFav }}" title="付箋をつける" style="position:absolute;top:-14px;right:24px;width:20px;height:46px;border-radius:2px;transform:rotate(3deg);cursor:pointer;user-select:none;z-index:3;background:{{ note.fusenBg }};border:{{ note.fusenBorder }};box-shadow:0 2px 5px rgba(27,27,24,.15)"><div style="position:absolute;left:2px;right:2px;top:2px;height:8px;background:{{ note.fusenBand }}"></div></div></sc-if>
+          <div style="position:absolute;left:-26px;top:26px;width:26px;height:66px;background:#fff;border-radius:10px 0 0 10px;box-shadow:-6px 4px 12px rgba(27,27,24,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px">
+            <span style="font-family:'Material Symbols Rounded';font-size:18px;color:#1b1b18">menu_book</span>
+            <span style="writing-mode:vertical-rl;font-size:9px;font-weight:700;color:#55554e;letter-spacing:.1em">{{ ui3.tabLabel }}</span>
+          </div>
+          <sc-if value="{{ ui3.isDay }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:18px 20px 10px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:16px;font-weight:900">{{ note.title }}</span>
+                <sc-if value="{{ note.today }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#2f3a00;background:#eef7cc;border-radius:6px;padding:2px 6px">今日</span></sc-if>
+              </div>
+              <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9d9b91;margin-top:3px">この本の中身</div>
+            </div>
+            <div class="noscroll" style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 16px">
+              <sc-for list="{{ note.slots }}" as="sl" hint-placeholder-count="4">
+                <div style="margin-top:10px">
+                  <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13px">{{ sl.icon }}</span><span style="font-size:11.5px;font-weight:900">{{ sl.name }}</span></div>
+                  <div style="display:flex;flex-direction:column">
+                    <sc-for list="{{ sl.rows }}" as="r" hint-placeholder-count="2">
+                      <div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid #f1efe8;opacity:{{ r.op }}">
+                        <span style="font-size:15px;filter:{{ r.ef }}">{{ r.e }}</span>
+                        <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                        <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#e8842c">{{ r.f }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="font-size:11px;font-weight:700;color:#55554e;margin:16px 0 8px">絵文字のかず</div>
+              <div style="display:flex;align-items:center;gap:14px">
+                <div style="position:relative;width:74px;height:74px;flex:0 0 auto;border-radius:50%;background:{{ note.chartGrad }}">
+                  <div style="position:absolute;inset:23px;background:#fffdf8;border-radius:50%"></div>
+                </div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                  <sc-for list="{{ note.chartItems }}" as="c" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span style="width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:{{ c.color }}"></span>
+                      <span style="font-size:12px;line-height:1">{{ c.e }}</span>
+                      <span style="flex:1;min-width:0;font-size:11px;font-weight:700;color:#55554e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                      <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#1b1b18">×{{ c.n }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="font-size:11px;font-weight:700;color:#55554e;margin:16px 0 6px">日記</div>
+              <textarea value="{{ note.diary }}" onChange="{{ note.onDiary }}" placeholder="この日のことをメモ" style="width:100%;min-height:64px;resize:vertical;background:#fbfaf6;border:1px solid #eee9dc;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:12px;line-height:1.6;color:#1b1b18;outline:none"></textarea>
+            </div>
+          </sc-if>
+          <sc-if value="{{ ui3.isMonth }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:18px 20px 10px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:16px;font-weight:900">{{ mnote.title }}</span>
+                <sc-if value="{{ mnote.cur }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#2f3a00;background:#eef7cc;border-radius:6px;padding:2px 6px">今月</span></sc-if>
+              </div>
+              <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9d9b91;margin-top:3px">この月のまとめ</div>
+            </div>
+            <div class="noscroll" style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 16px">
+              <div style="font-size:11px;font-weight:700;color:#55554e;margin:10px 0 2px">疲労ランキング TOP5</div>
+              <sc-for list="{{ mnote.fatTop }}" as="r" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid #f1efe8">
+                  <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#9d9b91;width:14px;flex:0 0 auto">{{ r.rank }}</span>
+                  <span style="font-size:15px">{{ r.e }}</span>
+                  <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                  <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#e8842c">×{{ r.n }}</span>
+                </div>
+              </sc-for>
+              <div style="font-size:11px;font-weight:700;color:#55554e;margin:16px 0 2px">回復ランキング TOP5</div>
+              <sc-for list="{{ mnote.recTop }}" as="r" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid #f1efe8">
+                  <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#9d9b91;width:14px;flex:0 0 auto">{{ r.rank }}</span>
+                  <span style="font-size:15px">{{ r.e }}</span>
+                  <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                  <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#7a9a00">×{{ r.n }}</span>
+                </div>
+              </sc-for>
+              <div style="font-size:11px;font-weight:700;color:#55554e;margin:16px 0 8px">絵文字のかず</div>
+              <div style="display:flex;align-items:center;gap:14px;padding-bottom:6px">
+                <div style="position:relative;width:74px;height:74px;flex:0 0 auto;border-radius:50%;background:{{ mnote.chartGrad }}">
+                  <div style="position:absolute;inset:23px;background:#fffdf8;border-radius:50%"></div>
+                </div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                  <sc-for list="{{ mnote.chartItems }}" as="c" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span style="width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:{{ c.color }}"></span>
+                      <span style="font-size:12px;line-height:1">{{ c.e }}</span>
+                      <span style="flex:1;min-width:0;font-size:11px;font-weight:700;color:#55554e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                      <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#1b1b18">×{{ c.n }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+          <div style="flex:0 0 auto;padding:12px 20px;border-top:1px solid #f1efe8"><div style="text-align:center;font-size:12px;font-weight:700;color:#1b1b18;background:#f7f4ec;border-radius:12px;padding:10px">{{ ui3.footLabel }}</div></div>
+        </div></div>
+      </div>
+    </div>
+    </sc-if>
+    <sc-if value="{{ ui3.port }}" hint-placeholder-val="{{ false }}">
+    <div style="width:372px;background:#1b1b18;border-radius:46px;padding:11px;box-shadow:0 30px 70px rgba(27,27,24,.28)">
+      <div style="position:relative;height:812px;background:#f7f4ec;border-radius:36px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="height:40px;flex:0 0 40px;display:flex;align-items:center;justify-content:space-between;padding:0 24px 0 26px;font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#1b1b18"><span>9:41</span><span style="letter-spacing:.15em;font-size:11px">● ● ●</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:2px 18px 0">
+          <div style="font-size:17px;font-weight:900;letter-spacing:-.01em">がんばりの本棚</div>
+          <span style="flex:1"></span>
+          <div style="display:flex;background:#eceadd;border-radius:999px;padding:2px">
+            <div onClick="{{ ui3.onDay }}" style="cursor:pointer;user-select:none;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border-radius:999px;padding:3px 10px;background:{{ ui3.dayBg }};color:{{ ui3.dayFg }}">日別</div>
+            <div onClick="{{ ui3.onMonth }}" style="cursor:pointer;user-select:none;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border-radius:999px;padding:3px 10px;background:{{ ui3.monBg }};color:{{ ui3.monFg }}">月別</div>
+          </div>
+          <div onClick="{{ ui3.onToday }}" style="cursor:pointer;user-select:none;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#2f3a00;background:#eef7cc;border:1px solid #d9ecab;border-radius:999px;padding:4px 9px">今日</div>
+          <div onClick="{{ ui3.onRotate }}" title="画面を回転" style="cursor:pointer;user-select:none;width:26px;height:26px;flex:0 0 auto;border-radius:50%;background:#fff;border:1px solid #e3e0d5;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:15px;color:#55554e">screen_rotation</span></div>
+        </div>
+        <sc-if value="{{ ui3.isDay }}" hint-placeholder-val="{{ true }}">
+          <div class="noscroll" style="display:flex;align-items:center;gap:5px;padding:8px 18px 0;overflow-x:auto">
+            <div onClick="{{ ui3.onBoth }}" style="cursor:pointer;user-select:none;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border:1px solid #e3e0d5;border-radius:999px;padding:4px 9px;background:{{ ui3.bothBg }};color:{{ ui3.bothFg }}">疲労と回復</div>
+            <div onClick="{{ ui3.onNet }}" style="cursor:pointer;user-select:none;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border:1px solid #e3e0d5;border-radius:999px;padding:4px 9px;background:{{ ui3.netBg }};color:{{ ui3.netFg }}">寝るまえの量</div>
+            <div onClick="{{ ui3.onFavFilter }}" style="cursor:pointer;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border:1px solid {{ ui3.favBorder }};background:{{ ui3.favBg }};color:{{ ui3.favColor }};border-radius:999px;padding:4px 9px;user-select:none">付箋の日</div>
+          </div>
+          <div class="noscroll" style="display:flex;align-items:center;gap:6px;padding:7px 18px 0;overflow-x:auto">
+            <select value="{{ ui3.month }}" onChange="{{ ui3.onMonthSel }}" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#55554e;background:#fff;border:1px solid #e3e0d5;border-radius:8px;padding:4px 5px;outline:none">
+              <option value="5">5月</option>
+              <option value="6">6月</option>
+              <option value="7">7月</option>
+            </select>
+            <select value="{{ ui3.flood }}" onChange="{{ ui3.onFlood }}" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#55554e;background:#fff;border:1px solid #e3e0d5;border-radius:8px;padding:4px 5px;outline:none">
+              <option value="all">すべての日</option>
+              <option value="over">あふれた日</option>
+              <option value="ok">おさまった日</option>
+            </select>
+            <select value="{{ ui3.sort }}" onChange="{{ ui3.onSort }}" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#55554e;background:#fff;border:1px solid #e3e0d5;border-radius:8px;padding:4px 5px;outline:none">
+              <option value="date">日付順</option>
+              <option value="more">多い順</option>
+              <option value="less">少ない順</option>
+            </select>
+          </div>
+          <div id="bookShelf3p" class="noscroll" style="flex:0 0 300px;overflow-x:auto;overflow-y:hidden">
+            <div style="position:relative;display:inline-flex;align-items:flex-end;gap:11px;height:100%;padding:0 24px 0">
+              <sc-for list="{{ books3 }}" as="day" hint-placeholder-count="8">
+                <div onClick="{{ day.onSel }}" style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding-bottom:16px">
+                  <sc-if value="{{ day.isMon }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#e8b23a;white-space:nowrap;z-index:3">{{ day.wk }}</div></sc-if>
+                  <sc-if value="{{ day.today }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:2px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#2f3a00;background:#c4f000;border-radius:999px;padding:1px 7px;white-space:nowrap;z-index:5">今日</div></sc-if>
+                  <div style="position:relative;width:66px;height:250px;margin-top:20px;background:rgba(255,255,255,.16);border:1px solid rgba(27,27,24,.18);border-radius:4px 4px 2px 2px;overflow:hidden;box-shadow:0 3px 6px rgba(27,27,24,.12)">
+                    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.08));box-shadow:inset -4px 0 6px rgba(27,27,24,.07),inset 2px 0 0 rgba(255,255,255,.45);z-index:2;pointer-events:none"></div><div style="position:absolute;top:0;left:0;right:0;height:9px;background:linear-gradient(90deg,#f1ede3,#fbf9f3 60%,#efe9dd);border-bottom:1px solid rgba(27,27,24,.07);z-index:2"></div>
+                    <div style="position:absolute;top:16px;left:0;right:0;text-align:center;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:#7a786f;z-index:3">{{ day.label }}</div>
+                    <div style="position:absolute;top:31px;left:0;right:0;text-align:center;font-size:11px;font-weight:500;color:#a7a59b;z-index:3">{{ day.wd }}</div>
+                    <sc-if value="{{ day.split3 }}" hint-placeholder-val="{{ true }}">
+                      <div style="position:absolute;top:46px;left:0;width:50%;text-align:center;font-size:8px;font-weight:700;color:#c9c5b8;z-index:3">疲労</div>
+                      <div style="position:absolute;top:46px;right:0;width:50%;text-align:center;font-size:8px;font-weight:700;color:#c9c5b8;z-index:3">回復</div>
+                      <div style="position:absolute;top:58px;bottom:6px;left:50%;width:1px;background:rgba(27,27,24,.12)"></div>
+                      <sc-for list="{{ day.fatHS }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                      <sc-for list="{{ day.fatHG }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                      <sc-for list="{{ day.recHS }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                      <sc-for list="{{ day.recHG }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                    </sc-if>
+                    <sc-if value="{{ day.net3 }}" hint-placeholder-val="{{ false }}">
+                      <sc-for list="{{ day.netS }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:24px;text-align:center;font-size:20px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                    </sc-if>
+                    <sc-if value="{{ day.fav }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:0;right:9px;width:9px;height:20px;background:#ff5fa2;clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%);z-index:3"></div></sc-if>
+                    <sc-if value="{{ day.today }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #c4f000;border-radius:4px 4px 2px 2px;pointer-events:none;z-index:4"></div></sc-if>
+                    <sc-if value="{{ day.sel }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #ff5fa2;border-radius:4px 4px 2px 2px;pointer-events:none;z-index:4"></div></sc-if>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="position:absolute;left:0;right:0;bottom:0;height:14px;background:linear-gradient(180deg,#4a3120,#241509);border-radius:2px;box-shadow:0 5px 10px rgba(27,27,24,.28);z-index:2"></div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ ui3.isMonth }}" hint-placeholder-val="{{ false }}">
+          <div id="bookShelf3mp" class="noscroll" style="flex:0 0 330px;overflow-x:auto;overflow-y:hidden">
+            <div style="position:relative;display:inline-flex;align-items:flex-end;gap:22px;height:100%;padding:0 24px 0">
+              <sc-for list="{{ months3 }}" as="mo" hint-placeholder-count="3">
+                <div onClick="{{ mo.onSel }}" style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding-bottom:16px">
+                  <sc-if value="{{ mo.cur }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:2px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#2f3a00;background:#c4f000;border-radius:999px;padding:1px 7px;white-space:nowrap;z-index:5">今月</div></sc-if>
+                  <div style="position:relative;width:170px;height:280px;margin-top:20px;background:linear-gradient(180deg,rgba(255,255,255,.6),rgba(255,255,255,.18));border:1px solid rgba(27,27,24,.18);border-radius:4px 10px 10px 4px;overflow:hidden;box-shadow:inset 6px 0 8px rgba(27,27,24,.08),inset 2px 0 0 rgba(255,255,255,.45),0 4px 8px rgba(27,27,24,.14)">
+                    <div style="position:absolute;top:0;bottom:0;left:10px;width:1px;background:rgba(27,27,24,.14)"></div>
+                    <div style="position:absolute;top:10px;left:0;right:0;text-align:center;z-index:2"><span style="font-family:'Space Mono',monospace;font-size:15px;font-weight:700;color:#7a786f;background:rgba(251,249,243,.85);border-radius:6px;padding:1px 8px">{{ mo.label }}</span></div>
+                    <sc-for list="{{ mo.pile }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:13px;text-align:center;font-size:11px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg)">{{ p.e }}</div></sc-for>
+                    <sc-for list="{{ mo.pileG }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:13px;text-align:center;font-size:11px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                    <sc-if value="{{ mo.cur }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #c4f000;border-radius:4px 10px 10px 4px;pointer-events:none"></div></sc-if>
+                    <sc-if value="{{ mo.sel }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #ff5fa2;border-radius:4px 10px 10px 4px;pointer-events:none"></div></sc-if>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="position:absolute;left:0;right:0;bottom:0;height:14px;background:linear-gradient(180deg,#4a3120,#241509);border-radius:2px;box-shadow:0 5px 10px rgba(27,27,24,.28);z-index:2"></div>
+            </div>
+          </div>
+        </sc-if>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:18px 16px 10px">
+          <div style="position:relative;flex:1;min-height:0;background:#fffdf8;border:1px solid #e7e2d3;border-radius:10px 16px 16px 10px;box-shadow:3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 12px 26px rgba(27,27,24,.14);display:flex;flex-direction:column">
+            <sc-if value="{{ ui3.isDay }}" hint-placeholder-val="{{ true }}"><div onClick="{{ note.onFav }}" title="付箋をつける" style="position:absolute;top:-14px;right:24px;width:20px;height:46px;border-radius:2px;transform:rotate(3deg);cursor:pointer;user-select:none;z-index:3;background:{{ note.fusenBg }};border:{{ note.fusenBorder }};box-shadow:0 2px 5px rgba(27,27,24,.15)"><div style="position:absolute;left:2px;right:2px;top:2px;height:8px;background:{{ note.fusenBand }}"></div></div></sc-if>
+            <sc-if value="{{ ui3.isDay }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:14px 20px 8px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:15px;font-weight:900">{{ note.title }}</span>
+                  <sc-if value="{{ note.today }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#2f3a00;background:#eef7cc;border-radius:6px;padding:2px 6px">今日</span></sc-if>
+                </div>
+                <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9d9b91;margin-top:2px">この本の中身</div>
+              </div>
+              <div class="noscroll" style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 14px">
+                <sc-for list="{{ note.slots }}" as="sl" hint-placeholder-count="4">
+                  <div style="margin-top:8px">
+                    <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13px">{{ sl.icon }}</span><span style="font-size:11.5px;font-weight:900">{{ sl.name }}</span></div>
+                    <div style="display:flex;flex-direction:column">
+                      <sc-for list="{{ sl.rows }}" as="r" hint-placeholder-count="2">
+                        <div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f1efe8;opacity:{{ r.op }}">
+                          <span style="font-size:15px;filter:{{ r.ef }}">{{ r.e }}</span>
+                          <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                          <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#e8842c">{{ r.f }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="font-size:11px;font-weight:700;color:#55554e;margin:14px 0 8px">絵文字のかず</div>
+                <div style="display:flex;align-items:center;gap:14px">
+                  <div style="position:relative;width:74px;height:74px;flex:0 0 auto;border-radius:50%;background:{{ note.chartGrad }}">
+                    <div style="position:absolute;inset:23px;background:#fffdf8;border-radius:50%"></div>
+                  </div>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                    <sc-for list="{{ note.chartItems }}" as="c" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:center;gap:6px">
+                        <span style="width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:{{ c.color }}"></span>
+                        <span style="font-size:12px;line-height:1">{{ c.e }}</span>
+                        <span style="flex:1;min-width:0;font-size:11px;font-weight:700;color:#55554e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                        <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#1b1b18">×{{ c.n }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="font-size:11px;font-weight:700;color:#55554e;margin:14px 0 6px">日記</div>
+                <textarea value="{{ note.diary }}" onChange="{{ note.onDiary }}" placeholder="この日のことをメモ" style="width:100%;min-height:56px;resize:vertical;background:#fbfaf6;border:1px solid #eee9dc;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:12px;line-height:1.6;color:#1b1b18;outline:none"></textarea>
+              </div>
+            </sc-if>
+            <sc-if value="{{ ui3.isMonth }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:14px 20px 8px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:15px;font-weight:900">{{ mnote.title }}</span>
+                  <sc-if value="{{ mnote.cur }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#2f3a00;background:#eef7cc;border-radius:6px;padding:2px 6px">今月</span></sc-if>
+                </div>
+                <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9d9b91;margin-top:2px">この月のまとめ</div>
+              </div>
+              <div class="noscroll" style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 14px">
+                <div style="font-size:11px;font-weight:700;color:#55554e;margin:8px 0 2px">疲労ランキング TOP5</div>
+                <sc-for list="{{ mnote.fatTop }}" as="r" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f1efe8">
+                    <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#9d9b91;width:14px;flex:0 0 auto">{{ r.rank }}</span>
+                    <span style="font-size:15px">{{ r.e }}</span>
+                    <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                    <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#e8842c">×{{ r.n }}</span>
+                  </div>
+                </sc-for>
+                <div style="font-size:11px;font-weight:700;color:#55554e;margin:14px 0 2px">回復ランキング TOP5</div>
+                <sc-for list="{{ mnote.recTop }}" as="r" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f1efe8">
+                    <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#9d9b91;width:14px;flex:0 0 auto">{{ r.rank }}</span>
+                    <span style="font-size:15px">{{ r.e }}</span>
+                    <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                    <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#7a9a00">×{{ r.n }}</span>
+                  </div>
+                </sc-for>
+                <div style="font-size:11px;font-weight:700;color:#55554e;margin:14px 0 8px">絵文字のかず</div>
+                <div style="display:flex;align-items:center;gap:14px;padding-bottom:6px">
+                  <div style="position:relative;width:74px;height:74px;flex:0 0 auto;border-radius:50%;background:{{ mnote.chartGrad }}">
+                    <div style="position:absolute;inset:23px;background:#fffdf8;border-radius:50%"></div>
+                  </div>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                    <sc-for list="{{ mnote.chartItems }}" as="c" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:center;gap:6px">
+                        <span style="width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:{{ c.color }}"></span>
+                        <span style="font-size:12px;line-height:1">{{ c.e }}</span>
+                        <span style="flex:1;min-width:0;font-size:11px;font-weight:700;color:#55554e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                        <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#1b1b18">×{{ c.n }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+            <div style="flex:0 0 auto;padding:10px 20px;border-top:1px solid #f1efe8"><div style="text-align:center;font-size:12px;font-weight:700;color:#1b1b18;background:#f7f4ec;border-radius:12px;padding:9px">{{ ui3.footLabel }}</div></div>
+          </div>
+        </div>
+        <div style="flex:0 0 64px;display:flex;align-items:stretch;background:#fff;border-top:1px solid #efece3">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:23px;color:#1b1b18">auto_stories</span><span style="font-size:10px;font-weight:700;color:#1b1b18">本棚</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:23px;color:#8a8a82">blur_on</span><span style="font-size:10px;font-weight:700;color:#8a8a82">シャカ</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:23px;color:#8a8a82">home</span><span style="font-size:10px;font-weight:700;color:#8a8a82">ホーム</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:23px;color:#8a8a82">person</span><span style="font-size:10px;font-weight:700;color:#8a8a82">マイ</span></div>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+  </div>
+
+  <div style="display:inline-flex;align-items:center;gap:10px;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#8a8a82;margin:44px 0 22px"><span style="display:inline-block;width:28px;height:1px;background:#8a8a82"></span>TURN 2 · 疲労と回復の見せ方</div>
+
+  <!-- ============ 2a : SPLIT SPINE (疲労|回復) ============ -->
+  <div id="2a" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:9px"><a href="#2a" style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;background:#1b1b18;color:#fff;border-radius:6px;padding:3px 8px;text-decoration:none">2a</a><span style="font-size:13px;font-weight:700;color:#55554e">背表紙を左右に分割 — 左＝疲労・右＝回復</span></div>
+    <div style="width:812px;background:#1b1b18;border-radius:46px;padding:11px;box-shadow:0 30px 70px rgba(27,27,24,.28)">
+      <div style="position:relative;height:390px;background:#f7f4ec;border-radius:34px;overflow:hidden;display:flex">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 22px 4px">
+            <div style="font-size:16px;font-weight:900;letter-spacing:-.01em">がんばりの本棚</div>
+            <span style="flex:1"></span>
+            <span style="font-family:'Space Mono',monospace;font-size:9.5px;color:#9d9b91">左＝疲労 ・ 右＝回復</span>
+          </div>
+          <div id="bookShelf2a" class="noscroll" style="flex:1;min-height:0;overflow-x:auto;overflow-y:hidden">
+            <div style="position:relative;display:inline-flex;align-items:flex-end;gap:11px;height:100%;padding:0 40px 0">
+              <sc-for list="{{ books2 }}" as="day" hint-placeholder-count="10">
+                <div onClick="{{ day.onSel }}" style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding-bottom:16px">
+                  <sc-if value="{{ day.today }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:2px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#2f3a00;background:#c4f000;border-radius:999px;padding:1px 7px;white-space:nowrap;z-index:5">今日</div></sc-if>
+                  <div style="position:relative;width:66px;height:270px;margin-top:20px;background:rgba(255,255,255,.16);border:1px solid rgba(27,27,24,.18);border-radius:4px 4px 2px 2px;overflow:hidden;box-shadow:0 3px 6px rgba(27,27,24,.12)">
+                    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.08));box-shadow:inset -4px 0 6px rgba(27,27,24,.07),inset 2px 0 0 rgba(255,255,255,.45);z-index:2;pointer-events:none"></div><div style="position:absolute;top:0;left:0;right:0;height:9px;background:linear-gradient(90deg,#f1ede3,#fbf9f3 60%,#efe9dd);border-bottom:1px solid rgba(27,27,24,.07);z-index:2"></div>
+                    <div style="position:absolute;top:16px;left:0;right:0;text-align:center;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:#7a786f;z-index:3">{{ day.label }}</div>
+                    <div style="position:absolute;top:31px;left:0;right:0;text-align:center;font-size:11px;font-weight:500;color:#a7a59b;z-index:3">{{ day.wd }}</div>
+                    <div style="position:absolute;top:46px;left:0;width:50%;text-align:center;font-size:8px;font-weight:700;color:#c9c5b8;z-index:3">疲労</div>
+                    <div style="position:absolute;top:46px;right:0;width:50%;text-align:center;font-size:8px;font-weight:700;color:#c9c5b8;z-index:3">回復</div>
+                    <div style="position:absolute;top:58px;bottom:6px;left:50%;width:1px;background:rgba(27,27,24,.12)"></div>
+                    <sc-for list="{{ day.fatHS }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                    <sc-for list="{{ day.fatHG }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                    <sc-for list="{{ day.recHS }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                    <sc-for list="{{ day.recHG }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:20px;text-align:center;font-size:18px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                    <sc-if value="{{ day.fav }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:0;right:9px;width:9px;height:20px;background:#ff5fa2;clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%);z-index:3"></div></sc-if>
+                    <sc-if value="{{ day.today }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #c4f000;border-radius:4px 4px 2px 2px;pointer-events:none;z-index:4"></div></sc-if>
+                    <sc-if value="{{ day.sel }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #ff5fa2;border-radius:4px 4px 2px 2px;pointer-events:none;z-index:4"></div></sc-if>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="position:absolute;left:0;right:0;bottom:0;height:14px;background:linear-gradient(180deg,#4a3120,#241509);border-radius:2px;box-shadow:0 5px 10px rgba(27,27,24,.28);z-index:2"></div>
+            </div>
+          </div>
+        </div>
+        <div style="position:relative;flex:0 0 286px;display:flex;flex-direction:column;padding:22px 14px 14px 4px"><div style="position:relative;flex:1;min-height:0;background:#fffdf8;border:1px solid #e7e2d3;border-radius:10px 16px 16px 10px;box-shadow:3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 16px 34px rgba(27,27,24,.18);display:flex;flex-direction:column"><div onClick="{{ note.onFav }}" title="付箋をつける" style="position:absolute;top:-14px;right:24px;width:20px;height:46px;border-radius:2px;transform:rotate(3deg);cursor:pointer;user-select:none;z-index:3;background:{{ note.fusenBg }};border:{{ note.fusenBorder }};box-shadow:0 2px 5px rgba(27,27,24,.15)"><div style="position:absolute;left:2px;right:2px;top:2px;height:9px;background:{{ note.fusenBand }}"></div></div>
+          <div style="padding:18px 20px 10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px;font-weight:900">{{ note.title }}</span>
+              <sc-if value="{{ note.today }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#2f3a00;background:#eef7cc;border-radius:6px;padding:2px 6px">今日</span></sc-if>
+              
+            </div>
+            <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9d9b91;margin-top:3px">この本の中身</div>
+          </div>
+          <div class="noscroll" style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 16px">
+            <sc-for list="{{ note.slots }}" as="sl" hint-placeholder-count="4">
+              <div style="margin-top:10px">
+                <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13px">{{ sl.icon }}</span><span style="font-size:11.5px;font-weight:900">{{ sl.name }}</span></div>
+                <div style="display:flex;flex-direction:column">
+                  <sc-for list="{{ sl.rows }}" as="r" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid #f1efe8;opacity:{{ r.op }}">
+                      <span style="font-size:15px;filter:{{ r.ef }}">{{ r.e }}</span>
+                      <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                      <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#e8842c">{{ r.f }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+            <div style="font-size:11px;font-weight:700;color:#55554e;margin:16px 0 8px">絵文字のかず</div>
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="position:relative;width:74px;height:74px;flex:0 0 auto;border-radius:50%;background:{{ note.chartGrad }}">
+                <div style="position:absolute;inset:23px;background:#fffdf8;border-radius:50%"></div>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                <sc-for list="{{ note.chartItems }}" as="c" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:{{ c.color }}"></span>
+                    <span style="font-size:12px;line-height:1">{{ c.e }}</span>
+                    <span style="flex:1;min-width:0;font-size:11px;font-weight:700;color:#55554e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                    <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#1b1b18">×{{ c.n }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="font-size:11px;font-weight:700;color:#55554e;margin:16px 0 6px">日記</div>
+            <textarea value="{{ note.diary }}" onChange="{{ note.onDiary }}" placeholder="この日のことをメモ" style="width:100%;min-height:64px;resize:vertical;background:#fbfaf6;border:1px solid #eee9dc;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:12px;line-height:1.6;color:#1b1b18;outline:none"></textarea>
+          </div>
+          <div style="flex:0 0 auto;padding:12px 20px;border-top:1px solid #f1efe8"><div style="text-align:center;font-size:12px;font-weight:700;color:#1b1b18;background:#f7f4ec;border-radius:12px;padding:10px">この日を見る</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 2b : VIEW TOGGLE (寝るまえの量/疲労/回復) ============ -->
+  <div id="2b" style="display:flex;flex-direction:column;gap:14px;margin-top:44px">
+    <div style="display:flex;align-items:center;gap:9px"><a href="#2b" style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;background:#1b1b18;color:#fff;border-radius:6px;padding:3px 8px;text-decoration:none">2b</a><span style="font-size:13px;font-weight:700;color:#55554e">表示切り替え — 寝るまえの量／疲労だけ／回復だけ</span></div>
+    <div style="width:812px;background:#1b1b18;border-radius:46px;padding:11px;box-shadow:0 30px 70px rgba(27,27,24,.28)">
+      <div style="position:relative;height:390px;background:#f7f4ec;border-radius:34px;overflow:hidden;display:flex">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 22px 4px">
+            <div style="font-size:16px;font-weight:900;letter-spacing:-.01em">がんばりの本棚</div>
+            <span style="flex:1"></span>
+            <div style="display:flex;gap:5px">
+              <div onClick="{{ ui2.onNet }}" style="cursor:pointer;user-select:none;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border:1px solid #e3e0d5;border-radius:999px;padding:4px 10px;background:{{ ui2.netBg }};color:{{ ui2.netFg }}">寝るまえの量</div>
+              <div onClick="{{ ui2.onFat }}" style="cursor:pointer;user-select:none;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border:1px solid #e3e0d5;border-radius:999px;padding:4px 10px;background:{{ ui2.fatBg }};color:{{ ui2.fatFg }}">疲労だけ</div>
+              <div onClick="{{ ui2.onRec }}" style="cursor:pointer;user-select:none;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border:1px solid #e3e0d5;border-radius:999px;padding:4px 10px;background:{{ ui2.recBg }};color:{{ ui2.recFg }}">回復だけ</div>
+            </div>
+          </div>
+          <div id="bookShelf2b" class="noscroll" style="flex:1;min-height:0;overflow-x:auto;overflow-y:hidden">
+            <div style="position:relative;display:inline-flex;align-items:flex-end;gap:11px;height:100%;padding:0 40px 0">
+              <sc-for list="{{ books2 }}" as="day" hint-placeholder-count="10">
+                <div onClick="{{ day.onSel }}" style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding-bottom:16px">
+                  <sc-if value="{{ day.today }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:2px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#2f3a00;background:#c4f000;border-radius:999px;padding:1px 7px;white-space:nowrap;z-index:5">今日</div></sc-if>
+                  <div style="position:relative;width:66px;height:270px;margin-top:20px;background:rgba(255,255,255,.16);border:1px solid rgba(27,27,24,.18);border-radius:4px 4px 2px 2px;overflow:hidden;box-shadow:0 3px 6px rgba(27,27,24,.12)">
+                    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.08));box-shadow:inset -4px 0 6px rgba(27,27,24,.07),inset 2px 0 0 rgba(255,255,255,.45);z-index:2;pointer-events:none"></div><div style="position:absolute;top:0;left:0;right:0;height:9px;background:linear-gradient(90deg,#f1ede3,#fbf9f3 60%,#efe9dd);border-bottom:1px solid rgba(27,27,24,.07);z-index:2"></div>
+                    <div style="position:absolute;top:16px;left:0;right:0;text-align:center;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:#7a786f;z-index:3">{{ day.label }}</div>
+                    <div style="position:absolute;top:31px;left:0;right:0;text-align:center;font-size:11px;font-weight:500;color:#a7a59b;z-index:3">{{ day.wd }}</div>
+                    <sc-for list="{{ day.show }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:28px;text-align:center;font-size:26px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                    <sc-for list="{{ day.showG }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:28px;text-align:center;font-size:26px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                    <sc-if value="{{ day.fav }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:0;right:9px;width:9px;height:20px;background:#ff5fa2;clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%);z-index:3"></div></sc-if>
+                    <sc-if value="{{ day.today }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #c4f000;border-radius:4px 4px 2px 2px;pointer-events:none;z-index:4"></div></sc-if>
+                    <sc-if value="{{ day.sel }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #ff5fa2;border-radius:4px 4px 2px 2px;pointer-events:none;z-index:4"></div></sc-if>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="position:absolute;left:0;right:0;bottom:0;height:14px;background:linear-gradient(180deg,#4a3120,#241509);border-radius:2px;box-shadow:0 5px 10px rgba(27,27,24,.28);z-index:2"></div>
+            </div>
+          </div>
+        </div>
+        <div style="position:relative;flex:0 0 286px;display:flex;flex-direction:column;padding:22px 14px 14px 4px"><div style="position:relative;flex:1;min-height:0;background:#fffdf8;border:1px solid #e7e2d3;border-radius:10px 16px 16px 10px;box-shadow:3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 16px 34px rgba(27,27,24,.18);display:flex;flex-direction:column"><div onClick="{{ note.onFav }}" title="付箋をつける" style="position:absolute;top:-14px;right:24px;width:20px;height:46px;border-radius:2px;transform:rotate(3deg);cursor:pointer;user-select:none;z-index:3;background:{{ note.fusenBg }};border:{{ note.fusenBorder }};box-shadow:0 2px 5px rgba(27,27,24,.15)"><div style="position:absolute;left:2px;right:2px;top:2px;height:9px;background:{{ note.fusenBand }}"></div></div>
+          <div style="padding:18px 20px 10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px;font-weight:900">{{ note.title }}</span>
+              <sc-if value="{{ note.today }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#2f3a00;background:#eef7cc;border-radius:6px;padding:2px 6px">今日</span></sc-if>
+              
+            </div>
+            <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9d9b91;margin-top:3px">この本の中身</div>
+          </div>
+          <div class="noscroll" style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 16px">
+            <sc-for list="{{ note.slots }}" as="sl" hint-placeholder-count="4">
+              <div style="margin-top:10px">
+                <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13px">{{ sl.icon }}</span><span style="font-size:11.5px;font-weight:900">{{ sl.name }}</span></div>
+                <div style="display:flex;flex-direction:column">
+                  <sc-for list="{{ sl.rows }}" as="r" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid #f1efe8;opacity:{{ r.op }}">
+                      <span style="font-size:15px;filter:{{ r.ef }}">{{ r.e }}</span>
+                      <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                      <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#e8842c">{{ r.f }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+            <div style="font-size:11px;font-weight:700;color:#55554e;margin:16px 0 8px">絵文字のかず</div>
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="position:relative;width:74px;height:74px;flex:0 0 auto;border-radius:50%;background:{{ note.chartGrad }}">
+                <div style="position:absolute;inset:23px;background:#fffdf8;border-radius:50%"></div>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                <sc-for list="{{ note.chartItems }}" as="c" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:{{ c.color }}"></span>
+                    <span style="font-size:12px;line-height:1">{{ c.e }}</span>
+                    <span style="flex:1;min-width:0;font-size:11px;font-weight:700;color:#55554e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                    <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#1b1b18">×{{ c.n }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="font-size:11px;font-weight:700;color:#55554e;margin:16px 0 6px">日記</div>
+            <textarea value="{{ note.diary }}" onChange="{{ note.onDiary }}" placeholder="この日のことをメモ" style="width:100%;min-height:64px;resize:vertical;background:#fbfaf6;border:1px solid #eee9dc;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:12px;line-height:1.6;color:#1b1b18;outline:none"></textarea>
+          </div>
+          <div style="flex:0 0 auto;padding:12px 20px;border-top:1px solid #f1efe8"><div style="text-align:center;font-size:12px;font-weight:700;color:#1b1b18;background:#f7f4ec;border-radius:12px;padding:10px">この日を見る</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:48px 56px 100px;min-width:1180px">
+
+  <div style="max-width:1040px;margin-bottom:38px">
+    <div style="display:inline-flex;align-items:center;gap:10px;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#8a8a82">
+      <span style="display:inline-block;width:28px;height:1px;background:#8a8a82"></span>
+      別案 · 本棚タイムライン
+    </div>
+    <h1 style="margin:14px 0 0;font-weight:900;font-size:46px;line-height:1.04;letter-spacing:-.01em">1日1冊の透明な本 — がんばりの本棚</h1>
+    <p style="margin:16px 0 0;max-width:900px;font-size:16px;line-height:1.9;color:#55554e;text-wrap:pretty">試験管のかわりに<b style="color:#1b1b18">1日＝1冊の透明な本</b>。本棚に背表紙を向けて並び、透明な背に<b style="color:#1b1b18">下＝朝〜上＝夜</b>で絵文字が積もる。過去＝実体・未来＝グレーの予定、今日＝ライムの背。棚板はダークブラウンの木。絵文字1個＝疲労1で、数値・ゲージ・%は出さない。</p>
+    <div style="display:flex;gap:22px;margin-top:20px;font-family:'Space Mono',monospace;font-size:11.5px;color:#55554e;flex-wrap:wrap">
+      <span style="display:inline-flex;align-items:center;gap:7px"><span style="font-size:16px">🍙</span>実体＝記録</span>
+      <span style="display:inline-flex;align-items:center;gap:7px"><span style="font-size:16px;opacity:.32;filter:grayscale(1)">🍙</span>グレー＝予定</span>
+      <span style="display:inline-flex;align-items:center;gap:7px"><span style="width:12px;height:12px;border-radius:2px;background:#c4f000;display:inline-block"></span>今日の背</span>
+      <span style="display:inline-flex;align-items:center;gap:7px"><span style="width:12px;height:12px;border-radius:2px;background:#3a2416;display:inline-block"></span>棚板＝木</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:52px;align-items:flex-start;flex-wrap:wrap">
+
+    <!-- ============ 1a : PORTRAIT BOOKCASE ============ -->
+    <div id="1a" style="display:flex;flex-direction:column;gap:14px;flex:0 0 auto">
+      <div style="display:flex;align-items:center;gap:9px"><a href="#1a" style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;background:#1b1b18;color:#fff;border-radius:6px;padding:3px 8px;text-decoration:none">1a</a><span style="font-size:13px;font-weight:700;color:#55554e">本棚ビュー（週ごとの段）</span></div>
+
+      <div style="width:372px;background:#1b1b18;border-radius:46px;padding:11px;box-shadow:0 30px 70px rgba(27,27,24,.28)">
+        <div style="position:relative;height:812px;background:#f7f4ec;border-radius:36px;overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:40px;flex:0 0 40px;display:flex;align-items:center;justify-content:space-between;padding:0 24px 0 26px;font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#1b1b18"><span>9:41</span><span style="letter-spacing:.15em;font-size:11px">● ● ●</span></div>
+
+          <div style="padding:4px 22px 10px">
+            <div style="font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#9d9b91">BOOKSHELF</div>
+            <div style="font-size:21px;font-weight:900;margin-top:2px;letter-spacing:-.01em">がんばりの本棚</div>
+            <div style="font-size:12px;color:#8a8a82;margin-top:4px">下の段ほど最近。今日は本棚の一番下にある。</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:10px">
+              <div style="display:flex;background:#eceadd;border-radius:999px;padding:2px;flex:0 0 auto">
+                <div onClick="{{ ui3.onDay }}" style="cursor:pointer;user-select:none;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border-radius:999px;padding:3px 9px;background:{{ ui3.dayBg }};color:{{ ui3.dayFg }}">日別</div>
+                <div onClick="{{ ui3.onMonth }}" style="cursor:pointer;user-select:none;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border-radius:999px;padding:3px 9px;background:{{ ui3.monBg }};color:{{ ui3.monFg }}">月別</div>
+              </div>
+              <div onClick="{{ ui3.onToday }}" style="cursor:pointer;user-select:none;white-space:nowrap;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#2f3a00;background:#eef7cc;border:1px solid #d9ecab;border-radius:999px;padding:4px 9px">今日</div>
+              <select value="{{ ui3.month }}" onChange="{{ ui3.onMonthSel }}" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#55554e;background:#fff;border:1px solid #e3e0d5;border-radius:8px;padding:4px 5px;outline:none">
+                <option value="5">5月</option>
+                <option value="6">6月</option>
+                <option value="7">7月</option>
+              </select>
+              <select value="{{ ui3.sort }}" onChange="{{ ui3.onSort }}" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#55554e;background:#fff;border:1px solid #e3e0d5;border-radius:8px;padding:4px 5px;outline:none">
+                <option value="date">日付順</option>
+                <option value="more">多い順</option>
+                <option value="less">少ない順</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="bookcasePort" class="noscroll" style="flex:1;min-height:0;overflow-y:auto">
+            <div style="position:relative;padding:10px 0 20px">
+              <!-- top board -->
+              <div style="height:13px;background:linear-gradient(180deg,#5a3d27,#33200f);position:relative;z-index:2;box-shadow:0 3px 6px rgba(27,27,24,.2)"></div>
+
+              <!-- case body: sides + shelves (all connected) -->
+              <div style="position:relative;padding:0">
+
+                <sc-if value="{{ ui3.isDay }}" hint-placeholder-val="{{ true }}">
+                <sc-for list="{{ booksWeeks1 }}" as="week" hint-placeholder-count="4">
+                  <div style="position:relative">
+                    <div style="display:flex;align-items:flex-end;justify-content:flex-start;gap:6px;padding:16px 8px 0 {{ week.padPx }}px;position:relative;z-index:1">
+                      <sc-for list="{{ week.days }}" as="day" hint-placeholder-count="7">
+                        <sc-if value="{{ day.notToday }}" hint-placeholder-val="{{ true }}">
+                          <div onClick="{{ day.onSel }}" style="position:relative;cursor:pointer;width:41px;height:168px;background:rgba(255,255,255,.16);border:1px solid rgba(27,27,24,.18);border-radius:3px 3px 1px 1px;overflow:hidden;box-shadow:0 3px 5px rgba(27,27,24,.1)">
+                            <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.08));box-shadow:inset -3px 0 5px rgba(27,27,24,.07),inset 2px 0 0 rgba(255,255,255,.45);z-index:2;pointer-events:none"></div><div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#f1ede3,#fbf9f3 60%,#efe9dd);border-bottom:1px solid rgba(27,27,24,.07);z-index:2"></div>
+                            <div style="position:absolute;top:9px;left:0;right:0;text-align:center;font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#7a786f;letter-spacing:-.02em;z-index:3">{{ day.label }}</div>
+                            <div style="position:absolute;top:19px;left:0;right:0;text-align:center;font-size:8px;font-weight:500;color:#a7a59b;z-index:3">{{ day.wd }}</div>
+                            <sc-for list="{{ day.solid }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:18px;text-align:center;font-size:17px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                            <sc-for list="{{ day.ghost }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:18px;text-align:center;font-size:17px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                            <sc-if value="{{ day.sel }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:2px solid #ff5fa2;border-radius:3px 3px 1px 1px;pointer-events:none;z-index:4"></div></sc-if>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ day.today }}" hint-placeholder-val="{{ false }}">
+                          <div onClick="{{ day.onSel }}" style="position:relative;cursor:pointer">
+                            <div style="position:relative;width:41px;height:168px;background:rgba(255,255,255,.2);border:2px solid #c4f000;border-radius:3px 3px 1px 1px;overflow:hidden;box-shadow:0 3px 6px rgba(27,27,24,.14)">
+                              <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.08));box-shadow:inset -3px 0 5px rgba(27,27,24,.07),inset 2px 0 0 rgba(255,255,255,.45);z-index:2;pointer-events:none"></div><div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#f1ede3,#fbf9f3 60%,#efe9dd);border-bottom:1px solid rgba(27,27,24,.07);z-index:2"></div>
+                              <div style="position:absolute;top:9px;left:0;right:0;text-align:center;font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#5a7a00;letter-spacing:-.02em;z-index:3">{{ day.label }}</div>
+                              <div style="position:absolute;top:19px;left:0;right:0;text-align:center;font-size:8px;font-weight:700;color:#7a9a00;z-index:3">{{ day.wd }}</div>
+                              <sc-for list="{{ day.solid }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:18px;text-align:center;font-size:17px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                              <sc-for list="{{ day.ghost }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:18px;text-align:center;font-size:17px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                              <sc-if value="{{ day.sel }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:2px solid #ff5fa2;border-radius:3px 3px 1px 1px;pointer-events:none;z-index:4"></div></sc-if>
+                            </div>
+                          </div>
+                        </sc-if>
+                      </sc-for>
+                    </div>
+                    <!-- shelf board (spans side to side) -->
+                    <div style="height:13px;background:linear-gradient(180deg,#4a3120,#2a190f);box-shadow:0 5px 9px rgba(27,27,24,.22);position:relative;z-index:1"><div style="position:absolute;left:10px;top:1px;font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#e8b23a;letter-spacing:.04em">{{ week.wk }}</div></div>
+                  </div>
+                </sc-for>
+                </sc-if>
+                <sc-if value="{{ ui3.isMonth }}" hint-placeholder-val="{{ false }}">
+                <sc-for list="{{ monthRows }}" as="row" hint-placeholder-count="2">
+                  <div style="position:relative">
+                    <div style="display:flex;align-items:flex-end;justify-content:flex-start;gap:12px;padding:20px 8px 0;position:relative;z-index:1">
+                      <sc-for list="{{ row.ms }}" as="mo" hint-placeholder-count="2">
+                        <div onClick="{{ mo.onSel1 }}" style="position:relative;cursor:pointer">
+                          <div style="position:relative;width:158px;height:260px;background:linear-gradient(180deg,rgba(255,255,255,.6),rgba(255,255,255,.18));border:1px solid rgba(27,27,24,.18);border-radius:4px 10px 10px 4px;overflow:hidden;box-shadow:inset 6px 0 8px rgba(27,27,24,.08),inset 2px 0 0 rgba(255,255,255,.45),0 4px 8px rgba(27,27,24,.14)">
+                            <div style="position:absolute;top:0;bottom:0;left:10px;width:1px;background:rgba(27,27,24,.14)"></div>
+                            <div style="position:absolute;top:10px;left:0;right:0;text-align:center;z-index:2"><span style="font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:#7a786f;background:rgba(251,249,243,.85);border-radius:6px;padding:1px 8px">{{ mo.label }}</span></div>
+                            <sc-for list="{{ mo.pile }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:13px;text-align:center;font-size:11px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg)">{{ p.e }}</div></sc-for>
+                            <sc-for list="{{ mo.pileG }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:13px;text-align:center;font-size:11px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                            <sc-if value="{{ mo.cur }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #c4f000;border-radius:4px 10px 10px 4px;pointer-events:none"></div></sc-if>
+                            <sc-if value="{{ mo.sel }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #ff5fa2;border-radius:4px 10px 10px 4px;pointer-events:none"></div></sc-if>
+                          </div>
+                        </div>
+                      </sc-for>
+                    </div>
+                    <div style="height:13px;background:linear-gradient(180deg,#4a3120,#2a190f);box-shadow:0 5px 9px rgba(27,27,24,.22);position:relative;z-index:1"></div>
+                  </div>
+                </sc-for>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:0 0 auto;position:relative;z-index:3">
+            <div onClick="{{ ui3.onOpenSheet }}" style="cursor:pointer;position:absolute;top:-25px;left:18px;width:70px;height:26px;background:#fffdf8;border:1px solid #e7e2d3;border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -5px 10px rgba(27,27,24,.08);display:flex;align-items:center;justify-content:center;gap:4px">
+              <span style="font-family:'Material Symbols Rounded';font-size:14px;color:#1b1b18">menu_book</span>
+              <span style="font-size:9px;font-weight:700;color:#55554e;letter-spacing:.08em">{{ ui3.tabLabel }}</span>
+            </div>
+            <div onClick="{{ ui3.onOpenSheet }}" style="cursor:pointer;background:#fffdf8;border-top:1px solid #e7e2d3;box-shadow:0 -10px 24px rgba(27,27,24,.1);padding:10px 18px;display:flex;align-items:center;gap:8px">
+              <sc-if value="{{ ui3.isDay }}" hint-placeholder-val="{{ true }}"><span style="font-size:14px;font-weight:900">{{ note.title }}</span></sc-if>
+              <sc-if value="{{ ui3.noteToday }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#2f3a00;background:#eef7cc;border-radius:6px;padding:2px 6px">今日</span></sc-if>
+              <sc-if value="{{ ui3.isMonth }}" hint-placeholder-val="{{ false }}"><span style="font-size:14px;font-weight:900">{{ mnote.title }}</span></sc-if>
+              <span style="flex:1"></span>
+              <div style="font-size:12px;font-weight:700;color:#2f3a00;background:#c4f000;border-radius:999px;padding:8px 14px;cursor:pointer">{{ ui3.footLabel }}</div>
+            </div>
+          </div>
+
+          <div style="flex:0 0 64px;display:flex;align-items:stretch;background:#fff;border-top:1px solid #efece3">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-variation-settings:'FILL' 1;font-size:23px;color:#1b1b18">auto_stories</span><span style="font-size:10px;font-weight:700;color:#1b1b18">本棚</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:23px;color:#8a8a82">blur_on</span><span style="font-size:10px;font-weight:700;color:#8a8a82">シャカ</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:23px;color:#8a8a82">home</span><span style="font-size:10px;font-weight:700;color:#8a8a82">ホーム</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:23px;color:#8a8a82">person</span><span style="font-size:10px;font-weight:700;color:#8a8a82">マイ</span></div>
+          </div>
+          <sc-if value="{{ ui3.sheet1 }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ ui3.onCloseSheet }}" style="position:absolute;top:0;left:0;right:0;bottom:64px;background:rgba(27,27,24,.35);z-index:9"></div>
+            <div style="position:absolute;left:0;right:0;bottom:64px;height:66%;background:#fffdf8;border:1px solid #e7e2d3;border-bottom:none;border-radius:22px 22px 0 0;box-shadow:0 -18px 44px rgba(27,27,24,.3);z-index:10;display:flex;flex-direction:column;animation:sheetUp .3s cubic-bezier(.2,.8,.3,1)">
+              <sc-if value="{{ ui3.isDay }}" hint-placeholder-val="{{ true }}"><div onClick="{{ note.onFav }}" title="付箋をつける" style="position:absolute;top:-14px;right:30px;width:20px;height:46px;border-radius:2px;transform:rotate(3deg);cursor:pointer;user-select:none;z-index:3;background:{{ note.fusenBg }};border:{{ note.fusenBorder }};box-shadow:0 2px 5px rgba(27,27,24,.15)"><div style="position:absolute;left:2px;right:2px;top:2px;height:8px;background:{{ note.fusenBand }}"></div></div></sc-if>
+              <div style="flex:0 0 auto;display:flex;justify-content:center;padding:8px 0 0"><div style="width:40px;height:4px;border-radius:999px;background:#e3dfd2"></div></div>
+              <sc-if value="{{ ui3.isDay }}" hint-placeholder-val="{{ true }}">
+                <div style="padding:8px 20px 8px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:16px;font-weight:900">{{ note.title }}</span>
+                    <sc-if value="{{ note.today }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#2f3a00;background:#eef7cc;border-radius:6px;padding:2px 6px">今日</span></sc-if>
+                  </div>
+                  <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9d9b91;margin-top:2px">この本の中身</div>
+                </div>
+                <div class="noscroll" style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 14px">
+                  <sc-for list="{{ note.slots }}" as="sl" hint-placeholder-count="4">
+                    <div style="margin-top:8px">
+                      <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13px">{{ sl.icon }}</span><span style="font-size:11.5px;font-weight:900">{{ sl.name }}</span></div>
+                      <div style="display:flex;flex-direction:column">
+                        <sc-for list="{{ sl.rows }}" as="r" hint-placeholder-count="2">
+                          <div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f1efe8;opacity:{{ r.op }}">
+                            <span style="font-size:15px;filter:{{ r.ef }}">{{ r.e }}</span>
+                            <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                            <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#e8842c">{{ r.f }}</span>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-for>
+                  <div style="font-size:11px;font-weight:700;color:#55554e;margin:14px 0 8px">絵文字のかず</div>
+                  <div style="display:flex;align-items:center;gap:14px">
+                    <div style="position:relative;width:74px;height:74px;flex:0 0 auto;border-radius:50%;background:{{ note.chartGrad }}">
+                      <div style="position:absolute;inset:23px;background:#fffdf8;border-radius:50%"></div>
+                    </div>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                      <sc-for list="{{ note.chartItems }}" as="c" hint-placeholder-count="3">
+                        <div style="display:flex;align-items:center;gap:6px">
+                          <span style="width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:{{ c.color }}"></span>
+                          <span style="font-size:12px;line-height:1">{{ c.e }}</span>
+                          <span style="flex:1;min-width:0;font-size:11px;font-weight:700;color:#55554e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                          <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#1b1b18">×{{ c.n }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="font-size:11px;font-weight:700;color:#55554e;margin:14px 0 6px">日記</div>
+                  <textarea value="{{ note.diary }}" onChange="{{ note.onDiary }}" placeholder="この日のことをメモ" style="width:100%;min-height:56px;resize:vertical;background:#fbfaf6;border:1px solid #eee9dc;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:12px;line-height:1.6;color:#1b1b18;outline:none"></textarea>
+                </div>
+              </sc-if>
+              <sc-if value="{{ ui3.isMonth }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:8px 20px 8px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:16px;font-weight:900">{{ mnote.title }}</span>
+                    <sc-if value="{{ mnote.cur }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#2f3a00;background:#eef7cc;border-radius:6px;padding:2px 6px">今月</span></sc-if>
+                  </div>
+                  <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9d9b91;margin-top:2px">この月のまとめ</div>
+                </div>
+                <div class="noscroll" style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 14px">
+                  <div style="font-size:11px;font-weight:700;color:#55554e;margin:8px 0 2px">疲労ランキング TOP5</div>
+                  <sc-for list="{{ mnote.fatTop }}" as="r" hint-placeholder-count="5">
+                    <div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f1efe8">
+                      <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#9d9b91;width:14px;flex:0 0 auto">{{ r.rank }}</span>
+                      <span style="font-size:15px">{{ r.e }}</span>
+                      <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                      <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#e8842c">×{{ r.n }}</span>
+                    </div>
+                  </sc-for>
+                  <div style="font-size:11px;font-weight:700;color:#55554e;margin:14px 0 2px">回復ランキング TOP5</div>
+                  <sc-for list="{{ mnote.recTop }}" as="r" hint-placeholder-count="4">
+                    <div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f1efe8">
+                      <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#9d9b91;width:14px;flex:0 0 auto">{{ r.rank }}</span>
+                      <span style="font-size:15px">{{ r.e }}</span>
+                      <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                      <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#7a9a00">×{{ r.n }}</span>
+                    </div>
+                  </sc-for>
+                  <div style="font-size:11px;font-weight:700;color:#55554e;margin:14px 0 8px">絵文字のかず</div>
+                  <div style="display:flex;align-items:center;gap:14px;padding-bottom:6px">
+                    <div style="position:relative;width:74px;height:74px;flex:0 0 auto;border-radius:50%;background:{{ mnote.chartGrad }}">
+                      <div style="position:absolute;inset:23px;background:#fffdf8;border-radius:50%"></div>
+                    </div>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                      <sc-for list="{{ mnote.chartItems }}" as="c" hint-placeholder-count="3">
+                        <div style="display:flex;align-items:center;gap:6px">
+                          <span style="width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:{{ c.color }}"></span>
+                          <span style="font-size:12px;line-height:1">{{ c.e }}</span>
+                          <span style="flex:1;min-width:0;font-size:11px;font-weight:700;color:#55554e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                          <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#1b1b18">×{{ c.n }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+              <div style="flex:0 0 auto;padding:10px 20px;border-top:1px solid #f1efe8"><div style="text-align:center;font-size:12px;font-weight:700;color:#1b1b18;background:#f7f4ec;border-radius:12px;padding:9px">{{ ui3.footLabel }}</div></div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ 1b : LANDSCAPE LONG SHELF + NOTE ============ -->
+  <div id="1b" style="display:flex;flex-direction:column;gap:14px;margin-top:44px">
+    <div style="display:flex;align-items:center;gap:9px"><a href="#1b" style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;background:#1b1b18;color:#fff;border-radius:6px;padding:3px 8px;text-decoration:none">1b</a><span style="font-size:13px;font-weight:700;color:#55554e">横向き — 一列の長い棚＋右からノート</span></div>
+
+    <div style="width:812px;background:#1b1b18;border-radius:46px;padding:11px;box-shadow:0 30px 70px rgba(27,27,24,.28)">
+      <div style="position:relative;height:390px;background:#f7f4ec;border-radius:34px;overflow:hidden;display:flex">
+
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;gap:10px;padding:11px 22px 0">
+            <div style="font-size:16px;font-weight:900;letter-spacing:-.01em">がんばりの本棚</div>
+            <span style="flex:1"></span>
+            <span style="font-family:'Space Mono',monospace;font-size:9.5px;color:#9d9b91">背表紙をタップ → 右にその日</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:7px 22px 4px">
+            <select value="{{ ui.month }}" onChange="{{ ui.onMonth }}" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#55554e;background:#fff;border:1px solid #e3e0d5;border-radius:8px;padding:4px 5px;outline:none">
+              <option value="all">全部の月</option>
+              <option value="6">6月</option>
+              <option value="7">7月</option>
+            </select>
+            <select value="{{ ui.flood }}" onChange="{{ ui.onFlood }}" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#55554e;background:#fff;border:1px solid #e3e0d5;border-radius:8px;padding:4px 5px;outline:none">
+              <option value="all">すべての日</option>
+              <option value="over">あふれた日</option>
+              <option value="ok">おさまった日</option>
+            </select>
+            <select value="{{ ui.sort }}" onChange="{{ ui.onSort }}" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#55554e;background:#fff;border:1px solid #e3e0d5;border-radius:8px;padding:4px 5px;outline:none">
+              <option value="date">日付順</option>
+              <option value="more">多い順</option>
+              <option value="less">少ない順</option>
+            </select>
+            <div onClick="{{ ui.onFavFilter }}" style="cursor:pointer;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border:1px solid {{ ui.favBorder }};background:{{ ui.favBg }};color:{{ ui.favColor }};border-radius:8px;padding:4px 8px;user-select:none">♥ お気に入り</div>
+          </div>
+
+          <div id="bookShelf" class="noscroll" style="flex:1;min-height:0;overflow-x:auto;overflow-y:hidden">
+            <div style="position:relative;display:inline-flex;align-items:flex-end;gap:11px;height:100%;padding:0 40px 0">
+              <sc-for list="{{ booksLong }}" as="day" hint-placeholder-count="14">
+                <div onClick="{{ day.onSel }}" style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding-bottom:16px">
+                  <sc-if value="{{ day.today }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:2px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#2f3a00;background:#c4f000;border-radius:999px;padding:1px 7px;white-space:nowrap;z-index:5">今日</div></sc-if>
+                  <sc-if value="{{ day.first }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:2px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;color:#9d9b91;white-space:nowrap;z-index:3">{{ day.month }}</div></sc-if>
+                  <div style="position:relative;width:66px;height:270px;margin-top:20px;background:rgba(255,255,255,.16);border:1px solid rgba(27,27,24,.18);border-radius:4px 4px 2px 2px;overflow:hidden;box-shadow:0 3px 6px rgba(27,27,24,.12)">
+                    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.08));box-shadow:inset -4px 0 6px rgba(27,27,24,.07),inset 2px 0 0 rgba(255,255,255,.45);z-index:2;pointer-events:none"></div><div style="position:absolute;top:0;left:0;right:0;height:9px;background:linear-gradient(90deg,#f1ede3,#fbf9f3 60%,#efe9dd);border-bottom:1px solid rgba(27,27,24,.07);z-index:2"></div>
+                    <div style="position:absolute;top:16px;left:0;right:0;text-align:center;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:#7a786f;z-index:3">{{ day.label }}</div>
+                    <div style="position:absolute;top:31px;left:0;right:0;text-align:center;font-size:11px;font-weight:500;color:#a7a59b;z-index:3">{{ day.wd }}</div>
+                    <sc-if value="{{ day.fav }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:0;right:9px;width:9px;height:20px;background:#ff5fa2;clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%);z-index:3"></div></sc-if>
+                    <sc-for list="{{ day.solid }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:28px;text-align:center;font-size:26px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);filter:drop-shadow(0 1px 1px rgba(27,27,24,.12))">{{ p.e }}</div></sc-for>
+                    <sc-for list="{{ day.ghost }}" as="p" hint-placeholder-count="0"><div style="position:absolute;width:28px;text-align:center;font-size:26px;line-height:1;left:{{ p.x }}px;bottom:{{ p.bottom }}px;transform:rotate({{ p.rot }}deg);opacity:.3;filter:grayscale(.85)">{{ p.e }}</div></sc-for>
+                    <sc-if value="{{ day.today }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #c4f000;border-radius:4px 4px 2px 2px;pointer-events:none;z-index:4"></div></sc-if>
+                    <sc-if value="{{ day.sel }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid #ff5fa2;border-radius:4px 4px 2px 2px;pointer-events:none;z-index:4"></div></sc-if>
+                  </div>
+                </div>
+              </sc-for>
+              <!-- long shelf board -->
+              <div style="position:absolute;left:0;right:0;bottom:0;height:14px;background:linear-gradient(180deg,#4a3120,#241509);border-radius:2px;box-shadow:0 5px 10px rgba(27,27,24,.28);z-index:2"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="position:relative;flex:0 0 286px;display:flex;flex-direction:column;padding:22px 14px 14px 4px"><div style="position:relative;flex:1;min-height:0;background:#fffdf8;border:1px solid #e7e2d3;border-radius:10px 16px 16px 10px;box-shadow:3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 16px 34px rgba(27,27,24,.18);display:flex;flex-direction:column"><div onClick="{{ note.onFav }}" title="付箋をつける" style="position:absolute;top:-14px;right:24px;width:20px;height:46px;border-radius:2px;transform:rotate(3deg);cursor:pointer;user-select:none;z-index:3;background:{{ note.fusenBg }};border:{{ note.fusenBorder }};box-shadow:0 2px 5px rgba(27,27,24,.15)"><div style="position:absolute;left:2px;right:2px;top:2px;height:9px;background:{{ note.fusenBand }}"></div></div>
+          <div style="position:absolute;left:-26px;top:26px;width:26px;height:66px;background:#fff;border-radius:10px 0 0 10px;box-shadow:-6px 4px 12px rgba(27,27,24,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px">
+            <span style="font-family:'Material Symbols Rounded';font-size:18px;color:#1b1b18">menu_book</span>
+            <span style="writing-mode:vertical-rl;font-size:9px;font-weight:700;color:#55554e;letter-spacing:.1em">その日</span>
+          </div>
+          <div style="padding:18px 20px 10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px;font-weight:900">{{ note.title }}</span>
+              <sc-if value="{{ note.today }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#2f3a00;background:#eef7cc;border-radius:6px;padding:2px 6px">今日</span></sc-if>
+              
+            </div>
+            <div style="font-family:'Space Mono',monospace;font-size:10px;color:#9d9b91;margin-top:3px">この本の中身</div>
+          </div>
+          <div class="noscroll" style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 16px">
+            <sc-for list="{{ note.slots }}" as="sl" hint-placeholder-count="4">
+              <div style="margin-top:10px">
+                <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13px">{{ sl.icon }}</span><span style="font-size:11.5px;font-weight:900">{{ sl.name }}</span></div>
+                <div style="display:flex;flex-direction:column">
+                  <sc-for list="{{ sl.rows }}" as="r" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid #f1efe8;opacity:{{ r.op }}">
+                      <span style="font-size:15px;filter:{{ r.ef }}">{{ r.e }}</span>
+                      <span style="flex:1;font-size:12px;font-weight:700">{{ r.name }}</span>
+                      <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#e8842c">{{ r.f }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+            <div style="font-size:11px;font-weight:700;color:#55554e;margin:16px 0 8px">絵文字のかず</div>
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="position:relative;width:74px;height:74px;flex:0 0 auto;border-radius:50%;background:{{ note.chartGrad }}">
+                <div style="position:absolute;inset:23px;background:#fffdf8;border-radius:50%"></div>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                <sc-for list="{{ note.chartItems }}" as="c" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:{{ c.color }}"></span>
+                    <span style="font-size:12px;line-height:1">{{ c.e }}</span>
+                    <span style="flex:1;min-width:0;font-size:11px;font-weight:700;color:#55554e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                    <span style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#1b1b18">×{{ c.n }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="font-size:11px;font-weight:700;color:#55554e;margin:16px 0 6px">日記</div>
+            <textarea value="{{ note.diary }}" onChange="{{ note.onDiary }}" placeholder="この日のことをメモ" style="width:100%;min-height:64px;resize:vertical;background:#fbfaf6;border:1px solid #eee9dc;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:12px;line-height:1.6;color:#1b1b18;outline:none"></textarea>
+
+          </div>
+          <div style="flex:0 0 auto;padding:12px 20px;border-top:1px solid #f1efe8"><div style="text-align:center;font-size:12px;font-weight:700;color:#1b1b18;background:#f7f4ec;border-radius:12px;padding:10px">この日を見る</div></div></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { selKey: 0, fMonth: 'all', fFlood: 'all', fFav: false, sortBy: 'date', favs: {}, diaries: {}, mode2: 'net', view3: 'day', disp3: 'both', orient3: 'land', f3M: '7', f3F: 'all', f3S: 'date', f3Fav: false, selMon: 7 };
+  mkChart(counts) {
+    const palette = ['#c4f000', '#ff5fa2', '#e8842c', '#7a9a00', '#f0c24b', '#a08cd0', '#6fb8a0', '#c9c5b8'];
+    const sorted = Object.entries(counts).map(([e, n]) => ({ e, n })).sort((a, b) => b.n - a.n);
+    const total = sorted.reduce((s, i) => s + i.n, 0) || 1;
+    let acc = 0; const stops = [];
+    const items = sorted.map((it, i) => {
+      const color = palette[i % palette.length];
+      const from = acc / total * 360; acc += it.n;
+      stops.push(color + ' ' + from.toFixed(1) + 'deg ' + (acc / total * 360).toFixed(1) + 'deg');
+      return { e: it.e, n: it.n, name: this.NAMES[it.e] || 'その他', color };
+    });
+    return { grad: stops.length ? 'conic-gradient(' + stops.join(',') + ')' : '#f1efe8', items };
+  }
+  persist() { try { localStorage.setItem('kame-bookshelf-mock', JSON.stringify({ favs: this.state.favs, diaries: this.state.diaries })); } catch (e) {} }
+  setFav(k) { const favs = { ...this.state.favs }; if (favs[k]) delete favs[k]; else favs[k] = true; this.setState({ favs }, () => this.persist()); }
+  setDiary(k, v) { const diaries = { ...this.state.diaries, [k]: v }; this.setState({ diaries }, () => this.persist()); }
+  rng(seed) { let s = seed; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
+  isoWeek(d) { const t = new Date(d); t.setHours(0, 0, 0, 0); t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7)); const w1 = new Date(t.getFullYear(), 0, 4); return 1 + Math.round(((t - w1) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7); }
+
+  GB = { x0: 11, jx: 10, pitch: 13, rot: 13, y0: 5 };
+  GBL = { x0: 16, jx: 15, pitch: 21, rot: 12, y0: 8 };
+  WD = ['日','月','火','水','木','金','土'];
+  DAYPAL = ['🚃','⌨️','📧','📝','💬','⌨️','🍙','🛒','🧹','📞','⌨️','📚','🎬','🌙'];
+  NAMES = { '🚃':'電車', '⌨️':'パソコン作業', '📧':'メール', '📝':'書きもの', '💬':'打ち合わせ', '🍙':'ごはん', '🛒':'買い物', '🧹':'そうじ', '📞':'電話', '📚':'読書', '🎬':'動画', '🌙':'夜ふかし', '🍵':'お茶', '😴':'昼寝', '🛁':'入浴', '🧘':'ストレッチ' };
+  REC = ['🍵','😴','🛁','🧘'];
+  SLOTS = [{ name:'朝', icon:'🌅' }, { name:'午前', icon:'☀️' }, { name:'午後', icon:'🌤' }, { name:'夜', icon:'🌙' }];
+
+  tube(seq, done, seed, geo) {
+    const r = this.rng(seed), solid = [], ghost = [];
+    seq.forEach((e, i) => {
+      const p = { e, x: Math.round(geo.x0 + (r() - 0.5) * geo.jx), bottom: Math.round(geo.y0 + i * geo.pitch + (r() - 0.5) * 2), rot: Math.round((r() - 0.5) * geo.rot) };
+      (i < done ? solid : ghost).push(p);
+    });
+    return { solid, ghost };
+  }
+  seqFrom(count, seed) {
+    const r = this.rng(seed), out = [];
+    for (let i = 0; i < count; i++) out.push(this.DAYPAL[Math.floor(r() * this.DAYPAL.length)]);
+    return out;
+  }
+  mkDay(dt, geo) {
+    const base = new Date(2026, 6, 12);
+    const off = Math.round((dt - base) / 86400000);
+    const seed = (off + 60) * 61 + 13;
+    const rr = this.rng(seed);
+    const wd = dt.getDay();
+    const weekend = (wd === 0 || wd === 6);
+    const count = Math.round((weekend ? 4 : 7) + rr() * (weekend ? 5 : 8));
+    const today = off === 0;
+    const done = off < 0 ? count : (today ? Math.min(count, 5) : 0);
+    const seq = this.seqFrom(count, seed);
+    const b = this.tube(seq, done, seed, geo);
+    const recCount = Math.round(1 + rr() * 3);
+    const r2 = this.rng(seed + 7); const recSeq = [];
+    for (let k = 0; k < recCount; k++) recSeq.push(this.REC[Math.floor(r2() * this.REC.length)]);
+    const recDone = off < 0 ? recCount : (today ? Math.min(recCount, 2) : 0);
+    const recFull = this.tube(recSeq, recDone, seed + 11, geo);
+    const half = { x0: 8, jx: 7, pitch: Math.round(geo.pitch * 0.85), rot: geo.rot, y0: geo.y0 };
+    const fh = this.tube(seq, done, seed + 3, half);
+    const rh = this.tube(recSeq, recDone, seed + 5, half);
+    rh.solid.forEach(p => { p.x += 34; }); rh.ghost.forEach(p => { p.x += 34; });
+    const rn = this.rng(seed + 9);
+    const netS = seq.slice(0, Math.max(0, done - recDone)).map((e, i) => ({ e, x: Math.round(6 + (i % 2) * 31 + (rn() - .5) * 5), bottom: Math.round(geo.y0 + Math.floor(i / 2) * 17 + (rn() - .5) * 3), rot: Math.round((rn() - .5) * 13) }));
+    return {
+      recS: recFull.solid, recG: recFull.ghost,
+      fatHS: fh.solid, fatHG: fh.ghost, recHS: rh.solid, recHG: rh.ghost,
+      netS,
+      off, today, notToday: !today, future: off > 0,
+      label: (dt.getMonth() + 1) + '/' + dt.getDate(),
+      d: dt.getDate(), wd: this.WD[wd],
+      first: dt.getDate() === 1, month: (dt.getMonth() + 1) + '月',
+      solid: b.solid, ghost: b.ghost,
+    };
+  }
+
+  mkSlots(es) {
+    const all = es.solid.map(e => ({ e, g: false, rec: false })).concat(es.ghost.map(e => ({ e, g: true, rec: false })));
+    const buckets = [[], [], [], []];
+    all.forEach((it, i) => buckets[Math.min(3, Math.floor(i / all.length * 4))].push(it));
+    const future = es.solid.length === 0;
+    [{ e: '🍵', b: 1 }, { e: '😴', b: 2 }, { e: '🛁', b: 3 }].forEach(r => buckets[r.b].push({ e: r.e, g: future, rec: true }));
+    return this.SLOTS.map((sl, i) => {
+      const rows = [];
+      buckets[i].forEach(it => {
+        const last = rows[rows.length - 1];
+        if (last && last.e === it.e && last.g === it.g && last.rec === it.rec) { last.n += 1; last.f = (it.rec ? '−' : '+') + last.n; }
+        else rows.push({ e: it.e, g: it.g, rec: it.rec, name: this.NAMES[it.e] || 'その他', n: 1, f: it.rec ? '−1' : '+1', op: it.g ? 0.45 : 1, ef: it.g ? 'grayscale(.85)' : 'none' });
+      });
+      return { name: sl.name, icon: sl.icon, rows };
+    }).filter(sl => sl.rows.length > 0);
+  }
+
+  renderVals() {
+    // ---- portrait bookcase: 4 weeks ending 7/15 (last row has today + a few future) ----
+    const start = new Date(2026, 5, 18); // 6/18
+    const flat = [];
+    for (let i = 0; i < 28; i++) { const dt = new Date(start); dt.setDate(start.getDate() + i); flat.push(this.mkDay(dt, this.GB)); }
+    const booksWeeks = [];
+    for (let w = 0; w < 4; w++) booksWeeks.push({ days: flat.slice(w * 7, w * 7 + 7) });
+
+    // ---- landscape long shelf: 35 days (today -28 .. +6) ----
+    const st = this.state;
+    const allDays = [];
+    const lstart = new Date(2026, 6, 12); lstart.setDate(lstart.getDate() - 28);
+    for (let i = 0; i < 35; i++) { const dt = new Date(lstart); dt.setDate(lstart.getDate() + i); const d = this.mkDay(dt, this.GBL); d.m = dt.getMonth() + 1; allDays.push(d); }
+    allDays.forEach(d => {
+      d.total = d.solid.length + d.ghost.length; d.over = d.total > 10;
+      d.fav = !!st.favs[d.off];
+      d.onSel = () => this.setState({ selKey: d.off });
+      d.sel = (d.off === st.selKey);
+    });
+    const m3 = +st.f3M || 7;
+    const days3 = [], days1 = [];
+    const lastD3 = new Date(2026, m3, 0).getDate();
+    for (let i = 1; i <= lastD3; i++) {
+      const dt = new Date(2026, m3 - 1, i);
+      const a3 = this.mkDay(dt, this.GBL); a3.dt = dt; days3.push(a3);
+      const a1 = this.mkDay(dt, this.GB); a1.dt = dt; days1.push(a1);
+    }
+    [days3, days1].forEach(arr => arr.forEach(d => {
+      d.total = d.solid.length + d.ghost.length; d.over = d.total > 10;
+      d.fav = !!st.favs[d.off];
+      d.onSel = () => this.setState({ selKey: d.off });
+      d.sel = (d.off === st.selKey);
+      d.split3 = st.disp3 === 'both'; d.net3 = st.disp3 !== 'both';
+      d.isMon = d.dt.getDay() === 1; d.wk = 'week' + this.isoWeek(d.dt);
+    }));
+    days1.forEach(d => { d.onSel = () => this.setState({ selKey: d.off, sheet1: true }); });
+    const filt3 = (arr) => {
+      let r = arr.filter(d => (st.f3F === 'all' || (st.f3F === 'over') === d.over) && (!st.f3Fav || d.fav));
+      if (st.f3S === 'more') r = r.slice().sort((a, b) => b.total - a.total);
+      else if (st.f3S === 'less') r = r.slice().sort((a, b) => a.total - b.total);
+      return r;
+    };
+    const books3 = filt3(days3), books1 = filt3(days1);
+    const booksWeeks1 = [];
+    if (st.f3S === 'date') {
+      let row = null;
+      books1.forEach(d => {
+        const dow = (d.dt.getDay() + 6) % 7;
+        if (!row || dow === 0) { row = { days: [], wk: d.wk, padPx: 8 + dow * 47 }; booksWeeks1.push(row); }
+        row.days.push(d);
+      });
+    } else {
+      for (let i = 0; i < books1.length; i += 7) booksWeeks1.push({ days: books1.slice(i, i + 7), wk: '', padPx: 8 });
+    }
+    let booksLong = allDays.filter(d =>
+      (st.fMonth === 'all' || d.m === +st.fMonth) &&
+      (st.fFlood === 'all' || (st.fFlood === 'over') === d.over) &&
+      (!st.fFav || d.fav));
+    if (st.sortBy === 'more') booksLong = booksLong.slice().sort((a, b) => b.total - a.total);
+    else if (st.sortBy === 'less') booksLong = booksLong.slice().sort((a, b) => a.total - b.total);
+
+    const sel = days3.find(d => d.off === st.selKey) || allDays.find(d => d.off === st.selKey) || days3.find(d => d.today) || days3[0];
+    const slotsArr = this.mkSlots({ solid: sel.solid.map(p => p.e), ghost: sel.ghost.map(p => p.e) });
+    const counts = {};
+    slotsArr.forEach(sl => sl.rows.forEach(r => { counts[r.e] = (counts[r.e] || 0) + r.n; }));
+    const palette = ['#c4f000', '#ff5fa2', '#e8842c', '#7a9a00', '#f0c24b', '#a08cd0', '#6fb8a0', '#c9c5b8'];
+    const sortedC = Object.entries(counts).map(([e, n]) => ({ e, n })).sort((a, b) => b.n - a.n);
+    const totalC = sortedC.reduce((s, i) => s + i.n, 0) || 1;
+    let accC = 0; const stops = [];
+    const chartItems = sortedC.map((it, i) => {
+      const color = palette[i % palette.length];
+      const from = accC / totalC * 360; accC += it.n;
+      stops.push(color + ' ' + from.toFixed(1) + 'deg ' + (accC / totalC * 360).toFixed(1) + 'deg');
+      return { e: it.e, n: it.n, name: this.NAMES[it.e] || 'その他', color };
+    });
+    const note = {
+      title: sel.label + ' ' + sel.wd + '曜',
+      today: !!sel.today,
+      solid: sel.solid.map(p => p.e),
+      slots: slotsArr,
+      chartGrad: stops.length ? 'conic-gradient(' + stops.join(',') + ')' : '#f1efe8',
+      chartItems,
+      fusenBg: sel.fav ? 'linear-gradient(180deg,#ff8fbe,#ff5fa2)' : '#f3f0e4',
+      fusenBorder: sel.fav ? '1px solid #f04b91' : '1px dashed #cfcaba',
+      fusenBand: sel.fav ? 'rgba(255,255,255,.35)' : 'transparent',
+      ghost: sel.ghost.map(p => p.e),
+      hasGhost: sel.ghost.length > 0,
+      recovery: ['🍵','🛁','😴'],
+      fav: sel.fav, favColor: sel.fav ? '#ff5fa2' : '#d8d4c8',
+      onFav: () => this.setFav(sel.off),
+      diary: st.diaries[sel.off] || '',
+      onDiary: (e) => this.setDiary(sel.off, e.target.value),
+    };
+
+    const ui = {
+      month: st.fMonth, onMonth: (e) => this.setState({ fMonth: e.target.value }),
+      flood: st.fFlood, onFlood: (e) => this.setState({ fFlood: e.target.value }),
+      sort: st.sortBy, onSort: (e) => this.setState({ sortBy: e.target.value }),
+      onFavFilter: () => this.setState({ fFav: !st.fFav }),
+      favBg: st.fFav ? '#ff5fa2' : '#fff',
+      favColor: st.fFav ? '#fff' : '#8a8a82',
+      favBorder: st.fFav ? '#ff5fa2' : '#e3e0d5',
+    };
+
+    const mode = st.mode2;
+    allDays.forEach(d => {
+      d.show = mode === 'fat' ? d.solid : (mode === 'rec' ? d.recS : d.netS);
+      d.showG = mode === 'fat' ? d.ghost : (mode === 'rec' ? d.recG : []);
+    });
+    const ui2 = {
+      onNet: () => this.setState({ mode2: 'net' }),
+      onFat: () => this.setState({ mode2: 'fat' }),
+      onRec: () => this.setState({ mode2: 'rec' }),
+      netBg: mode === 'net' ? '#1b1b18' : '#fff', netFg: mode === 'net' ? '#fff' : '#55554e',
+      fatBg: mode === 'fat' ? '#1b1b18' : '#fff', fatFg: mode === 'fat' ? '#fff' : '#55554e',
+      recBg: mode === 'rec' ? '#1b1b18' : '#fff', recFg: mode === 'rec' ? '#fff' : '#55554e',
+    };
+
+    const months3 = [5, 6, 7].map(m => {
+      const lastD = new Date(2026, m, 0).getDate();
+      const fatC = {}, recC = {}; const solidE = [], ghostE = [];
+      for (let dd = 1; dd <= lastD; dd++) {
+        const d = this.mkDay(new Date(2026, m - 1, dd), this.GB);
+        d.solid.forEach(p => { fatC[p.e] = (fatC[p.e] || 0) + 1; solidE.push(p.e); });
+        d.ghost.forEach(p => ghostE.push(p.e));
+        d.recS.forEach(p => { recC[p.e] = (recC[p.e] || 0) + 1; });
+      }
+      const rm = this.rng(m * 97 + 5);
+      const pos = (k) => { const row = Math.floor(k / 11), col = k % 11; return { x: Math.round(7 + col * 14 + (rm() - .5) * 4), bottom: Math.round(6 + row * 12 + (rm() - .5) * 2), rot: Math.round((rm() - .5) * 14) }; };
+      const pile = solidE.slice(0, 230).map((e, i) => Object.assign({ e }, pos(i)));
+      const pileG = ghostE.slice(0, Math.max(0, 230 - pile.length)).map((e, i) => Object.assign({ e }, pos(pile.length + i)));
+      const top = (o) => Object.entries(o).map(([e, n]) => ({ e, n, name: this.NAMES[e] || 'その他' })).sort((a, b) => b.n - a.n).slice(0, 5).map((r, i) => Object.assign({ rank: i + 1 }, r));
+      const chart = this.mkChart(Object.assign({}, fatC, recC));
+      return { m, label: m + '月', cur: m === 7, sel: st.selMon === m, onSel: () => this.setState({ selMon: m }), onSel1: () => this.setState({ selMon: m, sheet1: true }), pile, pileG, fatTop: top(fatC), recTop: top(recC), chart };
+    });
+    const monthRows = []; for (let i = 0; i < months3.length; i += 2) monthRows.push({ ms: months3.slice(i, i + 2) });
+    const selMo = months3.find(x => x.m === st.selMon) || months3[months3.length - 1];
+    const mnote = { title: '2026年' + selMo.label, cur: selMo.cur, fatTop: selMo.fatTop, recTop: selMo.recTop, chartGrad: selMo.chart.grad, chartItems: selMo.chart.items };
+
+    const isDay = st.view3 === 'day', both = st.disp3 === 'both';
+    const ui3 = {
+      isDay, isMonth: !isDay, noteToday: isDay && !!note.today,
+      land: st.orient3 !== 'port', port: st.orient3 === 'port',
+      onRotate: () => this.setState({ orient3: st.orient3 === 'port' ? 'land' : 'port' }),
+      tabLabel: isDay ? 'その日' : 'その月', footLabel: isDay ? 'この日を見る' : 'この月を見る',
+      onDay: () => this.setState({ view3: 'day' }), onMonth: () => this.setState({ view3: 'month' }),
+      onToday: () => this.jumpToday(),
+      sheet1: !!st.sheet1,
+      onOpenSheet: () => this.setState({ sheet1: true }),
+      onCloseSheet: () => this.setState({ sheet1: false }),
+      dayBg: isDay ? '#1b1b18' : 'transparent', dayFg: isDay ? '#fff' : '#55554e',
+      monBg: !isDay ? '#1b1b18' : 'transparent', monFg: !isDay ? '#fff' : '#55554e',
+      onBoth: () => this.setState({ disp3: 'both' }), onNet: () => this.setState({ disp3: 'net' }),
+      bothBg: both ? '#1b1b18' : '#fff', bothFg: both ? '#fff' : '#55554e',
+      netBg: !both ? '#1b1b18' : '#fff', netFg: !both ? '#fff' : '#55554e',
+      month: st.f3M, onMonthSel: (e) => this.setState({ f3M: e.target.value }),
+      flood: st.f3F, onFlood: (e) => this.setState({ f3F: e.target.value }),
+      sort: st.f3S, onSort: (e) => this.setState({ f3S: e.target.value }),
+      onFavFilter: () => this.setState({ f3Fav: !st.f3Fav }),
+      favBg: st.f3Fav ? '#ff5fa2' : '#fff', favColor: st.f3Fav ? '#fff' : '#8a8a82', favBorder: st.f3Fav ? '#ff5fa2' : '#e3e0d5',
+    };
+
+    return { booksWeeks, booksWeeks1, monthRows, booksLong, books2: allDays, books3, months3, mnote, ui3, note, ui, ui2 };
+  }
+
+  centerToday(s) {
+    const el = Array.from(s.querySelectorAll('div')).find(x => x.childElementCount === 0 && x.textContent === '今日');
+    if (!el) return false;
+    const r = el.getBoundingClientRect(), sr = s.getBoundingClientRect();
+    s.scrollLeft += (r.left + r.width / 2 - sr.left) - sr.width / 2;
+    return true;
+  }
+  jumpToday() {
+    this.setState({ view3: 'day', f3M: '7', selKey: 0 }, () => {
+      ['bookShelf3', 'bookShelf3p'].forEach(id => { const s = document.getElementById(id); if (s) this.centerToday(s); });
+      const p = document.getElementById('bookcasePort'); if (p) p.scrollTop = p.scrollHeight;
+    });
+  }
+  restoreScroll() {
+    if (this._touched) return;
+    const p = document.getElementById('bookcasePort');
+    if (p && p.scrollTop === 0 && p.scrollHeight > p.clientHeight) p.scrollTop = p.scrollHeight;
+    ['bookShelf', 'bookShelf2a', 'bookShelf2b'].forEach(id => {
+      const s = document.getElementById(id);
+      if (s && s.scrollLeft === 0 && s.scrollWidth > s.clientWidth) s.scrollLeft = Math.max(0, s.scrollWidth * 0.78 - s.clientWidth / 2);
+    });
+    ['bookShelf3', 'bookShelf3p'].forEach(id => {
+      const s = document.getElementById(id);
+      if (s && s.scrollLeft === 0 && s.scrollWidth > s.clientWidth && !this.centerToday(s)) s.scrollLeft = s.scrollWidth;
+    });
+  }
+  componentDidUpdate() { this.restoreScroll(); }
+  componentWillUnmount() {
+    if (this._scrollTimer) clearInterval(this._scrollTimer);
+    window.removeEventListener('pointerdown', this._onTouch, true);
+    window.removeEventListener('wheel', this._onTouch, true);
+  }
+  componentDidMount() {
+    try { const s = JSON.parse(localStorage.getItem('kame-bookshelf-mock') || '{}'); if (s.favs || s.diaries) this.setState({ favs: s.favs || {}, diaries: s.diaries || {} }); } catch (e) {}
+    this._onTouch = () => { this._touched = true; if (this._scrollTimer) { clearInterval(this._scrollTimer); this._scrollTimer = null; } };
+    window.addEventListener('pointerdown', this._onTouch, true);
+    window.addEventListener('wheel', this._onTouch, true);
+    this._scrollTimer = setInterval(() => this.restoreScroll(), 400);
+    this.restoreScroll();
+  }
+}
+</script>
+</body>
+</html>

@@ -16,6 +16,7 @@ input { font-family: inherit; }
 @keyframes drop { 0% { transform: translateY(-16px) rotate(var(--r)); opacity: 0; } 100% { transform: translateY(0) rotate(var(--r)); opacity: 1; } }
 @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @keyframes moonfall { 0% { transform: translateY(0); opacity: 1; } 75% { opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } }
+@keyframes sheetUp { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
 
 /* マイナス絵文字がプラスを消したときのリングエフェクト */
 @keyframes popfx { 0% { transform: translate(-50%, -50%) scale(.4); opacity: .95; } 100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } }

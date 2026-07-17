@@ -92,6 +92,8 @@ export function serialize(st) {
     mindFatCoef: st.mindFatCoef || 1,
     bodyRecCoef: st.bodyRecCoef || 1,
     mindRecCoef: st.mindRecCoef || 1,
+    bookFav: st.bookFav || {},      // 本棚: お気に入り（付箋） dateStr→true
+    bookDiary: st.bookDiary || {},  // 本棚: 日記 dateStr→string
     updatedAt: Date.now(),
   };
 }
@@ -143,6 +145,8 @@ export function deserialize(data) {
     mindFatCoef: typeof data.mindFatCoef === 'number' ? data.mindFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
     bodyRecCoef: typeof data.bodyRecCoef === 'number' ? data.bodyRecCoef : (typeof data.recoverCoef === 'number' ? data.recoverCoef : 1),
     mindRecCoef: typeof data.mindRecCoef === 'number' ? data.mindRecCoef : (typeof data.recoverCoef === 'number' ? data.recoverCoef : 1),
+    bookFav: (data.bookFav && typeof data.bookFav === 'object') ? data.bookFav : {},
+    bookDiary: (data.bookDiary && typeof data.bookDiary === 'object') ? data.bookDiary : {},
   };
 }
 
@@ -154,6 +158,7 @@ export function freshState() {
     slotHours: null, hiddenCats: [],
     onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null, mainScreen: null,
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1,
+    bookFav: {}, bookDiary: {},
   };
 }
 

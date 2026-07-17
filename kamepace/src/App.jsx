@@ -34,6 +34,7 @@ import Help from './screens/Help';
 import Tutorial from './screens/Tutorial';
 import Onboard from './screens/Onboard';
 import Cycle from './screens/Cycle';
+import Bookshelf from './screens/Bookshelf';
 
 export default class App extends React.Component {
   state = {
@@ -142,6 +143,7 @@ export default class App extends React.Component {
       onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, mainScreen: s.mainScreen,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
+      bookFav: s.bookFav, bookDiary: s.bookDiary,
     };
   }
   save() {
@@ -1033,6 +1035,17 @@ export default class App extends React.Component {
   goRecordNow = () => this.openRecord(this.slotNow());
   setMainScreen = (v) => { this.set({ mainScreen: v }); this.save(); };
   goMypage = () => this.set({ screen: 'mypage' });
+  goBookshelf = () => this.set({ screen: 'bookshelf' });
+  setBookFav = (key) => {
+    const bookFav = { ...(this.state.bookFav || {}) };
+    if (bookFav[key]) delete bookFav[key]; else bookFav[key] = true;
+    this.set({ bookFav }); this.save();
+  };
+  setBookDiary = (key, val) => {
+    const bookDiary = { ...(this.state.bookDiary || {}) };
+    if (val) bookDiary[key] = val; else delete bookDiary[key];
+    this.set({ bookDiary }); this.save();
+  };
   goSleep = () => {
     // 翌朝＝睡眠記録のタイミングで、続いている調子（バフ・デバフ）をまだ続いているか確認
     if (this.buffEntries().length && this.state.lastBuffCheck !== todayStr()) {
@@ -2362,6 +2375,7 @@ export default class App extends React.Component {
       isHome: st.screen === 'home', isRecord: st.screen === 'record',
       isSleep: st.screen === 'sleep', isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
       isTrash: st.screen === 'trash', isBuffLog: st.screen === 'buffLog',
+      isBookshelf: st.screen === 'bookshelf',
       isSlotTimes: st.screen === 'slotTimes', isCatsManage: st.screen === 'catsManage',
       isTemplates: st.screen === 'templates', isSensitivity: st.screen === 'sensitivity',
       isHelp: st.screen === 'help', helpPersona: st.helpPersona || 0,
@@ -2396,6 +2410,12 @@ export default class App extends React.Component {
       navHomeFill: ['home', 'record', 'sleep'].includes(st.screen) ? 1 : 0,
       navShakaColor: ['shaka', 'collect'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navShakaFill: ['shaka', 'collect'].includes(st.screen) ? 1 : 0,
+      navBookColor: st.screen === 'bookshelf' ? '#1b1b18' : '#8a8a82',
+      navBookFill: st.screen === 'bookshelf' ? 1 : 0,
+      goBookshelf: this.goBookshelf,
+      bookEntries: st.entries, bookSlotHours: st.slotHours,
+      bookFav: st.bookFav || {}, bookDiary: st.bookDiary || {},
+      setBookFav: this.setBookFav, setBookDiary: this.setBookDiary,
       navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? 1 : 0,
       homeDate: this.homeDateStr(),
@@ -2594,7 +2614,7 @@ export default class App extends React.Component {
   render() {
     const v = this.renderVals();
     return (
-      <div className="app-screen" ref={this._screenRef} style={{ background: v.screenBg }}>
+      <div className="app-screen" ref={this._screenRef} style={{ background: v.screenBg, ...(v.isBookshelf ? { maxWidth: 'none' } : null) }}>
         {/* status bar spacer */}
         <div style={{ height: 'max(40px, env(safe-area-inset-top))', flex: '0 0 auto', zIndex: 5 }} />
         {v.isOnboard && <Onboard v={v} />}
@@ -2613,6 +2633,7 @@ export default class App extends React.Component {
         {v.isTemplates && <Templates v={v} />}
         {v.isSensitivity && <Sensitivity v={v} />}
         {v.isHelp && <Help v={v} />}
+        {v.isBookshelf && <Bookshelf v={v} />}
         {v.tutorial > 0 && <Tutorial v={v} />}
         {v.symAdjustOpen && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 11, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
@@ -2629,7 +2650,7 @@ export default class App extends React.Component {
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}
-        <Nav v={v} />
+        {!v.isBookshelf && <Nav v={v} />}
         </>}
       </div>
     );
