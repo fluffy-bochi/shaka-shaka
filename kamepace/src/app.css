@@ -16,6 +16,7 @@ input { font-family: inherit; }
 @keyframes drop { 0% { transform: translateY(-16px) rotate(var(--r)); opacity: 0; } 100% { transform: translateY(0) rotate(var(--r)); opacity: 1; } }
 @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @keyframes moonfall { 0% { transform: translateY(0); opacity: 1; } 75% { opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } }
+@keyframes sheetUp { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
 
 /* マイナス絵文字がプラスを消したときのリングエフェクト */
 @keyframes popfx { 0% { transform: translate(-50%, -50%) scale(.4); opacity: .95; } 100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } }
@@ -28,6 +29,10 @@ input { font-family: inherit; }
   pointer-events: none;
   animation: popfx .4s ease-out forwards;
 }
+
+/* ステータスバー用スペーサー。本棚の横向き時は詰めてナビ・棚を上端まで使う */
+.app-status-spacer { height: max(40px, env(safe-area-inset-top)); }
+body.kame-book-land .app-status-spacer { height: env(safe-area-inset-top); }
 
 /* app fills the viewport like the prototype's phone screen */
 #root { min-height: 100dvh; }
@@ -125,4 +130,7 @@ input { font-family: inherit; }
     border-radius: 20px;
     box-shadow: 0 10px 30px rgba(27,27,24,.14);
   }
+  /* 本棚を横向きにしたとき: 縦のスマホを回転しただけの等倍サイズ（拡大しない） */
+  body.kame-book-land .phone { width: auto; }
+  body.kame-book-land .phone .app-screen { width: 812px; height: 410px; }
 }

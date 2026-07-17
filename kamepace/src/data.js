@@ -237,14 +237,17 @@ export const IMPORT_DEFAULT_DELTA = 10;
 /* きもち・できごと（時間をつけずに記録する心のイベント）。
    ショック系はプラス（心が疲れる）、うれしい系はマイナス（心が回復） */
 export const MOODS = [
-  { id: 'shock', glyph: '😢', name: 'ショックなこと', kind: 'bad' },
-  { id: 'sad', glyph: '😔', name: 'かなしい', kind: 'bad' },
-  { id: 'angry', glyph: '😤', name: 'いらいら・怒り', kind: 'bad' },
-  { id: 'anxious', glyph: '😰', name: '不安・心配', kind: 'bad' },
-  { id: 'happy', glyph: '😊', name: 'うれしい', kind: 'good' },
-  { id: 'love', glyph: '🥰', name: 'しあわせ', kind: 'good' },
-  { id: 'relief', glyph: '😌', name: 'ほっとした', kind: 'good' },
-  { id: 'fun', glyph: '🎉', name: 'たのしかった', kind: 'good' },
+  { id: 'shock', glyph: '😢', name: 'ショックなこと', kind: 'bad', axis: 'mind' },
+  { id: 'sad', glyph: '😔', name: 'かなしい', kind: 'bad', axis: 'mind' },
+  { id: 'angry', glyph: '😤', name: 'いらいら・怒り', kind: 'bad', axis: 'mind' },
+  { id: 'anxious', glyph: '😰', name: '不安・心配', kind: 'bad', axis: 'mind' },
+  { id: 'happy', glyph: '😊', name: 'うれしい', kind: 'good', axis: 'mind' },
+  { id: 'love', glyph: '🥰', name: 'しあわせ', kind: 'good', axis: 'mind' },
+  { id: 'relief', glyph: '😌', name: 'ほっとした', kind: 'good', axis: 'mind' },
+  { id: 'fun', glyph: '🎉', name: 'たのしかった', kind: 'good', axis: 'mind' },
+  // からだの感覚（暑さ・寒さ）＝体の疲労
+  { id: 'hot', glyph: '🥵', name: 'あつい', kind: 'bad', axis: 'body' },
+  { id: 'cold', glyph: '🥶', name: 'さむい', kind: 'bad', axis: 'body' },
 ];
 /* 強さ → 心の値 */
 export const MOOD_STRENGTHS = [

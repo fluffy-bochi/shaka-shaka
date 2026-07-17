@@ -1,5 +1,6 @@
 import React from 'react';
 import Emo from '../fluent';
+import { BuffSheet } from './Home';
 
 const mono = { fontFamily: "'Space Mono',monospace" };
 
@@ -22,15 +23,19 @@ export default function BuffLog({ v }) {
         <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>🎭 調子の記録</div>
       </div>
       <div className="nos" style={{ flex: 1, overflowY: 'auto', padding: '0 16px 24px' }}>
+        <button onClick={v.openBuffs} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 7, background: '#c4f000', border: 'none', borderRadius: 13, padding: '13px 0', margin: '2px 0 14px', fontSize: 14, fontWeight: 700, color: '#2f3a00', cursor: 'pointer', fontFamily: 'inherit' }}>
+          <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 18 }}>tune</span>いまの調子を設定する
+        </button>
         <div style={{ ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a8a82', margin: '4px 2px 8px' }}>いま有効</div>
         {v.buffLogActive.length === 0
-          ? <div style={{ fontSize: 12, color: '#b4b2a8', padding: '2px 4px 8px' }}>いまオンにしている調子はありません。ホーム右上の🎭から設定できます。</div>
+          ? <div style={{ fontSize: 12, color: '#b4b2a8', padding: '2px 4px 8px' }}>いまオンにしている調子はありません。上の「いまの調子を設定する」から、バフ・デバフをオンにできます。</div>
           : v.buffLogActive.map(row)}
         <div style={{ ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a8a82', margin: '16px 2px 8px' }}>これまでの記録</div>
         {v.buffLogPast.length === 0
           ? <div style={{ fontSize: 12, color: '#b4b2a8', padding: '2px 4px' }}>まだ履歴はありません。オフにしたり期間が終わると、ここに残ります。</div>
           : v.buffLogPast.map(row)}
       </div>
+      {v.buffOpen && <BuffSheet v={v} />}
     </div>
   );
 }

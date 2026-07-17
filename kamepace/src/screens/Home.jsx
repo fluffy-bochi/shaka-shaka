@@ -122,7 +122,7 @@ function BuffCheckSheet({ v }) {
 }
 
 /* いまの調子（バフ・デバフ）: 体・心の疲労/回復に一時的な倍率がかかる */
-function BuffSheet({ v }) {
+export function BuffSheet({ v }) {
   const section = (kind, label) => (
     <React.Fragment key={kind}>
       <div style={{ ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a8a82', margin: '14px 2px 6px' }}>{label}</div>
