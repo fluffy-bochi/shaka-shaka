@@ -46,6 +46,11 @@ export default function MyPage({ v }) {
             {v.templateRows.length > 0 && <span style={{ ...mono, fontSize: 11.5, color: '#8a8a82' }}>{v.templateRows.length}件</span>}
             <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
           </button>
+          <button onClick={v.goBuffLog} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>🎭</span>
+            <span style={{ flex: 1, fontSize: 14 }}>調子の記録（バフ・デバフ）</span>
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
           <button onClick={v.goTrash} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
             <span style={{ fontSize: 16 }}>🗑</span>
             <span style={{ flex: 1, fontSize: 14 }}>ゴミ箱</span>
@@ -59,6 +64,12 @@ export default function MyPage({ v }) {
             <span style={{ fontSize: 16 }}>💪</span>
             <span style={{ flex: 1, fontSize: 14 }}>疲れやすさの調整</span>
             <span style={{ ...mono, fontSize: 11.5, color: '#8a8a82' }}>{v.sensSub}</span>
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
+          <button onClick={v.goCycle} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>🌙</span>
+            <span style={{ flex: 1, fontSize: 14 }}>生理の反映</span>
+            <span style={{ ...mono, fontSize: 11.5, color: v.cycPhaseNow && v.cycPhaseNow !== 'normal' ? '#a33e6d' : '#8a8a82' }}>{v.cycleStatus}</span>
             <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
           </button>
           <button onClick={v.doCalendarSync} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
@@ -77,6 +88,14 @@ export default function MyPage({ v }) {
             </div>
             <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
           </button>
+          <button onClick={v.redoOnboard} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>🐢</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14 }}>はじめの質問をやりなおす</div>
+              <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 1 }}>職業・疲れやすさの設定（約1分）</div>
+            </div>
+            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+          </button>
           <button onClick={v.goHelp} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
             <span style={{ fontSize: 16 }}>📖</span>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -88,6 +107,17 @@ export default function MyPage({ v }) {
         </div>
         <div style={label}>ひょうじ</div>
         <div style={card}>
+          <div style={row()}>
+            <span style={{ fontSize: 16 }}>🚩</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14 }}>さいしょの画面</div>
+              <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 1 }}>アプリを開いたとき出る画面</div>
+            </div>
+            <div style={{ display: 'flex', gap: 0, background: '#efece3', borderRadius: 10, padding: 3, flex: '0 0 auto' }}>
+              <button onClick={v.setMainShaka} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.mainScreen === 'shaka' ? '#1b1b18' : 'transparent', color: v.mainScreen === 'shaka' ? '#fff' : '#8a8a82' }}>シャカ</button>
+              <button onClick={v.setMainHome} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.mainScreen === 'home' ? '#1b1b18' : 'transparent', color: v.mainScreen === 'home' ? '#fff' : '#8a8a82' }}>記録</button>
+            </div>
+          </div>
           <div style={row(true)}>
             <span style={{ fontSize: 16 }}>🌀</span>
             <div style={{ flex: 1, minWidth: 0 }}>

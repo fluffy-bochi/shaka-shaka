@@ -1,5 +1,7 @@
 import React from 'react';
 import SlotPill from './SlotPill';
+import EmojiPicker from './EmojiPicker';
+import Emo from '../fluent';
 
 const mono = { fontFamily: "'Space Mono',monospace" };
 const msIcon = (size, color, fill = true) => ({ fontFamily: 'Material Symbols Rounded', ...(fill ? { fontVariationSettings: "'FILL' 1" } : {}), fontSize: size, color });
@@ -43,6 +45,9 @@ export default function Record({ v }) {
       {v.showCart && !v.searchConfirmOpen && <CartBar v={v} />}
       {v.degreeOpen && <DegreePopup v={v} />}
       {v.catAddOpen && <CatAddPopup v={v} />}
+      {v.actAddOpen && <ActAddPopup v={v} />}
+      {v.newActOpen && <NewActPopup v={v} />}
+      {v.moodOpen && <MoodPopup v={v} />}
       {v.intensityOpen && <IntensityPopup v={v} />}
       {v.planDetailOpen && <PlanDetailPopup v={v} />}
       {v.planAddOpen && <PlanAddPopup v={v} />}
@@ -63,6 +68,14 @@ function Cats({ v }) {
         <button onClick={v.openSearch} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: '#efece3', border: 'none', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}>
           <span style={msIcon(19, '#8a8a82', false)}>search</span>
           <span style={{ fontSize: 14, color: '#a5a39a' }}>なにをした？（例：皿洗い、会議）</span>
+        </button>
+        <button onClick={v.openMood} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: '#fff', border: '1.5px solid #e4e1d8', borderRadius: 12, padding: '11px 13px', marginTop: 9, cursor: 'pointer', textAlign: 'left' }}>
+          <span style={{ fontSize: 18 }}>💭</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>きもち・できごと</span>
+            <span style={{ display: 'block', fontSize: 11, color: '#9d9b91', marginTop: 1 }}>ショックなこと・うれしかったことを時間なしで</span>
+          </span>
+          <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
         </button>
       </div>
       <div style={sectionLabel}>予定から</div>
@@ -247,6 +260,11 @@ function Confirm({ v }) {
         <button onClick={v.addMoreMenu} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#fff', border: 'none', borderRadius: 14, padding: '14px 0', fontSize: 14, fontWeight: 700, color: '#7a9a00', cursor: 'pointer', boxShadow: '0 1px 3px rgba(27,27,24,.05)' }}>
           <span style={msIcon(20, '#7a9a00', false)}>add_circle</span>メニューを追加
         </button>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
+          <button onClick={v.openTplSave} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', padding: '4px 2px', fontSize: 12.5, fontWeight: 700, color: '#55554e', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+            <span style={msIcon(17, '#55554e', false)}>bookmark_add</span>テンプレートへ
+          </button>
+        </div>
         <div style={{ marginTop: 12, background: '#fff', borderRadius: 16, padding: 15, boxShadow: '0 1px 3px rgba(27,27,24,.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 700 }}>時間の割り振り</span>
@@ -296,6 +314,23 @@ function Confirm({ v }) {
           <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 8 }}>つまみを左右にドラッグで配分を変更（1分単位）。強度チップで体感を調整</div>
         </div>
       </div>
+      {v.tplOpen && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 9, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
+          <div style={{ width: '100%', background: '#fff', borderRadius: 22, padding: '16px 20px 20px', boxShadow: '0 24px 60px rgba(27,27,24,.35)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>テンプレにまとめる</div>
+              <button onClick={v.closeTpl} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>テンプレの名前</div>
+            <input value={v.tplName} onChange={v.onTplName} placeholder="例：学生相談室、朝のしたく" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
+            <div style={{ fontSize: 11.5, color: '#8a8a82', marginTop: 10, lineHeight: 1.7 }}>いまの行動と時間の組み合わせを保存します。同じ名前の予定をGoogleカレンダーから取り込むと、次回から自動でこの構成が使われます。</div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button onClick={v.closeTpl} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>キャンセル</button>
+              <button onClick={v.saveTpl} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>まとめる</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ flex: '0 0 auto', padding: '10px 16px 22px' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '0 4px 9px' }}>
           <span style={{ fontSize: 12, color: '#8a8a82' }}>合計 {v.searchTotalText}</span>
@@ -331,7 +366,7 @@ function Sub({ v }) {
             <button onClick={t.onTap} style={{ width: 30, height: 30, borderRadius: '50%', border: t.btnBorder, background: t.btnBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, fontWeight: 700, flex: '0 0 auto', cursor: 'pointer', color: t.btnColor }}>{t.btnLabel}</button>
           </div>
         ))}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, margin: '14px 16px 0', border: '1.5px dashed #d8d5cb', borderRadius: 12, padding: '11px 0', fontSize: 12.5, fontWeight: 700, color: '#8a8a82' }}>＋ にているものをコピーして作る</div>
+        <button onClick={v.openActAdd} style={{ display: 'flex', width: 'calc(100% - 32px)', alignItems: 'center', justifyContent: 'center', gap: 7, margin: '14px 16px 0', border: '1.5px dashed #d8d5cb', borderRadius: 12, padding: '11px 0', fontSize: 12.5, fontWeight: 700, color: '#8a8a82', background: '#fff', cursor: 'pointer' }}>＋ にているものをコピーして作る</button>
       </div>
     </div>
   );
@@ -400,17 +435,182 @@ function CatAddPopup({ v }) {
         <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>なまえ</div>
         <input value={v.newCatName} onChange={v.onCatName} placeholder="例：ペットのこと" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
         <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>アイコン</div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 8 }}>
           {v.catIconChoices.map((ic, ii) => (
-            <button key={ii} onClick={ic.onPick} style={{ width: 44, height: 44, borderRadius: 12, border: ic.border, background: ic.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <span style={msIcon(21, '#55554e')}>{ic.icon}</span>
+            <button key={ii} onClick={ic.onPick} style={{ width: 40, height: 40, borderRadius: 11, border: ic.border, background: ic.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <span style={msIcon(20, '#55554e')}>{ic.icon}</span>
             </button>
           ))}
         </div>
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>標準の絵文字（このカテゴリの行動に使われます）</div>
+        <EmojiPicker value={v.newCatGlyph} onPick={v.pickCatGlyph} />
         <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
           <button onClick={v.closeCatAdd} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>キャンセル</button>
           <button onClick={v.addCat} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>作る</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- 行動をつくる popup（コピー式・設計書§2） ---- */
+function ActAddPopup({ v }) {
+  const [srcOpen, setSrcOpen] = React.useState(false);
+  const cur = v.actSrcChoices.find(sc => sc.on) || v.actSrcChoices[0];
+  const cmpBtns = (opts) => (
+    <div style={{ display: 'flex', gap: 5, marginTop: 8 }}>
+      {opts.map((o, oi) => (
+        <button key={oi} onClick={o.onPick} style={{ flex: 1, textAlign: 'center', border: o.on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: o.on ? '#fbfdf0' : '#fff', borderRadius: 10, padding: '9px 0', fontSize: 10.5, fontWeight: o.on ? 900 : 700, cursor: 'pointer', lineHeight: 1.3 }}>{o.text}</button>
+      ))}
+    </div>
+  );
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 7, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div className="nos" style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: '#fff', borderRadius: '22px 22px 0 0', padding: '16px 18px 20px', boxShadow: '0 -12px 40px rgba(27,27,24,.3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>行動をつくる</div>
+          <button onClick={v.closeActAdd} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
+        </div>
+        {/* コピー元を選ぶ（プルダウン。空欄からの新規は不可＝アンカリング） */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>にているものをえらぶ（コピー元）</div>
+        <div style={{ position: 'relative', marginTop: 8 }}>
+          <button onClick={() => setSrcOpen(!srcOpen)} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, border: '1.5px solid #e4e1d8', background: '#fff', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}>
+            <span style={{ fontSize: 17 }}>{cur ? cur.glyph : ''}</span>
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>{cur ? cur.name : ''}</span>
+            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 19, color: '#8a8a82' }}>{srcOpen ? 'expand_less' : 'expand_more'}</span>
+          </button>
+          {srcOpen && (
+            <div className="nos" style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)', zIndex: 5, background: '#fff', border: '1px solid #efece3', borderRadius: 14, boxShadow: '0 12px 28px rgba(27,27,24,.2)', padding: 6, maxHeight: 210, overflowY: 'auto' }}>
+              {v.actSrcChoices.map(sc => (
+                <button key={sc.id} onClick={() => { sc.onPick(); setSrcOpen(false); }} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: sc.on ? '#fbfdf0' : '#fff', border: 'none', borderRadius: 10, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ fontSize: 16 }}>{sc.glyph}</span>
+                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: '#1b1b18' }}>{sc.name}</span>
+                  {sc.on && <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 17, color: '#7a9a00' }}>check</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* くらべてどう？（体・心それぞれ。回復系は「回復の量」で比べる） */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>「{v.actSrcName}」と同じ時間やったとして、{v.actIsRecover ? 'からだの回復は？' : 'からだは？'}</div>
+        {cmpBtns(v.actBodyOpts)}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 12, color: '#55554e' }}>{v.actIsRecover ? 'こころの回復は？' : 'こころは？'}</div>
+        {cmpBtns(v.actMindOpts)}
+        <div style={{ background: '#c4f000', borderRadius: 12, padding: '9px 14px', marginTop: 12, textAlign: 'center' }}>
+          <span style={{ ...mono, fontSize: 13, fontWeight: 700, color: '#2f3a00' }}>{v.actIsRecover ? '回復の目安' : '目安'} {v.actEstText}</span>
+        </div>
+        {/* なまえ */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>なまえ</div>
+        <input value={v.actName} onChange={v.onActName} placeholder="例：数学、皿洗い（夜）" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
+        {/* 絵文字: カテゴリ標準 or 検索して個別に設定 */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>絵文字（カテゴリ標準か、この行動だけの絵文字）</div>
+        <EmojiPicker
+          value={v.actGlyph === 'std' ? null : v.actGlyph}
+          onPick={v.pickActGlyph}
+          lead={(
+            <button onClick={() => v.pickActGlyph('std')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 56, height: 40, borderRadius: 10, border: v.actGlyph === 'std' ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: v.actGlyph === 'std' ? '#fbfdf0' : '#fff', cursor: 'pointer', padding: 0, lineHeight: 1 }}>
+              <Emo e={v.actStdGlyph} size={18} />
+              <span style={{ fontSize: 8.5, fontWeight: 700, color: '#7a9a00', marginTop: 2 }}>標準</span>
+            </button>
+          )}
+        />
+        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+          <button onClick={v.closeActAdd} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>キャンセル</button>
+          <button onClick={v.addAction} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>つくる</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- 検索で見つからない→行動を新しくつくる popup（タイトル・大カテゴリ・絵文字） ---- */
+function NewActPopup({ v }) {
+  const [catOpen, setCatOpen] = React.useState(false);
+  const cur = v.newActCatChoices.find(c => c.on) || v.newActCatChoices[0];
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 7, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div className="nos" style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: '#fff', borderRadius: '22px 22px 0 0', padding: '16px 18px 20px', boxShadow: '0 -12px 40px rgba(27,27,24,.3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>行動を新しくつくる</div>
+          <button onClick={v.closeNewAct} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
+        </div>
+        {/* タイトル */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>タイトル</div>
+        <input value={v.newActName} onChange={v.onNewActName} placeholder="例：ピアノの練習" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
+        {/* 大カテゴリ（プルダウン） */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>大カテゴリ</div>
+        <div style={{ position: 'relative', marginTop: 8 }}>
+          <button onClick={() => setCatOpen(!catOpen)} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, border: '1.5px solid #e4e1d8', background: '#fff', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}>
+            {cur && <span style={{ ...msIcon(20, cur.color), flex: '0 0 auto' }}>{cur.icon}</span>}
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>{cur ? cur.name : ''}</span>
+            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 19, color: '#8a8a82' }}>{catOpen ? 'expand_less' : 'expand_more'}</span>
+          </button>
+          {catOpen && (
+            <div className="nos" style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)', zIndex: 5, background: '#fff', border: '1px solid #efece3', borderRadius: 14, boxShadow: '0 12px 28px rgba(27,27,24,.2)', padding: 6, maxHeight: 220, overflowY: 'auto' }}>
+              {v.newActCatChoices.map(c => (
+                <button key={c.id} onClick={() => { c.onPick(); setCatOpen(false); }} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: c.on ? '#fbfdf0' : '#fff', border: 'none', borderRadius: 10, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ ...msIcon(19, c.color), flex: '0 0 auto' }}>{c.icon}</span>
+                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: '#1b1b18' }}>{c.name}</span>
+                  {c.on && <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 17, color: '#7a9a00' }}>check</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* 絵文字（カテゴリ標準 or 検索して選ぶ） */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>絵文字</div>
+        <EmojiPicker
+          value={v.newActGlyph === 'std' ? null : v.newActGlyph}
+          onPick={v.pickNewActGlyph}
+          lead={(
+            <button onClick={() => v.pickNewActGlyph('std')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 56, height: 40, borderRadius: 10, border: v.newActGlyph === 'std' ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: v.newActGlyph === 'std' ? '#fbfdf0' : '#fff', cursor: 'pointer', padding: 0, lineHeight: 1 }}>
+              <Emo e={v.newActStdGlyph} size={18} />
+              <span style={{ fontSize: 8.5, fontWeight: 700, color: '#7a9a00', marginTop: 2 }}>標準</span>
+            </button>
+          )}
+        />
+        <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 8, lineHeight: 1.6 }}>疲労のめやすは選んだカテゴリに合わせて自動で決まります（時間・強度・すききらいであとから調整できます）</div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <button onClick={v.closeNewAct} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>キャンセル</button>
+          <button onClick={v.createNewAct} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>つくって記録</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- きもち・できごと popup（時間なしの心イベント） ---- */
+function MoodPopup({ v }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 7, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div className="nos" style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: '#fff', borderRadius: '22px 22px 0 0', padding: '16px 18px 20px', boxShadow: '0 -12px 40px rgba(27,27,24,.3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>きもち・できごと</div>
+          <button onClick={v.closeMood} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
+        </div>
+        <div style={{ fontSize: 11.5, color: '#8a8a82', textAlign: 'center', marginTop: 6, lineHeight: 1.6 }}>時間はつけません。心にだけ効きます</div>
+        {/* きもち選択 */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>どんなきもち？</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+          {v.moodChoices.map(m => (
+            <button key={m.id} onClick={m.onPick} style={{ display: 'flex', alignItems: 'center', gap: 8, border: m.on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: m.on ? '#fbfdf0' : '#fff', borderRadius: 12, padding: '11px 12px', fontSize: 13, fontWeight: m.on ? 900 : 700, color: '#1b1b18', cursor: 'pointer', textAlign: 'left' }}>
+              <Emo e={m.glyph} size={22} />
+              <span style={{ flex: 1, minWidth: 0 }}>{m.name}</span>
+              <span style={{ ...mono, fontSize: 9, background: m.kind === 'bad' ? '#ffe3ef' : '#eef7cc', color: m.kind === 'bad' ? '#a33e6d' : '#5a7500', borderRadius: 5, padding: '2px 6px' }}>{m.kind === 'bad' ? '＋' : '−'}</span>
+            </button>
+          ))}
+        </div>
+        {/* 強さ */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>どれくらい？</div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          {v.moodStrengths.map(x => (
+            <button key={x.key} onClick={x.onPick} style={{ flex: 1, textAlign: 'center', border: x.on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: x.on ? '#fbfdf0' : '#fff', borderRadius: 12, padding: '11px 0', fontSize: 13, fontWeight: x.on ? 900 : 700, cursor: 'pointer' }}>{x.label}</button>
+          ))}
+        </div>
+        {/* ひとこと（手入力・任意） */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>ひとこと（任意）</div>
+        <textarea value={v.moodNote} onChange={v.onMoodNote} placeholder="例：発表がうまくいった／急なキャンセルでへこんだ" rows={2} style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 14, color: '#1b1b18', boxSizing: 'border-box', outline: 'none', resize: 'none', lineHeight: 1.6 }} />
+        <button onClick={v.commitMood} disabled={!v.moodCanSave} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 14, background: v.moodCanSave ? '#c4f000' : '#e4e1d8', color: v.moodCanSave ? '#2f3a00' : '#a5a39a', fontWeight: 700, fontSize: 16, padding: 16, cursor: v.moodCanSave ? 'pointer' : 'default' }}>きろくする</button>
       </div>
     </div>
   );
