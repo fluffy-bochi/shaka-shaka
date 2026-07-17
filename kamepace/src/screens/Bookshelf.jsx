@@ -168,8 +168,13 @@ export default function Bookshelf({ v }) {
       <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 15, color: '#55554e' }}>screen_rotation</span>
     </div>
   );
-  // 縦フレーム内で横向きを見たい時はビューポート全体に広げる
-  const breakoutStyle = breakout ? { position: 'fixed', inset: 0, zIndex: 40, width: '100vw', height: '100dvh' } : null;
+  // 縦フレーム内で横向きを見たい時は、中央に浮くスマホ横サイズのデバイス風にする（全画面にしない）
+  const breakoutStyle = breakout ? {
+    position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+    width: 'min(94vw, 812px)', height: 'min(92dvh, 392px)',
+    zIndex: 40, borderRadius: 30, overflow: 'hidden',
+    boxShadow: '0 0 0 11px #1b1b18, 0 40px 90px rgba(27,27,24,.5)',
+  } : null;
 
   const names = useMemo(() => nameMap(entries), [entries]);
   const months = useMemo(() => monthsWithData(entries), [entries]);
@@ -456,7 +461,7 @@ export default function Bookshelf({ v }) {
   }
 
   /* ======================= 横持ち（3a） ======================= */
-  return (
+  const landscape = (
     <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec', ...breakoutStyle }}>
       {/* 左レールナビ */}
       <div style={{ flex: '0 0 58px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 17, background: '#fff', borderRight: '1px solid #efece3' }}>
@@ -511,4 +516,12 @@ export default function Bookshelf({ v }) {
       </div>
     </div>
   );
+  // 縦フレーム内で横向きを見せる時は、暗幕＋中央のスマホ横デバイス
+  if (breakout) {
+    return (<>
+      <div onClick={() => setManualOrient('port')} style={{ position: 'fixed', inset: 0, zIndex: 39, background: 'rgba(27,27,24,.55)' }} />
+      {landscape}
+    </>);
+  }
+  return landscape;
 }
