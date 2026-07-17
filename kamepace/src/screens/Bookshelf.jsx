@@ -135,7 +135,10 @@ function NoteBody({ isMonth, day, month, names, slotHours, diary, onDiary, footL
 export default function Bookshelf({ v }) {
   const today = todayStr();
   const rootRef = useRef(null);
-  const [land, setLand] = useState(false);
+  const [autoLand, setAutoLand] = useState(false);   // 端末の向き（実寸 w>h）
+  const [manualOrient, setManualOrient] = useState(null); // 手動: null=自動 / 'land' / 'port'
+  const land = manualOrient != null ? manualOrient === 'land' : autoLand;
+  const breakout = manualOrient === 'land'; // 縦フレームでも横を見たい時は全画面化
   const [view, setView] = useState('day');        // 'day' | 'month'
   const [monthYm, setMonthYm] = useState(today.slice(0, 7));
   const [sort, setSort] = useState('date');        // 'date' | 'more' | 'less'
@@ -154,11 +157,19 @@ export default function Bookshelf({ v }) {
   /* 向き＝本棚の実寸で判定（縦フレーム=縦持ち, 横に広い=横持ち） */
   useLayoutEffect(() => {
     const el = rootRef.current; if (!el) return;
-    const update = () => setLand(el.clientWidth > el.clientHeight);
+    const update = () => setAutoLand(el.clientWidth > el.clientHeight);
     update();
     const ro = new ResizeObserver(update); ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  const RotateBtn = () => (
+    <div onClick={() => setManualOrient(land ? 'port' : 'land')} title="むきを変える" style={{ cursor: 'pointer', userSelect: 'none', width: 26, height: 26, flex: '0 0 auto', borderRadius: '50%', background: '#fff', border: '1px solid #e3e0d5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 15, color: '#55554e' }}>screen_rotation</span>
+    </div>
+  );
+  // 縦フレーム内で横向きを見たい時はビューポート全体に広げる
+  const breakoutStyle = breakout ? { position: 'fixed', inset: 0, zIndex: 40, width: '100vw', height: '100dvh' } : null;
 
   const names = useMemo(() => nameMap(entries), [entries]);
   const months = useMemo(() => monthsWithData(entries), [entries]);
@@ -356,8 +367,8 @@ export default function Bookshelf({ v }) {
   /* 内蔵ナビ（縦=下タブ / 横=左レール）。本棚 screen では全体Navを隠す代わりにこれを出す。 */
   const navItems = [
     { icon: 'auto_stories', label: '本棚', on: true, go: v.goBookshelf },
-    { icon: 'blur_on', label: 'シャカ', on: false, go: v.goShaka },
     { icon: 'home', label: 'ホーム', on: false, go: v.goHome },
+    { icon: 'blur_on', label: 'シャカ', on: false, go: v.goShaka },
     { icon: 'person', label: 'マイ', on: false, go: v.goMypage },
   ];
   const NavItem = ({ it, size }) => (
@@ -382,7 +393,7 @@ export default function Bookshelf({ v }) {
           <div style={{ fontSize: 21, fontWeight: 900, marginTop: 2, letterSpacing: '-.01em' }}>がんばりの本棚</div>
           <div style={{ fontSize: 12, color: '#8a8a82', marginTop: 4 }}>下の段ほど最近。今日は本棚の一番下にある。</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-            <Segment /><TodayBtn />{!isMonth && <><MonthSel /><SortSel /></>}
+            <Segment /><TodayBtn /><RotateBtn />{!isMonth && <><MonthSel /><SortSel /></>}
           </div>
         </div>
 
@@ -446,7 +457,7 @@ export default function Bookshelf({ v }) {
 
   /* ======================= 横持ち（3a） ======================= */
   return (
-    <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec' }}>
+    <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec', ...breakoutStyle }}>
       {/* 左レールナビ */}
       <div style={{ flex: '0 0 58px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 17, background: '#fff', borderRight: '1px solid #efece3' }}>
         {navItems.map((it, i) => (
@@ -461,7 +472,7 @@ export default function Bookshelf({ v }) {
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px 0', flexWrap: 'wrap' }}>
           <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 1 auto', overflow: 'hidden', textOverflow: 'ellipsis' }}>がんばりの本棚</div>
-          <Segment /><TodayBtn />
+          <Segment /><TodayBtn /><RotateBtn />
           {!isMonth && <DispPill />}
         </div>
         {!isMonth && (

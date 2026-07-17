@@ -588,18 +588,26 @@ function MoodPopup({ v }) {
           <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>きもち・できごと</div>
           <button onClick={v.closeMood} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
         </div>
-        <div style={{ fontSize: 11.5, color: '#8a8a82', textAlign: 'center', marginTop: 6, lineHeight: 1.6 }}>時間はつけません。心にだけ効きます</div>
-        {/* きもち選択 */}
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>どんなきもち？</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-          {v.moodChoices.map(m => (
+        <div style={{ fontSize: 11.5, color: '#8a8a82', textAlign: 'center', marginTop: 6, lineHeight: 1.6 }}>時間はつけません。きもちは心に、暑さ・寒さは体に効きます</div>
+        {(() => {
+          const moodBtn = (m) => (
             <button key={m.id} onClick={m.onPick} style={{ display: 'flex', alignItems: 'center', gap: 8, border: m.on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: m.on ? '#fbfdf0' : '#fff', borderRadius: 12, padding: '11px 12px', fontSize: 13, fontWeight: m.on ? 900 : 700, color: '#1b1b18', cursor: 'pointer', textAlign: 'left' }}>
               <Emo e={m.glyph} size={22} />
               <span style={{ flex: 1, minWidth: 0 }}>{m.name}</span>
               <span style={{ ...mono, fontSize: 9, background: m.kind === 'bad' ? '#ffe3ef' : '#eef7cc', color: m.kind === 'bad' ? '#a33e6d' : '#5a7500', borderRadius: 5, padding: '2px 6px' }}>{m.kind === 'bad' ? '＋' : '−'}</span>
             </button>
-          ))}
-        </div>
+          );
+          const mind = v.moodChoices.filter(m => m.axis !== 'body');
+          const body = v.moodChoices.filter(m => m.axis === 'body');
+          return (<>
+            {/* きもち（心） */}
+            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>どんなきもち？<span style={{ fontSize: 10.5, color: '#9d9b91', fontWeight: 700, marginLeft: 6 }}>心</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>{mind.map(moodBtn)}</div>
+            {/* からだの感覚（暑さ・寒さ） */}
+            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>からだの感覚<span style={{ fontSize: 10.5, color: '#9d9b91', fontWeight: 700, marginLeft: 6 }}>体</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>{body.map(moodBtn)}</div>
+          </>);
+        })()}
         {/* 強さ */}
         <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>どれくらい？</div>
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>

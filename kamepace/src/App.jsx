@@ -216,15 +216,21 @@ export default class App extends React.Component {
   async loadCloud() {
     try {
       const data = await loadUserData();
+      // オンボ判定は「読み込んだデータ」で行う（this.set は非同期で this.state に即反映されないため）
+      let onboardDone;
       if (data) {
-        { const dd = deserialize(data); this.set({ ...dd, booted: true, screen: dd.mainScreen || 'shaka' }); }
+        const dd = deserialize(data);
+        this.set({ ...dd, booted: true, screen: dd.mainScreen || 'shaka' });
+        onboardDone = dd.onboardDone;
       } else {
-        // 新規ユーザー: ゲストデータがあれば引き継いで保存
+        // 新規ユーザー（初めての登録）: ゲストデータがあれば引き継いで保存
         this.set({ booted: true });
         this.save();
+        onboardDone = this.state.onboardDone; // ゲスト時に済ませていれば true
       }
       setTimeout(() => this.advancePlans(), 0);
-      if (!this.state.onboardDone) setTimeout(() => this.set({ screen: 'onboard', obStep: 1, obSel: {} }), 200);
+      // 既にオンボ済みのログインユーザーには出さない。初回（未オンボ）だけ出す
+      if (!onboardDone) setTimeout(() => this.set({ screen: 'onboard', obStep: 1, obSel: {} }), 200);
     } catch (err) {
       console.warn('[kamepace] load failed', err);
       this.set({ booted: true });
@@ -484,9 +490,12 @@ export default class App extends React.Component {
     if (!mood) return;
     const base = (MOOD_STRENGTHS.find(x => x.key === this.state.moodStrength) || MOOD_STRENGTHS[1]).v;
     const recover = mood.kind === 'good';
+    const isBody = mood.axis === 'body'; // あつい・さむい＝体、きもち＝心
     const bm = this.buffMult();
-    // 心だけに効く。個人の心係数×バフ×周期を掛ける
-    const coef = recover ? (this.state.mindRecCoef || 1) * bm.mindRec : (this.state.mindFatCoef || 1) * bm.mindFat;
+    // 体/心それぞれの個人係数×バフ×周期を掛ける
+    const coef = recover
+      ? (isBody ? (this.state.bodyRecCoef || 1) * bm.bodyRec : (this.state.mindRecCoef || 1) * bm.mindRec)
+      : (isBody ? (this.state.bodyFatCoef || 1) * bm.bodyFat : (this.state.mindFatCoef || 1) * bm.mindFat);
     const val = Math.max(1, Math.round(base * coef));
     const delta = recover ? -val : val;
     const recDate = this.homeDateStr();
@@ -504,7 +513,7 @@ export default class App extends React.Component {
     this.set({
       entries, moodOpen: false, moodId: null, moodNote: '',
       screen: 'shaka', dayOffset: 0,
-      toast: recover ? 'きもちを記録（回復）' : 'きもちを記録',
+      toast: isBody ? 'からだを記録' : (recover ? 'きもちを記録（回復）' : 'きもちを記録'),
     });
     this.save();
     this.stopPhysics();
@@ -2528,7 +2537,7 @@ export default class App extends React.Component {
       goHome: this.goHome, goShaka: this.goShaka, goMypage: this.goMypage, goSleep: this.goSleep,
       moodOpen: !!st.moodOpen, openMood: this.openMood, closeMood: this.closeMood, commitMood: this.commitMood,
       moodNote: st.moodNote || '', onMoodNote: this.onMoodNote,
-      moodChoices: MOODS.map(m => ({ id: m.id, glyph: m.glyph, name: m.name, kind: m.kind, on: st.moodId === m.id, onPick: () => this.pickMood(m.id) })),
+      moodChoices: MOODS.map(m => ({ id: m.id, glyph: m.glyph, name: m.name, kind: m.kind, axis: m.axis || 'mind', on: st.moodId === m.id, onPick: () => this.pickMood(m.id) })),
       moodStrengths: MOOD_STRENGTHS.map(x => ({ key: x.key, label: x.label, on: st.moodStrength === x.key, onPick: () => this.pickMoodStrength(x.key) })),
       moodCanSave: !!st.moodId,
       /* バフ・デバフ */
