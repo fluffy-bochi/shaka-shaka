@@ -138,7 +138,6 @@ export default function Bookshelf({ v }) {
   const [autoLand, setAutoLand] = useState(false);   // 端末の向き（実寸 w>h）
   const [manualOrient, setManualOrient] = useState(null); // 手動: null=自動 / 'land' / 'port'
   const land = manualOrient != null ? manualOrient === 'land' : autoLand;
-  const breakout = manualOrient === 'land'; // 縦フレームでも横を見たい時は全画面化
   const [view, setView] = useState('day');        // 'day' | 'month'
   const [monthYm, setMonthYm] = useState(today.slice(0, 7));
   const [sort, setSort] = useState('date');        // 'date' | 'more' | 'less'
@@ -168,13 +167,11 @@ export default function Bookshelf({ v }) {
       <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 15, color: '#55554e' }}>screen_rotation</span>
     </div>
   );
-  // 縦フレーム内で横向きを見たい時は、中央に浮くスマホ横サイズのデバイス風にする（全画面にしない）
-  const breakoutStyle = breakout ? {
-    position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-    width: 'min(94vw, 812px)', height: 'min(92dvh, 392px)',
-    zIndex: 40, borderRadius: 30, overflow: 'hidden',
-    boxShadow: '0 0 0 11px #1b1b18, 0 40px 90px rgba(27,27,24,.5)',
-  } : null;
+  // 横向きのときは端末フレームごと横長スマホの形にする（ポップアップ・暗幕なし・その場で使える）
+  useEffect(() => {
+    document.body.classList.toggle('kame-book-land', land);
+    return () => document.body.classList.remove('kame-book-land');
+  }, [land]);
 
   const names = useMemo(() => nameMap(entries), [entries]);
   const months = useMemo(() => monthsWithData(entries), [entries]);
@@ -462,7 +459,7 @@ export default function Bookshelf({ v }) {
 
   /* ======================= 横持ち（3a） ======================= */
   const landscape = (
-    <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec', ...breakoutStyle }}>
+    <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec' }}>
       {/* 左レールナビ */}
       <div style={{ flex: '0 0 58px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 17, background: '#fff', borderRight: '1px solid #efece3' }}>
         {navItems.map((it, i) => (
@@ -516,12 +513,5 @@ export default function Bookshelf({ v }) {
       </div>
     </div>
   );
-  // 縦フレーム内で横向きを見せる時は、暗幕＋中央のスマホ横デバイス
-  if (breakout) {
-    return (<>
-      <div onClick={() => setManualOrient('port')} style={{ position: 'fixed', inset: 0, zIndex: 39, background: 'rgba(27,27,24,.55)' }} />
-      {landscape}
-    </>);
-  }
   return landscape;
 }
