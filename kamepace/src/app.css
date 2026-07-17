@@ -30,6 +30,10 @@ input { font-family: inherit; }
   animation: popfx .4s ease-out forwards;
 }
 
+/* ステータスバー用スペーサー。本棚の横向き時は詰めてナビ・棚を上端まで使う */
+.app-status-spacer { height: max(40px, env(safe-area-inset-top)); }
+body.kame-book-land .app-status-spacer { height: env(safe-area-inset-top); }
+
 /* app fills the viewport like the prototype's phone screen */
 #root { min-height: 100dvh; }
 .app-screen {

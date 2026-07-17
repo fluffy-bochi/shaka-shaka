@@ -462,8 +462,8 @@ export default function Bookshelf({ v }) {
   /* ======================= 横持ち（3a） ======================= */
   const landscape = (
     <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec' }}>
-      {/* 左レールナビ */}
-      <div style={{ flex: '0 0 58px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 17, background: '#fff', borderRight: '1px solid #efece3' }}>
+      {/* 左レールナビ（上詰め・上端まで） */}
+      <div style={{ flex: '0 0 58px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 20, paddingTop: 16, background: '#fff', borderRight: '1px solid #efece3' }}>
         {navItems.map((it, i) => (
           <button key={i} onClick={it.go} style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, cursor: 'pointer' }}>
             <span style={{ fontFamily: 'Material Symbols Rounded', fontVariationSettings: `'FILL' ${it.on ? 1 : 0}`, fontSize: 21, color: it.on ? '#1b1b18' : '#8a8a82' }}>{it.icon}</span>
