@@ -508,12 +508,12 @@ export default function Bookshelf({ v }) {
       {/* 中央: 棚 */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         {/* タイトル行（日別/月別・今日・回転を横に）＋その下に残りのボタンを1行で */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px 0' }}>
-          <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 0 auto' }}>がんばりの本棚</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '20px 14px 0' }}>
+          <div style={{ fontSize: 21, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 0 auto' }}>がんばりの本棚</div>
           <Segment /><TodayBtn /><RotateBtn />
         </div>
         {!isMonth && (
-          <div className="nos" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px 0', overflowX: 'auto' }}>
+          <div className="nos" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '14px 14px 0', overflowX: 'auto' }}>
             <DispSwitch /><MonthSel /><FloodSel /><SortSel /><FavFilter round={false} />
           </div>
         )}
