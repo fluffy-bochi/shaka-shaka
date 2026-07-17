@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
+import Emo from '../fluent';
 import { todayStr, strToDate, pad2 } from '../model';
 import {
   buildDay, buildMonth, monthsWithData, nameMap, daySlots, dayChart,
@@ -9,12 +10,13 @@ const MONO = "'Space Mono', monospace";
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
 
 /* ---------- 小物 ---------- */
+/* 積まれる絵文字はシャカと同じ Fluent 3D（Emo）で描く */
 const Pile = ({ pts, w, fs, ghost }) => pts.map((p, i) => (
   <div key={i} style={{
-    position: 'absolute', width: w, textAlign: 'center', fontSize: fs, lineHeight: 1,
+    position: 'absolute', width: w, display: 'flex', justifyContent: 'center', lineHeight: 1,
     left: p.x, bottom: p.bottom, transform: `rotate(${p.rot}deg)`,
     ...(ghost ? { opacity: 0.3, filter: 'grayscale(.85)' } : { filter: 'drop-shadow(0 1px 1px rgba(27,27,24,.12))' }),
-  }}>{p.e}</div>
+  }}><Emo e={p.e} size={fs} /></div>
 ));
 
 const Glass = () => (<>
@@ -32,7 +34,7 @@ function Chart({ chart }) {
         {chart.items.map((c, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: 2, flex: '0 0 auto', background: c.color }} />
-            <span style={{ fontSize: 12, lineHeight: 1 }}>{c.e}</span>
+            <span style={{ display: 'inline-flex', lineHeight: 1 }}><Emo e={c.e} size={13} /></span>
             <span style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: '#55554e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
             <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: '#1b1b18' }}>×{c.n}</span>
           </div>
@@ -54,7 +56,7 @@ function Timeline({ slots }) {
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {sl.rows.map((r, ri) => (
           <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', borderBottom: '1px solid #f1efe8', opacity: r.ghost ? 0.45 : 1 }}>
-            <span style={{ fontSize: 15, filter: r.ghost ? 'grayscale(.85)' : 'none' }}>{r.glyph}</span>
+            <span style={{ display: 'inline-flex', filter: r.ghost ? 'grayscale(.85)' : 'none' }}><Emo e={r.glyph} size={16} /></span>
             <span style={{ flex: 1, fontSize: 12, fontWeight: 700 }}>{r.name}</span>
             <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: r.rec ? '#7a9a00' : '#e8842c' }}>{r.f}</span>
           </div>
@@ -70,7 +72,7 @@ function Ranking({ title, rows }) {
     {rows.length ? rows.map((r, i) => (
       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', borderBottom: '1px solid #f1efe8' }}>
         <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: '#9d9b91', width: 14, flex: '0 0 auto' }}>{r.rank}</span>
-        <span style={{ fontSize: 15 }}>{r.e}</span>
+        <span style={{ display: 'inline-flex' }}><Emo e={r.e} size={16} /></span>
         <span style={{ flex: 1, fontSize: 12, fontWeight: 700 }}>{r.name}</span>
         <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: r.color }}>×{r.n}</span>
       </div>
@@ -137,7 +139,7 @@ export default function Bookshelf({ v }) {
   const rootRef = useRef(null);
   const [autoLand, setAutoLand] = useState(false);   // 端末の向き（実寸 w>h）
   const [manualOrient, setManualOrient] = useState(null); // 手動: null=自動 / 'land' / 'port'
-  // PC用スマホ枠が出ている時だけ手動回転を許可。実機（スマホ）は物理的な向き(autoLand)に従う
+  // PC用スマホ枠が出ているか（枠の形を変える方式で横にする）。スマホは画面ごと90°回転で横にする
   const [frameMode, setFrameMode] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width:768px) and (min-height:600px)').matches);
   useEffect(() => {
     const mq = window.matchMedia('(min-width:768px) and (min-height:600px)');
@@ -146,7 +148,9 @@ export default function Bookshelf({ v }) {
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
-  const land = (frameMode && manualOrient != null) ? manualOrient === 'land' : autoLand;
+  const land = manualOrient != null ? manualOrient === 'land' : autoLand;
+  // スマホが物理的に縦のまま「横」を選んだ → 画面を90°回転して横向きとして見せる
+  const forceRotate = land && !autoLand && !frameMode;
   const [view, setView] = useState('day');        // 'day' | 'month'
   const [monthYm, setMonthYm] = useState(today.slice(0, 7));
   const [sort, setSort] = useState('date');        // 'date' | 'more' | 'less'
@@ -164,11 +168,11 @@ export default function Bookshelf({ v }) {
 
   /* 向き＝本棚の実寸で判定（縦フレーム=縦持ち, 横に広い=横持ち） */
   useLayoutEffect(() => {
-    const el = rootRef.current; if (!el) return;
-    const update = () => setAutoLand(el.clientWidth > el.clientHeight);
+    // 端末の物理的な向きはビューポートで判定（90°回転表示中の要素サイズに引きずられないように）
+    const update = () => setAutoLand(window.innerWidth > window.innerHeight && !window.matchMedia('(min-width:768px) and (min-height:600px)').matches);
     update();
-    const ro = new ResizeObserver(update); ro.observe(el);
-    return () => ro.disconnect();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
   const RotateBtn = () => (
@@ -237,11 +241,13 @@ export default function Bookshelf({ v }) {
   /* ---------- スクロール位置 ---------- */
   const portRef = useRef(null), landRef = useRef(null);
   const centerToday = (el) => {
+    // 90°回転表示中でも狂わないよう、画面座標でなくレイアウト座標(offsetLeft)で中央へ
     if (!el) return false;
     const t = el.querySelector('[data-today="1"]');
     if (!t) return false;
-    const r = t.getBoundingClientRect(), sr = el.getBoundingClientRect();
-    el.scrollLeft += (r.left + r.width / 2 - sr.left) - sr.width / 2;
+    let x = 0;
+    for (let n = t; n && n !== el; n = n.offsetParent) x += n.offsetLeft;
+    el.scrollLeft = x + t.offsetWidth / 2 - el.clientWidth / 2;
     return true;
   };
   const scrollPortToToday = (el) => {
@@ -406,7 +412,7 @@ export default function Bookshelf({ v }) {
           <div style={{ fontSize: 21, fontWeight: 900, marginTop: 2, letterSpacing: '-.01em' }}>がんばりの本棚</div>
           <div style={{ fontSize: 12, color: '#8a8a82', marginTop: 4 }}>下の段ほど最近。今日は本棚の一番下にある。</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-            <Segment /><TodayBtn />{frameMode && <RotateBtn />}{!isMonth && <><MonthSel /><SortSel /></>}
+            <Segment /><TodayBtn /><RotateBtn />{!isMonth && <><MonthSel /><SortSel /></>}
           </div>
         </div>
 
@@ -469,8 +475,13 @@ export default function Bookshelf({ v }) {
   }
 
   /* ======================= 横持ち（3a） ======================= */
+  // forceRotate: 縦のビューポートいっぱいに90°回転して「横向きスマホ」として見せる
+  const rotateStyle = forceRotate ? {
+    position: 'fixed', top: 0, left: 0, width: '100dvh', height: '100dvw',
+    transform: 'rotate(90deg) translateY(-100%)', transformOrigin: 'top left', zIndex: 50,
+  } : null;
   const landscape = (
-    <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec' }}>
+    <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec', ...rotateStyle }}>
       {/* 左レールナビ（上端まで・4つを均等配置） */}
       <div style={{ flex: '0 0 58px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-evenly', padding: '10px 0', background: '#fff', borderRight: '1px solid #efece3' }}>
         {navItems.map((it, i) => (
@@ -485,7 +496,7 @@ export default function Bookshelf({ v }) {
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px 0', flexWrap: 'wrap' }}>
           <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 1 auto', overflow: 'hidden', textOverflow: 'ellipsis' }}>がんばりの本棚</div>
-          <Segment /><TodayBtn />{frameMode && <RotateBtn />}
+          <Segment /><TodayBtn /><RotateBtn />
           {!isMonth && <DispPill />}
         </div>
         {!isMonth && (
@@ -494,7 +505,7 @@ export default function Bookshelf({ v }) {
           </div>
         )}
         {!isMonth ? (
-          <div ref={landRef} className="nos" style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+          <div ref={landRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'flex-end', gap: 11, height: '100%', padding: '0 40px' }}>
               {filtered.map((d) => <LandBook key={d.dateStr} day={d} />)}
               <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 14, background: 'linear-gradient(180deg,#4a3120,#241509)', borderRadius: 2, boxShadow: '0 5px 10px rgba(27,27,24,.28)', zIndex: 2 }} />

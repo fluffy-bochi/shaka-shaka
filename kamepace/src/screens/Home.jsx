@@ -4,6 +4,23 @@ import Emo from '../fluent';
 const mono = { fontFamily: "'Space Mono',monospace" };
 const ndBtn = { width: 30, height: 30, background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#55554e', cursor: 'pointer', flex: '0 0 auto', padding: 0 };
 
+/* カレンダーで日付を選ぶボタン。input は1px不可視で置き、タップ時に showPicker で開く */
+function CalendarBtn({ value, onChange }) {
+  const ref = React.useRef(null);
+  const open = () => {
+    const el = ref.current; if (!el) return;
+    try { if (el.showPicker) { el.showPicker(); return; } } catch (e) { /* fallthrough */ }
+    el.focus(); el.click();
+  };
+  return (
+    <button onClick={open} aria-label="カレンダーから選ぶ" style={{ ...ndBtn, position: 'relative' }}>
+      <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20 }}>calendar_month</span>
+      <input ref={ref} type="date" value={value} onChange={onChange} tabIndex={-1}
+        style={{ position: 'absolute', left: 0, bottom: 0, width: 1, height: 1, opacity: 0, border: 'none', padding: 0, pointerEvents: 'none' }} />
+    </button>
+  );
+}
+
 export default function Home({ v }) {
   return (
     <>
@@ -29,11 +46,8 @@ export default function Home({ v }) {
             <button onClick={v.homeNextDay} aria-label="次の日" style={ndBtn}>
               <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 22 }}>chevron_right</span>
             </button>
-            {/* カレンダーから任意の日へ */}
-            <label style={{ ...ndBtn, position: 'relative', cursor: 'pointer' }} aria-label="カレンダーから選ぶ">
-              <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20 }}>calendar_month</span>
-              <input type="date" value={v.homeDate} onChange={v.setHomeDate} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
-            </label>
+            {/* カレンダーから任意の日へ（透明inputを重ねるとiOSで隣のボタンのタップを吸うため、ボタン→showPickerで開く） */}
+            <CalendarBtn value={v.homeDate} onChange={v.setHomeDate} />
             {/* 今日以外を見ているときだけ「今日」に戻るチップ */}
             {!v.homeIsToday && (
               <button onClick={v.goToday} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, height: 30, background: '#c4f000', border: 'none', borderRadius: 999, padding: '0 11px', fontSize: 12, fontWeight: 800, color: '#2f3a00', cursor: 'pointer', flex: '0 0 auto' }}>
