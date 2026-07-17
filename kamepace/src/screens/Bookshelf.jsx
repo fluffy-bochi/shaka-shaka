@@ -311,8 +311,8 @@ export default function Bookshelf({ v }) {
         <div style={{ position: 'absolute', top: 9, left: 0, right: 0, textAlign: 'center', fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: day.today ? '#5a7a00' : '#7a786f', letterSpacing: '-.02em', zIndex: 3 }}>{day.label}</div>
         <div style={{ position: 'absolute', top: 19, left: 0, right: 0, textAlign: 'center', fontSize: 8, fontWeight: day.today ? 700 : 500, color: day.today ? '#7a9a00' : '#a7a59b', zIndex: 3 }}>{day.wd}</div>
         {fav[day.dateStr] && <div style={{ position: 'absolute', top: 0, right: 6, width: 8, height: 17, background: '#ff5fa2', clipPath: 'polygon(0 0,100% 0,100% 100%,50% 76%,0 100%)', zIndex: 3 }} />}
-        <Pile pts={b.solid} w={18} fs={17} />
-        <Pile pts={b.ghost} w={18} fs={17} ghost />
+        <Pile pts={b.solid} w={20} fs={19} />
+        <Pile pts={b.ghost} w={20} fs={19} ghost />
         {day.dateStr === selKey && <div style={{ position: 'absolute', inset: 0, border: '2px solid #ff5fa2', borderRadius: '3px 3px 1px 1px', pointerEvents: 'none', zIndex: 4 }} />}
       </div>
     );
@@ -336,9 +336,9 @@ export default function Bookshelf({ v }) {
             <div style={{ position: 'absolute', top: 46, left: 0, width: '50%', textAlign: 'center', fontSize: 8, fontWeight: 700, color: '#c9c5b8', zIndex: 3 }}>疲労</div>
             <div style={{ position: 'absolute', top: 46, right: 0, width: '50%', textAlign: 'center', fontSize: 8, fontWeight: 700, color: '#c9c5b8', zIndex: 3 }}>回復</div>
             <div style={{ position: 'absolute', top: 58, bottom: 6, left: '50%', width: 1, background: 'rgba(27,27,24,.12)' }} />
-            <Pile pts={sp.fh.solid} w={20} fs={18} /><Pile pts={sp.fh.ghost} w={20} fs={18} ghost />
-            <Pile pts={sp.rh.solid} w={20} fs={18} /><Pile pts={sp.rh.ghost} w={20} fs={18} ghost />
-          </>) : (<Pile pts={net} w={24} fs={20} />)}
+            <Pile pts={sp.fh.solid} w={22} fs={20} /><Pile pts={sp.fh.ghost} w={22} fs={20} ghost />
+            <Pile pts={sp.rh.solid} w={22} fs={20} /><Pile pts={sp.rh.ghost} w={22} fs={20} ghost />
+          </>) : (<Pile pts={net} w={26} fs={23} />)}
           {fav[day.dateStr] && <div style={{ position: 'absolute', top: 0, right: 9, width: 9, height: 20, background: '#ff5fa2', clipPath: 'polygon(0 0,100% 0,100% 100%,50% 76%,0 100%)', zIndex: 3 }} />}
           {day.today && <div style={{ position: 'absolute', inset: 0, border: '3px solid #c4f000', borderRadius: '4px 4px 2px 2px', pointerEvents: 'none', zIndex: 4 }} />}
           {day.dateStr === selKey && !day.today && <div style={{ position: 'absolute', inset: 0, border: '3px solid #ff5fa2', borderRadius: '4px 4px 2px 2px', pointerEvents: 'none', zIndex: 4 }} />}

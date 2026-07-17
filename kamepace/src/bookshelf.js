@@ -18,9 +18,10 @@ export function isoWeek(d) {
   return 1 + Math.round(((t - w1) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7);
 }
 
-/* 背表紙ジオメトリ（絵文字1個の間隔・ゆらぎ）。モック #1a/#3a の値。 */
-export const GEO_PORT = { x0: 11, jx: 10, pitch: 13, rot: 13, y0: 5, w: 18, fs: 17 }; // 41x168
-export const GEO_LAND = { x0: 16, jx: 15, pitch: 21, rot: 12, y0: 8, w: 28, fs: 26 }; // 66x250
+/* 背表紙ジオメトリ（絵文字1個の間隔・ゆらぎ）。
+   1列＝10個で満杯（下から縦積みで本の上端に届く）になるよう pitch を本の高さ/10 に合わせる。 */
+export const GEO_PORT = { x0: 11, jx: 8, pitch: 16, rot: 13, y0: 4, w: 18, fs: 17 }; // 41x168 → 10個で満杯
+export const GEO_LAND = { x0: 16, jx: 12, pitch: 24, rot: 12, y0: 8, w: 28, fs: 26 }; // 66x250 → 10個で満杯
 
 function tube(seq, done, seed, geo) {
   const r = rng(seed), solid = [], ghost = [];
@@ -88,10 +89,11 @@ export function placeNet(day) {
   const netCount = Math.max(0, day.fatSolid.length - day.recSolid.length);
   const seq = day.fatSolid.slice(0, netCount);
   const r = rng(seedOf(day.dateStr) + 9);
+  // 2列（i%2）×縦10段（floor(i/2)）で 20個＝満杯
   return seq.map((e, i) => ({
     e,
     x: Math.round(6 + (i % 2) * 31 + (r() - 0.5) * 5),
-    bottom: Math.round(8 + Math.floor(i / 2) * 17 + (r() - 0.5) * 3),
+    bottom: Math.round(8 + Math.floor(i / 2) * 22 + (r() - 0.5) * 3),
     rot: Math.round((r() - 0.5) * 13),
   }));
 }
