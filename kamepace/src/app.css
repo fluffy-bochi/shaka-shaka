@@ -51,7 +51,8 @@ body.kame-book-land .app-status-spacer { height: env(safe-area-inset-top); }
 .shell-head, .shell-side { display: none; }
 
 /* PC表示: プロトタイプと同じスマホ枠＋左上ロゴ＋右にQR */
-@media (min-width: 768px) {
+/* PC用のスマホ枠。高さも十分ある時だけ＝実機を横向きにした「幅は広いが低い」状態では出さない */
+@media (min-width: 768px) and (min-height: 600px) {
   body { background: #dcdad2; }
   .shell {
     min-height: 100dvh;

@@ -137,7 +137,16 @@ export default function Bookshelf({ v }) {
   const rootRef = useRef(null);
   const [autoLand, setAutoLand] = useState(false);   // 端末の向き（実寸 w>h）
   const [manualOrient, setManualOrient] = useState(null); // 手動: null=自動 / 'land' / 'port'
-  const land = manualOrient != null ? manualOrient === 'land' : autoLand;
+  // PC用スマホ枠が出ている時だけ手動回転を許可。実機（スマホ）は物理的な向き(autoLand)に従う
+  const [frameMode, setFrameMode] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width:768px) and (min-height:600px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width:768px) and (min-height:600px)');
+    const on = () => setFrameMode(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const land = (frameMode && manualOrient != null) ? manualOrient === 'land' : autoLand;
   const [view, setView] = useState('day');        // 'day' | 'month'
   const [monthYm, setMonthYm] = useState(today.slice(0, 7));
   const [sort, setSort] = useState('date');        // 'date' | 'more' | 'less'
@@ -311,8 +320,8 @@ export default function Bookshelf({ v }) {
         <div style={{ position: 'absolute', top: 9, left: 0, right: 0, textAlign: 'center', fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: day.today ? '#5a7a00' : '#7a786f', letterSpacing: '-.02em', zIndex: 3 }}>{day.label}</div>
         <div style={{ position: 'absolute', top: 19, left: 0, right: 0, textAlign: 'center', fontSize: 8, fontWeight: day.today ? 700 : 500, color: day.today ? '#7a9a00' : '#a7a59b', zIndex: 3 }}>{day.wd}</div>
         {fav[day.dateStr] && <div style={{ position: 'absolute', top: 0, right: 6, width: 8, height: 17, background: '#ff5fa2', clipPath: 'polygon(0 0,100% 0,100% 100%,50% 76%,0 100%)', zIndex: 3 }} />}
-        <Pile pts={b.solid} w={18} fs={17} />
-        <Pile pts={b.ghost} w={18} fs={17} ghost />
+        <Pile pts={b.solid} w={20} fs={19} />
+        <Pile pts={b.ghost} w={20} fs={19} ghost />
         {day.dateStr === selKey && <div style={{ position: 'absolute', inset: 0, border: '2px solid #ff5fa2', borderRadius: '3px 3px 1px 1px', pointerEvents: 'none', zIndex: 4 }} />}
       </div>
     );
@@ -336,9 +345,9 @@ export default function Bookshelf({ v }) {
             <div style={{ position: 'absolute', top: 46, left: 0, width: '50%', textAlign: 'center', fontSize: 8, fontWeight: 700, color: '#c9c5b8', zIndex: 3 }}>疲労</div>
             <div style={{ position: 'absolute', top: 46, right: 0, width: '50%', textAlign: 'center', fontSize: 8, fontWeight: 700, color: '#c9c5b8', zIndex: 3 }}>回復</div>
             <div style={{ position: 'absolute', top: 58, bottom: 6, left: '50%', width: 1, background: 'rgba(27,27,24,.12)' }} />
-            <Pile pts={sp.fh.solid} w={20} fs={18} /><Pile pts={sp.fh.ghost} w={20} fs={18} ghost />
-            <Pile pts={sp.rh.solid} w={20} fs={18} /><Pile pts={sp.rh.ghost} w={20} fs={18} ghost />
-          </>) : (<Pile pts={net} w={24} fs={20} />)}
+            <Pile pts={sp.fh.solid} w={22} fs={20} /><Pile pts={sp.fh.ghost} w={22} fs={20} ghost />
+            <Pile pts={sp.rh.solid} w={22} fs={20} /><Pile pts={sp.rh.ghost} w={22} fs={20} ghost />
+          </>) : (<Pile pts={net} w={26} fs={23} />)}
           {fav[day.dateStr] && <div style={{ position: 'absolute', top: 0, right: 9, width: 9, height: 20, background: '#ff5fa2', clipPath: 'polygon(0 0,100% 0,100% 100%,50% 76%,0 100%)', zIndex: 3 }} />}
           {day.today && <div style={{ position: 'absolute', inset: 0, border: '3px solid #c4f000', borderRadius: '4px 4px 2px 2px', pointerEvents: 'none', zIndex: 4 }} />}
           {day.dateStr === selKey && !day.today && <div style={{ position: 'absolute', inset: 0, border: '3px solid #ff5fa2', borderRadius: '4px 4px 2px 2px', pointerEvents: 'none', zIndex: 4 }} />}
@@ -397,7 +406,7 @@ export default function Bookshelf({ v }) {
           <div style={{ fontSize: 21, fontWeight: 900, marginTop: 2, letterSpacing: '-.01em' }}>がんばりの本棚</div>
           <div style={{ fontSize: 12, color: '#8a8a82', marginTop: 4 }}>下の段ほど最近。今日は本棚の一番下にある。</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-            <Segment /><TodayBtn /><RotateBtn />{!isMonth && <><MonthSel /><SortSel /></>}
+            <Segment /><TodayBtn />{frameMode && <RotateBtn />}{!isMonth && <><MonthSel /><SortSel /></>}
           </div>
         </div>
 
@@ -476,7 +485,7 @@ export default function Bookshelf({ v }) {
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px 0', flexWrap: 'wrap' }}>
           <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 1 auto', overflow: 'hidden', textOverflow: 'ellipsis' }}>がんばりの本棚</div>
-          <Segment /><TodayBtn /><RotateBtn />
+          <Segment /><TodayBtn />{frameMode && <RotateBtn />}
           {!isMonth && <DispPill />}
         </div>
         {!isMonth && (
