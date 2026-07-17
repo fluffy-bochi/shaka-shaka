@@ -507,12 +507,16 @@ export default function Bookshelf({ v }) {
 
       {/* 中央: 棚 */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        {/* タイトル行＋その下にボタン類を1行で（あふれたら横スクロール） */}
-        <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', padding: '10px 14px 0' }}>がんばりの本棚</div>
-        <div className="nos" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px 0', overflowX: 'auto' }}>
+        {/* タイトル行（日別/月別・今日・回転を横に）＋その下に残りのボタンを1行で */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px 0' }}>
+          <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 0 auto' }}>がんばりの本棚</div>
           <Segment /><TodayBtn /><RotateBtn />
-          {!isMonth && <><DispSwitch /><MonthSel /><FloodSel /><SortSel /><FavFilter round={false} /></>}
         </div>
+        {!isMonth && (
+          <div className="nos" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px 0', overflowX: 'auto' }}>
+            <DispSwitch /><MonthSel /><FloodSel /><SortSel /><FavFilter round={false} />
+          </div>
+        )}
         {!isMonth ? (
           <div ref={landRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'flex-end', gap: 11, height: '100%', padding: '0 40px' }}>
