@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import Emo from '../fluent';
-import { todayStr, strToDate, pad2 } from '../model';
+import { todayStr, strToDate, dateToStr, pad2 } from '../model';
 import {
   buildDay, buildMonth, monthsWithData, nameMap, daySlots, dayChart,
   placeMain, placeSplit, placeNet, GEO_PORT, GEO_LAND,
@@ -188,15 +188,25 @@ export default function Bookshelf({ v }) {
 
   const names = useMemo(() => nameMap(entries), [entries]);
   const months = useMemo(() => monthsWithData(entries), [entries]);
+  /* 睡眠の回復（collected の 🌙）を日別に集計 → 回復列に含める */
+  const sleepMap = useMemo(() => {
+    const m = {};
+    (v.bookCollected || []).forEach((c) => {
+      if (c.glyph !== '🌙' || !c.ts) return;
+      const k = dateToStr(new Date(c.ts));
+      m[k] = (m[k] || 0) + (c.amount || 1);
+    });
+    return m;
+  }, [v.bookCollected]);
 
   /* 日別: 選択月の1日〜末日 */
   const monthDays = useMemo(() => {
     const [y, m] = monthYm.split('-').map(Number);
     const last = new Date(y, m, 0).getDate();
     const arr = [];
-    for (let i = 1; i <= last; i++) arr.push(buildDay(entries, y + '-' + pad2(m) + '-' + pad2(i)));
+    for (let i = 1; i <= last; i++) arr.push(buildDay(entries, y + '-' + pad2(m) + '-' + pad2(i), sleepMap));
     return arr;
-  }, [entries, monthYm]);
+  }, [entries, monthYm, sleepMap]);
 
   const filtered = useMemo(() => {
     let r = monthDays.filter((d) => (flood === 'all' || (flood === 'over') === d.over) && (!favFilter || fav[d.dateStr]));
@@ -222,18 +232,18 @@ export default function Bookshelf({ v }) {
 
   const monthObjs = useMemo(() => months.map((ym) => {
     const [y, m] = ym.split('-').map(Number);
-    const mo = buildMonth(entries, y, m, names);
+    const mo = buildMonth(entries, y, m, names, sleepMap);
     mo.cur = ym === today.slice(0, 7);
     return mo;
-  }), [entries, months, names, today]);
+  }), [entries, months, names, today, sleepMap]);
 
-  const selDay = useMemo(() => buildDay(entries, selKey), [entries, selKey]);
+  const selDay = useMemo(() => buildDay(entries, selKey, sleepMap), [entries, selKey, sleepMap]);
   const selMonth = useMemo(() => {
     const found = monthObjs.find((m) => m.ym === selMonYm);
     if (found) return found;
     const [y, m] = selMonYm.split('-').map(Number);
-    const mo = buildMonth(entries, y, m, names); mo.cur = selMonYm === today.slice(0, 7); return mo;
-  }, [monthObjs, selMonYm, entries, names, today]);
+    const mo = buildMonth(entries, y, m, names, sleepMap); mo.cur = selMonYm === today.slice(0, 7); return mo;
+  }, [monthObjs, selMonYm, entries, names, today, sleepMap]);
 
   const isMonth = view === 'month';
   const footLabel = isMonth ? 'この月を見る' : 'この日を見る';

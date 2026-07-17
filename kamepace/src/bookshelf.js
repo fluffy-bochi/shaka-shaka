@@ -44,8 +44,9 @@ function solidCount(e, isPast) {
   return N;
 }
 
-/* 1日ぶんの本のデータ（絵文字列＋メタ）を entries から作る */
-export function buildDay(entries, dateStr) {
+/* 1日ぶんの本のデータ（絵文字列＋メタ）を entries から作る。
+   sleepMap: dateStr→その日の睡眠回復量（collected の 🌙 を日別集計したもの） */
+export function buildDay(entries, dateStr, sleepMap) {
   const today = todayStr();
   const isPast = dateStr < today, isToday = dateStr === today, isFuture = dateStr > today;
   const list = sortEntries(entries).filter((e) => e.date === dateStr && !e.exp);
@@ -69,6 +70,7 @@ export function buildDay(entries, dateStr) {
     monthLabel: (dt.getMonth() + 1) + '月', first: dt.getDate() === 1,
     today: isToday, future: isFuture, past: isPast,
     fatSolid, fatGhost, recSolid, recGhost,
+    sleep: (sleepMap && sleepMap[dateStr]) || 0,
     total: fatTotal, over: fatTotal > 100, empty: fatTotal === 0 && recSolid.length + recGhost.length === 0,
     list,
   };
@@ -93,14 +95,18 @@ function shrink(solidArr, ghostArr, ratio) {
   const s = Math.min(solidN, totalN);
   return { seq: sampleSeq(solidArr, s).concat(sampleSeq(ghostArr, totalN - s)), done: s };
 }
+/* 縦の本＝「寝るまえの量」（疲労−回復。睡眠は寝る前なので含めない）の1列版。実量の1/10で10個満杯 */
 export function placeMain(day, geo) {
-  const { seq, done } = shrink(day.fatSolid, day.fatGhost, BOOK_RATIO);
-  return tube(seq, done, seedOf(day.dateStr) + 1, geo);
+  const netCount = Math.max(0, day.fatSolid.length - day.recSolid.length);
+  const n = netCount > 0 ? Math.max(1, Math.round(netCount / BOOK_RATIO)) : 0;
+  return tube(sampleSeq(day.fatSolid.slice(0, netCount), n), n, seedOf(day.dateStr) + 1, geo);
 }
+/* 横「疲労と回復」＝疲労列:記録した疲労の1/10／回復列:記録した回復の1/10（睡眠🌙含む） */
 export function placeSplit(day, geo) {
   const half = { x0: 8, jx: 7, pitch: geo.pitch, rot: geo.rot, y0: geo.y0 };
   const f = shrink(day.fatSolid, day.fatGhost, BOOK_RATIO);
-  const rcv = shrink(day.recSolid, day.recGhost, BOOK_RATIO);
+  const recAll = day.recSolid.concat(Array(day.sleep || 0).fill('🌙'));
+  const rcv = shrink(recAll, day.recGhost, BOOK_RATIO);
   const fh = tube(f.seq, f.done, seedOf(day.dateStr) + 3, half);
   const rh = tube(rcv.seq, rcv.done, seedOf(day.dateStr) + 5, half);
   rh.solid.forEach((p) => { p.x += 34; }); rh.ghost.forEach((p) => { p.x += 34; });
@@ -135,7 +141,7 @@ export function mkChart(counts, names) {
 
 /* glyph → 表示名（行動名）の対応表を entries から作る */
 export function nameMap(entries) {
-  const m = {};
+  const m = { '🌙': '睡眠' };
   entries.forEach((e) => { const g = entryGlyph(e); if (!m[g]) m[g] = e.act || e.title || 'その他'; });
   return m;
 }
@@ -161,19 +167,21 @@ export function daySlots(day, slotHours) {
 export function dayChart(day, names) {
   const counts = {};
   [day.fatSolid, day.fatGhost, day.recSolid, day.recGhost].forEach((arr) => arr.forEach((g) => { counts[g] = (counts[g] || 0) + 1; }));
+  if (day.sleep) counts['🌙'] = (counts['🌙'] || 0) + day.sleep;
   return mkChart(counts, names);
 }
 
 /* 月まとめ（TOP5×2・円グラフ・表紙の山） */
-export function buildMonth(entries, year, month, names) {
+export function buildMonth(entries, year, month, names, sleepMap) {
   const last = new Date(year, month, 0).getDate();
   const days = [];
-  for (let i = 1; i <= last; i++) days.push(buildDay(entries, year + '-' + pad2(month) + '-' + pad2(i)));
+  for (let i = 1; i <= last; i++) days.push(buildDay(entries, year + '-' + pad2(month) + '-' + pad2(i), sleepMap));
   const fatC = {}, recC = {}, solidE = [], ghostE = [];
   days.forEach((d) => {
     d.fatSolid.forEach((g) => { fatC[g] = (fatC[g] || 0) + 1; solidE.push(g); });
     d.fatGhost.forEach((g) => ghostE.push(g));
     d.recSolid.forEach((g) => { recC[g] = (recC[g] || 0) + 1; });
+    if (d.sleep) recC['🌙'] = (recC['🌙'] || 0) + d.sleep;
   });
   const top = (o, color) => Object.entries(o).map(([e, n]) => ({ e, n, name: names[e] || 'その他' }))
     .sort((a, b) => b.n - a.n).slice(0, 5).map((r, i) => ({ ...r, rank: i + 1, color }));

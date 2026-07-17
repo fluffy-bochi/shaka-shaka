@@ -2431,7 +2431,7 @@ export default class App extends React.Component {
       navBookFill: st.screen === 'bookshelf' ? 1 : 0,
       goBookshelf: this.goBookshelf,
       goBookDay: (dateStr) => this.set({ screen: 'home', homeDate: dateStr, dayOffset: 0 }),
-      bookEntries: st.entries, bookSlotHours: st.slotHours,
+      bookEntries: st.entries, bookSlotHours: st.slotHours, bookCollected: st.collected,
       bookFav: st.bookFav || {}, bookDiary: st.bookDiary || {},
       setBookFav: this.setBookFav, setBookDiary: this.setBookDiary,
       navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
