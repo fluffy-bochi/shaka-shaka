@@ -156,7 +156,8 @@ export default function Bookshelf({ v }) {
   const [sort, setSort] = useState('date');        // 'date' | 'more' | 'less'
   const [flood, setFlood] = useState('all');       // 'all' | 'over' | 'ok'
   const [favFilter, setFavFilter] = useState(false);
-  const [disp, setDisp] = useState('both');        // 'both' | 'net'（横・日別）
+  const [disp, setDisp] = useState('net');         // 横・日別: 'net'=寝るまえの量(基本) | 'both'=疲労と回復
+  const [pageOpen, setPageOpen] = useState(true);  // 横: 右の「その日」ページの開閉
   const [selKey, setSelKey] = useState(today);
   const [selMonYm, setSelMonYm] = useState(today.slice(0, 7));
   const [sheet, setSheet] = useState(false);
@@ -319,11 +320,13 @@ export default function Bookshelf({ v }) {
   const FavFilter = ({ round }) => (
     <div onClick={() => setFavFilter((s) => !s)} style={{ cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: MONO, fontSize: 10, fontWeight: 700, border: '1px solid ' + (favFilter ? '#ff5fa2' : '#e3e0d5'), background: favFilter ? '#ff5fa2' : '#fff', color: favFilter ? '#fff' : '#8a8a82', borderRadius: round ? 999 : 8, padding: '4px 9px', userSelect: 'none' }}>付箋の日</div>
   );
-  const DispPill = () => (
-    <div style={{ display: 'flex', gap: 4, flex: '0 0 auto' }}>
-      {[['both', '疲労と回復'], ['net', '寝るまえの量']].map(([k, lb]) => (
-        <div key={k} onClick={() => setDisp(k)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', fontFamily: MONO, fontSize: 10, fontWeight: 700, border: '1px solid #e3e0d5', borderRadius: 999, padding: '4px 8px', background: disp === k ? '#1b1b18' : '#fff', color: disp === k ? '#fff' : '#55554e' }}>{lb}</div>
-      ))}
+  /* 寝るまえの量（基本）⇄ 疲労と回復 のスイッチ */
+  const DispSwitch = () => (
+    <div onClick={() => setDisp(disp === 'net' ? 'both' : 'net')} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none', flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+      <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: disp === 'both' ? '#1b1b18' : '#8a8a82' }}>疲労と回復</span>
+      <span style={{ width: 34, height: 20, borderRadius: 999, background: disp === 'both' ? '#c4f000' : '#e4e1d8', position: 'relative', flex: '0 0 auto', transition: 'background .15s' }}>
+        <span style={{ position: 'absolute', top: 2, left: disp === 'both' ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)', transition: 'left .15s' }} />
+      </span>
     </div>
   );
 
@@ -504,16 +507,14 @@ export default function Bookshelf({ v }) {
 
       {/* 中央: 棚 */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px 0', flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 1 auto', overflow: 'hidden', textOverflow: 'ellipsis' }}>がんばりの本棚</div>
-          <Segment /><TodayBtn /><RotateBtn />
-          {!isMonth && <DispPill />}
-        </div>
-        {!isMonth && (
-          <div className="nos" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 22px 0', overflowX: 'auto' }}>
-            <MonthSel /><FloodSel /><SortSel /><FavFilter round={false} />
+        {/* コントロールは1行に収める（あふれたら横スクロール） */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px 0' }}>
+          <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 0 auto' }}>がんばりの本棚</div>
+          <div className="nos" style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, overflowX: 'auto' }}>
+            <Segment /><TodayBtn /><RotateBtn />
+            {!isMonth && <><DispSwitch /><MonthSel /><FloodSel /><SortSel /><FavFilter round={false} /></>}
           </div>
-        )}
+        </div>
         {!isMonth ? (
           <div ref={landRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'flex-end', gap: 11, height: '100%', padding: '0 40px' }}>
@@ -531,14 +532,16 @@ export default function Bookshelf({ v }) {
         )}
       </div>
 
-      {/* 右: 本のページ */}
-      <div style={{ position: 'relative', flex: '0 0 clamp(200px, 38%, 300px)', display: 'flex', flexDirection: 'column', padding: '22px 12px 14px 4px' }}>
-        <div style={{ position: 'relative', flex: 1, minHeight: 0, background: '#fffdf8', border: '1px solid #e7e2d3', borderRadius: '10px 16px 16px 10px', boxShadow: '3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 16px 34px rgba(27,27,24,.18)', display: 'flex', flexDirection: 'column' }}>
+      {/* 右: 本のページ（タブで右へスライド収納できる） */}
+      <div style={{ position: 'relative', flex: pageOpen ? '0 0 clamp(226px, 40%, 326px)' : '0 0 26px', transition: 'flex-basis .3s cubic-bezier(.2,.8,.3,1)', minWidth: 0 }}>
+        {/* タブ（開閉ボタン・常に見える） */}
+        <button onClick={() => setPageOpen((o) => !o)} style={{ position: 'absolute', left: 0, top: 26, width: 26, height: 66, background: '#fff', border: 'none', borderRadius: '10px 0 0 10px', boxShadow: '-6px 4px 12px rgba(27,27,24,.12)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer', zIndex: 2, padding: 0 }}>
+          <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 18, color: '#1b1b18' }}>menu_book</span>
+          <span style={{ writingMode: 'vertical-rl', fontSize: 9, fontWeight: 700, color: '#55554e', letterSpacing: '.1em' }}>{isMonth ? 'その月' : 'その日'}</span>
+        </button>
+        {/* ページ本体（閉じると右へスライドして消える） */}
+        <div style={{ position: 'absolute', top: 22, bottom: 14, right: 12, width: 'min(288px, calc(40dvw - 38px))', transform: pageOpen ? 'none' : 'translateX(130%)', transition: 'transform .3s cubic-bezier(.2,.8,.3,1)', background: '#fffdf8', border: '1px solid #e7e2d3', borderRadius: '10px 16px 16px 10px', boxShadow: '3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 16px 34px rgba(27,27,24,.18)', display: 'flex', flexDirection: 'column' }}>
           {!isMonth && fusen(selDay)}
-          <div style={{ position: 'absolute', left: -26, top: 26, width: 26, height: 66, background: '#fff', borderRadius: '10px 0 0 10px', boxShadow: '-6px 4px 12px rgba(27,27,24,.12)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 18, color: '#1b1b18' }}>menu_book</span>
-            <span style={{ writingMode: 'vertical-rl', fontSize: 9, fontWeight: 700, color: '#55554e', letterSpacing: '.1em' }}>{isMonth ? 'その月' : 'その日'}</span>
-          </div>
           <NoteBody {...noteProps} />
           <div style={{ flex: '0 0 auto', padding: '12px 20px', borderTop: '1px solid #f1efe8' }}><div onClick={goDay} style={{ cursor: 'pointer', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 12, padding: 10 }}>{footLabel}</div></div>
         </div>
