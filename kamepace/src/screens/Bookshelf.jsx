@@ -104,7 +104,7 @@ function NoteBody({ isMonth, day, month, names, slotHours, diary, onDiary, footL
         <div style={{ fontFamily: MONO, fontSize: 10, color: '#9d9b91', marginTop: 2 }}>この月のまとめ</div>
       </div>
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 14px' }}>
-        <Ranking title="疲労ランキング TOP5" rows={month.fatTop} />
+        <Ranking title="頑張りランキング TOP5" rows={month.fatTop} />
         <Ranking title="回復ランキング TOP5" rows={month.recTop} />
         <div style={{ fontSize: 11, fontWeight: 700, color: '#55554e', margin: '14px 0 8px' }}>絵文字のかず</div>
         <Chart chart={month.chart} />
@@ -167,10 +167,21 @@ export default function Bookshelf({ v }) {
       <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 15, color: '#55554e' }}>screen_rotation</span>
     </div>
   );
-  // 横向きのときは端末フレームごと横長スマホの形にする（ポップアップ・暗幕なし・その場で使える）
+  // 横向きのときは端末フレームごと横長スマホの形にし、画面に収まる最大サイズへ拡大（ポップアップ・暗幕なし）
   useEffect(() => {
+    const root = document.documentElement;
+    const apply = () => {
+      // 横スマホ（枠込み約834×432）を画面いっぱいまで拡大（縮小はしない）
+      const s = Math.max(1, Math.min(window.innerWidth * 0.96 / 834, window.innerHeight * 0.94 / 432));
+      root.style.setProperty('--book-land-scale', s.toFixed(3));
+    };
     document.body.classList.toggle('kame-book-land', land);
-    return () => document.body.classList.remove('kame-book-land');
+    if (land) { apply(); window.addEventListener('resize', apply); }
+    return () => {
+      document.body.classList.remove('kame-book-land');
+      window.removeEventListener('resize', apply);
+      root.style.removeProperty('--book-land-scale');
+    };
   }, [land]);
 
   const names = useMemo(() => nameMap(entries), [entries]);
@@ -231,8 +242,10 @@ export default function Bookshelf({ v }) {
     if (!el) return false;
     const t = el.querySelector('[data-today="1"]');
     if (!t) return false;
+    // 横向きは .phone に transform: scale がかかるため、画面px差を拡大率で content px に戻す
+    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--book-land-scale')) || 1;
     const r = t.getBoundingClientRect(), sr = el.getBoundingClientRect();
-    el.scrollLeft += (r.left + r.width / 2 - sr.left) - sr.width / 2;
+    el.scrollLeft += ((r.left + r.width / 2 - sr.left) - sr.width / 2) / scale;
     return true;
   };
   const scrollPortToToday = (el) => {
@@ -256,6 +269,8 @@ export default function Bookshelf({ v }) {
 
   const selectDay = (d) => { setSelKey(d.dateStr); if (!land) setSheet(true); };
   const selectMonth = (mo) => { setSelMonYm(mo.ym); if (!land) setSheet(true); };
+  // 「この日を見る／この月を見る」→ ホームでその日を開く
+  const goDay = () => v.goBookDay(isMonth ? selMonYm + '-01' : selKey);
 
   /* ---------- パーツ描画 ---------- */
   const monthOptions = months.map((ym) => {
@@ -434,7 +449,7 @@ export default function Bookshelf({ v }) {
             {!isMonth && selDay.today && <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: '#2f3a00', background: '#eef7cc', borderRadius: 6, padding: '2px 6px' }}>今日</span>}
             {isMonth && selMonth.cur && <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: '#2f3a00', background: '#eef7cc', borderRadius: 6, padding: '2px 6px' }}>今月</span>}
             <span style={{ flex: 1 }} />
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 999, padding: '8px 14px' }}>{footLabel}</div>
+            <div onClick={(e) => { e.stopPropagation(); goDay(); }} style={{ cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 999, padding: '8px 14px' }}>{footLabel}</div>
           </div>
         </div>
 
@@ -450,7 +465,7 @@ export default function Bookshelf({ v }) {
             {!isMonth && fusen(selDay)}
             <div style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'center', padding: '8px 0 0' }}><div style={{ width: 40, height: 4, borderRadius: 999, background: '#e3dfd2' }} /></div>
             <NoteBody {...noteProps} />
-            <div style={{ flex: '0 0 auto', padding: '10px 20px', borderTop: '1px solid #f1efe8' }}><div style={{ textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#1b1b18', background: '#f7f4ec', borderRadius: 12, padding: 9 }}>{footLabel}</div></div>
+            <div style={{ flex: '0 0 auto', padding: '10px 20px', borderTop: '1px solid #f1efe8' }}><div onClick={goDay} style={{ cursor: 'pointer', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 12, padding: 9 }}>{footLabel}</div></div>
           </div>
         </>)}
       </div>
@@ -508,7 +523,7 @@ export default function Bookshelf({ v }) {
             <span style={{ writingMode: 'vertical-rl', fontSize: 9, fontWeight: 700, color: '#55554e', letterSpacing: '.1em' }}>{isMonth ? 'その月' : 'その日'}</span>
           </div>
           <NoteBody {...noteProps} />
-          <div style={{ flex: '0 0 auto', padding: '12px 20px', borderTop: '1px solid #f1efe8' }}><div style={{ textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#1b1b18', background: '#f7f4ec', borderRadius: 12, padding: 10 }}>{footLabel}</div></div>
+          <div style={{ flex: '0 0 auto', padding: '12px 20px', borderTop: '1px solid #f1efe8' }}><div onClick={goDay} style={{ cursor: 'pointer', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 12, padding: 10 }}>{footLabel}</div></div>
         </div>
       </div>
     </div>

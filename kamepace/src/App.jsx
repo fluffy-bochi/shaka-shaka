@@ -2422,6 +2422,7 @@ export default class App extends React.Component {
       navBookColor: st.screen === 'bookshelf' ? '#1b1b18' : '#8a8a82',
       navBookFill: st.screen === 'bookshelf' ? 1 : 0,
       goBookshelf: this.goBookshelf,
+      goBookDay: (dateStr) => this.set({ screen: 'home', homeDate: dateStr, dayOffset: 0 }),
       bookEntries: st.entries, bookSlotHours: st.slotHours,
       bookFav: st.bookFav || {}, bookDiary: st.bookDiary || {},
       setBookFav: this.setBookFav, setBookDiary: this.setBookDiary,
