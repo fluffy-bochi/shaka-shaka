@@ -125,13 +125,20 @@ export function placeNet(day) {
   }));
 }
 
-/* 円グラフ（絵文字のかず）。counts: {glyph:個数} */
-export function mkChart(counts, names) {
+/* 円グラフ（絵文字のかず）。counts: {glyph:個数}、kinds: {glyph:'rec'|'fat'}。
+   疲労系＝ピンクの濃淡・回復系＝緑の濃淡で塗り分ける */
+const PINKS = ['#ff5fa2', '#ff8fbe', '#d94b8a', '#ffb3d1', '#b83b70', '#ffd1e2', '#a03062', '#ff9fc8'];
+const GREENS = ['#7a9a00', '#a4c520', '#5a7500', '#c4f000', '#8fb840', '#3f5300', '#d9ec9a', '#b5d660'];
+export function mkChart(counts, names, kinds) {
   const sorted = Object.entries(counts).map(([e, n]) => ({ e, n })).sort((a, b) => b.n - a.n);
   const total = sorted.reduce((s, i) => s + i.n, 0) || 1;
-  let acc = 0; const stops = [];
-  const items = sorted.map((it, i) => {
-    const color = PALETTE[i % PALETTE.length];
+  // 疲労を先に・回復を後にまとめて並べる（円グラフでピンク→緑の順に見える）
+  const fat = sorted.filter((it) => !(kinds && kinds[it.e] === 'rec'));
+  const rec = sorted.filter((it) => kinds && kinds[it.e] === 'rec');
+  let acc = 0; const stops = []; let fi = 0; let ri = 0;
+  const items = fat.concat(rec).map((it) => {
+    const isRec = kinds && kinds[it.e] === 'rec';
+    const color = isRec ? GREENS[ri++ % GREENS.length] : PINKS[fi++ % PINKS.length];
     const from = acc / total * 360; acc += it.n;
     stops.push(color + ' ' + from.toFixed(1) + 'deg ' + (acc / total * 360).toFixed(1) + 'deg');
     return { e: it.e, n: it.n, name: names[it.e] || 'その他', color };
@@ -165,10 +172,11 @@ export function daySlots(day, slotHours) {
 
 /* その日の円グラフ（疲労＋回復のすべての絵文字を個数で集計） */
 export function dayChart(day, names) {
-  const counts = {};
-  [day.fatSolid, day.fatGhost, day.recSolid, day.recGhost].forEach((arr) => arr.forEach((g) => { counts[g] = (counts[g] || 0) + 1; }));
-  if (day.sleep) counts['🌙'] = (counts['🌙'] || 0) + day.sleep;
-  return mkChart(counts, names);
+  const counts = {}; const kinds = {};
+  [day.fatSolid, day.fatGhost].forEach((arr) => arr.forEach((g) => { counts[g] = (counts[g] || 0) + 1; kinds[g] = 'fat'; }));
+  [day.recSolid, day.recGhost].forEach((arr) => arr.forEach((g) => { counts[g] = (counts[g] || 0) + 1; kinds[g] = 'rec'; }));
+  if (day.sleep) { counts['🌙'] = (counts['🌙'] || 0) + day.sleep; kinds['🌙'] = 'rec'; }
+  return mkChart(counts, names, kinds);
 }
 
 /* 月まとめ（TOP5×2・円グラフ・表紙の山） */
@@ -185,6 +193,9 @@ export function buildMonth(entries, year, month, names, sleepMap) {
   });
   const top = (o, color) => Object.entries(o).map(([e, n]) => ({ e, n, name: names[e] || 'その他' }))
     .sort((a, b) => b.n - a.n).slice(0, 5).map((r, i) => ({ ...r, rank: i + 1, color }));
+  const kinds = {};
+  Object.keys(fatC).forEach((g) => { kinds[g] = 'fat'; });
+  Object.keys(recC).forEach((g) => { kinds[g] = 'rec'; });
   const r = rng(seedOf(year + '-' + month) + 5);
   const pos = (k) => { const row = Math.floor(k / 11), col = k % 11; return { x: Math.round(7 + col * 14 + (r() - 0.5) * 4), bottom: Math.round(6 + row * 12 + (r() - 0.5) * 2), rot: Math.round((r() - 0.5) * 14) }; };
   const pile = solidE.slice(0, 230).map((e, i) => ({ e, ...pos(i) }));
@@ -192,7 +203,7 @@ export function buildMonth(entries, year, month, names, sleepMap) {
   return {
     year, month, ym: year + '-' + pad2(month), label: month + '月',
     fatTop: top(fatC), recTop: top(recC),
-    chart: mkChart({ ...fatC, ...recC }, names),
+    chart: mkChart({ ...fatC, ...recC }, names, kinds),
     pile, pileG,
   };
 }
