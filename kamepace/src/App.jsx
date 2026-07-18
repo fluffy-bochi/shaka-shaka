@@ -1044,10 +1044,9 @@ export default class App extends React.Component {
   // 100個で画面全体を埋めるサイズ。100を超えたら縮小して画面に収める（あふれ対策）
   calcR(w, h, count) {
     const area = Math.max(1, w) * Math.max(1, h);
-    // 100個でその画面がちょうど満杯（上端まで）になる大きさ。画面の実寸(area)から計算するので機種で自動調整
-    let r = Math.sqrt(area * 0.8 / (100 * Math.PI));
-    const n = count || 100;
-    if (n > 100) r *= Math.sqrt(100 / n);
+    // 100個でその画面がちょうど満杯（上端まで）になる大きさ。画面の実寸(area)から計算するので機種で自動調整。
+    // 100を超えても縮小せず同じ大きさのまま画面の外（上）に積み上げる
+    const r = Math.sqrt(area * 0.8 / (100 * Math.PI));
     return Math.max(8, Math.min(r, 60));
   }
   /* 今この画面で積む絵文字の数（シャカ・ホーム・睡眠で共通） */
