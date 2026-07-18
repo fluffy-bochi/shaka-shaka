@@ -9,17 +9,19 @@ import {
 } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, doc, getDoc, setDoc,
+  collection, query, where, getDocs, Timestamp,
 } from 'firebase/firestore';
 import { serialize } from './model';
 
+/* カレンダーアプリ(my-schedule-app)と同じFirebaseプロジェクトに統合（2026-07-15合意の引っ越し）。
+   同じアカウント(uid)でログインでき、カレンダーの予定・タスクをFirestoreから直接読める */
 const firebaseConfig = {
-  apiKey: 'AIzaSyDY69_fbIy9rcWUSj6tLc5kMq6bb3nlYzI',
-  authDomain: 'do-our-best-in-moderation-tool.firebaseapp.com',
-  projectId: 'do-our-best-in-moderation-tool',
-  storageBucket: 'do-our-best-in-moderation-tool.firebasestorage.app',
-  messagingSenderId: '323614318907',
-  appId: '1:323614318907:web:5ee2ead7150a7d3743d71e',
-  measurementId: 'G-J0ETSC15KT',
+  apiKey: 'AIzaSyBiyucoP28Cou_Aqqqxz2qnSXU1mcConLA',
+  authDomain: 'studio-9921986470-57994.firebaseapp.com',
+  projectId: 'studio-9921986470-57994',
+  storageBucket: 'studio-9921986470-57994.firebasestorage.app',
+  messagingSenderId: '446667309305',
+  appId: '1:446667309305:web:8c126317232039788ea228',
 };
 
 const app = initializeApp(firebaseConfig);
@@ -58,8 +60,10 @@ export async function loginEmail(email, pass) { await signInWithEmailAndPassword
 export async function signupEmail(email, pass) { await createUserWithEmailAndPassword(auth, email, pass); }
 export async function logout() { googleAccessToken = null; await fbSignOut(auth); }
 
-/* ---- Firestore sync ---- */
-function userDoc() { return doc(db, 'users', auth.currentUser.uid); }
+/* ---- Firestore sync ----
+   カレンダーアプリは users/{uid}/ 配下のサブコレクション(events, projectTasks, dailyData…)を使うので、
+   かめペースのデータは users/{uid}/apps/kamepace に置いて衝突を避ける */
+function userDoc() { return doc(db, 'users', auth.currentUser.uid, 'apps', 'kamepace'); }
 let saveTimer = null;
 export function cloudSave(st) {
   if (!auth.currentUser) return;
@@ -74,6 +78,49 @@ export async function loadUserData() {
   const snap = await getDoc(userDoc());
   return snap.exists() ? snap.data() : null;
 }
+
+/* ---- カレンダーアプリ(my-schedule-app)からの取り込み ----
+   同じFirebaseプロジェクトなので、Firestoreの users/{uid}/events を直接読む。
+   取り込んだ予定は既存の importEvents 経由で「予定」になり、終了時刻で自動記録される */
+const tsToDate = (v) => (v && typeof v.toDate === 'function') ? v.toDate() : (v ? new Date(v) : null);
+export async function fetchScheduleEvents(dayCount = 2) {
+  if (!auth.currentUser) return [];
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const end = new Date(start); end.setDate(end.getDate() + dayCount); // 今日+明日
+  const col = collection(db, 'users', auth.currentUser.uid, 'events');
+  const q = query(col, where('start', '>=', Timestamp.fromDate(start)), where('start', '<', Timestamp.fromDate(end)));
+  const snap = await getDocs(q);
+  const out = [];
+  snap.forEach((d) => {
+    const ev = d.data();
+    const s = tsToDate(ev.start), e = tsToDate(ev.end) || s;
+    if (!s) return;
+    // 睡眠ブロック・時報・予測は取り込まない（記録の対象にならないもの）
+    if (ev.blockType === 'sleep' || ev.blockType === 'chime' || ev.isPredicted) return;
+    out.push({
+      srcId: 'sched:' + d.id,
+      title: ev.title || '(無題の予定)',
+      date: ymd(s),
+      from: hm(s),
+      to: hm(e),
+    });
+  });
+  out.sort((a, b) => (a.date + a.from).localeCompare(b.date + b.from));
+  return out;
+}
+
+/* 検証用: カレンダーアプリ形式の予定を1件書き込む（自分のuid配下のみ） */
+export async function _seedScheduleEvent(title, startMs, endMs) {
+  if (!auth.currentUser) throw new Error('not-signed-in');
+  const id = 'kame-test-' + Date.now();
+  await setDoc(doc(db, 'users', auth.currentUser.uid, 'events', id), {
+    title, start: Timestamp.fromMillis(startMs), end: Timestamp.fromMillis(endMs), category: 'Other',
+  });
+  return id;
+}
+
+// 検証用フック（読み書きは自分のuid配下のみ）
+if (typeof window !== 'undefined') window.__kameFb = { _seedScheduleEvent, loadUserData, fetchScheduleEvents };
 
 /* ---- Google Calendar / Tasks import ---- */
 function pad2m(n) { return String(n).padStart(2, '0'); }
