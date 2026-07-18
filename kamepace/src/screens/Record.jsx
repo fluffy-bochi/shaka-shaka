@@ -304,14 +304,22 @@ function Confirm({ v }) {
             ))}
           </div>
           {v.allocSegs.map((s, si) => (
-            <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 2px 9px', borderBottom: '1px solid #f1efe8' }}>
+            <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 2px 9px', borderBottom: '1px solid #f1efe8' }}>
               <span style={{ width: 11, height: 11, borderRadius: 3, background: s.color, flex: '0 0 auto' }} />
               <span style={{ fontSize: 13.5, flex: 1, minWidth: 0 }}>{s.name}</span>
-              <MinEdit text={s.minText} raw={s.rawMin} onSet={s.onSetMin} style={{ ...mono, fontSize: 12, fontWeight: 700, background: '#efece3', borderRadius: 8, padding: '4px 9px' }} />
-              <span style={{ ...mono, fontSize: 12, fontWeight: 700, color: '#f5994e', width: 34, textAlign: 'right' }}>{s.fatText}</span>
+              {s.timeMode ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flex: '0 0 auto' }}>
+                  <input type="time" value={s.fromHm} onChange={(e) => e.target.value && s.onSetFrom(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '4px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
+                  <span style={{ color: '#8a8a82', fontSize: 12 }}>→</span>
+                  <input type="time" value={s.toHm} onChange={(e) => e.target.value && s.onSetTo(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '4px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
+                </span>
+              ) : (
+                <MinEdit text={s.minText} raw={s.rawMin} onSet={s.onSetMin} style={{ ...mono, fontSize: 12, fontWeight: 700, background: '#efece3', borderRadius: 8, padding: '4px 9px' }} />
+              )}
+              <span style={{ ...mono, fontSize: 12, fontWeight: 700, color: '#f5994e', width: 30, textAlign: 'right', flex: '0 0 auto' }}>{s.fatText}</span>
             </div>
           ))}
-          <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 8 }}>つまみを左右にドラッグで配分を変更（1分単位）。強度チップで体感を調整</div>
+          <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 8 }}>{v.confirmIsTime ? '各行の開始→終了の時刻で調整。つまみドラッグでも配分できます' : 'つまみを左右にドラッグで配分を変更（1分単位）。強度チップで体感を調整'}</div>
         </div>
       </div>
       {v.tplOpen && (

@@ -701,6 +701,37 @@ export default class App extends React.Component {
     if (timeMode && this.state.startTime) patch.endTime = this.addHm(this.state.startTime, newTotal);
     this.set(patch);
   };
+  /* 時刻モードで各行の開始/終了時刻を編集する。行は startTime から連続して並ぶ想定。
+     which='to': この行の終了時刻＝hm（＝この行の長さが決まり、以降の行はそのぶんずれる）
+     which=null(from): この行の開始時刻＝hm（＝前の行の終了、なければ全体のstartTime） */
+  setRowTime = (idx, hm, which) => {
+    const items = this.state.searchCart;
+    const n = items.length;
+    if (!n || idx < 0 || idx >= n || !hm) return;
+    const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(1 / n);
+    const total = this.timeSpanMin();
+    const mins = fr.map(f => Math.max(1, Math.round(f * total)));
+    const start = this.hmToTs(this.state.startTime);
+    // 各行の開始tsを求める
+    const starts = []; let cur = start;
+    for (let i = 0; i < n; i++) { starts[i] = cur; cur += mins[i] * 60000; }
+    let target = this.hmToTs(hm);
+    if (which === 'to') {
+      // 終了時刻。日をまたいで手前になったら+24h補正
+      while (target <= starts[idx]) target += 24 * 3600000;
+      mins[idx] = Math.max(1, Math.round((target - starts[idx]) / 60000));
+    } else {
+      // 開始時刻。前の行の終了を動かす（idx=0 は全体の開始）
+      if (idx === 0) {
+        this.set({ startTime: hm });
+        return;
+      }
+      while (target <= starts[idx - 1]) target += 24 * 3600000;
+      mins[idx - 1] = Math.max(1, Math.round((target - starts[idx - 1]) / 60000));
+    }
+    const newTotal = mins.reduce((a, b) => a + b, 0);
+    this.set({ searchTotalMin: newTotal, searchFracs: mins.map(x => x / newTotal), endTime: this.addHm(this.state.startTime, newTotal) });
+  };
   onFracDrag = (k) => (e) => {
     if (e.type === 'pointermove' && e.buttons === 0) return;
     const rect = e.currentTarget.parentElement.getBoundingClientRect();
@@ -2467,13 +2498,18 @@ export default class App extends React.Component {
     let segCursor = timeMode ? this.hmToTs(st.startTime) : 0;
     const allocSegs = scItems.map((it, idx) => {
       const fat = Math.round(this.effFh(it) * (mins[idx] / 60));
-      let timeText = '';
-      if (timeMode) { const f = segCursor, t = f + mins[idx] * 60000; timeText = this.tsToHm(f) + '–' + this.tsToHm(t); segCursor = t; }
+      let timeText = '', fromHm = '', toHm = '';
+      if (timeMode) { const f = segCursor, t = f + mins[idx] * 60000; fromHm = this.tsToHm(f); toHm = this.tsToHm(t); timeText = fromHm + '–' + toHm; segCursor = t; }
       return {
         color: scPalette[idx % scPalette.length], widthPct: (fr0[idx] * 100) + '%', name: it.name,
         minText: timeMode ? timeText : this.fmtMin(mins[idx]), fatText: (fat >= 0 ? '+' + fat : '' + fat),
         rawMin: mins[idx],
-        onSetMin: (m) => this.setRowMin(idx, m), // 時間モードでも各行の数字を手動編集できる
+        // 分入力（時間割り。時刻モードでも数値で微調整はできる）
+        onSetMin: (m) => this.setRowMin(idx, m),
+        // 時刻モード: 各行を「開始→終了の時刻」で編集
+        timeMode, fromHm, toHm,
+        onSetFrom: (hm) => this.setRowTime(idx, hm, null),
+        onSetTo: (hm) => this.setRowTime(idx, hm, 'to'),
       };
     });
     const allocHandles = [];
@@ -2733,7 +2769,7 @@ export default class App extends React.Component {
       moreData, moreFilters, closeMore: this.closeMore,
       searchCartRows, searchCount: scCount, searchTotalText: this.fmtMin(totalMin),
       searchTotalMinRaw: totalMin, setTotalMin: this.setTotalMin,
-      allocSegs, allocHandles,
+      allocSegs, allocHandles, confirmIsTime: timeMode,
       confirmMode: st.confirmMode, isTimeMode: timeMode, isDurationMode: !timeMode,
       setDurationMode: () => this.setConfirmMode('duration'), setTimeMode: () => this.setConfirmMode('time'),
       durTabBg: timeMode ? '#fff' : '#1b1b18', durTabColor: timeMode ? '#8a8a82' : '#fff',
