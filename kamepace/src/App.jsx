@@ -2180,15 +2180,20 @@ export default class App extends React.Component {
   };
 
   /* ---------- collected (ためた回復) tall scroll world ---------- */
+  /* ためた回復＝「今日」ぶんだけ（今日消した疲労＋今日の回復）。過去分はデータには残すが表示しない */
+  collectedToday() {
+    const t = todayStr();
+    return (this.state.collected || []).filter(c => c.ts && dateToStr(new Date(c.ts)) === t);
+  }
   collectedGlyphs() {
     const g = [];
-    (this.state.collected || []).forEach(c => {
+    this.collectedToday().forEach(c => {
       const glyph = c.glyph || ACT_EMOJI[c.act] || '✨';
       for (let i = 0; i < (c.amount || 0); i++) g.push(glyph);
     });
     return g;
   }
-  collectedTotal() { return (this.state.collected || []).reduce((a, c) => a + (c.amount || 0), 0); }
+  collectedTotal() { return this.collectedToday().reduce((a, c) => a + (c.amount || 0), 0); }
   goCollect = () => {
     this.set({ screen: 'collect' });
     requestAnimationFrame(() => {
