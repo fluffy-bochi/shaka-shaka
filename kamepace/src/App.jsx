@@ -1043,8 +1043,8 @@ export default class App extends React.Component {
   // 100個で画面全体を埋めるサイズ。100を超えたら縮小して画面に収める（あふれ対策）
   calcR(w, h, count) {
     const area = Math.max(1, w) * Math.max(1, h);
-    // 100個で画面がほぼ満杯になる大きさ（絵文字は透明余白があるので係数は高め）
-    let r = Math.sqrt(area * 0.95 / (100 * Math.PI));
+    // 100個でその画面がちょうど満杯（上端まで）になる大きさ。画面の実寸(area)から計算するので機種で自動調整
+    let r = Math.sqrt(area * 0.8 / (100 * Math.PI));
     const n = count || 100;
     if (n > 100) r *= Math.sqrt(100 / n);
     return Math.max(8, Math.min(r, 60));
