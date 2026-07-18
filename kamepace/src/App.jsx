@@ -16,7 +16,7 @@ import {
 } from './model';
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout,
-  cloudSave, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, completeScheduleTask, jpError,
+  cloudSave, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
 } from './firebase';
 import { initShakaSound, attachCollisionSound } from './sound';
 import { appendGlyph } from './fluent';
@@ -2176,16 +2176,19 @@ export default class App extends React.Component {
   async syncScheduleApp() {
     if (!this.state.user) return;
     try {
-      const [items, taskItems] = await Promise.all([
+      const [items, projTasks, dailyTasks] = await Promise.all([
         fetchScheduleEvents().catch(() => []),
         fetchScheduleTasks().catch(() => []),
+        fetchDailyTasks().catch(() => []),
       ]);
       const nEv = items.length ? this.importEvents(items) : 0;
-      // 今日の対象から外れた未完了の取り込みタスク（前日の期限切れ等）は掃除する
+      const taskItems = [...projTasks, ...dailyTasks];
+      // mylifecore側で消えた/対象外になった取り込みタスクは掃除する（今日以降のみ・かめ側で完了済みは残す）
       const validIds = new Set(taskItems.map(t => t.srcId));
       const t0 = todayStr();
+      const isSynced = (t) => /^(ptask|daily):/.test(String(t.srcId || ''));
       const pruned = (this.state.tasks || []).filter(t =>
-        t.done || !String(t.srcId || '').startsWith('ptask:') || t.date !== t0 || validIds.has(t.srcId));
+        t.done || !isSynced(t) || t.date < t0 || validIds.has(t.srcId));
       if (pruned.length !== (this.state.tasks || []).length) { this.set({ tasks: pruned }); this.save(); }
       const nTask = taskItems.length ? this.importTasks(taskItems) : 0;
       if (nEv + nTask > 0) {
@@ -2227,6 +2230,8 @@ export default class App extends React.Component {
     if (t && t.done && String(srcId).startsWith('ptask:')) {
       completeScheduleTask(String(srcId).slice(6)).catch(e => console.warn('[kamepace] task complete sync failed', e));
     }
+    const dm = t && t.done ? String(srcId).match(/^daily:(\d{4}-\d{2}-\d{2}):(.+)$/) : null;
+    if (dm) completeDailyTask(dm[1], dm[2]).catch(e => console.warn('[kamepace] daily task complete sync failed', e));
   };
 
   /* タスクの編集（名前・行動との紐づけ） */
@@ -2334,16 +2339,26 @@ export default class App extends React.Component {
   }
   importTasks(items) {
     if (!Array.isArray(items)) return 0;
-    const tasks = Array.isArray(this.state.tasks) ? [...this.state.tasks] : [];
-    const existing = new Set(tasks.map(t => t.srcId));
-    let added = 0;
+    let tasks = Array.isArray(this.state.tasks) ? [...this.state.tasks] : [];
+    const idx = new Map(tasks.map((t, i) => [t.srcId, i]));
+    let added = 0; let changed = false;
     items.forEach(it => {
-      if (!it || !it.srcId || existing.has(it.srcId)) return;
-      tasks.push({ srcId: it.srcId, title: it.title || '(無題)', done: false, date: todayStr() });
-      existing.add(it.srcId);
+      if (!it || !it.srcId) return;
+      const i = idx.get(it.srcId);
+      if (i != null) {
+        // 既存: mylifecore側で完了になっていたらこちらもチェック（タイトル変更も追従）
+        const t = tasks[i];
+        if ((it.done && !t.done) || (it.title && it.title !== t.title)) {
+          tasks[i] = { ...t, done: t.done || !!it.done, title: it.title || t.title };
+          changed = true;
+        }
+        return;
+      }
+      tasks.push({ srcId: it.srcId, title: it.title || '(無題)', done: !!it.done, date: it.date || todayStr() });
+      idx.set(it.srcId, tasks.length - 1);
       added++;
     });
-    if (added) { this.set({ tasks }); this.save(); }
+    if (added || changed) { this.set({ tasks }); this.save(); }
     return added;
   }
 

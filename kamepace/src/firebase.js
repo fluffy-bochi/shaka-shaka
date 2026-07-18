@@ -125,6 +125,38 @@ export async function fetchScheduleTasks() {
   return out;
 }
 
+/* mylifecore の「毎日のページ」タスク（dailyData/{yyyy-MM-dd}.tasks）を今日〜+7日ぶん読む。
+   mylifecore は Googleタスク・終日予定もここに取り込むので、それらも自動で入る */
+export async function fetchDailyTasks(days = 8) {
+  if (!auth.currentUser) return [];
+  const uid = auth.currentUser.uid;
+  const out = [];
+  const reads = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(); d.setDate(d.getDate() + i);
+    const key = ymd(d);
+    reads.push(getDoc(doc(db, 'users', uid, 'dailyData', key)).then((snap) => {
+      if (!snap.exists()) return;
+      (snap.data().tasks || []).forEach((t) => {
+        if (!t || !t.title) return;
+        out.push({ srcId: 'daily:' + key + ':' + (t.id || t.title), title: t.title, date: key, done: !!t.completed });
+      });
+    }).catch(() => { /* その日のdocが無い等は無視 */ }));
+  }
+  await Promise.all(reads);
+  return out;
+}
+
+/* かめペースでチェックしたら mylifecore の毎日ページ側も完了にする */
+export async function completeDailyTask(dateKey, taskId) {
+  if (!auth.currentUser) return;
+  const ref = doc(db, 'users', auth.currentUser.uid, 'dailyData', dateKey);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const tasks = (snap.data().tasks || []).map((t) => (t.id === taskId ? { ...t, completed: true } : t));
+  await setDoc(ref, { tasks }, { merge: true });
+}
+
 /* かめペースでチェックしたら mylifecore 側のタスクも完了にする */
 export async function completeScheduleTask(taskId) {
   if (!auth.currentUser) return;
@@ -152,8 +184,16 @@ export async function _seedScheduleTask(title, assignedDate) {
   return id;
 }
 
+/* 検証用: mylifecoreの毎日ページ形式のタスクを書き込む */
+export async function _seedDailyTasks(dateKey, titles, completedIdx = -1) {
+  if (!auth.currentUser) throw new Error('not-signed-in');
+  const tasks = titles.map((title, i) => ({ id: 'kame-test-' + Date.now() + '-' + i, title, completed: i === completedIdx, indent: 0, order: i }));
+  await setDoc(doc(db, 'users', auth.currentUser.uid, 'dailyData', dateKey), { tasks }, { merge: true });
+  return tasks.map(t => t.id);
+}
+
 // 検証用フック（読み書きは自分のuid配下のみ）
-if (typeof window !== 'undefined') window.__kameFb = { _seedScheduleEvent, _seedScheduleTask, loadUserData, fetchScheduleEvents, fetchScheduleTasks };
+if (typeof window !== 'undefined') window.__kameFb = { _seedScheduleEvent, _seedScheduleTask, _seedDailyTasks, loadUserData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks };
 
 /* ---- Google Calendar / Tasks import ---- */
 function pad2m(n) { return String(n).padStart(2, '0'); }
