@@ -1144,6 +1144,11 @@ export default class App extends React.Component {
         });
         return out;
       }
+      // 山全体が下端から浮いていたら（振った形の保存など）、形はそのままで下端に寄せて隙間を無くす
+      if (base.length) {
+        const minY = Math.min(...base.map(p => p.y));
+        if (minY > 0) base.forEach(p => { p.y -= minY; });
+      }
       return base;
     }
     const glyphs = this.pileGlyphs().slice(-160); // 上限は新しい側を残す
