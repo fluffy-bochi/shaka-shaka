@@ -196,10 +196,26 @@ export function buildMonth(entries, year, month, names, sleepMap) {
   const kinds = {};
   Object.keys(fatC).forEach((g) => { kinds[g] = 'fat'; });
   Object.keys(recC).forEach((g) => { kinds[g] = 'rec'; });
+  /* 表紙の山: 上限200個。表示数 = その月に記録した絵文字の総数（疲労＋回復・睡眠含む）÷ 月の日数。
+     絵文字の内訳は、その月の実際の割合に合わせて比例配分する */
+  const allC = { ...fatC };
+  Object.entries(recC).forEach(([g, n]) => { allC[g] = (allC[g] || 0) + n; });
+  const totalAll = Object.values(allC).reduce((a, b) => a + b, 0);
+  const showN = totalAll > 0 ? Math.min(200, Math.max(1, Math.round(totalAll / last))) : 0;
+  // 比例配分（端数は大きい順に配る）
+  const ent = Object.entries(allC).map(([g, n]) => { const exact = n / totalAll * showN; return { g, base: Math.floor(exact), fracPart: exact - Math.floor(exact) }; });
+  let used = ent.reduce((a, x) => a + x.base, 0);
+  ent.sort((a, b) => b.fracPart - a.fracPart);
+  for (let i = 0; used < showN && i < ent.length; i++, used++) ent[i].base += 1;
+  const seq = [];
+  ent.forEach((x) => { for (let i = 0; i < x.base; i++) seq.push(x.g); });
+  // 決定論的にシャッフルして混ぜる
   const r = rng(seedOf(year + '-' + month) + 5);
-  const pos = (k) => { const row = Math.floor(k / 11), col = k % 11; return { x: Math.round(7 + col * 14 + (r() - 0.5) * 4), bottom: Math.round(6 + row * 12 + (r() - 0.5) * 2), rot: Math.round((r() - 0.5) * 14) }; };
-  const pile = solidE.slice(0, 230).map((e, i) => ({ e, ...pos(i) }));
-  const pileG = ghostE.slice(0, Math.max(0, 230 - pile.length)).map((e, i) => ({ e, ...pos(pile.length + i) }));
+  for (let i = seq.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [seq[i], seq[j]] = [seq[j], seq[i]]; }
+  // 200個でちょうど表紙に収まるグリッド（13列×16段・絵文字約10px）
+  const pos = (k) => { const row = Math.floor(k / 13), col = k % 13; return { x: Math.round(5 + col * 11.4 + (r() - 0.5) * 3), bottom: Math.round(6 + row * 13 + (r() - 0.5) * 2), rot: Math.round((r() - 0.5) * 14) }; };
+  const pile = seq.map((e, i) => ({ e, ...pos(i) }));
+  const pileG = [];
   return {
     year, month, ym: year + '-' + pad2(month), label: month + '月',
     fatTop: top(fatC), recTop: top(recC),
