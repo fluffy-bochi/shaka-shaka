@@ -1761,7 +1761,11 @@ export default class App extends React.Component {
       const collectStack = document.getElementById('collectstack');
       const collectScroll = document.getElementById('collectscroll');
       if (this.state.screen === 'shaka') {
-        if (shakaEl && !this.engine) this.startPhysics(shakaEl);
+        // データ読込前(booted false)に空の山で始めない。また空エンジンのまま固定されたら作り直す
+        if (shakaEl && this.state.booted) {
+          const emptyButShould = this.engine && (!this.bodies || this.bodies.length === 0) && this.pileCount() > 0;
+          if (!this.engine || emptyButShould) { if (this.engine) this.stopPhysics(); this.startPhysics(shakaEl); }
+        }
         if (this.collectEngine) this.stopCollectPhysics();
       } else if (this.state.screen === 'collect') {
         if (collectStack && collectScroll && !this.collectEngine) this.startCollectPhysics(collectStack, collectScroll);
