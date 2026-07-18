@@ -594,16 +594,57 @@ export default class App extends React.Component {
   clearKeyword = (i) => { const k = [...this.state.keywords]; if (k.length > 1) k.splice(i, 1); else k[0] = ''; this.set({ keywords: k }); };
   runSearch = () => { if (!this.state.keywords.some(k => (k || '').trim())) return; this.set({ searchStep: 'results', resolvedIdx: [] }); };
   goSearchConfirm = () => { if (this.state.searchCart.length) this.set({ searchStep: 'confirm', confirmOrigin: this.state.confirmOrigin === 'edit' ? 'edit' : 'search' }); };
+  /* 時刻モード: 各行動は独立した時間範囲 ranges:[{from,to}] を1つ以上持つ。順不同・重複OK・全体長は個別で変わらない */
+  rangeMin(r) { let d = Math.round((this.hmToTs(r.to) - this.hmToTs(r.from)) / 60000); if (d <= 0) d += 1440; return Math.max(1, d); }
   setConfirmMode = (mode) => {
+    const items = this.state.searchCart || [];
+    const n = items.length;
     if (mode === 'time' && this.state.confirmMode !== 'time') {
-      const now = new Date();
-      const startHm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
-      const endHm = this.tsToHm(now.getTime() + (this.state.searchTotalMin || 30) * 60000);
-      this.set({ confirmMode: 'time', startTime: startHm, endTime: endHm });
+      // いまの分の割り当てを初期の時間範囲に（現在時刻から連続配置。以後は各行を自由に編集できる）
+      const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(n ? 1 / n : 0);
+      const total = this.state.searchTotalMin || (n * 30) || 30;
+      let cur = new Date(); cur.setSeconds(0, 0);
+      const startHm = this.tsToHm(cur.getTime());
+      const withRanges = items.map((it, i) => {
+        const min = Math.max(1, Math.round((fr[i] || (n ? 1 / n : 1)) * total));
+        const from = this.tsToHm(cur.getTime());
+        cur = new Date(cur.getTime() + min * 60000);
+        return { ...it, ranges: [{ from, to: this.tsToHm(cur.getTime()) }] };
+      });
+      this.set({ confirmMode: 'time', startTime: startHm, endTime: this.tsToHm(cur.getTime()), searchCart: withRanges });
+    } else if (mode !== 'time' && this.state.confirmMode === 'time') {
+      // 所要時間モードへ戻す: ranges の合計を分に、比率も更新
+      const mins = items.map(it => (it.ranges || []).reduce((a, r) => a + this.rangeMin(r), 0) || it.defMin || 30);
+      const total = Math.max(1, mins.reduce((a, b) => a + b, 0));
+      const stripped = items.map(it => { const { ranges, ...rest } = it; return rest; });
+      this.set({ confirmMode: mode, searchCart: stripped, searchTotalMin: total, searchFracs: stripped.length ? mins.map(m => m / total) : [] });
     } else { this.set({ confirmMode: mode }); }
   };
   onStartTime = (e) => this.set({ startTime: e.target.value });
   onEndTime = (e) => this.set({ endTime: e.target.value });
+  setRange = (ii, ri, key, hm) => {
+    if (!hm) return;
+    const cart = (this.state.searchCart || []).map((it, i) => i !== ii ? it
+      : { ...it, ranges: (it.ranges || []).map((r, j) => j === ri ? { ...r, [key]: hm } : r) });
+    this.set({ searchCart: cart });
+  };
+  addRange = (ii) => {
+    const cart = (this.state.searchCart || []).map((it, i) => {
+      if (i !== ii) return it;
+      const rs = it.ranges || [];
+      const from = rs.length ? rs[rs.length - 1].to : (this.state.startTime || '09:00');
+      return { ...it, ranges: [...rs, { from, to: this.addHm(from, it.defMin || 30) }] };
+    });
+    this.set({ searchCart: cart });
+  };
+  removeRange = (ii, ri) => {
+    const cart = (this.state.searchCart || []).map((it, i) => {
+      if (i !== ii) return it;
+      const rs = (it.ranges || []).filter((_, j) => j !== ri);
+      return { ...it, ranges: rs.length ? rs : it.ranges };
+    });
+    this.set({ searchCart: cart });
+  };
   backFromConfirm = () => {
     // 編集フローだけは編集のキャンセル＝ホームへ
     if (this.state.confirmOrigin === 'edit') { this.set({ searchStep: null, searchCart: [], screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', framePlan: null }); return; }
@@ -617,7 +658,10 @@ export default class App extends React.Component {
     const picks = this.intensityQuestions(item).map(q => Math.floor(q.opts.length / 2));
     const id = 'sc' + Date.now() + Math.floor(Math.random() * 1000);
     const newMin = this.initialMinOf(item);
-    const cart = [...prev, { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, defMin: newMin, kw: item.kw, picks, symId: item.id, symptom: item.symptom, buffLv: item.buffLv }];
+    const newItem = { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, defMin: newMin, kw: item.kw, picks, symId: item.id, symptom: item.symptom, buffLv: item.buffLv };
+    // 時刻モードなら初期の時間範囲を付ける（現在時刻から defMin ぶん）
+    if (this.state.confirmMode === 'time') { const f = this.tsToHm(Date.now()); newItem.ranges = [{ from: f, to: this.addHm(f, newMin) }]; }
+    const cart = [...prev, newItem];
     const resolved = kwIndex == null ? this.state.resolvedIdx : [...this.state.resolvedIdx, kwIndex];
     const remaining = this.remainingKw(resolved);
     // 既に設定した各行の時間は保持し、新しい行に標準所要時間を足すだけ（追加で時間がリセットされない）
@@ -785,55 +829,61 @@ export default class App extends React.Component {
       return;
     }
     const n = items.length;
-    const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(1 / n);
     const timeMode = this.state.confirmMode === 'time';
-    const totalMin = timeMode ? this.timeSpanMin() : (this.state.searchTotalMin || (n * 30));
-    const mins = fr.map(f => Math.max(1, Math.round(f * totalMin)));
-    const d = totalMin - mins.reduce((a, b) => a + b, 0); mins[n - 1] = Math.max(1, mins[n - 1] + d);
     const now = Date.now();
     const slotId = this.state.slotId || this.slotNow();
     const slot = this.slotDef(slotId);
-    let cursor = timeMode ? this.hmToTs(this.state.startTime) : null;
-    // 記録先＝ホームで見ている日付（過去日のつけ忘れ・未来日の下書きにも対応）。
-    // 編集フローは元の記録の日付を維持する
+    // 記録先＝ホームで見ている日付。編集フローは元の記録の日付を維持する
     let recDate = this.homeDateStr();
     if (isEdit && Array.isArray(this.state.editIdxs) && this.state.editIdxs.length) {
       const oe = this.state.entries[this.state.editIdxs[0]];
       if (oe && oe.date) recDate = oe.date;
     }
     const isToday = recDate === todayStr();
+    // 所要時間モードの各行の分（比率×合計）
+    const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(1 / n);
+    const durTotal = this.state.searchTotalMin || (n * 30);
+    const durMins = fr.map(f => Math.max(1, Math.round(f * durTotal)));
+    if (durMins.length) { const d = durTotal - durMins.reduce((a, b) => a + b, 0); durMins[n - 1] = Math.max(1, durMins[n - 1] + d); }
     // 通常記録の配置位置: 同スロットの使用済み分（編集中は元の記録を除いて数える）
     let slotOffset = baseEntries
       .filter(e => e.date === recDate && !e.exp && !e.planned && this.slotOf(e) === slotId)
       .reduce((a, e) => a + entryMin(e), 0);
-    const newEntries = items.map((t, i) => {
-      const fat = Math.round(this.effFh(t) * (mins[i] / 60));
-      const e = {
-        ...baseEntry(t.name, fat, recDate),
-        glyph: t.glyph, min: mins[i], _new: true,
-      };
-      // 枠に入れているときは枠タイトルでグループ化（既製の予定経由でも枠が勝つ）
-      if (this.state.framePlan) e.plan = this.state.framePlan;
-      else if (t.plan) e.plan = t.plan;
-      if (t.after) e.after = Math.round(t.after * (mins[i] / 60));
-      if (timeMode) {
-        const fromTs = cursor, toTs = cursor + mins[i] * 60000;
-        e.from = this.tsToHm(fromTs); e.to = this.tsToHm(toTs); cursor = toTs;
-        // 予定（時間どおりに降る）は今日を見ているときだけ。過去/未来日は即記録
-        if (isToday && toTs > now) { e.planned = true; e.dropped = planUnitsDue({ ...e, date: todayStr() }, now); e._new = e.dropped > 0; }
-      } else {
-        // 通常記録＝選んだ時間帯の基準時刻に配置（CLAUDE.md §G）
-        e.slot = slotId;
-        e.from = this.slotHm(slot, slotOffset); e.to = this.slotHm(slot, slotOffset + mins[i]);
-        slotOffset += mins[i];
-      }
-      // 体調・症状: あとで自動デバフ＋後続時間帯へ複製するための情報を残す
+    const learnMin = [];
+    const mkEntry = (t, min, fromHm, toHm, planned) => {
+      const fat = Math.round(this.effFh(t) * (min / 60));
+      const e = { ...baseEntry(t.name, fat, recDate), glyph: t.glyph, min, _new: true };
+      if (this.state.framePlan) e.plan = this.state.framePlan; else if (t.plan) e.plan = t.plan;
+      if (t.after) e.after = Math.round(t.after * (min / 60));
+      if (fromHm) { e.from = fromHm; e.to = toHm; }
+      if (planned) { e.planned = true; e.dropped = planUnitsDue({ ...e, date: todayStr() }, now); e._new = e.dropped > 0; }
       if (t.symptom && t.symId) { e.symptom = true; e.symId = t.symId; e.level = (t.picks && t.picks[0] != null) ? t.picks[0] : 1; e.buffLv = t.buffLv; }
       return e;
+    };
+    const newEntries = [];
+    items.forEach((t, i) => {
+      if (timeMode) {
+        // 各行動の時間範囲ごとに1件（同じ行動を複数の時間に記録できる）
+        const ranges = (t.ranges && t.ranges.length) ? t.ranges : [{ from: this.state.startTime || this.tsToHm(now), to: this.addHm(this.state.startTime || this.tsToHm(now), t.defMin || 30) }];
+        let sum = 0;
+        ranges.forEach(r => {
+          const min = this.rangeMin(r);
+          sum += min;
+          const fromTs = this.hmToTs(r.from);
+          let toTs = this.hmToTs(r.to); if (toTs <= fromTs) toTs += 1440 * 60000;
+          newEntries.push(mkEntry(t, min, this.tsToHm(fromTs), this.tsToHm(toTs), isToday && toTs > now));
+        });
+        learnMin[i] = sum;
+      } else {
+        const min = durMins[i];
+        const e = mkEntry(t, min, null, null, false);
+        e.slot = slotId; e.from = this.slotHm(slot, slotOffset); e.to = this.slotHm(slot, slotOffset + min);
+        slotOffset += min; newEntries.push(e); learnMin[i] = min;
+      }
     });
     // 前回つかった時間を学習（次回の初期値になる）
     const lastMins = { ...(this.state.lastMins || {}) };
-    items.forEach((t, i) => { const k = normTitle(t.name); if (k) lastMins[k] = mins[i]; });
+    items.forEach((t, i) => { const k = normTitle(t.name); if (k) lastMins[k] = learnMin[i] || durMins[i] || 30; });
     // テンプレは自動保存しない（確認画面の「テンプレにまとめる」ボタンで明示的に保存）
     const framePlan = this.state.framePlan;
     // 編集で症状のつらさ(level)が変わったら、あとでデバフ倍率の確認を出す
@@ -1330,13 +1380,16 @@ export default class App extends React.Component {
     const entries = this.state.entries;
     const mins = idxs.map(i => entryMin(entries[i]) || 30);
     const total = mins.reduce((a, b) => a + b, 0) || idxs.length * 30;
+    const anyPlanned = idxs.some(i => !!entries[i].planned);
     const items = idxs.map((i, k) => {
       const e = entries[i];
       const min = entryMin(e) || 30;
       const fh = min ? (e.delta * 60 / min) : e.delta;
-      const it = { id: 'sce' + Date.now() + k, name: e.title, glyph: entryGlyph(e), fh, kw: [e.act, e.title].filter(Boolean), picks: [] };
+      const it = { id: 'sce' + Date.now() + k, name: e.title, glyph: entryGlyph(e), fh, defMin: min, kw: [e.act, e.title].filter(Boolean), picks: [] };
       if (e.plan) it.plan = e.plan;
       if (e.after) it.after = min ? (e.after * 60 / min) : e.after;
+      // 時刻編集: 元の記録の開始→終了を範囲として引き継ぐ
+      if (anyPlanned) it.ranges = [{ from: e.from || '09:00', to: e.to || this.addHm(e.from || '09:00', min) }];
       // 症状: つらさ(level)を強度チップで再編集できるよう引き継ぐ
       if (e.symptom && e.symId) {
         it.symId = e.symId; it.symptom = true; it.buffLv = e.buffLv;
@@ -1346,7 +1399,6 @@ export default class App extends React.Component {
       return it;
     });
     const first = entries[idxs[0]], last = entries[idxs[idxs.length - 1]];
-    const anyPlanned = idxs.some(i => !!entries[i].planned);
     // 予定グループを編集するときは framePlan をセット。あとで追加した行動も同じ予定の中に入る
     const planName = g.isPlan ? (g.title || (first && first.plan) || '') : '';
     this.set({
@@ -2485,8 +2537,10 @@ export default class App extends React.Component {
     const totalMin = timeMode ? this.timeSpanMin() : (st.searchTotalMin || (scCount * 30) || 30);
     const mins = fr0.map(f => Math.max(1, Math.round(f * totalMin)));
     if (mins.length) { const d = totalMin - mins.reduce((a, b) => a + b, 0); mins[mins.length - 1] = Math.max(1, mins[mins.length - 1] + d); }
+    // 各行動の分: 時刻モードは range 合計、所要時間モードは配分
+    const itemMinAt = (it, idx) => timeMode ? ((it.ranges || []).reduce((a, r) => a + this.rangeMin(r), 0) || it.defMin || 30) : mins[idx];
     const searchCartRows = scItems.map((it, idx) => {
-      const fat = Math.round(this.effFh(it) * (mins[idx] / 60));
+      const fat = Math.round(this.effFh(it) * (itemMinAt(it, idx) / 60));
       return {
         id: it.id, name: it.name, glyph: it.glyph,
         intensityText: this.intensitySummary(it) || '強度',
@@ -2495,32 +2549,37 @@ export default class App extends React.Component {
         onIntensity: () => this.openIntensity(it.id),
       };
     });
-    let segCursor = timeMode ? this.hmToTs(st.startTime) : 0;
+    let segCursor = 0;
     const allocSegs = scItems.map((it, idx) => {
-      const fat = Math.round(this.effFh(it) * (mins[idx] / 60));
-      let timeText = '', fromHm = '', toHm = '';
-      if (timeMode) { const f = segCursor, t = f + mins[idx] * 60000; fromHm = this.tsToHm(f); toHm = this.tsToHm(t); timeText = fromHm + '–' + toHm; segCursor = t; }
+      const min = itemMinAt(it, idx);
+      const fat = Math.round(this.effFh(it) * (min / 60));
+      let widthPct = (fr0[idx] * 100) + '%';
+      // 時刻モード: 各行動が持つ独立した時間範囲（複数可）
+      const ranges = timeMode ? (it.ranges && it.ranges.length ? it.ranges : [{ from: st.startTime, to: this.addHm(st.startTime, it.defMin || 30) }]).map((r, ri) => ({
+        fromHm: r.from, toHm: r.to,
+        onSetFrom: (hm) => this.setRange(idx, ri, 'from', hm),
+        onSetTo: (hm) => this.setRange(idx, ri, 'to', hm),
+        onRemove: () => this.removeRange(idx, ri),
+      })) : null;
       return {
-        color: scPalette[idx % scPalette.length], widthPct: (fr0[idx] * 100) + '%', name: it.name,
-        minText: timeMode ? timeText : this.fmtMin(mins[idx]), fatText: (fat >= 0 ? '+' + fat : '' + fat),
-        rawMin: mins[idx],
-        // 分入力（時間割り。時刻モードでも数値で微調整はできる）
+        color: scPalette[idx % scPalette.length], widthPct, name: it.name,
+        minText: this.fmtMin(min), fatText: (fat >= 0 ? '+' + fat : '' + fat), rawMin: min,
         onSetMin: (m) => this.setRowMin(idx, m),
-        // 時刻モード: 各行を「開始→終了の時刻」で編集
-        timeMode, fromHm, toHm,
-        onSetFrom: (hm) => this.setRowTime(idx, hm, null),
-        onSetTo: (hm) => this.setRowTime(idx, hm, 'to'),
+        timeMode, ranges, canRemoveRange: !!(ranges && ranges.length > 1),
+        onAddRange: () => this.addRange(idx),
       };
     });
+    // 配分つまみ（つまみドラッグ）は所要時間モードのみ
     const allocHandles = [];
-    { let cum = 0; for (let k = 0; k < scCount - 1; k++) { cum += fr0[k]; allocHandles.push({ leftPct: (cum * 100) + '%', onDrag: this.onFracDrag(k) }); } }
-    const searchTotalFat = scItems.reduce((a, it, idx) => a + Math.round(this.effFh(it) * (mins[idx] / 60)), 0);
+    if (!timeMode) { let cum = 0; for (let k = 0; k < scCount - 1; k++) { cum += fr0[k]; allocHandles.push({ leftPct: (cum * 100) + '%', onDrag: this.onFracDrag(k) }); } }
+    const searchTotalFat = scItems.reduce((a, it, idx) => a + Math.round(this.effFh(it) * (itemMinAt(it, idx) / 60)), 0);
+    const searchTotalMinAll = scItems.reduce((a, it, idx) => a + itemMinAt(it, idx), 0);
     const intItem = st.intensityId ? scItems.find(x => x.id === st.intensityId) : null;
     const intQuestions = intItem ? this.intensityQuestions(intItem).map((q, qi) => ({
       label: q.label,
       opts: q.opts.map((o, oi) => { const on = (intItem.picks || [])[qi] === oi; return { text: o, onPick: () => this.setIntensityPick(qi, oi), border: on ? '#1b1b18' : '#e4e1d8', bg: on ? '#fbfdf0' : '#fff', color: on ? '#1b1b18' : '#55554e', weight: on ? '900' : '700' }; }),
     })) : [];
-    const intFat = intItem ? Math.round(this.effFh(intItem) * ((mins[scItems.indexOf(intItem)] || 30) / 60)) : 0;
+    const intFat = intItem ? Math.round(this.effFh(intItem) * (itemMinAt(intItem, scItems.indexOf(intItem)) / 60)) : 0;
     // 好き嫌い（行動ごとに永続・強度ポップアップで設定）
     const curPref = intItem ? ((st.prefs || {})[normTitle(intItem.name)] || 'normal') : 'normal';
     const prefOpts = intItem ? [
@@ -2767,7 +2826,7 @@ export default class App extends React.Component {
       searchBtnBg: canSearch ? '#c4f000' : '#e4e1d8', searchBtnColor: canSearch ? '#2f3a00' : '#a5a39a',
       keywordRows, searchGroups,
       moreData, moreFilters, closeMore: this.closeMore,
-      searchCartRows, searchCount: scCount, searchTotalText: this.fmtMin(totalMin),
+      searchCartRows, searchCount: scCount, searchTotalText: this.fmtMin(timeMode ? searchTotalMinAll : totalMin),
       searchTotalMinRaw: totalMin, setTotalMin: this.setTotalMin,
       allocSegs, allocHandles, confirmIsTime: timeMode,
       confirmMode: st.confirmMode, isTimeMode: timeMode, isDurationMode: !timeMode,
