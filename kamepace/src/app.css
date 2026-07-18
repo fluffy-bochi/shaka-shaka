@@ -34,12 +34,14 @@ input { font-family: inherit; }
 .app-status-spacer { height: max(40px, env(safe-area-inset-top)); }
 body.kame-book-land .app-status-spacer { height: env(safe-area-inset-top); }
 
-/* app fills the viewport like the prototype's phone screen */
-#root { min-height: 100dvh; }
+/* app fills the viewport like the prototype's phone screen.
+   --app-vh は main.jsx が測る実可視高さ（Android下部ナビ/iOSホームインジケータ/URLバーを除いた領域）。
+   未対応環境向けに 100dvh をフォールバック。 */
+#root { min-height: var(--app-vh, 100dvh); }
 .app-screen {
   position: relative;
   isolation: isolate;
-  height: 100dvh;
+  height: var(--app-vh, 100dvh);
   max-width: 480px;
   margin: 0 auto;
   overflow: hidden;

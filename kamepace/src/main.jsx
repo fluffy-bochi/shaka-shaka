@@ -26,4 +26,15 @@ function Shell() {
   );
 }
 
+/* 実際の可視高さ(システムのステータスバー・下部ナビを除いた領域)を測ってCSS変数に。
+   Android(▼●■)・iOS(ホームインジケータ)・URLバーの出入りに追従して、常に1画面に収める */
+function setAppVH() {
+  // innerHeight = システムバー(Android下部ナビ等)を除いた領域。キーボードでは縮まないので画面がガタつかない
+  const h = Math.round(window.innerHeight || 0);
+  if (h) document.documentElement.style.setProperty('--app-vh', h + 'px');
+}
+setAppVH();
+window.addEventListener('resize', setAppVH);
+window.addEventListener('orientationchange', () => setTimeout(setAppVH, 250));
+
 createRoot(document.getElementById('root')).render(<Shell />);
