@@ -283,43 +283,45 @@ function Confirm({ v }) {
             </div>
           )}
           {v.isTimeMode && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-                <input type="time" value={v.startTime} onChange={v.onStartTime} style={{ flex: 1, minWidth: 0, ...mono, fontSize: 15, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 10, padding: '9px 8px', textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
-                <span style={{ color: '#8a8a82', fontSize: 14 }}>→</span>
-                <input type="time" value={v.endTime} onChange={v.onEndTime} style={{ flex: 1, minWidth: 0, ...mono, fontSize: 15, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 10, padding: '9px 8px', textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
-              </div>
-              <div style={{ fontSize: 11, color: '#6f8fbf', marginTop: 7, lineHeight: 1.5 }}>終了が先の時刻なら「予定」として時間どおりに1個ずつ記録されます</div>
-            </>
+            <div style={{ fontSize: 11, color: '#6f8fbf', marginTop: 10, lineHeight: 1.5 }}>行動ごとに「開始→終了の時刻」を設定。同じ行動を別の時間にも入れられます（＋時間）。まだ来ていない時刻は「予定」として時間どおりに記録されます</div>
           )}
-          {/* 配分バー: つまみを左右ドラッグで1分単位調整 */}
-          <div style={{ position: 'relative', height: 38, marginTop: 14, touchAction: 'none' }}>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', borderRadius: 11, overflow: 'hidden' }}>
-              {v.allocSegs.map((s, si) => <div key={si} style={{ width: s.widthPct, background: s.color }} />)}
-            </div>
-            {v.allocHandles.map((h, hi) => (
-              <div key={hi} onPointerDown={h.onDrag} onPointerMove={h.onDrag} style={{ position: 'absolute', top: -4, bottom: -4, left: h.leftPct, width: 28, marginLeft: -14, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'ew-resize', touchAction: 'none' }}>
-                <span style={{ width: 8, height: 34, borderRadius: 5, background: '#fff', border: '2px solid #1b1b18', boxShadow: '0 2px 6px rgba(27,27,24,.3)' }} />
+          {/* 所要時間モードのみ: 配分バー（つまみドラッグ） */}
+          {v.isDurationMode && (
+            <div style={{ position: 'relative', height: 38, marginTop: 14, touchAction: 'none' }}>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', borderRadius: 11, overflow: 'hidden' }}>
+                {v.allocSegs.map((s, si) => <div key={si} style={{ width: s.widthPct, background: s.color }} />)}
               </div>
-            ))}
-          </div>
+              {v.allocHandles.map((h, hi) => (
+                <div key={hi} onPointerDown={h.onDrag} onPointerMove={h.onDrag} style={{ position: 'absolute', top: -4, bottom: -4, left: h.leftPct, width: 28, marginLeft: -14, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'ew-resize', touchAction: 'none' }}>
+                  <span style={{ width: 8, height: 34, borderRadius: 5, background: '#fff', border: '2px solid #1b1b18', boxShadow: '0 2px 6px rgba(27,27,24,.3)' }} />
+                </div>
+              ))}
+            </div>
+          )}
           {v.allocSegs.map((s, si) => (
-            <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 2px 9px', borderBottom: '1px solid #f1efe8' }}>
-              <span style={{ width: 11, height: 11, borderRadius: 3, background: s.color, flex: '0 0 auto' }} />
-              <span style={{ fontSize: 13.5, flex: 1, minWidth: 0 }}>{s.name}</span>
-              {s.timeMode ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flex: '0 0 auto' }}>
-                  <input type="time" value={s.fromHm} onChange={(e) => e.target.value && s.onSetFrom(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '4px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
-                  <span style={{ color: '#8a8a82', fontSize: 12 }}>→</span>
-                  <input type="time" value={s.toHm} onChange={(e) => e.target.value && s.onSetTo(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '4px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
-                </span>
-              ) : (
-                <MinEdit text={s.minText} raw={s.rawMin} onSet={s.onSetMin} style={{ ...mono, fontSize: 12, fontWeight: 700, background: '#efece3', borderRadius: 8, padding: '4px 9px' }} />
+            <div key={si} style={{ padding: '10px 2px 9px', borderBottom: '1px solid #f1efe8' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 11, height: 11, borderRadius: 3, background: s.color, flex: '0 0 auto' }} />
+                <span style={{ fontSize: 13.5, flex: 1, minWidth: 0 }}>{s.name}</span>
+                {!s.timeMode && <MinEdit text={s.minText} raw={s.rawMin} onSet={s.onSetMin} style={{ ...mono, fontSize: 12, fontWeight: 700, background: '#efece3', borderRadius: 8, padding: '4px 9px' }} />}
+                <span style={{ ...mono, fontSize: 12, fontWeight: 700, color: '#f5994e', width: 30, textAlign: 'right', flex: '0 0 auto' }}>{s.fatText}</span>
+              </div>
+              {s.timeMode && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 7, paddingLeft: 19 }}>
+                  {s.ranges.map((r, ri) => (
+                    <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <input type="time" value={r.fromHm} onChange={(e) => e.target.value && r.onSetFrom(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 72, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
+                      <span style={{ color: '#8a8a82', fontSize: 12 }}>→</span>
+                      <input type="time" value={r.toHm} onChange={(e) => e.target.value && r.onSetTo(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 72, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
+                      {s.canRemoveRange && <button onClick={r.onRemove} style={{ width: 26, height: 26, border: 'none', background: 'none', fontSize: 16, color: '#c9c7bf', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>}
+                    </div>
+                  ))}
+                  <button onClick={s.onAddRange} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, border: '1.5px dashed #cfe08a', background: '#fbfdf0', borderRadius: 999, padding: '4px 11px', fontSize: 11, fontWeight: 700, color: '#5a7500', cursor: 'pointer' }}>＋ 時間を追加</button>
+                </div>
               )}
-              <span style={{ ...mono, fontSize: 12, fontWeight: 700, color: '#f5994e', width: 30, textAlign: 'right', flex: '0 0 auto' }}>{s.fatText}</span>
             </div>
           ))}
-          <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 8 }}>{v.confirmIsTime ? '各行の開始→終了の時刻で調整。つまみドラッグでも配分できます' : 'つまみを左右にドラッグで配分を変更（1分単位）。強度チップで体感を調整'}</div>
+          <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 8 }}>{v.isTimeMode ? '強度チップで体感を調整できます' : 'つまみを左右にドラッグで配分を変更（1分単位）。強度チップで体感を調整'}</div>
         </div>
       </div>
       {v.tplOpen && (
