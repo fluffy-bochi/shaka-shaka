@@ -2181,6 +2181,12 @@ export default class App extends React.Component {
         fetchScheduleTasks().catch(() => []),
       ]);
       const nEv = items.length ? this.importEvents(items) : 0;
+      // 今日の対象から外れた未完了の取り込みタスク（前日の期限切れ等）は掃除する
+      const validIds = new Set(taskItems.map(t => t.srcId));
+      const t0 = todayStr();
+      const pruned = (this.state.tasks || []).filter(t =>
+        t.done || !String(t.srcId || '').startsWith('ptask:') || t.date !== t0 || validIds.has(t.srcId));
+      if (pruned.length !== (this.state.tasks || []).length) { this.set({ tasks: pruned }); this.save(); }
       const nTask = taskItems.length ? this.importTasks(taskItems) : 0;
       if (nEv + nTask > 0) {
         this.toast('📅 mylifecoreから' + [nEv ? '予定' + nEv + '件' : '', nTask ? 'タスク' + nTask + '件' : ''].filter(Boolean).join('・') + 'をとりこみました');
@@ -2190,15 +2196,62 @@ export default class App extends React.Component {
     }
   }
 
-  /* ホームのタスク（夜の下）: チェックで完了。mylifecore由来は本家側にも完了を書き戻す */
+  /* ホームのタスク（夜の下）: チェックで完了。
+     完了時は「チェックした時間帯」に行動としてタスク名で記録し、mylifecore由来は本家側にも完了を書き戻す */
   toggleHomeTask = (srcId) => {
     const tasks = (this.state.tasks || []).map(t => (t.srcId === srcId ? { ...t, done: !t.done } : t));
     const t = tasks.find(x => x.srcId === srcId);
-    this.set({ tasks });
+    let entries = this.state.entries;
+    if (t && t.done) {
+      // 二重記録防止（一度チェック→外して再チェックでも増やさない）
+      const recId = 'taskrec:' + srcId;
+      if (!entries.some(e => e.srcId === recId)) {
+        const slotId = this.slotNow();
+        const slot = this.slotDef(slotId);
+        const off = this.slotUsedMin(slotId);
+        const min = t.linkMin || 30;
+        // 紐づけた行動があればその疲労/絵文字、なければ推測＋標準の目安
+        const fh = (t.linkFh != null) ? t.linkFh : null;
+        const delta = fh != null ? Math.max(1, Math.round(fh * min / 60)) : IMPORT_DEFAULT_DELTA;
+        const glyph = t.linkGlyph || ACT_EMOJI[guessAct(t.title)] || '📝';
+        entries = sortEntries([...entries, {
+          ...baseEntry(t.title, delta, todayStr()),
+          act: t.linkAct || guessAct(t.title), glyph, min, srcId: recId, _new: true,
+          slot: slotId, from: this.slotHm(slot, off), to: this.slotHm(slot, off + min),
+        }]);
+        this.toast('✅ ' + t.title + ' を' + slot.name + 'に記録しました');
+      }
+    }
+    this.set({ tasks, entries });
     this.save();
     if (t && t.done && String(srcId).startsWith('ptask:')) {
       completeScheduleTask(String(srcId).slice(6)).catch(e => console.warn('[kamepace] task complete sync failed', e));
     }
+  };
+
+  /* タスクの編集（名前・行動との紐づけ） */
+  openTaskEdit = (srcId) => {
+    const t = (this.state.tasks || []).find(x => x.srcId === srcId);
+    if (!t) return;
+    this.set({ taskEdit: srcId, taskEditTitle: t.title, taskEditKw: '', taskEditLinkName: t.linkName || '' });
+  };
+  closeTaskEdit = () => this.set({ taskEdit: null });
+  saveTaskEdit = () => {
+    const srcId = this.state.taskEdit;
+    const title = (this.state.taskEditTitle || '').trim();
+    const tasks = (this.state.tasks || []).map(t => (t.srcId === srcId && title ? { ...t, title } : t));
+    this.set({ tasks, taskEdit: null });
+    this.save();
+  };
+  linkTaskAct = (item) => {
+    const srcId = this.state.taskEdit;
+    const tasks = (this.state.tasks || []).map(t => {
+      if (t.srcId !== srcId) return t;
+      if (!item) { const { linkName, linkGlyph, linkFh, linkMin, linkAct, ...rest } = t; return rest; }
+      return { ...t, linkName: item.name, linkGlyph: item.glyph, linkFh: item.fh, linkMin: item.defMin || 30, linkAct: guessAct(item.name) };
+    });
+    this.set({ tasks, taskEditLinkName: item ? item.name : '' });
+    this.save();
   };
 
   /* Googleカレンダー/ToDo 取り込み（旧本番と同一の entries 形式で追加） */
@@ -2571,9 +2624,26 @@ export default class App extends React.Component {
       // 夜の下に出すタスク（mylifecore / GoogleのToDo）
       homeTasks: (st.tasks || []).filter(t => t.date === this.homeDateStr()).map(t => ({
         srcId: t.srcId, title: t.title, done: !!t.done,
+        glyph: t.linkGlyph || null, linkName: t.linkName || '',
         srcLabel: String(t.srcId || '').startsWith('ptask:') ? 'mylifecore' : 'Google',
         onToggle: () => this.toggleHomeTask(t.srcId),
+        onEdit: () => this.openTaskEdit(t.srcId),
       })),
+      // タスク編集ポップアップ
+      taskEditOpen: !!st.taskEdit,
+      taskEditTitle: st.taskEditTitle || '',
+      onTaskEditTitle: (e) => this.set({ taskEditTitle: e.target.value }),
+      taskEditKw: st.taskEditKw || '',
+      onTaskEditKw: (e) => this.set({ taskEditKw: e.target.value }),
+      taskEditLinkName: st.taskEditLinkName || '',
+      taskEditResults: (st.taskEdit && (st.taskEditKw || '').trim())
+        ? this.searchDB((st.taskEditKw || '').trim()).slice(0, 6).map(it => ({
+            name: it.name, glyph: it.glyph, fatText: (it.fh >= 0 ? '+' : '') + Math.round(it.fh * (it.defMin || 30) / 60),
+            onPick: () => this.linkTaskAct(it),
+          }))
+        : [],
+      clearTaskLink: () => this.linkTaskAct(null),
+      saveTaskEdit: this.saveTaskEdit, closeTaskEdit: this.closeTaskEdit,
       // 睡眠カードに出す、その日の睡眠回復量（ためた回復の🌙を日別集計）
       sleepRecText: (() => {
         const dd = this.homeDateStr();

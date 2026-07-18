@@ -109,18 +109,18 @@ export async function fetchScheduleEvents(dayCount = 2) {
   return out;
 }
 
-/* mylifecore のタスク（projectTasks）: 未完了で「今日やる(assignedDate)」or 締切が今日以前のもの */
+/* mylifecore のタスク（projectTasks）: 未完了で「今日やる(assignedDate=今日)」or 締切が今日のもの。
+   前日以前のもの（期限切れ）は取り込まない */
 export async function fetchScheduleTasks() {
   if (!auth.currentUser) return [];
   const today = ymd(new Date());
-  const eod = new Date(); eod.setHours(23, 59, 59, 999);
   const col = collection(db, 'users', auth.currentUser.uid, 'projectTasks');
   const snap = await getDocs(query(col, where('completed', '==', false)));
   const out = [];
   snap.forEach((d) => {
     const t = d.data();
     const dl = tsToDate(t.deadline);
-    if (t.assignedDate === today || (dl && dl <= eod)) out.push({ srcId: 'ptask:' + d.id, title: t.title || '(無題のタスク)' });
+    if (t.assignedDate === today || (dl && ymd(dl) === today)) out.push({ srcId: 'ptask:' + d.id, title: t.title || '(無題のタスク)' });
   });
   return out;
 }

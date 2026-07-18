@@ -126,8 +126,10 @@ export default function Home({ v }) {
               {v.homeTasks.map((t) => (
                 <div key={t.srcId} onClick={t.onToggle} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 15px', borderBottom: '1px solid #f1efe8', cursor: 'pointer', userSelect: 'none' }}>
                   <span style={{ width: 22, height: 22, flex: '0 0 auto', borderRadius: '50%', border: t.done ? 'none' : '2px solid #d8d5cb', background: t.done ? '#c4f000' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 14, color: '#2f3a00' }}>{t.done ? 'check' : ''}</span>
+                  {t.glyph && <span style={{ flex: '0 0 auto', display: 'inline-flex' }}><Emo e={t.glyph} size={17} /></span>}
                   <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: t.done ? '#b4b2a8' : '#1b1b18', textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</span>
                   <span style={{ ...mono, fontSize: 9, color: '#b4b2a8', flex: '0 0 auto' }}>{t.srcLabel}</span>
+                  <button onClick={(e) => { e.stopPropagation(); t.onEdit(); }} style={{ flex: '0 0 auto', width: 26, height: 26, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'Material Symbols Rounded', fontSize: 16, color: '#c9c7bf', padding: 0 }}>edit</button>
                 </div>
               ))}
             </div>
@@ -136,7 +138,45 @@ export default function Home({ v }) {
       </div>
       {v.buffOpen && <BuffSheet v={v} />}
       {v.buffCheckOpen && <BuffCheckSheet v={v} />}
+      {v.taskEditOpen && <TaskEditPopup v={v} />}
     </>
+  );
+}
+
+/* タスクの編集: 名前の変更＋行動との紐づけ（チェック時にその行動として記録される） */
+function TaskEditPopup({ v }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 9, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
+      <div style={{ width: '100%', background: '#fff', borderRadius: 22, padding: '16px 20px 20px', boxShadow: '0 24px 60px rgba(27,27,24,.35)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>タスクを編集</div>
+          <button onClick={v.closeTaskEdit} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>タスク名</div>
+        <input value={v.taskEditTitle} onChange={v.onTaskEditTitle} style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>行動と紐づけ<span style={{ fontSize: 10.5, color: '#9d9b91', marginLeft: 6 }}>チェックしたらこの行動として記録</span></div>
+        {v.taskEditLinkName ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, background: '#fbfdf0', border: '2px solid #c4de52', borderRadius: 12, padding: '10px 12px' }}>
+            <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700 }}>{v.taskEditLinkName}</span>
+            <button onClick={v.clearTaskLink} style={{ border: '1.5px solid #e4e1d8', background: '#fff', borderRadius: 999, padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#55554e', cursor: 'pointer' }}>はずす</button>
+          </div>
+        ) : (
+          <>
+            <input value={v.taskEditKw} onChange={v.onTaskEditKw} placeholder="行動をけんさく（例：皿洗い）" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '11px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 14, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', marginTop: 6, maxHeight: 180, overflowY: 'auto' }} className="nos">
+              {v.taskEditResults.map((r, i) => (
+                <button key={i} onClick={r.onPick} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 4px', border: 'none', borderBottom: '1px solid #f1efe8', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ display: 'inline-flex' }}><Emo e={r.glyph} size={18} /></span>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#1b1b18' }}>{r.name}</span>
+                  <span style={{ ...mono, fontSize: 11, fontWeight: 700, color: '#f5994e' }}>{r.fatText}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <button onClick={v.saveTaskEdit} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 15, padding: 14, cursor: 'pointer' }}>ほぞんする</button>
+      </div>
+    </div>
   );
 }
 
