@@ -741,7 +741,13 @@ export default class App extends React.Component {
     // 編集モード: 元の記録を取り除いたうえで置き換える
     const isEdit = this.state.confirmOrigin === 'edit' && Array.isArray(this.state.editIdxs);
     const editSet = isEdit ? new Set(this.state.editIdxs) : null;
-    const baseEntries = editSet ? this.state.entries.filter((_, i) => !editSet.has(i)) : this.state.entries;
+    let baseEntries = editSet ? this.state.entries.filter((_, i) => !editSet.has(i)) : this.state.entries;
+    // 枠（カレンダー取り込みの予定）に記録するときは、同じ予定名の「空枠(needsSetup)」を必ず除く。
+    // editIdxs は配列インデックスなので同期等でズレることがあり、それでも空枠が残らないようにする
+    if (this.state.framePlan) {
+      const fp = this.state.framePlan;
+      baseEntries = baseEntries.filter(e => !(e.needsSetup && !e.delta && e.plan === fp));
+    }
     if (!items.length) {
       if (isEdit) this.trashOriginal(); // カートを空にして確定 = ゴミ箱へ
       else this.set({ searchStep: null });
@@ -1310,9 +1316,11 @@ export default class App extends React.Component {
     });
     const first = entries[idxs[0]], last = entries[idxs[idxs.length - 1]];
     const anyPlanned = idxs.some(i => !!entries[i].planned);
+    // 予定グループを編集するときは framePlan をセット。あとで追加した行動も同じ予定の中に入る
+    const planName = g.isPlan ? (g.title || (first && first.plan) || '') : '';
     this.set({
       screen: 'record', slotId: this.slotOf(first),
-      searchStep: 'confirm', confirmOrigin: 'edit', editIdxs: idxs,
+      searchStep: 'confirm', confirmOrigin: 'edit', editIdxs: idxs, framePlan: planName || null,
       searchCart: items, searchTotalMin: total, searchFracs: mins.map(m => m / total),
       confirmMode: anyPlanned ? 'time' : 'duration',
       startTime: anyPlanned ? (first.from || '') : '',
