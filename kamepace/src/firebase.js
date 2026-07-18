@@ -109,6 +109,29 @@ export async function fetchScheduleEvents(dayCount = 2) {
   return out;
 }
 
+/* mylifecore のタスク（projectTasks）: 未完了で「今日やる(assignedDate)」or 締切が今日以前のもの */
+export async function fetchScheduleTasks() {
+  if (!auth.currentUser) return [];
+  const today = ymd(new Date());
+  const eod = new Date(); eod.setHours(23, 59, 59, 999);
+  const col = collection(db, 'users', auth.currentUser.uid, 'projectTasks');
+  const snap = await getDocs(query(col, where('completed', '==', false)));
+  const out = [];
+  snap.forEach((d) => {
+    const t = d.data();
+    const dl = tsToDate(t.deadline);
+    if (t.assignedDate === today || (dl && dl <= eod)) out.push({ srcId: 'ptask:' + d.id, title: t.title || '(無題のタスク)' });
+  });
+  return out;
+}
+
+/* かめペースでチェックしたら mylifecore 側のタスクも完了にする */
+export async function completeScheduleTask(taskId) {
+  if (!auth.currentUser) return;
+  await setDoc(doc(db, 'users', auth.currentUser.uid, 'projectTasks', taskId),
+    { completed: true, completedAt: new Date() }, { merge: true });
+}
+
 /* 検証用: カレンダーアプリ形式の予定を1件書き込む（自分のuid配下のみ） */
 export async function _seedScheduleEvent(title, startMs, endMs) {
   if (!auth.currentUser) throw new Error('not-signed-in');
@@ -119,8 +142,18 @@ export async function _seedScheduleEvent(title, startMs, endMs) {
   return id;
 }
 
+/* 検証用: mylifecore形式のタスクを1件書き込む */
+export async function _seedScheduleTask(title, assignedDate) {
+  if (!auth.currentUser) throw new Error('not-signed-in');
+  const id = 'kame-test-task-' + Date.now();
+  await setDoc(doc(db, 'users', auth.currentUser.uid, 'projectTasks', id), {
+    projectId: 'kame-test', title, completed: false, assignedDate: assignedDate || ymd(new Date()),
+  });
+  return id;
+}
+
 // 検証用フック（読み書きは自分のuid配下のみ）
-if (typeof window !== 'undefined') window.__kameFb = { _seedScheduleEvent, loadUserData, fetchScheduleEvents };
+if (typeof window !== 'undefined') window.__kameFb = { _seedScheduleEvent, _seedScheduleTask, loadUserData, fetchScheduleEvents, fetchScheduleTasks };
 
 /* ---- Google Calendar / Tasks import ---- */
 function pad2m(n) { return String(n).padStart(2, '0'); }
