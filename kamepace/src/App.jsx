@@ -799,7 +799,8 @@ export default class App extends React.Component {
     const total = Math.max(1, mins.reduce((a, b) => a + b, 0));
     this.set({ searchCart: cart, searchTotalMin: total, searchFracs: cart.length ? mins.map(m => m / total) : [] });
   };
-  addMoreMenu = () => this.set({ searchStep: 'input', keywords: Array(10).fill(''), resolvedIdx: [] });
+  // 「メニューを追加」は検索窓ではなく記録の入口画面（検索・予定・大カテゴリ）へ。確認カートは保持
+  addMoreMenu = () => this.set({ searchStep: null, catId: null, cart: {}, keywords: [''], resolvedIdx: [], moreKw: null });
   openIntensity = (id) => this.set({ intensityId: id });
   closeIntensity = () => this.set({ intensityId: null });
   setIntensityPick = (qIdx, optIdx) => {
