@@ -216,17 +216,19 @@ export default class App extends React.Component {
   async loadCloud() {
     try {
       const data = await loadUserData();
+      // ゲストの山の散らばりを持ち込まない
+      this._pileLayout = null;
       // オンボ判定は「読み込んだデータ」で行う（this.set は非同期で this.state に即反映されないため）
       let onboardDone;
       if (data) {
         const dd = deserialize(data);
-        this.set({ ...dd, booted: true, screen: dd.mainScreen || 'shaka' });
+        this.set({ ...dd, booted: true, screen: dd.mainScreen || 'shaka', dayOffset: 0 });
         onboardDone = dd.onboardDone;
       } else {
-        // 新規ユーザー（初めての登録）: ゲストデータがあれば引き継いで保存
-        this.set({ booted: true });
+        // 新規ユーザー（初めての登録）: ゲストのデータ（サンプル含む）は引き継がず、まっさらで開始
+        this.set({ ...freshState(), booted: true, screen: 'shaka', dayOffset: 0 });
         this.save();
-        onboardDone = this.state.onboardDone; // ゲスト時に済ませていれば true
+        onboardDone = false;
       }
       setTimeout(() => this.advancePlans(), 0);
       // カレンダーアプリ(my-schedule-app)の予定を自動取り込み（ログイン時＋以後5分ごと）
