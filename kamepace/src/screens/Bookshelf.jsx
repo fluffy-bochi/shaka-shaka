@@ -424,8 +424,8 @@ export default function Bookshelf({ v }) {
       <div style={{ position: 'relative', width: w, height: h, marginTop: 20, background: 'linear-gradient(180deg,rgba(255,255,255,.6),rgba(255,255,255,.18))', border: '1px solid rgba(27,27,24,.18)', borderRadius: '4px 10px 10px 4px', overflow: 'hidden', boxShadow: 'inset 6px 0 8px rgba(27,27,24,.08),inset 2px 0 0 rgba(255,255,255,.45),0 4px 8px rgba(27,27,24,.14)' }}>
         <div style={{ position: 'absolute', top: 0, bottom: 0, left: 10, width: 1, background: 'rgba(27,27,24,.14)' }} />
         <div style={{ position: 'absolute', top: 10, left: 0, right: 0, textAlign: 'center', zIndex: 2 }}><span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: '#7a786f', background: 'rgba(251,249,243,.85)', borderRadius: 6, padding: '1px 8px' }}>{mo.label}</span></div>
-        <Pile pts={mo.pile} w={13} fs={11} />
-        <Pile pts={mo.pileG} w={13} fs={11} ghost />
+        <Pile pts={mo.pile} w={12} fs={10} />
+        <Pile pts={mo.pileG} w={12} fs={10} ghost />
         {mo.cur && <div style={{ position: 'absolute', inset: 0, border: '3px solid #c4f000', borderRadius: '4px 10px 10px 4px', pointerEvents: 'none' }} />}
         {mo.ym === selMonYm && !mo.cur && <div style={{ position: 'absolute', inset: 0, border: '3px solid #ff5fa2', borderRadius: '4px 10px 10px 4px', pointerEvents: 'none' }} />}
       </div>
