@@ -187,6 +187,16 @@ export default function Bookshelf({ v }) {
     return () => document.body.classList.remove('kame-book-land');
   }, [land]);
 
+  // 端末の戻るボタン（App から届く）: シートを閉じる → 手動横向きを解除
+  useEffect(() => {
+    const onBack = (e) => {
+      if (sheet) { setSheet(false); e.detail.consume(); return; }
+      if (manualOrient === 'land' && !autoLand) { setManualOrient('port'); e.detail.consume(); }
+    };
+    window.addEventListener('kame-back', onBack);
+    return () => window.removeEventListener('kame-back', onBack);
+  }, [sheet, manualOrient, autoLand]);
+
   const names = useMemo(() => nameMap(entries), [entries]);
   const months = useMemo(() => monthsWithData(entries), [entries]);
   /* 睡眠の回復（collected の 🌙）を日別に集計 → 回復列に含める */
@@ -495,16 +505,6 @@ export default function Bookshelf({ v }) {
   } : null;
   const landscape = (
     <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec', ...rotateStyle }}>
-      {/* 左レールナビ（上端まで・4つを均等配置） */}
-      <div style={{ flex: '0 0 58px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-evenly', padding: '10px 0', background: '#fff', borderRight: '1px solid #efece3' }}>
-        {navItems.map((it, i) => (
-          <button key={i} onClick={it.go} style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, cursor: 'pointer' }}>
-            <span style={{ fontFamily: 'Material Symbols Rounded', fontVariationSettings: `'FILL' ${it.on ? 1 : 0}`, fontSize: 21, color: it.on ? '#1b1b18' : '#8a8a82' }}>{it.icon}</span>
-            <span style={{ fontSize: 9, fontWeight: 700, color: it.on ? '#1b1b18' : '#8a8a82' }}>{it.label}</span>
-          </button>
-        ))}
-      </div>
-
       {/* 中央: 棚 */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         {/* タイトル行（日別/月別・今日・回転を横に）＋その下に残りのボタンを1行で */}
@@ -534,19 +534,26 @@ export default function Bookshelf({ v }) {
         )}
       </div>
 
-      {/* 右: 本のページ（タブで右へスライド収納できる） */}
-      <div style={{ position: 'relative', flex: pageOpen ? '0 0 clamp(226px, 40%, 326px)' : '0 0 26px', transition: 'flex-basis .3s cubic-bezier(.2,.8,.3,1)', minWidth: 0 }}>
-        {/* タブ（開閉ボタン・常に見える） */}
-        <button onClick={() => setPageOpen((o) => !o)} style={{ position: 'absolute', left: 0, top: 26, width: 26, height: 66, background: '#fff', border: 'none', borderRadius: '10px 0 0 10px', boxShadow: '-6px 4px 12px rgba(27,27,24,.12)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer', zIndex: 2, padding: 0 }}>
+      {/* 右端: ナビ（縦レール） */}
+      <div style={{ position: 'relative', zIndex: 4, flex: '0 0 58px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-evenly', padding: '10px 0', background: '#fff', borderLeft: '1px solid #efece3' }}>
+        {navItems.map((it, i) => (
+          <button key={i} onClick={it.go} style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, cursor: 'pointer' }}>
+            <span style={{ fontFamily: 'Material Symbols Rounded', fontVariationSettings: `'FILL' ${it.on ? 1 : 0}`, fontSize: 21, color: it.on ? '#1b1b18' : '#8a8a82' }}>{it.icon}</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: it.on ? '#1b1b18' : '#8a8a82' }}>{it.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* 本のページ（棚に重なるオーバーレイ。タブで右へスライド収納） */}
+      <div style={{ position: 'absolute', top: 22, bottom: 14, right: 70, width: 'min(288px, 46%)', zIndex: 3, transform: pageOpen ? 'none' : 'translateX(calc(100% + 12px))', transition: 'transform .3s cubic-bezier(.2,.8,.3,1)', background: '#fffdf8', border: '1px solid #e7e2d3', borderRadius: '10px 16px 16px 10px', boxShadow: '3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 16px 34px rgba(27,27,24,.18)', display: 'flex', flexDirection: 'column' }}>
+        {/* タブ（ページの左肩に付く。閉じてもナビの左に残る） */}
+        <button onClick={() => setPageOpen((o) => !o)} style={{ position: 'absolute', left: -26, top: 4, width: 26, height: 66, background: '#fff', border: 'none', borderRadius: '10px 0 0 10px', boxShadow: '-6px 4px 12px rgba(27,27,24,.12)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer', padding: 0 }}>
           <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 18, color: '#1b1b18' }}>menu_book</span>
           <span style={{ writingMode: 'vertical-rl', fontSize: 9, fontWeight: 700, color: '#55554e', letterSpacing: '.1em' }}>{isMonth ? 'その月' : 'その日'}</span>
         </button>
-        {/* ページ本体（閉じると右へスライドして消える） */}
-        <div style={{ position: 'absolute', top: 22, bottom: 14, right: 12, width: 'min(288px, calc(40dvw - 38px))', transform: pageOpen ? 'none' : 'translateX(130%)', transition: 'transform .3s cubic-bezier(.2,.8,.3,1)', background: '#fffdf8', border: '1px solid #e7e2d3', borderRadius: '10px 16px 16px 10px', boxShadow: '3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 16px 34px rgba(27,27,24,.18)', display: 'flex', flexDirection: 'column' }}>
-          {!isMonth && fusen(selDay)}
-          <NoteBody {...noteProps} />
-          <div style={{ flex: '0 0 auto', padding: '12px 20px', borderTop: '1px solid #f1efe8' }}><div onClick={goDay} style={{ cursor: 'pointer', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 12, padding: 10 }}>{footLabel}</div></div>
-        </div>
+        {!isMonth && fusen(selDay)}
+        <NoteBody {...noteProps} />
+        <div style={{ flex: '0 0 auto', padding: '12px 20px', borderTop: '1px solid #f1efe8' }}><div onClick={goDay} style={{ cursor: 'pointer', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 12, padding: 10 }}>{footLabel}</div></div>
       </div>
     </div>
   );

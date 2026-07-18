@@ -10,7 +10,7 @@ import {
   guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA, DEFAULT_SLOT_HOURS,
 } from './data';
 import {
-  todayStr, shiftDate, strToDate, formatDateCaps, formatDateShort, pad2, hmToTsOn,
+  todayStr, shiftDate, strToDate, dateToStr, formatDateCaps, formatDateShort, pad2, hmToTsOn,
   entryToRecord, entryGlyph, entryMin, planUnitsDue, entryEndTs,
   serialize, deserialize, freshState, sortEntries, normTitle, getTemplate, baseEntry,
 } from './model';
@@ -601,8 +601,9 @@ export default class App extends React.Component {
   backFromConfirm = () => {
     // 編集フローだけは編集のキャンセル＝ホームへ
     if (this.state.confirmOrigin === 'edit') { this.set({ searchStep: null, searchCart: [], screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', framePlan: null }); return; }
-    // それ以外の戻るは「＋メニューを追加」と同じ動き：確認カートの行動は消さず、追加の選択に戻る
-    this.addMoreMenu();
+    // それ以外は「記録を開いたとき最初の画面」（検索/予定/大カテゴリの入口）へ。
+    // 確認カートの行動は消さない（入口下部のバーからいつでも確認へ戻れる）
+    this.set({ searchStep: null, catId: null, cart: {}, keywords: [''], resolvedIdx: [] });
   };
   selectSearchItem = (kwIndex, item) => {
     const picks = this.intensityQuestions(item).map(q => Math.floor(q.opts.length / 2));
@@ -988,15 +989,40 @@ export default class App extends React.Component {
     let saved = this._pileLayout;
     if (saved && saved.length) {
       // 山が減っていたら（睡眠・ゴミ箱）古い側から間引いて量を合わせる
-      const target = this.pileGlyphs().length;
-      if (saved.length > target) saved = saved.slice(saved.length - target);
-      return saved.slice(0, 160).map(sp => ({
+      const glyphs = this.pileGlyphs();
+      const target = glyphs.length;
+      let compact = false;
+      if (saved.length > target) { saved = saved.slice(saved.length - target); compact = true; }
+      const base = saved.slice(0, 160).map(sp => ({
         e: sp.g,
         x: Math.round(sp.x * W - r),
         y: Math.round(H - sp.y * H - r),
         r2: Math.round(((sp.a || 0) * 180) / Math.PI),
         s: font,
       }));
+      // 下の絵文字が消えて上だけ残ると宙に浮くので、減った時は列ごとに下へ詰め直す。
+      // 増えた分（記録直後にホームを見た時）は山の上に足す
+      const extras = glyphs.slice(saved.length, 160 > saved.length ? 160 : saved.length);
+      if (compact || extras.length) {
+        const cols = Math.max(1, Math.floor(W / d));
+        const colH = Array(cols).fill(0);
+        const items = base.map(p => ({ ...p })).sort((p, q) => p.y - q.y); // 下(小さいbottom)から積む
+        const out = [];
+        items.forEach(p => {
+          const c = Math.min(cols - 1, Math.max(0, Math.floor((p.x + r) / d)));
+          out.push({ ...p, y: Math.round(colH[c]) });
+          colH[c] += d * 0.9;
+        });
+        let s2 = 11; const rng2 = () => { s2 = (s2 * 9301 + 49297) % 233280; return s2 / 233280; };
+        extras.forEach((g, i) => {
+          // いちばん低い列に積む（自然に山になる）
+          let c = 0; for (let k = 1; k < cols; k++) if (colH[k] < colH[c]) c = k;
+          out.push({ e: g, x: Math.round(c * d + (rng2() - 0.5) * d * 0.3), y: Math.round(colH[c]), r2: Math.round((rng2() - 0.5) * 54), s: font });
+          colH[c] += d * 0.9;
+        });
+        return out;
+      }
+      return base;
     }
     const glyphs = this.pileGlyphs().slice(-160); // 上限は新しい側を残す
     let s = seed; const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
@@ -1226,8 +1252,12 @@ export default class App extends React.Component {
         after: t.after || 0, symId: t.id, symptom: t.symptom, buffLv: t.buffLv,
       };
     });
-    const fracs = items.map(t => durOf(t) / totalMin);
-    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: totalMin, searchFracs: fracs, confirmOrigin: this.state.confirmOrigin === 'edit' ? 'edit' : 'cat' });
+    // 既に確認カートに積んである行動（確認→戻るで入口へ戻った分）は消さずに合流する
+    const merged = [...(this.state.searchCart || []), ...cart];
+    const allMins = merged.map(c => c.defMin || 30);
+    const allTotal = allMins.reduce((a, b) => a + b, 0) || 30;
+    const allFracs = allMins.map(m => m / allTotal);
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: merged, searchTotalMin: allTotal, searchFracs: allFracs, cart: {}, confirmOrigin: this.state.confirmOrigin === 'edit' ? 'edit' : 'cat' });
   };
   toggleTemplateToast = () => {
     this.set({ toast: 'テンプレに保存しました' });
@@ -1595,6 +1625,7 @@ export default class App extends React.Component {
     } catch (e) { /* ignore */ }
     // 旧本番と同じ外部フック（デバッグ・検証用）
     window.__importEvents = (items) => this.importEvents(items);
+    window.__kameApp = this; // 検証用（状態の読み取りのみに使う）
     this._unwatch = watchAuth((user) => {
       this.set({ user, authOpen: false, authPass: '' });
       if (user) this.loadCloud(); else this.loadGuest();
@@ -1621,6 +1652,58 @@ export default class App extends React.Component {
       if (hm !== this.state.clockHm) this.set({ clockHm: hm });
     }, 1000);
     this.set({ clockHm: this.tsToHm(Date.now()) });
+    // Android等の「戻る」ボタン: 画面内の戻ると同じ動きをさせる（番兵をpushして popstate で捕捉）
+    try { window.history.pushState({ kame: 1 }, ''); } catch (e) { /* ignore */ }
+    this._onPop = () => {
+      // Bookshelf 等、ローカルstateを持つ画面に先に問い合わせる
+      let consumed = false;
+      try { window.dispatchEvent(new CustomEvent('kame-back', { detail: { consume: () => { consumed = true; } } })); } catch (e) { /* ignore */ }
+      if (consumed || this.appBack()) {
+        try { window.history.pushState({ kame: 1 }, ''); } catch (e) { /* ignore */ }
+      }
+      // どちらも処理しなかった場合は再pushせず、端末に任せて終了（アプリを閉じる）
+    };
+    window.addEventListener('popstate', this._onPop);
+  }
+  /* 端末の戻るボタン: 画面内の戻る/✕と同じ動き。処理したら true */
+  appBack() {
+    const s = this.state;
+    // 手前に出ているポップアップ・シートを先に閉じる
+    if (s.symAdjust) { this.dismissSymAdjust(); return true; }
+    if (s.buffCfgId) { this.closeBuffCfg(); return true; }
+    if (s.buffOpen) { this.closeBuffs(); return true; }
+    if (s.moodOpen) { this.closeMood(); return true; }
+    if (s.intensityId) { this.closeIntensity(); return true; }
+    if (s.slotMenuOpen) { this.set({ slotMenuOpen: false }); return true; }
+    if (s.authOpen) { this.set({ authOpen: false }); return true; }
+    if (s.degreeItem) { this.set({ degreeItem: null }); return true; }
+    if (s.planDetailId) { this.set({ planDetailId: null }); return true; }
+    if (s.planAddOpen) { this.set({ planAddOpen: false }); return true; }
+    if (s.catAddOpen) { this.set({ catAddOpen: false }); return true; }
+    if (s.actAddOpen) { this.set({ actAddOpen: false }); return true; }
+    switch (s.screen) {
+      case 'record':
+        if (s.searchStep === 'confirm') { this.backFromConfirm(); return true; }
+        if (s.searchStep === 'more') { this.set({ moreKw: null, searchStep: 'results' }); return true; }
+        if (s.searchStep) { this.set({ searchStep: null }); return true; }
+        if (s.catId) { this.set({ catId: null }); return true; }
+        this.goHome(); return true; // 入口の✕と同じ
+      case 'sleep': this.set({ screen: 'home' }); return true;
+      case 'collect': this.goShaka(); return true;
+      case 'trash': case 'buffLog': case 'slotTimes': case 'catsManage':
+      case 'templates': case 'sensitivity': case 'help':
+        this.goMypage(); return true;
+      case 'cycle': this.cancelCycle(); return true;
+      case 'onboard':
+        if ((s.obStep || 1) > 1) { this.set({ obStep: s.obStep - 1 }); return true; }
+        return true; // オンボード1問目では何もしない（誤爆でアプリ終了させない）
+      case 'home': case 'shaka': case 'bookshelf': case 'mypage': {
+        const main = s.mainScreen || 'shaka';
+        if (s.screen !== main) { if (main === 'shaka') this.goShaka(); else this.goHome(); return true; }
+        return false; // メイン画面ではアプリ終了に任せる
+      }
+      default: return false;
+    }
   }
   componentDidUpdate(prevProps, prevState) {
     if (this.state.tutorial) this.checkTutorial(prevState);
@@ -1629,6 +1712,7 @@ export default class App extends React.Component {
     clearInterval(this._tick); clearInterval(this._planT); clearInterval(this._clockT);
     if (this._unwatch) this._unwatch();
     if (this._motionOn) window.removeEventListener('devicemotion', this._onDeviceMotion);
+    if (this._onPop) window.removeEventListener('popstate', this._onPop);
     this.stopPhysics(); this.stopCollectPhysics();
   }
 
@@ -2447,6 +2531,12 @@ export default class App extends React.Component {
         : this.homeDateStr() === shiftDate(todayStr(), 1) ? '明日' : '',
       homePrevDay: this.homePrevDay, homeNextDay: this.homeNextDay,
       setHomeDate: this.setHomeDate, goToday: this.goToday,
+      // 睡眠カードに出す、その日の睡眠回復量（ためた回復の🌙を日別集計）
+      sleepRecText: (() => {
+        const dd = this.homeDateStr();
+        const n = (st.collected || []).reduce((a, c) => (c.glyph === '🌙' && c.ts && dateToStr(new Date(c.ts)) === dd) ? a + (c.amount || 1) : a, 0);
+        return n > 0 ? '−' + n : '';
+      })(),
       pile: st.screen === 'home' ? this.makePile(7) : [],
       // 残量ライン（rank）より上の絵文字が消える。ホーム/シャカと同じ配置
       sleepPile: st.screen === 'sleep' ? this.makeSleepPile().map((p, i) => ({
@@ -2538,9 +2628,14 @@ export default class App extends React.Component {
       recordSlotName: activeSlot.name, recordSlotEmoji: activeSlot.emoji,
       slotMenuOpen: !!st.slotMenuOpen, toggleSlotMenu: this.toggleSlotMenu,
       slotOptions: SLOTS.map(s => ({ id: s.id, emoji: s.emoji, name: s.name, active: s.id === (st.slotId || this.slotNow()), bg: s.id === (st.slotId || this.slotNow()) ? '#fbfdf0' : '#fff', onPick: () => this.pickSlot(s.id) })),
-      showCart: count > 0,
-      cartMeta: count + '件 · ' + this.fmtMin(items.reduce((a, t) => a + (t.defMin || 30), 0)),
-      cartFatText: (cartFat >= 0 ? '+' + cartFat : '' + cartFat),
+      // 入口/カテゴリのカートバー。確認→戻るで入口に戻った時は確認カート(searchCart)の内容で表示し、確認へ直帰できる
+      showCart: count > 0 || (!st.searchStep && scCount > 0),
+      cartMeta: count > 0
+        ? count + '件 · ' + this.fmtMin(items.reduce((a, t) => a + (t.defMin || 30), 0) + (scCount ? (st.searchTotalMin || 0) : 0))
+        : scCount + '件 · ' + this.fmtMin(st.searchTotalMin || totalMin),
+      cartFatText: count > 0
+        ? ((cartFat + searchTotalFat) >= 0 ? '+' + (cartFat + searchTotalFat) : '' + (cartFat + searchTotalFat))
+        : (searchTotalFat >= 0 ? '+' + searchTotalFat : '' + searchTotalFat),
       residual: st.residual,
       recoveredAbs: recovered,
       goHome: this.goHome, goShaka: this.goShaka, goMypage: this.goMypage, goSleep: this.goSleep,
@@ -2611,7 +2706,7 @@ export default class App extends React.Component {
       buffCfgTitle: st.buffCfgTitle || '', onBuffCfgTitle: this.onBuffCfgTitle,
       buffCfgPeriods: this.BUFF_PERIODS.map(pp => ({ key: pp.key, label: pp.label, on: st.buffCfgKey === pp.key, onPick: () => this.pickBuffCfgKey(pp.key) })),
       saveBuffCfg: this.saveBuffCfg, closeBuffCfg: this.closeBuffCfg,
-      goConfirm: this.goConfirm,
+      goConfirm: (count === 0 && scCount > 0) ? this.goSearchConfirm : this.goConfirm,
       toggleTemplateToast: this.toggleTemplateToast, shake: this.shake,
       shakaDate: st.dayOffset === 0 ? formatDateShort(todayStr()) : formatDateShort(viewDateStr),
       clockHm: st.clockHm || this.tsToHm(Date.now()),

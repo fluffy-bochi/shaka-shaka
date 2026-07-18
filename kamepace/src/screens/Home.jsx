@@ -22,6 +22,9 @@ function CalendarBtn({ value, onChange }) {
 }
 
 export default function Home({ v }) {
+  // 時間帯カードのアコーディオン開閉（デフォルトは開）
+  const [closedSlots, setClosedSlots] = React.useState({});
+  const toggleSlot = (id) => setClosedSlots((s) => ({ ...s, [id]: !s[id] }));
   return (
     <>
       {/* 背景の積もった絵文字（ボカシ） */}
@@ -71,20 +74,23 @@ export default function Home({ v }) {
             <span style={{ fontSize: 15 }}>🛏</span>
             <span style={{ fontSize: 13, fontWeight: 700, flex: 1, textAlign: 'left' }}>睡眠</span>
             <span style={{ ...mono, fontSize: 10, color: '#8a8a82' }}>のこりをなぞって記録</span>
+            {v.sleepRecText && <span style={{ ...mono, fontSize: 13, fontWeight: 700, color: '#f5994e' }}>{v.sleepRecText}</span>}
           </div>
         </button>
         {/* slots */}
         {v.slots.map(s => (
           <div key={s.id} style={{ background: '#fff', borderRadius: 18, margin: '0 16px 12px', boxShadow: '0 1px 3px rgba(27,27,24,.06)', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px 12px' }}>
+            {/* ヘッダーをタップでアコーディオン開閉 */}
+            <div onClick={() => toggleSlot(s.id)} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px 12px', cursor: 'pointer', userSelect: 'none' }}>
               <div style={{ position: 'relative', width: 42, height: 42, flex: '0 0 auto', borderRadius: '50%', background: s.circleBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
                 {s.emoji}
                 {s.hasRecords && <span style={{ position: 'absolute', top: -1, right: -2, width: 17, height: 17, borderRadius: '50%', background: '#c4f000', border: '2.5px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 10, color: '#2f3a00' }}>check</span>}
               </div>
               <span style={{ fontSize: 15, fontWeight: 800, flex: 1, color: s.nameColor }}>{s.name}</span>
               <span style={{ ...mono, fontSize: 13, fontWeight: 700, color: '#f5994e' }}>{s.sumText}</span>
+              <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#c9c7bf', transform: closedSlots[s.id] ? 'none' : 'rotate(180deg)', transition: 'transform .2s', flex: '0 0 auto' }}>expand_more</span>
             </div>
-            {s.hasRecords && (
+            {!closedSlots[s.id] && s.hasRecords && (
               <div style={{ borderTop: '1px solid #f1efe8' }}>
                 {s.groups.map((g, gi) => (
                   <div key={gi} onClick={g.onTap} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '9px 15px', borderBottom: '1px solid #f1efe8', cursor: 'pointer' }}>
@@ -101,9 +107,11 @@ export default function Home({ v }) {
                 ))}
               </div>
             )}
-            <button onClick={s.onAdd} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', border: 'none', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#7a9a00' }}>
-              <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 16 }}>add</span>記録する
-            </button>
+            {!closedSlots[s.id] && (
+              <button onClick={s.onAdd} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', border: 'none', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#7a9a00' }}>
+                <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 16 }}>add</span>記録する
+              </button>
+            )}
           </div>
         ))}
       </div>
