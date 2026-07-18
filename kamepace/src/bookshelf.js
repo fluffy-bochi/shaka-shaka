@@ -196,12 +196,13 @@ export function buildMonth(entries, year, month, names, sleepMap) {
   const kinds = {};
   Object.keys(fatC).forEach((g) => { kinds[g] = 'fat'; });
   Object.keys(recC).forEach((g) => { kinds[g] = 'rec'; });
-  /* 表紙の山: 上限200個。表示数 = その月に記録した絵文字の総数（疲労＋回復・睡眠含む）÷ 月の日数。
-     絵文字の内訳は、その月の実際の割合に合わせて比例配分する */
+  /* 表紙の山: 上限200個。表示数 = その月に記録した絵文字の総数（疲労＋回復・睡眠含む）÷ その月の記録した日数。
+     （記録してない日は分母に入れない）絵文字の内訳は、その月の実際の割合に合わせて比例配分する */
   const allC = { ...fatC };
   Object.entries(recC).forEach(([g, n]) => { allC[g] = (allC[g] || 0) + n; });
   const totalAll = Object.values(allC).reduce((a, b) => a + b, 0);
-  const showN = totalAll > 0 ? Math.min(200, Math.max(1, Math.round(totalAll / last))) : 0;
+  const recordedDays = days.filter((d) => d.fatSolid.length + d.recSolid.length + (d.sleep || 0) > 0).length;
+  const showN = totalAll > 0 ? Math.min(200, Math.max(1, Math.round(totalAll / Math.max(1, recordedDays)))) : 0;
   // 比例配分（端数は大きい順に配る）
   const ent = Object.entries(allC).map(([g, n]) => { const exact = n / totalAll * showN; return { g, base: Math.floor(exact), fracPart: exact - Math.floor(exact) }; });
   let used = ent.reduce((a, x) => a + x.base, 0);
