@@ -209,20 +209,33 @@ export function BuffSheet({ v }) {
       <div style={{ ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a8a82', margin: '14px 2px 6px' }}>{label}</div>
       <div style={{ border: '1px solid #f1efe8', borderRadius: 14, overflow: 'hidden' }}>
         {v.buffChoices.filter(b => b.kind === kind).map((b, i, arr) => (
-          <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 13px', borderBottom: i < arr.length - 1 ? '1px solid #f1efe8' : 'none', background: b.on ? '#fbfdf0' : '#fff' }}>
-            <Emo e={b.glyph} size={26} />
-            <div onClick={b.onEdit || undefined} style={{ flex: 1, minWidth: 0, cursor: b.onEdit ? 'pointer' : 'default' }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700 }}>{b.name}{b.onEdit && <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 13, color: '#8a8a82', marginLeft: 5, verticalAlign: 'middle' }}>edit</span>}</div>
-              <div style={{ fontSize: 10.5, color: '#9d9b91', marginTop: 1 }}>{b.desc}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                {b.effects.map((e, ei) => (
-                  <span key={ei} style={{ ...mono, fontSize: 9, background: b.kind === 'debuff' ? '#ffe3ef' : '#eef7cc', color: b.kind === 'debuff' ? '#a33e6d' : '#5a7500', borderRadius: 5, padding: '2px 6px' }}>{e}</span>
-                ))}
+          <div key={b.id} style={{ borderBottom: i < arr.length - 1 ? '1px solid #f1efe8' : 'none', background: b.on ? '#fbfdf0' : '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 13px' }}>
+              <Emo e={b.glyph} size={26} />
+              <div onClick={b.onEdit || undefined} style={{ flex: 1, minWidth: 0, cursor: b.onEdit ? 'pointer' : 'default' }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{b.name}{b.count > 1 && <span style={{ ...mono, fontSize: 10, fontWeight: 700, color: b.kind === 'debuff' ? '#a33e6d' : '#5a7500', marginLeft: 5 }}>×{b.count}</span>}{b.onEdit && <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 13, color: '#8a8a82', marginLeft: 5, verticalAlign: 'middle' }}>edit</span>}</div>
+                <div style={{ fontSize: 10.5, color: '#9d9b91', marginTop: 1 }}>{b.desc}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                  {b.effects.map((e, ei) => (
+                    <span key={ei} style={{ ...mono, fontSize: 9, background: b.kind === 'debuff' ? '#ffe3ef' : '#eef7cc', color: b.kind === 'debuff' ? '#a33e6d' : '#5a7500', borderRadius: 5, padding: '2px 6px' }}>{e}</span>
+                  ))}
+                </div>
               </div>
+              {b.on && <button onClick={b.onAdd} title="同じものをもう1つ" style={{ width: 26, height: 26, borderRadius: '50%', border: '1.5px solid #d8d5cb', background: '#fff', fontSize: 15, color: '#7a9a00', cursor: 'pointer', flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>＋</button>}
+              <button onClick={b.onToggle} style={{ width: 44, height: 26, borderRadius: 999, border: 'none', background: b.on ? '#c4f000' : '#e4e1d8', position: 'relative', cursor: 'pointer', flex: '0 0 auto' }}>
+                <span style={{ position: 'absolute', top: 3, left: b.on ? 22 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)' }} />
+              </button>
             </div>
-            <button onClick={b.onToggle} style={{ width: 44, height: 26, borderRadius: 999, border: 'none', background: b.on ? '#c4f000' : '#e4e1d8', position: 'relative', cursor: 'pointer', flex: '0 0 auto' }}>
-              <span style={{ position: 'absolute', top: 3, left: b.on ? 22 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)' }} />
-            </button>
+            {/* 2個目以降のインスタンス（重複ぶん） */}
+            {(b.instances || []).map((ins) => (
+              <div key={ins.iid} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 13px 7px 50px', borderTop: '1px dashed #eee9dc' }}>
+                <div onClick={ins.onEdit} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700 }}>{ins.title}</span>
+                  <span style={{ ...mono, fontSize: 10, color: '#9d9b91', marginLeft: 6 }}>{ins.period}</span>
+                </div>
+                <button onClick={ins.onRemove} style={{ border: 'none', background: 'none', fontSize: 15, color: '#c9c7bf', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
+              </div>
+            ))}
           </div>
         ))}
       </div>

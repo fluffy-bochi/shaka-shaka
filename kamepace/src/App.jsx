@@ -435,19 +435,30 @@ export default class App extends React.Component {
   ];
   toggleBuff = (id) => {
     const cur = this.buffEntries();
-    const en = cur.find(x => x.id === id);
-    if (en) {
-      // オフ = 履歴に確定（endは今日）
-      this.set({ activeBuffs: cur.filter(x => x.id !== id), buffLog: this.pushBuffLog(en, todayStr()) });
+    const insts = cur.filter(x => x.id === id);
+    if (insts.length) {
+      // オフ = そのプリセットのインスタンスを全部まとめて履歴へ
+      let log = this.state.buffLog || [];
+      insts.forEach(en => { log = this.pushBuffLog(en, todayStr(), log); });
+      this.set({ activeBuffs: cur.filter(x => x.id !== id), buffLog: log });
       this.save();
     } else {
       this.openBuffCfg(id); // ONにするときはタイトル・期間を設定
     }
   };
-  /* 履歴へ確定。同じ from/id の既存ログは更新（重複防止） */
-  pushBuffLog(en, end) {
-    const log = (this.state.buffLog || []).filter(l => !(l.id === en.id && l.from === en.from));
-    return [...log, { id: en.id, title: en.title, from: en.from || todayStr(), end, key: en.key }];
+  // 既にオンでも「同じバフ・デバフをもう1つ」追加できる（重複＝効果が重なる）
+  addBuffInstance = (id) => this.openBuffCfg(id, null);
+  removeBuffInstance = (iid) => {
+    const cur = this.buffEntries();
+    const en = cur.find(x => x.iid === iid);
+    this.set({ activeBuffs: cur.filter(x => x.iid !== iid), buffLog: en ? this.pushBuffLog(en, todayStr()) : this.state.buffLog });
+    this.save();
+  };
+  /* 履歴へ確定。同じ iid（無ければ id+from）の既存ログは更新（重複防止）。base を渡せば連続適用できる */
+  pushBuffLog(en, end, base) {
+    const key = en.iid || (en.id + '|' + (en.from || ''));
+    const log = (base || this.state.buffLog || []).filter(l => (l.iid || (l.id + '|' + (l.from || ''))) !== key);
+    return [...log, { id: en.id, iid: en.iid, title: en.title, from: en.from || todayStr(), end, key: en.key }];
   }
   /* 期限切れになったバフを履歴へ移す（起動時に1回） */
   sweepExpiredBuffs() {
@@ -460,16 +471,16 @@ export default class App extends React.Component {
     this.set({ activeBuffs: raw.filter(x => !(x.until && x.until < t)), buffLog: log });
     this.save();
   }
-  openBuffCfg = (id) => {
+  openBuffCfg = (id, iid = null) => {
     const b = BUFFS.find(x => x.id === id);
-    const existing = this.buffEntries().find(x => x.id === id);
+    const existing = iid ? this.buffEntries().find(x => x.iid === iid) : null;
     this.set({
-      buffCfgId: id,
+      buffCfgId: id, buffCfgIid: iid,
       buffCfgTitle: (existing && existing.title) || (b ? b.name : ''),
       buffCfgKey: (existing && existing.key) || 'none',
     });
   };
-  closeBuffCfg = () => this.set({ buffCfgId: null });
+  closeBuffCfg = () => this.set({ buffCfgId: null, buffCfgIid: null });
   onBuffCfgTitle = (e) => this.set({ buffCfgTitle: e.target.value });
   pickBuffCfgKey = (key) => this.set({ buffCfgKey: key });
   saveBuffCfg = () => {
@@ -479,10 +490,13 @@ export default class App extends React.Component {
     const until = period.days == null ? null : shiftDate(todayStr(), period.days);
     const b = BUFFS.find(x => x.id === id);
     const title = (this.state.buffCfgTitle || '').trim() || (b ? b.name : '');
-    const prev = this.buffEntries().find(x => x.id === id);
-    const entry = { id, title, until, key: period.key, from: (prev && prev.from) || todayStr() };
-    const rest = this.buffEntries().filter(x => x.id !== id);
-    this.set({ activeBuffs: [...rest, entry], buffCfgId: null });
+    const iid = this.state.buffCfgIid;
+    const cur = this.buffEntries();
+    const prev = iid ? cur.find(x => x.iid === iid) : null;
+    const entry = { id, iid: iid || ('bf' + Date.now() + Math.floor(Math.random() * 1000)), title, until, key: period.key, from: (prev && prev.from) || todayStr() };
+    // 編集ならそのインスタンスを差し替え、新規なら他を全部残して追加（＝同じ種類を重複できる）
+    const rest = iid ? cur.filter(x => x.iid !== iid) : cur;
+    this.set({ activeBuffs: [...rest, entry], buffCfgId: null, buffCfgIid: null });
     this.save();
   };
   /* ===== きもち・できごと ===== */
@@ -1044,10 +1058,9 @@ export default class App extends React.Component {
   // 100個で画面全体を埋めるサイズ。100を超えたら縮小して画面に収める（あふれ対策）
   calcR(w, h, count) {
     const area = Math.max(1, w) * Math.max(1, h);
-    // 100個でその画面がちょうど満杯（上端まで）になる大きさ。画面の実寸(area)から計算するので機種で自動調整
-    let r = Math.sqrt(area * 0.8 / (100 * Math.PI));
-    const n = count || 100;
-    if (n > 100) r *= Math.sqrt(100 / n);
+    // 100個でその画面がちょうど満杯（上端まで）になる大きさ。画面の実寸(area)から計算するので機種で自動調整。
+    // 100を超えても縮小せず同じ大きさのまま画面の外（上）に積み上げる
+    const r = Math.sqrt(area * 0.8 / (100 * Math.PI));
     return Math.max(8, Math.min(r, 60));
   }
   /* 今この画面で積む絵文字の数（シャカ・ホーム・睡眠で共通） */
@@ -2915,15 +2928,23 @@ export default class App extends React.Component {
         if (b.mult.mindFat) eff.push('心の疲労 ×' + b.mult.mindFat);
         if (b.mult.bodyRec) eff.push('体の回復 ×' + b.mult.bodyRec);
         if (b.mult.mindRec) eff.push('心の回復 ×' + b.mult.mindRec);
-        const en = this.buffEntries().find(x => x.id === b.id);
-        const periodText = en ? (en.until ? `${parseInt(en.until.split('-')[1], 10)}/${parseInt(en.until.split('-')[2], 10)}まで` : 'ずっと') : '';
+        const insts = this.buffEntries().filter(x => x.id === b.id);
+        const pText = (en) => en.until ? `${parseInt(en.until.split('-')[1], 10)}/${parseInt(en.until.split('-')[2], 10)}まで` : 'ずっと';
+        const first = insts[0];
         return {
-          id: b.id, glyph: b.glyph, name: (en && en.title) || b.name, presetName: b.name,
-          desc: en ? `${b.name} ・ ${periodText}` : b.desc,
+          id: b.id, glyph: b.glyph, name: (first && first.title) || b.name, presetName: b.name,
+          desc: first ? `${b.name} ・ ${pText(first)}` : b.desc,
           kind: b.kind, effects: eff,
-          on: !!en,
+          on: insts.length > 0, count: insts.length,
           onToggle: () => this.toggleBuff(b.id),
-          onEdit: en ? () => this.openBuffCfg(b.id) : null,
+          onEdit: first ? () => this.openBuffCfg(b.id, first.iid) : null,
+          onAdd: () => this.addBuffInstance(b.id), // 同じ種類をもう1つ
+          // 2個目以降のインスタンス（タイトル・期間・個別削除）
+          instances: insts.slice(1).map(en => ({
+            iid: en.iid, title: en.title, period: pText(en),
+            onEdit: () => this.openBuffCfg(b.id, en.iid),
+            onRemove: () => this.removeBuffInstance(en.iid),
+          })),
         };
       }),
       goBuffLog: this.goBuffLog,
