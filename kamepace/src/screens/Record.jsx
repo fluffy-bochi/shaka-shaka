@@ -481,8 +481,23 @@ function ActAddPopup({ v }) {
           <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>行動をつくる</div>
           <button onClick={v.closeActAdd} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
         </div>
+        {/* なまえ */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>なまえ</div>
+        <input value={v.actName} onChange={v.onActName} placeholder="例：数学、皿洗い（夜）" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
+        {/* 絵文字: カテゴリ標準 or 検索して個別に設定 */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>絵文字（カテゴリ標準か、この行動だけの絵文字）</div>
+        <EmojiPicker
+          value={v.actGlyph === 'std' ? null : v.actGlyph}
+          onPick={v.pickActGlyph}
+          lead={(
+            <button onClick={() => v.pickActGlyph('std')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 56, height: 40, borderRadius: 10, border: v.actGlyph === 'std' ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: v.actGlyph === 'std' ? '#fbfdf0' : '#fff', cursor: 'pointer', padding: 0, lineHeight: 1 }}>
+              <Emo e={v.actStdGlyph} size={18} />
+              <span style={{ fontSize: 8.5, fontWeight: 700, color: '#7a9a00', marginTop: 2 }}>標準</span>
+            </button>
+          )}
+        />
         {/* コピー元を選ぶ（プルダウン。空欄からの新規は不可＝アンカリング） */}
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>にているものをえらぶ（コピー元）</div>
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>にているものをえらぶ（コピー元）</div>
         <div style={{ position: 'relative', marginTop: 8 }}>
           <button onClick={() => setSrcOpen(!srcOpen)} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, border: '1.5px solid #e4e1d8', background: '#fff', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}>
             <span style={{ fontSize: 17 }}>{cur ? cur.glyph : ''}</span>
@@ -509,21 +524,6 @@ function ActAddPopup({ v }) {
         <div style={{ background: '#c4f000', borderRadius: 12, padding: '9px 14px', marginTop: 12, textAlign: 'center' }}>
           <span style={{ ...mono, fontSize: 13, fontWeight: 700, color: '#2f3a00' }}>{v.actIsRecover ? '回復の目安' : '目安'} {v.actEstText}</span>
         </div>
-        {/* なまえ */}
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>なまえ</div>
-        <input value={v.actName} onChange={v.onActName} placeholder="例：数学、皿洗い（夜）" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
-        {/* 絵文字: カテゴリ標準 or 検索して個別に設定 */}
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>絵文字（カテゴリ標準か、この行動だけの絵文字）</div>
-        <EmojiPicker
-          value={v.actGlyph === 'std' ? null : v.actGlyph}
-          onPick={v.pickActGlyph}
-          lead={(
-            <button onClick={() => v.pickActGlyph('std')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 56, height: 40, borderRadius: 10, border: v.actGlyph === 'std' ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: v.actGlyph === 'std' ? '#fbfdf0' : '#fff', cursor: 'pointer', padding: 0, lineHeight: 1 }}>
-              <Emo e={v.actStdGlyph} size={18} />
-              <span style={{ fontSize: 8.5, fontWeight: 700, color: '#7a9a00', marginTop: 2 }}>標準</span>
-            </button>
-          )}
-        />
         <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
           <button onClick={v.closeActAdd} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>キャンセル</button>
           <button onClick={v.addAction} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>つくる</button>
