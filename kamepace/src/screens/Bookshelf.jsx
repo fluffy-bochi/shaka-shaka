@@ -260,7 +260,39 @@ export default function Bookshelf({ v }) {
   const footLabel = isMonth ? 'この月を見る' : 'この日を見る';
 
   /* ---------- スクロール位置 ---------- */
-  const portRef = useRef(null), landRef = useRef(null);
+  const portRef = useRef(null), landRef = useRef(null), landMonthRef = useRef(null);
+
+  /* 横の棚のスクロール補助:
+     - マウスホイール/トラックパッドの縦回転を横スクロールに変換（PCで回せない問題）
+     - 90°回転表示中は指の動き(画面縦=棚の横)を自前で横スクロールに変換（回転中にスクロールできない問題） */
+  useEffect(() => {
+    if (!land) return undefined;
+    const els = [landRef.current, landMonthRef.current].filter(Boolean);
+    const cleanups = els.map((el) => {
+      const onWheel = (e) => {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { el.scrollLeft += e.deltaY; e.preventDefault(); }
+      };
+      let sy = 0, sl = 0, active = false;
+      const onTS = (e) => { active = true; sy = e.touches[0].clientY; sl = el.scrollLeft; };
+      const onTM = (e) => {
+        if (!active || !forceRotate) return; // 通常の横向きはネイティブスクロールに任せる
+        el.scrollLeft = sl - (e.touches[0].clientY - sy);
+        e.preventDefault();
+      };
+      const onTE = () => { active = false; };
+      el.addEventListener('wheel', onWheel, { passive: false });
+      el.addEventListener('touchstart', onTS, { passive: true });
+      el.addEventListener('touchmove', onTM, { passive: false });
+      el.addEventListener('touchend', onTE);
+      return () => {
+        el.removeEventListener('wheel', onWheel);
+        el.removeEventListener('touchstart', onTS);
+        el.removeEventListener('touchmove', onTM);
+        el.removeEventListener('touchend', onTE);
+      };
+    });
+    return () => cleanups.forEach((f) => f());
+  }, [land, isMonth, forceRotate]);
   const centerToday = (el) => {
     // 90°回転表示中でも狂わないよう、画面座標でなくレイアウト座標(offsetLeft)で中央へ
     if (!el) return false;
@@ -525,7 +557,7 @@ export default function Bookshelf({ v }) {
             </div>
           </div>
         ) : (
-          <div className="nos" style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+          <div ref={landMonthRef} className="nos" style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'flex-end', gap: 22, height: '100%', padding: '0 40px' }}>
               {monthObjs.map((mo) => <Cover key={mo.ym} mo={mo} w={170} h={280} />)}
               <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 14, background: 'linear-gradient(180deg,#4a3120,#241509)', borderRadius: 2, boxShadow: '0 5px 10px rgba(27,27,24,.28)', zIndex: 2 }} />
