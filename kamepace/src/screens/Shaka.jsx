@@ -18,7 +18,7 @@ export default function Shaka({ v }) {
       </div>
       {/* ロック画面風の時計（旧本番 backClock 相当） */}
       <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '14px 26px 0', pointerEvents: 'none' }}>
-        <div style={{ fontFamily: "'Archivo',sans-serif", fontWeight: 800, fontSize: 68, lineHeight: 1.02, letterSpacing: '.01em', color: '#1b1b18' }}>{v.clockHm}</div>
+        <div style={{ fontFamily: "'Archivo',sans-serif", fontWeight: 800, fontSize: 68, lineHeight: 1.02, letterSpacing: '.01em', color: v.pileHigh ? '#fff' : '#1b1b18', textShadow: v.pileHigh ? '0 2px 10px rgba(27,27,24,.35)' : 'none', transition: 'color .3s' }}>{v.clockHm}</div>
       </div>
       <div style={{ flex: 1 }} />
       {/* 右端の「ためた回復」タブ（画面右辺にくっつく） */}

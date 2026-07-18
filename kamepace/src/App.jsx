@@ -2817,6 +2817,8 @@ export default class App extends React.Component {
         return n > 0 ? '−' + n : '';
       })(),
       pile: st.screen === 'home' ? this.makePile(7) : [],
+      // 山が高く積み上がって上部UI（時計・日付ナビ）に重なる量になったら白文字にする
+      pileHigh: this.pileCount() >= 90,
       // 残量ライン（rank）より上の絵文字が消える。ホーム/シャカと同じ配置
       sleepPile: st.screen === 'sleep' ? this.makeSleepPile().map((p, i) => ({
         ...p,
