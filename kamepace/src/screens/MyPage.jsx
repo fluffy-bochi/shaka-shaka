@@ -78,6 +78,19 @@ export default function MyPage({ v }) {
             <span style={{ display: 'inline-flex', background: '#eef7cc', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#2f3a00' }}>今日の予定を取り込む</span>
           </button>
         </div>
+        <div style={label}>れんけい</div>
+        <div style={card}>
+          <button onClick={v.syncMylifecore} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ fontSize: 16 }}>🗓️</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: 14 }}>mylifecore</span>
+              <span style={{ ...mono, fontSize: 10.5, color: '#9d9b91' }}>{v.mylifeStatusText}</span>
+            </span>
+            {v.mylifeConnected
+              ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#eef7cc', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#2f3a00', flex: '0 0 auto' }}>🟢 連携中 · いま同期</span>
+              : <span style={{ display: 'inline-flex', background: '#f1efe8', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#8a8a82', flex: '0 0 auto' }}>ログインで連携</span>}
+          </button>
+        </div>
         <div style={label}>ヘルプ</div>
         <div style={card}>
           <button onClick={v.startTutorial} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
