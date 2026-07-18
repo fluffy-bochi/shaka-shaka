@@ -16,7 +16,7 @@ import {
 } from './model';
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout,
-  cloudSave, loadUserData, fetchGoogleData, jpError,
+  cloudSave, loadUserData, fetchGoogleData, fetchScheduleEvents, jpError,
 } from './firebase';
 import { initShakaSound, attachCollisionSound } from './sound';
 import { appendGlyph } from './fluent';
@@ -229,6 +229,10 @@ export default class App extends React.Component {
         onboardDone = this.state.onboardDone; // ゲスト時に済ませていれば true
       }
       setTimeout(() => this.advancePlans(), 0);
+      // カレンダーアプリ(my-schedule-app)の予定を自動取り込み（ログイン時＋以後5分ごと）
+      setTimeout(() => this.syncScheduleApp(), 400);
+      clearInterval(this._schedT);
+      this._schedT = setInterval(() => this.syncScheduleApp(), 5 * 60 * 1000);
       // 既にオンボ済みのログインユーザーには出さない。初回（未オンボ）だけ出す
       if (!onboardDone) setTimeout(() => this.set({ screen: 'onboard', obStep: 1, obSel: {} }), 200);
     } catch (err) {
@@ -1709,7 +1713,7 @@ export default class App extends React.Component {
     if (this.state.tutorial) this.checkTutorial(prevState);
   }
   componentWillUnmount() {
-    clearInterval(this._tick); clearInterval(this._planT); clearInterval(this._clockT);
+    clearInterval(this._tick); clearInterval(this._planT); clearInterval(this._clockT); clearInterval(this._schedT);
     if (this._unwatch) this._unwatch();
     if (this._motionOn) window.removeEventListener('devicemotion', this._onDeviceMotion);
     if (this._onPop) window.removeEventListener('popstate', this._onPop);
@@ -2162,6 +2166,21 @@ export default class App extends React.Component {
   toast(text, ms = 1800) {
     this.set({ toast: text });
     clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), ms);
+  }
+
+  /* カレンダーアプリ(my-schedule-app)の予定を取り込む。
+     同じ予定は srcId で重複防止。テンプレ一致なら自動でタスク割り付け、無ければ「枠」になり、
+     予定は時間どおりに進んで終了時刻で自動記録される（既存の planned/frame の仕組みに乗る） */
+  async syncScheduleApp() {
+    if (!this.state.user) return;
+    try {
+      const items = await fetchScheduleEvents();
+      if (!items.length) return;
+      const added = this.importEvents(items);
+      if (added > 0) this.toast('📅 カレンダーから予定を' + added + '件とりこみました');
+    } catch (e) {
+      console.warn('[kamepace] schedule sync failed', e); // 権限・ネットワーク等は静かに再試行に任せる
+    }
   }
 
   /* Googleカレンダー/ToDo 取り込み（旧本番と同一の entries 形式で追加） */
