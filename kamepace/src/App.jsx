@@ -612,15 +612,25 @@ export default class App extends React.Component {
     this.set({ searchStep: null, catId: null, cart: {}, keywords: [''], resolvedIdx: [] });
   };
   selectSearchItem = (kwIndex, item) => {
+    const prev = this.state.searchCart || [];
+    const n0 = prev.length;
     const picks = this.intensityQuestions(item).map(q => Math.floor(q.opts.length / 2));
     const id = 'sc' + Date.now() + Math.floor(Math.random() * 1000);
-    const cart = [...this.state.searchCart, { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, defMin: this.initialMinOf(item), kw: item.kw, picks, symId: item.id, symptom: item.symptom, buffLv: item.buffLv }];
+    const newMin = this.initialMinOf(item);
+    const cart = [...prev, { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, defMin: newMin, kw: item.kw, picks, symId: item.id, symptom: item.symptom, buffLv: item.buffLv }];
     const resolved = kwIndex == null ? this.state.resolvedIdx : [...this.state.resolvedIdx, kwIndex];
     const remaining = this.remainingKw(resolved);
-    // 初期時間は各行動の標準所要時間（defaultMin）の合計・配分もその比率（v3）
-    const mins = cart.map(c => c.defMin || 30);
-    const total = mins.reduce((a, b) => a + b, 0);
-    this.set({ searchCart: cart, resolvedIdx: resolved, moreKw: null, searchStep: remaining.length ? 'results' : 'confirm', searchTotalMin: total, searchFracs: mins.map(m => m / total) });
+    // 既に設定した各行の時間は保持し、新しい行に標準所要時間を足すだけ（追加で時間がリセットされない）
+    const timeMode = this.state.confirmMode === 'time';
+    const prevTotal = timeMode ? this.timeSpanMin() : (this.state.searchTotalMin || (n0 * 30) || 0);
+    const prevFr = (this.state.searchFracs && this.state.searchFracs.length === n0) ? this.state.searchFracs : Array(n0).fill(n0 ? 1 / n0 : 0);
+    const prevMins = prevFr.map(f => Math.max(1, Math.round(f * prevTotal)));
+    const mins = n0 ? [...prevMins, newMin] : [newMin];
+    const total = mins.reduce((a, b) => a + b, 0) || 30;
+    const patch = { searchCart: cart, resolvedIdx: resolved, moreKw: null, searchStep: remaining.length ? 'results' : 'confirm', searchTotalMin: total, searchFracs: mins.map(m => m / total) };
+    // 時間モードなら、開始はそのまま・終了を伸ばして既存の割り当てを保つ
+    if (timeMode && this.state.startTime) patch.endTime = this.addHm(this.state.startTime, total);
+    this.set(patch);
   };
   /* 検索で見つからないとき: タイトル・大カテゴリ・絵文字を選んでつくる */
   addNewAction = (kwIndex, name) => {
@@ -680,12 +690,16 @@ export default class App extends React.Component {
     const items = this.state.searchCart;
     const n = items.length;
     if (!n || idx < 0 || idx >= n) return;
+    const timeMode = this.state.confirmMode === 'time';
     const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(1 / n);
-    const total = this.state.searchTotalMin || (n * 30);
+    const total = timeMode ? this.timeSpanMin() : (this.state.searchTotalMin || (n * 30));
     const mins = fr.map(f => Math.max(1, Math.round(f * total)));
     mins[idx] = Math.max(1, Math.round(Number(m) || 0) || 1);
     const newTotal = mins.reduce((a, b) => a + b, 0);
-    this.set({ searchTotalMin: newTotal, searchFracs: mins.map(x => x / newTotal) });
+    const patch = { searchTotalMin: newTotal, searchFracs: mins.map(x => x / newTotal) };
+    // 時間モードは終了時刻を伸縮させて各行の分を反映
+    if (timeMode && this.state.startTime) patch.endTime = this.addHm(this.state.startTime, newTotal);
+    this.set(patch);
   };
   onFracDrag = (k) => (e) => {
     if (e.type === 'pointermove' && e.buttons === 0) return;
@@ -1203,7 +1217,7 @@ export default class App extends React.Component {
     const totalMin = plan.tasks.reduce((a, t) => a + (t.min || 0), 0) || plan.tasks.length * 30;
     const cart = plan.tasks.map((t, i) => { const fh = t.min ? (t.fat * 60 / t.min) : t.fat; return { id: 'scp' + Date.now() + i, name: t.name, glyph: t.glyph, fh, kw: [plan.name, t.name], picks: [], plan: plan.name }; });
     const fracs = plan.tasks.map(t => (t.min || 30) / totalMin);
-    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: totalMin, searchFracs: fracs, planDetailId: null, planAddOpen: false, confirmOrigin: this.state.confirmOrigin === 'edit' ? 'edit' : 'plan' });
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: totalMin, searchFracs: fracs, confirmMode: 'duration', planDetailId: null, planAddOpen: false, confirmOrigin: this.state.confirmOrigin === 'edit' ? 'edit' : 'plan' });
   }
   openPlan = (id) => { const p = this.planById(id); if (p) this.planToConfirm(p); };
   closePlan = () => this.set({ planDetailId: null });
@@ -2199,6 +2213,15 @@ export default class App extends React.Component {
     }
   }
 
+  /* マイページ「いま同期」ボタン */
+  syncMylifecore = async () => {
+    if (!this.state.user) { this.openAuth(); return; }
+    this.toast('⏳ mylifecoreと同期中…', 5000);
+    await this.syncScheduleApp();
+    this.set({ lastSyncAt: Date.now() });
+    this.toast('🗓️ mylifecoreと同期しました');
+  };
+
   /* ホームのタスク（夜の下）: チェックで完了。
      完了時は「チェックした時間帯」に行動としてタスク名で記録し、mylifecore由来は本家側にも完了を書き戻す */
   toggleHomeTask = (srcId) => {
@@ -2442,7 +2465,7 @@ export default class App extends React.Component {
         color: scPalette[idx % scPalette.length], widthPct: (fr0[idx] * 100) + '%', name: it.name,
         minText: timeMode ? timeText : this.fmtMin(mins[idx]), fatText: (fat >= 0 ? '+' + fat : '' + fat),
         rawMin: mins[idx],
-        onSetMin: timeMode ? null : (m) => this.setRowMin(idx, m),
+        onSetMin: (m) => this.setRowMin(idx, m), // 時間モードでも各行の数字を手動編集できる
       };
     });
     const allocHandles = [];
@@ -2659,6 +2682,12 @@ export default class App extends React.Component {
         : [],
       clearTaskLink: () => this.linkTaskAct(null),
       saveTaskEdit: this.saveTaskEdit, closeTaskEdit: this.closeTaskEdit,
+      // mylifecore 連携（同じFirebaseなのでログインしていれば自動連携中）
+      mylifeConnected: !!st.user,
+      mylifeStatusText: st.user
+        ? '連携中 · ' + (st.lastSyncAt ? this.tsToHm(st.lastSyncAt) + ' に同期' : 'ログイン時＋5分ごとに自動取り込み')
+        : 'ログインすると予定・タスクを自動で取り込みます',
+      syncMylifecore: this.syncMylifecore,
       // 睡眠カードに出す、その日の睡眠回復量（ためた回復の🌙を日別集計）
       sleepRecText: (() => {
         const dd = this.homeDateStr();
