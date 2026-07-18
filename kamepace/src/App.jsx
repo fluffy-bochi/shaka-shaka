@@ -16,7 +16,7 @@ import {
 } from './model';
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout,
-  cloudSave, loadUserData, fetchGoogleData, fetchScheduleEvents, jpError,
+  cloudSave, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, completeScheduleTask, jpError,
 } from './firebase';
 import { initShakaSound, attachCollisionSound } from './sound';
 import { appendGlyph } from './fluent';
@@ -2176,14 +2176,30 @@ export default class App extends React.Component {
   async syncScheduleApp() {
     if (!this.state.user) return;
     try {
-      const items = await fetchScheduleEvents();
-      if (!items.length) return;
-      const added = this.importEvents(items);
-      if (added > 0) this.toast('📅 カレンダーから予定を' + added + '件とりこみました');
+      const [items, taskItems] = await Promise.all([
+        fetchScheduleEvents().catch(() => []),
+        fetchScheduleTasks().catch(() => []),
+      ]);
+      const nEv = items.length ? this.importEvents(items) : 0;
+      const nTask = taskItems.length ? this.importTasks(taskItems) : 0;
+      if (nEv + nTask > 0) {
+        this.toast('📅 mylifecoreから' + [nEv ? '予定' + nEv + '件' : '', nTask ? 'タスク' + nTask + '件' : ''].filter(Boolean).join('・') + 'をとりこみました');
+      }
     } catch (e) {
       console.warn('[kamepace] schedule sync failed', e); // 権限・ネットワーク等は静かに再試行に任せる
     }
   }
+
+  /* ホームのタスク（夜の下）: チェックで完了。mylifecore由来は本家側にも完了を書き戻す */
+  toggleHomeTask = (srcId) => {
+    const tasks = (this.state.tasks || []).map(t => (t.srcId === srcId ? { ...t, done: !t.done } : t));
+    const t = tasks.find(x => x.srcId === srcId);
+    this.set({ tasks });
+    this.save();
+    if (t && t.done && String(srcId).startsWith('ptask:')) {
+      completeScheduleTask(String(srcId).slice(6)).catch(e => console.warn('[kamepace] task complete sync failed', e));
+    }
+  };
 
   /* Googleカレンダー/ToDo 取り込み（旧本番と同一の entries 形式で追加） */
   doCalendarSync = async () => {
@@ -2552,6 +2568,12 @@ export default class App extends React.Component {
         : this.homeDateStr() === shiftDate(todayStr(), 1) ? '明日' : '',
       homePrevDay: this.homePrevDay, homeNextDay: this.homeNextDay,
       setHomeDate: this.setHomeDate, goToday: this.goToday,
+      // 夜の下に出すタスク（mylifecore / GoogleのToDo）
+      homeTasks: (st.tasks || []).filter(t => t.date === this.homeDateStr()).map(t => ({
+        srcId: t.srcId, title: t.title, done: !!t.done,
+        srcLabel: String(t.srcId || '').startsWith('ptask:') ? 'mylifecore' : 'Google',
+        onToggle: () => this.toggleHomeTask(t.srcId),
+      })),
       // 睡眠カードに出す、その日の睡眠回復量（ためた回復の🌙を日別集計）
       sleepRecText: (() => {
         const dd = this.homeDateStr();

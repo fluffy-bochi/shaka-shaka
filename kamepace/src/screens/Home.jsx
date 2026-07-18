@@ -114,6 +114,25 @@ export default function Home({ v }) {
             )}
           </div>
         ))}
+        {/* タスク（mylifecore / Google ToDo）: 夜の下 */}
+        {v.homeTasks.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 18, margin: '0 16px 12px', boxShadow: '0 1px 3px rgba(27,27,24,.06)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px 10px' }}>
+              <div style={{ width: 42, height: 42, flex: '0 0 auto', borderRadius: '50%', background: '#eef0e6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📝</div>
+              <span style={{ fontSize: 15, fontWeight: 800, flex: 1 }}>タスク</span>
+              <span style={{ ...mono, fontSize: 11, color: '#9d9b91' }}>{v.homeTasks.filter(t => t.done).length}/{v.homeTasks.length}</span>
+            </div>
+            <div style={{ borderTop: '1px solid #f1efe8' }}>
+              {v.homeTasks.map((t) => (
+                <div key={t.srcId} onClick={t.onToggle} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 15px', borderBottom: '1px solid #f1efe8', cursor: 'pointer', userSelect: 'none' }}>
+                  <span style={{ width: 22, height: 22, flex: '0 0 auto', borderRadius: '50%', border: t.done ? 'none' : '2px solid #d8d5cb', background: t.done ? '#c4f000' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 14, color: '#2f3a00' }}>{t.done ? 'check' : ''}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: t.done ? '#b4b2a8' : '#1b1b18', textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</span>
+                  <span style={{ ...mono, fontSize: 9, color: '#b4b2a8', flex: '0 0 auto' }}>{t.srcLabel}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       {v.buffOpen && <BuffSheet v={v} />}
       {v.buffCheckOpen && <BuffCheckSheet v={v} />}
