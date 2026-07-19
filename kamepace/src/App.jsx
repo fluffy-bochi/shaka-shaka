@@ -895,6 +895,51 @@ export default class App extends React.Component {
   };
 
   /* ================= 記録の確定（統一確認UI → entries へ） ================= */
+  /* その日に同名の mylifecore タスク（ptask:/daily:）があれば累計キーを返す。
+     Googleタスク(gtask:)や手入力は対象外＝従来どおり別々の記録。 */
+  mylifeTaskKeyFor(title, date) {
+    const k = normTitle(title);
+    if (!k) return null;
+    const has = (this.state.tasks || []).some(t => t.date === date && normTitle(t.title) === k && /^(ptask:|daily:)/.test(String(t.srcId || '')));
+    return has ? ('mlt:' + k) : null;
+  }
+  /* mylifecoreタスクの累計: newEntries の taskKey ごとに、同じ taskKey の
+     既存記録（baseEntries）と、新規どうしの重複を1件へ合算（分・疲労を足す）。古いぶんは消す。 */
+  mergeTaskCumulative(baseEntries, newEntries, recDate, now, isToday, timeMode) {
+    const keys = [...new Set(newEntries.filter(e => e.taskKey).map(e => e.taskKey))];
+    if (!keys.length) return baseEntries;
+    let base = baseEntries;
+    keys.forEach(key => {
+      const group = newEntries.filter(e => e.taskKey === key);
+      if (!group.length) return;
+      const target = group[0];
+      // 同じ taskKey の新規どうしをまとめる（先頭へ集約し、残りは newEntries から除去）
+      for (let i = group.length - 1; i >= 1; i--) {
+        target.min = (target.min || 0) + (group[i].min || 0);
+        target.delta = (target.delta || 0) + (group[i].delta || 0);
+        const gi = newEntries.indexOf(group[i]); if (gi >= 0) newEntries.splice(gi, 1);
+      }
+      // 既存記録（その日・同 taskKey・未ゴミ箱）を吸収して消す
+      const olds = base.filter(e => e.taskKey === key && e.date === recDate && !e.exp);
+      olds.forEach(o => {
+        target.min = (target.min || 0) + (entryMin(o) || 0);
+        target.delta = (target.delta || 0) + (o.delta || 0);
+        const of = this.hmToTs(o.from || target.from), ot = this.hmToTs(o.to || target.to);
+        if (o.from && of < this.hmToTs(target.from)) target.from = o.from;
+        if (o.to && ot > this.hmToTs(target.to)) target.to = o.to;
+      });
+      if (olds.length) base = base.filter(e => !(e.taskKey === key && e.date === recDate && !e.exp));
+      // 時刻モードは累計後の予定/確定を to で判定し直す。所要時間モードは常に確定（即記録）
+      if (timeMode) {
+        const endTs = this.hmToTs(target.to);
+        const isPlanned = isToday && endTs > now;
+        if (isPlanned) { target.planned = true; target.dropped = planUnitsDue({ ...target, date: todayStr() }, now); target._new = target.dropped > 0; }
+        else { delete target.planned; delete target.dropped; target._new = true; }
+      } else { delete target.planned; delete target.dropped; target._new = true; }
+    });
+    return base;
+  }
+
   commitSearch = () => {
     const items = this.state.searchCart;
     // 編集モード: 元の記録を取り除いたうえで置き換える
@@ -934,7 +979,7 @@ export default class App extends React.Component {
       .filter(e => e.date === recDate && !e.exp && !e.planned && this.slotOf(e) === slotId)
       .reduce((a, e) => a + entryMin(e), 0);
     const learnMin = [];
-    const mkEntry = (t, min, fromHm, toHm, planned) => {
+    const mkEntry = (t, min, fromHm, toHm, planned, taskKey) => {
       const fat = Math.round(this.effFh(t) * (min / 60));
       const e = { ...baseEntry(t.name, fat, recDate), glyph: t.glyph, min, _new: true };
       if (this.state.framePlan) e.plan = this.state.framePlan; else if (t.plan) e.plan = t.plan;
@@ -942,29 +987,46 @@ export default class App extends React.Component {
       if (fromHm) { e.from = fromHm; e.to = toHm; }
       if (planned) { e.planned = true; e.dropped = planUnitsDue({ ...e, date: todayStr() }, now); e._new = e.dropped > 0; }
       if (t.symptom && t.symId) { e.symptom = true; e.symId = t.symId; e.level = (t.picks && t.picks[0] != null) ? t.picks[0] : 1; e.buffLv = t.buffLv; }
+      if (taskKey) e.taskKey = taskKey;
       return e;
     };
     const newEntries = [];
     items.forEach((t, i) => {
+      // mylifecore由来のタスクと同名なら「その日1件に累計」する（複数の時間帯も合算）
+      const taskKey = this.mylifeTaskKeyFor(t.name, recDate);
       if (timeMode) {
         // 各行動の時間範囲ごとに1件（同じ行動を複数の時間に記録できる）
         const ranges = (t.ranges && t.ranges.length) ? t.ranges : [{ from: this.state.startTime || this.tsToHm(now), to: this.addHm(this.state.startTime || this.tsToHm(now), t.defMin || 30) }];
-        let sum = 0;
-        ranges.forEach(r => {
-          const min = this.rangeMin(r);
-          sum += min;
-          const fromTs = this.hmToTs(r.from);
-          let toTs = this.hmToTs(r.to); if (toTs <= fromTs) toTs += 1440 * 60000;
-          newEntries.push(mkEntry(t, min, this.tsToHm(fromTs), this.tsToHm(toTs), isToday && toTs > now));
-        });
-        learnMin[i] = sum;
+        if (taskKey) {
+          // mylifecoreタスク: 全レンジを合算して1件（from=最初・to=最後）
+          let sum = 0, minFromTs = Infinity, maxToTs = -Infinity;
+          ranges.forEach(r => {
+            const min = this.rangeMin(r); sum += min;
+            const fromTs = this.hmToTs(r.from); let toTs = this.hmToTs(r.to); if (toTs <= fromTs) toTs += 1440 * 60000;
+            minFromTs = Math.min(minFromTs, fromTs); maxToTs = Math.max(maxToTs, toTs);
+          });
+          newEntries.push(mkEntry(t, sum, this.tsToHm(minFromTs), this.tsToHm(maxToTs), isToday && maxToTs > now, taskKey));
+          learnMin[i] = sum;
+        } else {
+          let sum = 0;
+          ranges.forEach(r => {
+            const min = this.rangeMin(r);
+            sum += min;
+            const fromTs = this.hmToTs(r.from);
+            let toTs = this.hmToTs(r.to); if (toTs <= fromTs) toTs += 1440 * 60000;
+            newEntries.push(mkEntry(t, min, this.tsToHm(fromTs), this.tsToHm(toTs), isToday && toTs > now));
+          });
+          learnMin[i] = sum;
+        }
       } else {
         const min = durMins[i];
-        const e = mkEntry(t, min, null, null, false);
+        const e = mkEntry(t, min, null, null, false, taskKey);
         e.slot = slotId; e.from = this.slotHm(slot, slotOffset); e.to = this.slotHm(slot, slotOffset + min);
         slotOffset += min; newEntries.push(e); learnMin[i] = min;
       }
     });
+    // mylifecoreタスクの累計: 同じ taskKey の既存記録があれば時間を合算して1件に更新（古いぶんは消す）
+    baseEntries = this.mergeTaskCumulative(baseEntries, newEntries, recDate, now, isToday, timeMode);
     // 前回つかった時間を学習（次回の初期値になる）
     const lastMins = { ...(this.state.lastMins || {}) };
     items.forEach((t, i) => { const k = normTitle(t.name); if (k) lastMins[k] = learnMin[i] || durMins[i] || 30; });
@@ -2442,10 +2504,12 @@ export default class App extends React.Component {
         const fh = (t.linkFh != null) ? t.linkFh : null;
         const delta = fh != null ? Math.max(1, Math.round(fh * min / 60)) : IMPORT_DEFAULT_DELTA;
         const glyph = t.linkGlyph || ACT_EMOJI[guessAct(t.title)] || '📝';
+        const isMylife = /^(ptask:|daily:)/.test(String(srcId || ''));
         entries = sortEntries([...entries, {
           ...baseEntry(t.title, delta, todayStr()),
           act: t.linkAct || guessAct(t.title), glyph, min, srcId: recId, _new: true,
           slot: slotId, from: this.slotHm(slot, off), to: this.slotHm(slot, off + min),
+          ...(isMylife ? { taskKey: 'mlt:' + normTitle(t.title) } : {}),
         }]);
         this.toast('✅ ' + t.title + ' を' + slot.name + 'に記録しました');
       }
