@@ -5,6 +5,15 @@ const label = { ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'u
 const card = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 3px rgba(27,27,24,.05)', overflow: 'hidden' };
 const row = (last) => ({ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px', borderBottom: last ? 'none' : '1px solid #f1efe8' });
 
+/* iOS風トグルスイッチ */
+function Toggle({ on, onClick }) {
+  return (
+    <button onClick={onClick} aria-pressed={on} style={{ width: 46, height: 27, borderRadius: 999, border: 'none', cursor: 'pointer', padding: 0, flex: '0 0 auto', background: on ? '#c4f000' : '#d8d5cb', position: 'relative', transition: 'background .2s' }}>
+      <span style={{ position: 'absolute', top: 3, left: on ? 22 : 3, width: 21, height: 21, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(27,27,24,.3)', transition: 'left .2s' }} />
+    </button>
+  );
+}
+
 export default function MyPage({ v }) {
   const u = v.user;
   return (
@@ -141,6 +150,25 @@ export default function MyPage({ v }) {
               <button onClick={v.setMotionFixed} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.motionFixedBg, color: v.motionFixedColor }}>固定</button>
               <button onClick={v.setMotionMove} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.motionMoveBg, color: v.motionMoveColor }}>動かす</button>
             </div>
+          </div>
+        </div>
+        <div style={label}>サンプル（デモ）</div>
+        <div style={card}>
+          <div style={row()}>
+            <span style={{ fontSize: 16 }}>🎒</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14 }}>サンプルデータを表示</div>
+              <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 1 }}>デザイン学部2年の1年ぶん（毎年くりかえし）</div>
+            </div>
+            <Toggle on={v.sampleMode} onClick={v.toggleSample} />
+          </div>
+          <div style={row(true)}>
+            <span style={{ fontSize: 16 }}>🩸</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14 }}>生理周期をふくめる</div>
+              <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 1 }}>PMSでメンタル↓・生理中はお腹が痛い</div>
+            </div>
+            <Toggle on={v.sampleCycleOn} onClick={v.toggleSampleCycle} />
           </div>
         </div>
         {u && (

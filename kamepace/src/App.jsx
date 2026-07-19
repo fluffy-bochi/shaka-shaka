@@ -35,6 +35,7 @@ import Tutorial from './screens/Tutorial';
 import Onboard from './screens/Onboard';
 import Cycle from './screens/Cycle';
 import Bookshelf from './screens/Bookshelf';
+import { buildAcademicYear, academicYearOf } from './sample';
 
 export default class App extends React.Component {
   state = {
@@ -127,9 +128,69 @@ export default class App extends React.Component {
     authErr: '',
     authBusy: false,
     booted: false,
+    /* サンプル（デモ）データ表示。生理周期はオン/オフ切替 */
+    sampleMode: false,
+    sampleCycleOn: true,
   };
 
+  /* サンプル生成の状態（保存しない・実行時のみ） */
+  _sampleYears = new Set();
+  _sampleDiary = {};
+  _sampleFav = {};
+
   set(patch) { this.setState(patch); }
+
+  /* 表示中の日付まわりの学年ぶんサンプルを生成して entries に混ぜる（毎年くりかえし）。
+     生成ずみの学年はスキップするので何度呼んでも軽い。保存時は _sample を除外。 */
+  ensureSample(centerStr) {
+    if (!this.state.sampleMode) return;
+    const ay = academicYearOf(centerStr || this.homeDateStr());
+    const need = [];
+    for (let y = ay - 1; y <= ay + 1; y++) if (!this._sampleYears.has(y)) need.push(y);
+    if (!need.length) return;
+    let add = [];
+    need.forEach(y => {
+      const { entries, diary, fav } = buildAcademicYear(y, { cycleOn: this.state.sampleCycleOn });
+      add = add.concat(entries);
+      Object.assign(this._sampleDiary, diary);
+      Object.assign(this._sampleFav, fav);
+      this._sampleYears.add(y);
+    });
+    this._pileLayout = null;
+    // 関数型: 読込時の advancePlans 等のバッチ更新と競合しても最新の entries に足す
+    this.setState(prev => ({ entries: [...prev.entries, ...add] }));
+  }
+  clearSample() {
+    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._pileLayout = null;
+    this.set({ entries: this.state.entries.filter(e => !e._sample) });
+  }
+  regenSample() { // 生理オン/オフの切替時など、作り直し
+    const entries = this.state.entries.filter(e => !e._sample);
+    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._pileLayout = null;
+    this.set({ entries });
+    setTimeout(() => this.ensureSample(this.homeDateStr()), 0);
+  }
+  toggleSample = () => {
+    const on = !this.state.sampleMode;
+    const prefs = { ...(this.state.prefs || {}), sampleMode: on, sampleCycleOn: this.state.sampleCycleOn };
+    if (on) { this.set({ sampleMode: true, prefs }); setTimeout(() => this.ensureSample(this.homeDateStr()), 0); }
+    else { this.set({ sampleMode: false, prefs }); setTimeout(() => this.clearSample(), 0); }
+    this.save();
+  };
+  toggleSampleCycle = () => {
+    const on = !this.state.sampleCycleOn;
+    const prefs = { ...(this.state.prefs || {}), sampleMode: this.state.sampleMode, sampleCycleOn: on };
+    this.set({ sampleCycleOn: on, prefs });
+    if (this.state.sampleMode) setTimeout(() => this.regenSample(), 0);
+    this.save();
+  };
+  restoreSampleMode(data) {
+    const p = (data && data.prefs) || {};
+    if (!p.sampleMode) return;
+    this.set({ sampleMode: true, sampleCycleOn: p.sampleCycleOn !== false });
+    // advancePlans/sweepExpiredBuffs（読込直後の setState）が流れたあとに注入する
+    setTimeout(() => this.ensureSample(this.homeDateStr()), 150);
+  }
 
   /* ================= persistence / auth ================= */
   dataState() {
@@ -176,6 +237,11 @@ export default class App extends React.Component {
   /* 日付が変わっていたらサンプルを今日ぶんに作り直す（当日中の編集は保持＝旧本番と同じ） */
   refreshGuestSamples(data) {
     const t = todayStr();
+    // ペルソナのサンプル表示中は、旧「ゲストの1日サンプル」は出さない（二重になるため）
+    if (data.prefs && data.prefs.sampleMode) {
+      const kept = (data.entries || []).filter(e => !e.sample);
+      return { data: { ...data, entries: kept, sampleDay: t }, changed: (kept.length !== (data.entries || []).length) };
+    }
     if (data.sampleDay === t) return { data, changed: false };
     const removed = (data.entries || []).filter(e => e.sample);
     const kept = (data.entries || []).filter(e => !e.sample);
@@ -197,6 +263,7 @@ export default class App extends React.Component {
     const { data, changed } = this.refreshGuestSamples(deserialize(g));
     this.set({ ...data, booted: true, screen: data.mainScreen || 'shaka' });
     if (changed) { this._pileLayout = null; this.save(); }
+    this.restoreSampleMode(data);
     setTimeout(() => this.advancePlans(), 0); // アプリを閉じている間に進んだ予定をキャッチアップ
     setTimeout(() => this.sweepExpiredBuffs(), 0);
     // 初回はオンボーディング（9問）→ 記録のないゲストはそのあとチュートリアル。
@@ -204,7 +271,8 @@ export default class App extends React.Component {
     if (!this._autoTutChecked) {
       this._autoTutChecked = true;
       const hasData = (data.entries || []).some(e => !e.sample)
-        || (data.collected && data.collected.length > 0);
+        || (data.collected && data.collected.length > 0)
+        || !!(data.prefs && data.prefs.sampleMode); // サンプル表示中はチュートリアル自動起動しない
       if (!data.onboardDone) {
         this._tutorialAfterOnboard = !hasData;
         setTimeout(() => { if (!this.state.user) this.set({ screen: 'onboard', obStep: 1, obSel: {} }); }, 200);
@@ -224,6 +292,7 @@ export default class App extends React.Component {
         const dd = deserialize(data);
         this.set({ ...dd, booted: true, screen: dd.mainScreen || 'shaka', dayOffset: 0 });
         onboardDone = dd.onboardDone;
+        this.restoreSampleMode(dd);
       } else {
         // 新規ユーザー（初めての登録）: ゲストのデータ（サンプル含む）は引き継がず、まっさらで開始
         this.set({ ...freshState(), booted: true, screen: 'shaka', dayOffset: 0 });
@@ -291,10 +360,10 @@ export default class App extends React.Component {
       .reduce((a, e) => a + entryMin(e), 0);
   }
   /* 日付ナビ */
-  homePrevDay = () => this.set({ homeDate: shiftDate(this.homeDateStr(), -1) });
-  homeNextDay = () => this.set({ homeDate: shiftDate(this.homeDateStr(), 1) });
-  setHomeDate = (e) => { const v = e.target.value; if (v) this.set({ homeDate: v }); };
-  goToday = () => this.set({ homeDate: todayStr() });
+  homePrevDay = () => { const day = shiftDate(this.homeDateStr(), -1); if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: day }); this.ensureSample(day); };
+  homeNextDay = () => { const day = shiftDate(this.homeDateStr(), 1); if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: day }); this.ensureSample(day); };
+  setHomeDate = (e) => { const v = e.target.value; if (v) { if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: v }); this.ensureSample(v); } };
+  goToday = () => { if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: todayStr() }); };
   hmToTs(hm) { const [h, m] = (hm || '0:0').split(':').map(Number); const d = new Date(); d.setHours(h || 0, m || 0, 0, 0); return d.getTime(); }
   tsToHm(ts) { const d = new Date(ts); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
   timeSpanMin() { const s = this.hmToTs(this.state.startTime), t = this.hmToTs(this.state.endTime); const d = Math.round((t - s) / 60000); return d < 1 ? 1 : d; }
@@ -1071,17 +1140,30 @@ export default class App extends React.Component {
   /* 積む絵文字（旧本番 createPileBag と同じ考え方）:
      山＝全日付の正の疲労だけ。マイナス（回復）記録は山から直接引かず、
      マイナスの絵文字が降ってプラスにぶつかったぶん（consumed）だけ古い順に減る。 */
+  /* サンプル表示中は「山＝表示中の1日ぶんの負荷」に絞る（履歴は本棚で見る）。
+     全日付を積むと年ぶんで巨大になり重いため、サンプル分だけ当日にしぼる。 */
+  _sampleWindowDay() {
+    const s = this.state.screen;
+    return (s === 'home' || s === 'record' || s === 'sleep') ? this.homeDateStr() : todayStr();
+  }
   pileSource() {
+    const consumedRaw = this.state.consumed || 0;
+    const day = this.state.sampleMode ? this._sampleWindowDay() : null;
+    // 軽いキャッシュ（entries参照・consumed・当日が同じなら再計算しない）
+    if (this._psRef === this.state.entries && this._psConsumed === consumedRaw && this._psDay === day && this._psArr) return this._psArr;
+    const src = day ? this.state.entries.filter(e => !e._sample || e.date === day) : this.state.entries;
     const stack = [];
-    sortEntries(this.state.entries).forEach(r => {
+    sortEntries(src).forEach(r => {
       if (r.exp) return;
       if (r.delta > 0) {
         const n = r.planned ? (r.dropped || 0) : r.delta;
         for (let i = 0; i < n; i++) stack.push({ g: entryGlyph(r), isNew: !!r._new });
       }
     });
-    const consumed = Math.min(this.state.consumed || 0, stack.length);
-    return stack.slice(consumed);
+    const consumed = Math.min(consumedRaw, stack.length);
+    const out = stack.slice(consumed);
+    this._psRef = this.state.entries; this._psConsumed = consumedRaw; this._psDay = day; this._psArr = out;
+    return out;
   }
   /* 山の正の合計（consumed のキャップ用・旧本番 pilePositiveTotal） */
   pilePositiveTotal(entries) {
@@ -1197,7 +1279,7 @@ export default class App extends React.Component {
   goRecordNow = () => this.openRecord(this.slotNow());
   setMainScreen = (v) => { this.set({ mainScreen: v }); this.save(); };
   goMypage = () => this.set({ screen: 'mypage' });
-  goBookshelf = () => this.set({ screen: 'bookshelf' });
+  goBookshelf = () => { this.set({ screen: 'bookshelf' }); this.ensureSample(todayStr()); };
   setBookFav = (key) => {
     const bookFav = { ...(this.state.bookFav || {}) };
     if (bookFav[key]) delete bookFav[key]; else bookFav[key] = true;
@@ -2774,9 +2856,10 @@ export default class App extends React.Component {
       navBookColor: st.screen === 'bookshelf' ? '#1b1b18' : '#8a8a82',
       navBookFill: st.screen === 'bookshelf' ? 1 : 0,
       goBookshelf: this.goBookshelf,
-      goBookDay: (dateStr) => this.set({ screen: 'home', homeDate: dateStr, dayOffset: 0 }),
+      goBookDay: (dateStr) => { if (st.sampleMode) this._pileLayout = null; this.set({ screen: 'home', homeDate: dateStr, dayOffset: 0 }); this.ensureSample(dateStr); },
       bookEntries: st.entries, bookSlotHours: st.slotHours, bookCollected: st.collected,
-      bookFav: st.bookFav || {}, bookDiary: st.bookDiary || {},
+      bookFav: st.sampleMode ? { ...this._sampleFav, ...(st.bookFav || {}) } : (st.bookFav || {}),
+      bookDiary: st.sampleMode ? { ...this._sampleDiary, ...(st.bookDiary || {}) } : (st.bookDiary || {}),
       setBookFav: this.setBookFav, setBookDiary: this.setBookDiary,
       navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? 1 : 0,
@@ -2880,6 +2963,8 @@ export default class App extends React.Component {
       mainScreen: st.mainScreen || 'shaka', setMainShaka: () => this.setMainScreen('shaka'), setMainHome: () => this.setMainScreen('home'),
       motionFixedBg: st.homeMotion ? '#fff' : '#1b1b18', motionFixedColor: st.homeMotion ? '#8a8a82' : '#fff',
       motionMoveBg: st.homeMotion ? '#1b1b18' : '#fff', motionMoveColor: st.homeMotion ? '#fff' : '#8a8a82',
+      sampleMode: !!st.sampleMode, toggleSample: this.toggleSample,
+      sampleCycleOn: st.sampleCycleOn !== false, toggleSampleCycle: this.toggleSampleCycle,
       addTotalM1: () => this.addTotal(-1), addTotalP1: () => this.addTotal(1), addTotalM10: () => this.addTotal(-10), addTotalP10: () => this.addTotal(10),
       searchTotalFatText: (searchTotalFat >= 0 ? '+' + searchTotalFat : '' + searchTotalFat),
       addMoreMenu: this.addMoreMenu, commitSearch: this.commitSearch, backFromConfirm: this.backFromConfirm,
