@@ -5,7 +5,7 @@ const mono = { fontFamily: "'Space Mono',monospace" };
 export default function Shaka({ v }) {
   return (
     <>
-      <div id="shakacase" style={{ position: 'absolute', left: 0, right: 0, top: 40, bottom: 64, zIndex: 0, overflow: 'hidden' }} />
+      <div id="shakacase" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 64, zIndex: 0, overflow: 'hidden' }} />
       {/* 上部: 日付ピル＋シャッフル（メイン画面なので閉じるボタンは無し） */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 20px 0' }}>
         <div style={{ width: 34 }} />
