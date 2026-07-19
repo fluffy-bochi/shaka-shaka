@@ -1054,7 +1054,7 @@ export default class App extends React.Component {
   /* 画面サイズ: 実際のアプリ画面要素を実測（PC表示のスマホ枠にも追従） */
   _screenRef = React.createRef();
   screenW() { const el = this._screenRef.current; return (el && el.clientWidth) || Math.min(480, window.innerWidth || 372); }
-  screenH() { const el = this._screenRef.current; return ((el && el.clientHeight) || window.innerHeight || 812) - 104; }
+  screenH() { const el = this._screenRef.current; return ((el && el.clientHeight) || window.innerHeight || 812) - 64; }
   // 100個で画面全体を埋めるサイズ。100を超えたら縮小して画面に収める（あふれ対策）
   calcR(w, h, count) {
     const area = Math.max(1, w) * Math.max(1, h);
