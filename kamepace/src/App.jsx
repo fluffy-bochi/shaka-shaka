@@ -137,6 +137,7 @@ export default class App extends React.Component {
   _sampleYears = new Set();
   _sampleDiary = {};
   _sampleFav = {};
+  _sampleBalance = {}; // 日別「寝る前の山の量（前日からの繰り越し込み）」
 
   set(patch) { this.setState(patch); }
 
@@ -148,26 +149,29 @@ export default class App extends React.Component {
     const need = [];
     for (let y = ay - 1; y <= ay + 1; y++) if (!this._sampleYears.has(y)) need.push(y);
     if (!need.length) return;
-    let add = [];
+    let add = [], addColl = [];
     need.forEach(y => {
-      const { entries, diary, fav } = buildAcademicYear(y, { cycleOn: this.state.sampleCycleOn });
+      const { entries, diary, fav, collected, balanceByDay } = buildAcademicYear(y, { cycleOn: this.state.sampleCycleOn });
       add = add.concat(entries);
+      addColl = addColl.concat(collected || []);
       Object.assign(this._sampleDiary, diary);
       Object.assign(this._sampleFav, fav);
+      Object.assign(this._sampleBalance, balanceByDay || {});
       this._sampleYears.add(y);
     });
     this._pileLayout = null;
     // 関数型: 読込時の advancePlans 等のバッチ更新と競合しても最新の entries に足す
-    this.setState(prev => ({ entries: [...prev.entries, ...add] }));
+    this.setState(prev => ({ entries: [...prev.entries, ...add], collected: [...(prev.collected || []), ...addColl] }));
   }
   clearSample() {
-    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._pileLayout = null;
-    this.set({ entries: this.state.entries.filter(e => !e._sample) });
+    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._sampleBalance = {}; this._pileLayout = null;
+    this.set({ entries: this.state.entries.filter(e => !e._sample), collected: (this.state.collected || []).filter(c => !c._sample) });
   }
   regenSample() { // 生理オン/オフの切替時など、作り直し
     const entries = this.state.entries.filter(e => !e._sample);
-    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._pileLayout = null;
-    this.set({ entries });
+    const collected = (this.state.collected || []).filter(c => !c._sample);
+    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._sampleBalance = {}; this._pileLayout = null;
+    this.set({ entries, collected });
     setTimeout(() => this.ensureSample(this.homeDateStr()), 0);
   }
   toggleSample = () => {
@@ -207,6 +211,7 @@ export default class App extends React.Component {
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
       bookFav: s.bookFav, bookDiary: s.bookDiary,
+      trashedPlans: s.trashedPlans, purgedPlanIds: s.purgedPlanIds,
     };
   }
   save() {
@@ -290,11 +295,12 @@ export default class App extends React.Component {
       // ゲストの山の散らばりを持ち込まない
       this._pileLayout = null;
       // オンボ判定は「読み込んだデータ」で行う（this.set は非同期で this.state に即反映されないため）
-      let onboardDone;
+      let onboardDone, hadData = false;
       if (data) {
         const dd = deserialize(data);
         this.set({ ...dd, booted: true, screen: dd.mainScreen || 'shaka', dayOffset: 0 });
         onboardDone = dd.onboardDone;
+        hadData = (dd.entries || []).some(e => !e.sample && !e._sample) || (dd.collected || []).length > 0;
         this.restoreSampleMode(dd);
       } else {
         // 新規ユーザー（初めての登録）: ゲストのデータ（サンプル含む）は引き継がず、まっさらで開始
@@ -308,7 +314,11 @@ export default class App extends React.Component {
       clearInterval(this._schedT);
       this._schedT = setInterval(() => this.syncScheduleApp(), 5 * 60 * 1000);
       // 既にオンボ済みのログインユーザーには出さない。初回（未オンボ）だけ出す
-      if (!onboardDone) setTimeout(() => this.set({ screen: 'onboard', obStep: 1, obSel: {} }), 200);
+      // → オンボ後に操作チュートリアルも出す（記録がまだ無いユーザーのみ）
+      if (!onboardDone) {
+        this._tutorialAfterOnboard = !hadData;
+        setTimeout(() => this.set({ screen: 'onboard', obStep: 1, obSel: {} }), 200);
+      }
     } catch (err) {
       console.warn('[kamepace] load failed', err);
       this.set({ booted: true });
@@ -388,7 +398,12 @@ export default class App extends React.Component {
     const tplPlans = Object.entries(this.state.templates || {})
       .filter(([, t]) => t && Array.isArray(t.tasks) && t.tasks.length)
       .map(([key, t]) => ({ id: 'tpl:' + key, name: key, tasks: t.tasks }));
-    return [...PLANS, ...(this.state.customPlans || []), ...tplPlans];
+    // ゴミ箱の予定・完全削除した予定はリストに出さない
+    const hidden = new Set([
+      ...(this.state.trashedPlans || []).map(t => t.plan.id),
+      ...(this.state.purgedPlanIds || []),
+    ]);
+    return [...PLANS, ...(this.state.customPlans || []), ...tplPlans].filter(p => !hidden.has(p.id));
   }
   planById(id) { return this.allPlans().find(p => p.id === id); }
   planMeta(p) {
@@ -1192,9 +1207,10 @@ export default class App extends React.Component {
   // 100個で画面全体を埋めるサイズ。100を超えたら縮小して画面に収める（あふれ対策）
   calcR(w, h, count) {
     const area = Math.max(1, w) * Math.max(1, h);
-    // 100個でその画面がちょうど満杯（上端まで）になる大きさ。画面の実寸(area)から計算するので機種で自動調整。
-    // 100を超えても縮小せず同じ大きさのまま画面の外（上）に積み上げる
-    const r = Math.sqrt(area * 0.8 / (100 * Math.PI));
+    // 【重要】絵文字100個でその画面が上から下まで満杯（100個の時は少し上にはみ出すくらい）になる大きさ。
+    // 画面の実寸(area)から計算するので機種で自動調整。100を超えても縮小せず同じ大きさのまま画面の外（上）へ積む。
+    // ※ memory: emoji-pile-fill-rule（何度も指摘される最重要ルール）
+    const r = Math.sqrt(area * 1.0 / (100 * Math.PI));
     return Math.max(8, Math.min(r, 60));
   }
   /* 今この画面で積む絵文字の数（シャカ・ホーム・睡眠で共通） */
@@ -1216,17 +1232,40 @@ export default class App extends React.Component {
     const day = this.state.sampleMode ? this._sampleWindowDay() : null;
     // 軽いキャッシュ（entries参照・consumed・当日が同じなら再計算しない）
     if (this._psRef === this.state.entries && this._psConsumed === consumedRaw && this._psDay === day && this._psArr) return this._psArr;
-    const src = day ? this.state.entries.filter(e => !e._sample || e.date === day) : this.state.entries;
-    const stack = [];
-    sortEntries(src).forEach(r => {
-      if (r.exp) return;
-      if (r.delta > 0) {
+    let out;
+    const bal = day != null && this._sampleBalance ? this._sampleBalance[day] : null;
+    if (day != null && bal != null) {
+      // サンプル: 前日からの繰り越し込みの「寝る前の山の量」= bal 個。直近の疲労絵文字から取る（逆順で必要数だけ）
+      const sorted = sortEntries(this.state.entries);
+      out = []; let need = bal;
+      for (let i = sorted.length - 1; i >= 0 && need > 0; i--) {
+        const r = sorted[i];
+        if (r.exp || !r._sample || r.date > day || (r.delta || 0) <= 0) continue;
         const n = r.planned ? (r.dropped || 0) : r.delta;
-        for (let i = 0; i < n; i++) stack.push({ g: entryGlyph(r), isNew: !!r._new });
+        const take = Math.min(n, need);
+        for (let k = 0; k < take; k++) out.push({ g: entryGlyph(r), isNew: false });
+        need -= take;
       }
-    });
-    const consumed = Math.min(consumedRaw, stack.length);
-    const out = stack.slice(consumed);
+      out.reverse(); // 古い→新しい
+      // 実ユーザーの記録（非サンプル）があれば上に足す
+      this.state.entries.forEach(r => {
+        if (r.exp || r._sample || (r.delta || 0) <= 0) return;
+        const n = r.planned ? (r.dropped || 0) : r.delta;
+        for (let k = 0; k < n; k++) out.push({ g: entryGlyph(r), isNew: !!r._new });
+      });
+    } else {
+      const src = day ? this.state.entries.filter(e => !e._sample || e.date === day) : this.state.entries;
+      const stack = [];
+      sortEntries(src).forEach(r => {
+        if (r.exp) return;
+        if (r.delta > 0) {
+          const n = r.planned ? (r.dropped || 0) : r.delta;
+          for (let i = 0; i < n; i++) stack.push({ g: entryGlyph(r), isNew: !!r._new });
+        }
+      });
+      const consumed = Math.min(consumedRaw, stack.length);
+      out = stack.slice(consumed);
+    }
     this._psRef = this.state.entries; this._psConsumed = consumedRaw; this._psDay = day; this._psArr = out;
     return out;
   }
@@ -1262,7 +1301,7 @@ export default class App extends React.Component {
       const target = glyphs.length;
       let compact = false;
       if (saved.length > target) { saved = saved.slice(saved.length - target); compact = true; }
-      const base = saved.slice(0, 160).map(sp => ({
+      const base = saved.slice(0, 200).map(sp => ({
         e: sp.g,
         x: Math.round(sp.x * W - r),
         y: Math.round(H - sp.y * H - r),
@@ -1271,7 +1310,7 @@ export default class App extends React.Component {
       }));
       // 下の絵文字が消えて上だけ残ると宙に浮くので、減った時は列ごとに下へ詰め直す。
       // 増えた分（記録直後にホームを見た時）は山の上に足す
-      const extras = glyphs.slice(saved.length, 160 > saved.length ? 160 : saved.length);
+      const extras = glyphs.slice(saved.length, 200 > saved.length ? 200 : saved.length);
       if (compact || extras.length) {
         const cols = Math.max(1, Math.floor(W / d));
         const colH = Array(cols).fill(0);
@@ -1298,7 +1337,7 @@ export default class App extends React.Component {
       }
       return base;
     }
-    const glyphs = this.pileGlyphs().slice(-160); // 上限は新しい側を残す
+    const glyphs = this.pileGlyphs().slice(-200); // 上限は新しい側を残す
     let s = seed; const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
     const cols = Math.max(1, Math.floor(W / d)), out = [];
     const n = glyphs.length;
@@ -1640,10 +1679,10 @@ export default class App extends React.Component {
     }
     this.set(patch);
     this.save();
-    // 自分の記録がまだ無いゲストは、続けてチュートリアルへ
+    // 自分の記録がまだ無いユーザーは、続けてチュートリアルへ（ゲスト・ログイン両方）
     if (this._tutorialAfterOnboard) {
       this._tutorialAfterOnboard = false;
-      setTimeout(() => { if (!this.state.tutorial && !this.state.user) this.startTutorial(); }, 450);
+      setTimeout(() => { if (!this.state.tutorial) this.startTutorial(); }, 450);
     }
   }
 
@@ -1805,6 +1844,50 @@ export default class App extends React.Component {
   purgeTrash = (idx) => {
     const entries = this.state.entries.filter((_, i) => i !== idx);
     this.set({ entries, consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)) });
+    this.save();
+    this.toast('完全に削除しました');
+  };
+
+  /* ---- 予定のゴミ箱（記録入口の「予定から」リスト）----
+     entries と同じく完全削除せずゴミ箱へ。もどす／完全に削除ができる。 */
+  trashPlan = (id) => {
+    const p = this.allPlans().find(x => x.id === id);
+    if (!p) return;
+    const src = id.startsWith('tpl:') ? 'tpl' : ((this.state.customPlans || []).some(c => c.id === id) ? 'custom' : 'builtin');
+    this.set({ trashedPlans: [...(this.state.trashedPlans || []), { plan: { id: p.id, name: p.name, tasks: p.tasks }, src, trashedAt: Date.now() }] });
+    this.save();
+    this.toast('予定をゴミ箱に移動しました');
+  };
+  restorePlanTrash = (id) => {
+    const st = this.state;
+    const item = (st.trashedPlans || []).find(t => t.plan.id === id);
+    const patch = { trashedPlans: (st.trashedPlans || []).filter(t => t.plan.id !== id) };
+    // テンプレ由来の予定は、ゴミ箱に入れている間にテンプレ本体が消えていたらカスタム予定として復元
+    if (item && item.src === 'tpl') {
+      const key = id.slice(4);
+      const tpl = (st.templates || {})[key];
+      if (!tpl || !Array.isArray(tpl.tasks) || !tpl.tasks.length) {
+        patch.customPlans = [...(st.customPlans || []), { id: 'plan' + Date.now(), name: item.plan.name, tasks: item.plan.tasks }];
+      }
+    }
+    this.set(patch);
+    this.save();
+    this.toast('もどしました');
+  };
+  purgePlanTrash = (id) => {
+    const st = this.state;
+    const patch = { trashedPlans: (st.trashedPlans || []).filter(t => t.plan.id !== id) };
+    if ((st.customPlans || []).some(c => c.id === id)) {
+      patch.customPlans = st.customPlans.filter(c => c.id !== id);
+    } else if (id.startsWith('tpl:')) {
+      const templates = { ...(st.templates || {}) };
+      const key = id.slice(4);
+      if (templates[key]) { const { tasks, ...rest } = templates[key]; templates[key] = rest; }
+      patch.templates = templates;
+    } else {
+      patch.purgedPlanIds = [...(st.purgedPlanIds || []), id];
+    }
+    this.set(patch);
     this.save();
     this.toast('完全に削除しました');
   };
@@ -2005,22 +2088,30 @@ export default class App extends React.Component {
     const W = rect.width || 350, H = rect.height || 700;
     const r = this.calcR(W, H, this.pileCount()); // ホーム/睡眠と同じ個数基準で縮小
     this.PR = r;
+    this._caseW = W; this._caseH = H;
     this.engine = Engine.create();
     this.engine.world.gravity.y = 1.2;
     this._tuneEngine(this.engine);
     attachCollisionSound(this.engine);
-    const t = 80;
+    // 上に「蓋」つきの閉じた箱。絵文字は画面の少し上まであふれるが、蓋で止まって外へ飛び出さない。
+    // 満杯になると蓋との間でギチギチに詰まって動かなくなる。
+    const t = 120;
+    const over = H * 0.75;            // 画面上端より上へあふれてよい高さ（この上に蓋）
+    const lidY = -over;               // 蓋の位置（画面外・上）
+    this._lidY = lidY;
+    const wallCy = (H + lidY) / 2, wallH = (H - lidY) + t * 2;
     World.add(this.engine.world, [
-      Bodies.rectangle(W / 2, H + t / 2, W + t * 2, t, { isStatic: true }),
-      Bodies.rectangle(-t / 2, H / 2, t, H + t * 2, { isStatic: true }),
-      Bodies.rectangle(W + t / 2, H / 2, t, H + t * 2, { isStatic: true }),
+      Bodies.rectangle(W / 2, H + t / 2, W + t * 2, t, { isStatic: true }),        // 床
+      Bodies.rectangle(W / 2, lidY - t / 2, W + t * 2, t, { isStatic: true }),     // 蓋（上）
+      Bodies.rectangle(-t / 2, wallCy, t, wallH, { isStatic: true }),              // 左（蓋〜床）
+      Bodies.rectangle(W + t / 2, wallCy, t, wallH, { isStatic: true }),           // 右（蓋〜床）
     ]);
     this.bodies = [];
     // 表示上限は新しい側（末尾）を残す。画面に収まるのは約100個で、
     // それを超えたぶんは「あふれて」見える（=頑張りすぎの信号）。
     let marks;
-    if (this.state.dayOffset === 0) marks = this.pileGlyphsMarked().slice(-160);
-    else marks = this.currentBag().slice(-160).map(g => ({ g, isNew: false }));
+    if (this.state.dayOffset === 0) marks = this.pileGlyphsMarked().slice(-200);
+    else marks = this.currentBag().slice(-200).map(g => ({ g, isNew: false }));
     const newCount = marks.filter(m => m.isNew).length;
     const oldCount = marks.length - newCount;
     const perRow = Math.max(1, Math.floor(W / (2 * r)));
@@ -2041,9 +2132,10 @@ export default class App extends React.Component {
         y = Math.max(r, Math.min(H - r, saved[idx].y * H));
         angle = saved[idx].a || 0;
       } else {
+        // 初期配置は重なりを作らない（2r間隔）。重なると解消時に底が床を突き抜けて画面下へ弾かれる
         const row = Math.floor(idx / perRow), col = idx % perRow;
-        x = r + col * (2 * r) + (Math.random() - 0.5) * r * 0.5;
-        y = H - r - row * (2 * r * 0.92) + (Math.random() - 0.5) * r * 0.3;
+        x = r + col * (2 * r) + (Math.random() - 0.5) * r * 0.25;
+        y = H - r - row * (2 * r) + (Math.random() - 0.5) * r * 0.12;
       }
       const body = Bodies.circle(x, y, r, this.BODY_OPTS);
       if (angle) Matter.Body.setAngle(body, angle);
@@ -2075,8 +2167,13 @@ export default class App extends React.Component {
     this._phys = true;
     const loop = () => {
       if (!this._phys) return;
-      const rr = this.PR;
+      const rr = this.PR, cH = this._caseH || 700, cW = this._caseW || 350, lidY = this._lidY || -400;
       this.bodies.forEach(({ body, el }) => {
+        // まれに底/横をすり抜けた絵文字は、下から湧かせず「上（蓋の少し下）から落とし直す」＝自然な落下に見せる
+        if (body.position.y > cH + rr * 1.2 || body.position.y < lidY - rr || body.position.x < -rr * 2 || body.position.x > cW + rr * 2) {
+          Matter.Body.setPosition(body, { x: rr + Math.random() * (cW - 2 * rr), y: lidY + rr + Math.random() * rr * 3 });
+          Matter.Body.setVelocity(body, { x: 0, y: 0 });
+        }
         el.style.transform = `translate(${body.position.x - rr}px, ${body.position.y - rr}px) rotate(${body.angle}rad)`;
       });
       if (this.negBodies && this.negBodies.length) {
@@ -2288,7 +2385,7 @@ export default class App extends React.Component {
     if (!this.bodies) return;
     if (this.state.tutorial === 6 && !this.state.tutFlags.shaken) this.set({ tutFlags: { ...this.state.tutFlags, shaken: true } });
     this.enableMotion(); // 🔀タップ＝ユーザー操作のタイミングでセンサー許可を取る（iOS）
-    this.shakeImpulse(16);
+    this.shakeImpulse(9); // ボタンは軽めに（強すぎると絵文字が蓋まで飛びすぎる）
   };
 
   /* ---- スマホの加速度センサーで振る（旧本番 enableMotion/onMotion を移植） ---- */
@@ -2677,7 +2774,7 @@ export default class App extends React.Component {
     const hiddenCats = st.hiddenCats || [];
     // 非表示カテゴリはリストから隠すだけ（検索・既存記録からは到達可能）
     const cats = this.allCats().filter(c => !hiddenCats.includes(c.id)).map(c => ({ id: c.id, name: c.name, sub: c.sub, icon: c.icon, color: c.color, onSelect: () => this.selectCat(c.id) }));
-    const plans = this.allPlans().map(p => { const m = this.planMeta(p); return { id: p.id, name: p.name, meta: m.metaText, onOpen: () => this.openPlan(p.id) }; });
+    const plans = this.allPlans().map(p => { const m = this.planMeta(p); return { id: p.id, name: p.name, meta: m.metaText, onOpen: () => this.openPlan(p.id), onTrash: () => this.trashPlan(p.id) }; });
     const detailPlan = st.planDetailId ? this.planById(st.planDetailId) : null;
     const detailMeta = detailPlan ? this.planMeta(detailPlan) : null;
     const planTasks = detailPlan ? detailPlan.tasks.map(t => ({ glyph: t.glyph, name: t.name, minText: this.fmtMin(t.min || 0), fatText: (t.fat >= 0 ? '+' + t.fat : '' + t.fat) })) : [];
@@ -2879,6 +2976,19 @@ export default class App extends React.Component {
         onRestore: () => this.restoreTrash(i),
         onPurge: () => this.purgeTrash(i),
       }));
+    const trashPlanRows = (st.trashedPlans || [])
+      .slice()
+      .sort((a, b) => (b.trashedAt || 0) - (a.trashedAt || 0))
+      .map(t => {
+        const m = this.planMeta(t.plan);
+        return {
+          id: t.plan.id, glyph: '📋', name: t.plan.name,
+          meta: '予定 · ' + t.plan.tasks.length + '件 · ' + this.fmtMin(m.min),
+          fatText: m.fatText,
+          onRestore: () => this.restorePlanTrash(t.plan.id),
+          onPurge: () => this.purgePlanTrash(t.plan.id),
+        };
+      });
 
     return {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
@@ -2927,6 +3037,8 @@ export default class App extends React.Component {
       bookEntries: st.entries, bookSlotHours: st.slotHours, bookCollected: st.collected,
       bookFav: st.sampleMode ? { ...this._sampleFav, ...(st.bookFav || {}) } : (st.bookFav || {}),
       bookDiary: st.sampleMode ? { ...this._sampleDiary, ...(st.bookDiary || {}) } : (st.bookDiary || {}),
+      bookBeforeSleep: st.sampleMode ? this._sampleBalance : null, // 寝る前の疲労（繰り越し込み）
+
       setBookFav: this.setBookFav, setBookDiary: this.setBookDiary,
       navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? 1 : 0,
@@ -3020,7 +3132,7 @@ export default class App extends React.Component {
         : (isEditFlow ? 'へんこうする' : 'きろくする'),
       confirmTitle: isEditFlow ? 'きろくを編集' : '登録を確認',
       isEditFlow, trashOriginal: this.trashOriginal,
-      trashRows, trashCount: trashRows.length, goTrash: this.goTrash,
+      trashRows, trashPlanRows, trashCount: trashRows.length + trashPlanRows.length, goTrash: this.goTrash,
       /* マイページの設定サブ画面 */
       slotTimeRows, slotTimesSub, catRows, templateRows, sensSections,
       sensSub: '体×' + (st.bodyFatCoef || 1).toFixed(1) + ' ・ 心×' + (st.mindFatCoef || 1).toFixed(1),

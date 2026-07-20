@@ -81,14 +81,17 @@ function Cats({ v }) {
       <div style={sectionLabel}>予定から</div>
       <div style={{ padding: '0 0 2px' }}>
         {v.plans.map(p => (
-          <button key={p.id} onClick={p.onOpen} style={{ display: 'flex', width: '100%', textAlign: 'left', alignItems: 'center', gap: 13, padding: '10px 22px', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer' }}>
+          <div key={p.id} onClick={p.onOpen} style={{ display: 'flex', width: '100%', textAlign: 'left', alignItems: 'center', gap: 13, padding: '10px 12px 10px 22px', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer' }}>
             <span style={{ width: 26, textAlign: 'center', flex: '0 0 auto', fontSize: 19 }}>📋</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>{p.name}</div>
               <div style={{ ...mono, fontSize: 11, color: '#9d9b91', marginTop: 1 }}>{p.meta}</div>
             </div>
             <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
-          </button>
+            <button onClick={(e) => { e.stopPropagation(); p.onTrash(); }} aria-label="ゴミ箱へ" style={{ width: 34, height: 34, border: 'none', background: 'none', cursor: 'pointer', flex: '0 0 auto', padding: 0 }}>
+              <span style={msIcon(18, '#c9c7bf', false)}>delete</span>
+            </button>
+          </div>
         ))}
         <button onClick={v.openPlanAdd} style={{ display: 'flex', width: 'calc(100% - 32px)', margin: '12px 16px 2px', alignItems: 'center', justifyContent: 'center', gap: 7, border: '1.5px dashed #d8d5cb', borderRadius: 12, padding: '12px 0', fontSize: 13, fontWeight: 700, color: '#8a8a82', background: '#fff', cursor: 'pointer' }}>
           <span style={msIcon(18, '#8a8a82', false)}>calendar_add_on</span>予定をつくる

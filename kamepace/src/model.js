@@ -68,7 +68,7 @@ export function serialize(st) {
   return {
     schema: 2,
     days,
-    collected: st.collected || [],
+    collected: (st.collected || []).filter(c => !c._sample), // サンプルの睡眠等は保存しない
     collectedSeen: st.collectedSeen || 0,
     templates: st.templates || {},
     sortMode: !!st.sortMode,
@@ -95,6 +95,8 @@ export function serialize(st) {
     mindRecCoef: st.mindRecCoef || 1,
     bookFav: st.bookFav || {},      // 本棚: お気に入り（付箋） dateStr→true
     bookDiary: st.bookDiary || {},  // 本棚: 日記 dateStr→string
+    trashedPlans: st.trashedPlans || [],   // ゴミ箱の予定 [{plan,src,trashedAt}]
+    purgedPlanIds: st.purgedPlanIds || [], // 完全削除した標準予定の id
     updatedAt: Date.now(),
   };
 }
@@ -148,6 +150,8 @@ export function deserialize(data) {
     mindRecCoef: typeof data.mindRecCoef === 'number' ? data.mindRecCoef : (typeof data.recoverCoef === 'number' ? data.recoverCoef : 1),
     bookFav: (data.bookFav && typeof data.bookFav === 'object') ? data.bookFav : {},
     bookDiary: (data.bookDiary && typeof data.bookDiary === 'object') ? data.bookDiary : {},
+    trashedPlans: Array.isArray(data.trashedPlans) ? data.trashedPlans : [],
+    purgedPlanIds: Array.isArray(data.purgedPlanIds) ? data.purgedPlanIds : [],
   };
 }
 
@@ -160,6 +164,7 @@ export function freshState() {
     onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null, mainScreen: null,
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1,
     bookFav: {}, bookDiary: {},
+    trashedPlans: [], purgedPlanIds: [],
   };
 }
 

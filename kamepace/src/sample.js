@@ -65,6 +65,7 @@ export function buildAcademicYear(ay, opts = {}) {
   const E = [];
   const diary = {};
   const fav = {};
+  const collected = []; // 睡眠(🌙)などの「ためた回復」
   const add = (date, from, to, title, glyph, delta) => E.push({
     date, from, to, title, act: guessAct(title), glyph, delta, mood: '🙂', exp: false, _sample: true,
   });
@@ -169,6 +170,19 @@ export function buildAcademicYear(ay, opts = {}) {
     if (wd === 0 || wd === 3) add(date, '10:00', '10:40', '掃除・洗濯', '🧺', D(8, 40));
     if (wd === 6 || (isBreak && wd === 3)) add(date, '16:30', '17:10', '買い物（スーパー）', '🛒', D(9, 40));
 
+    // ---- 回復（入浴・食事・趣味・休憩・昼寝など。delta マイナス＝回復） ----
+    add(date, '22:10', '22:30', '入浴', '🛁', D(12, 20, true)); // 毎晩お風呂でリセット
+    if (rnd('lunch' + date) < 0.85) add(date, '12:15', '12:50', '食事（ランチ）', '🍙', D(7, 35, true));
+    if (rnd('leis' + date) < 0.6) {
+      const lg = pick('lg' + date, [['ゲーム', '🎮', 7], ['趣味・音楽', '🎧', 10], ['SNS・動画', '📱', 5], ['読書', '📖', 8]]);
+      add(date, '21:00', '21:40', lg[0], lg[1], D(lg[2], 40, true));
+    }
+    if ((inSpringExam || inFallExam || (inSpringClass && between(d, addDays(spClassEnd, -14), spClassEnd))) && rnd('cof' + date) < 0.6) {
+      add(date, '15:30', '15:45', '休憩・コーヒー', '☕', D(7, 15, true)); // 追い込み期はこまめに休憩
+    }
+    if ((wd === 0 || wd === 6 || isBreak) && rnd('nap' + date) < 0.35) add(date, '14:30', '15:10', '昼寝・仮眠', '😴', D(13, 40, true));
+    if (isBreak && !inWinterGap && rnd('relax' + date) < 0.4) add(date, '16:00', '16:40', 'ぼーっとする', '🌳', D(8, 40, true));
+
     // ---- 運動（春〜秋ラン・距離のびる／冬は室内筋トレ） ----
     const canRunOutside = month >= 3 && month <= 11; // 冬(12〜2)は雪でなし
     if (!inSpringExam && !inFallExam) {
@@ -207,14 +221,23 @@ export function buildAcademicYear(ay, opts = {}) {
       const day = Math.floor((d.getTime() - cycleAnchor) / 864e5);
       const phase = ((day % 29) + 29) % 29; // 0=生理初日
       if (phase < 5) {
-        // 生理中: お腹が痛い（体）
-        add(date, '08:20', '10:20', '生理痛', '🩸', D(8, 120));
+        // 生理中: お腹が痛い（体）。苦しそうな顔の絵文字で
+        add(date, '08:20', '10:20', '生理痛', '😖', D(8, 120));
       } else if (phase >= 25) {
         // PMS: メンタルがやられやすい（心）
         add(date, '21:30', '22:00', pick('pms' + date, ['気分が落ち込む（PMS）', '理由もなく不安（PMS）', 'イライラする（PMS）']),
           pick('pmsg' + date, ['😔', '😰', '😤']), D(7, 60));
       }
     }
+
+    // ---- 睡眠の記録（前夜の睡眠を 🌙 として。テスト/制作期は削り、長期休みはよく寝る） ----
+    const crunchSleep = d >= addDays(spClassEnd, -14) && d < spExamEnd;
+    let sleepAmt = 42;
+    if (inSpringExam || inFallExam) sleepAmt = 26;
+    else if (crunchSleep) sleepAmt = 30;
+    else if (isBreak) sleepAmt = 50;
+    sleepAmt += Math.round((rnd('slp' + date) - 0.5) * 8);
+    collected.push({ glyph: '🌙', act: '睡眠', amount: Math.max(14, sleepAmt), ts: d.getTime() + 7 * 3600 * 1000, _sample: true });
 
     // ---- 日記（前期テスト・制作期で途切れ→夏に再開して定着） ----
     const diaryGapStart = addDays(spClassEnd, -14); // 制作＆テスト直前
@@ -232,7 +255,25 @@ export function buildAcademicYear(ay, opts = {}) {
     }
   }
 
-  return { entries: E, diary, fav };
+  // 日ごとの疲労/回復/睡眠から「寝る前の山の量（前日からの繰り越し込み）」を計算。
+  // 睡眠で回復しきれなかったぶんが翌日へ引き継がれる。
+  const fatBy = {}, recBy = {}, sleepBy = {};
+  E.forEach(e => { if (e.exp) return; const v = e.delta || 0; if (v > 0) fatBy[e.date] = (fatBy[e.date] || 0) + v; else if (v < 0) recBy[e.date] = (recBy[e.date] || 0) + (-v); });
+  collected.forEach(c => { const ds = ymd(new Date(c.ts)); sleepBy[ds] = (sleepBy[ds] || 0) + (c.amount || 0); });
+  // 睡眠は「1晩で大半が回復」する想定（回復量は🌙の量×係数）。回復しきれないぶんが翌日へ繰り越す。
+  // よく寝た日はほぼリセット、テスト/制作で睡眠を削った日は多めに繰り越して山が高くなる。
+  // 繰り越しは最大50までに制限（現実には週末などで一度リセットされるため、青天井に貯めない）。
+  const SLEEP_RECOVER = 2.0, CARRY_MAX = 50;
+  const balanceByDay = {};
+  let carry = 0;
+  for (let d = new Date(D0); d < D1; d = addDays(d, 1)) {
+    const ds = ymd(d);
+    const before = Math.max(0, carry + (fatBy[ds] || 0) - (recBy[ds] || 0)); // 寝る前の山（繰り越し込み）
+    balanceByDay[ds] = before;
+    carry = Math.max(0, Math.min(CARRY_MAX, before - (sleepBy[ds] || 0) * SLEEP_RECOVER)); // 睡眠で回復した残りを翌日へ（上限あり）
+  }
+
+  return { entries: E, diary, fav, collected, balanceByDay };
 }
 
 /* 表示中の日付が属する「学年（春スタートの年）」 */
