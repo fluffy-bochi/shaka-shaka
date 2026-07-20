@@ -65,6 +65,7 @@ export function buildAcademicYear(ay, opts = {}) {
   const E = [];
   const diary = {};
   const fav = {};
+  const collected = []; // 睡眠(🌙)などの「ためた回復」
   const add = (date, from, to, title, glyph, delta) => E.push({
     date, from, to, title, act: guessAct(title), glyph, delta, mood: '🙂', exp: false, _sample: true,
   });
@@ -220,14 +221,23 @@ export function buildAcademicYear(ay, opts = {}) {
       const day = Math.floor((d.getTime() - cycleAnchor) / 864e5);
       const phase = ((day % 29) + 29) % 29; // 0=生理初日
       if (phase < 5) {
-        // 生理中: お腹が痛い（体）
-        add(date, '08:20', '10:20', '生理痛', '🩸', D(8, 120));
+        // 生理中: お腹が痛い（体）。苦しそうな顔の絵文字で
+        add(date, '08:20', '10:20', '生理痛', '😖', D(8, 120));
       } else if (phase >= 25) {
         // PMS: メンタルがやられやすい（心）
         add(date, '21:30', '22:00', pick('pms' + date, ['気分が落ち込む（PMS）', '理由もなく不安（PMS）', 'イライラする（PMS）']),
           pick('pmsg' + date, ['😔', '😰', '😤']), D(7, 60));
       }
     }
+
+    // ---- 睡眠の記録（前夜の睡眠を 🌙 として。テスト/制作期は削り、長期休みはよく寝る） ----
+    const crunchSleep = d >= addDays(spClassEnd, -14) && d < spExamEnd;
+    let sleepAmt = 42;
+    if (inSpringExam || inFallExam) sleepAmt = 26;
+    else if (crunchSleep) sleepAmt = 30;
+    else if (isBreak) sleepAmt = 50;
+    sleepAmt += Math.round((rnd('slp' + date) - 0.5) * 8);
+    collected.push({ glyph: '🌙', act: '睡眠', amount: Math.max(14, sleepAmt), ts: d.getTime() + 7 * 3600 * 1000, _sample: true });
 
     // ---- 日記（前期テスト・制作期で途切れ→夏に再開して定着） ----
     const diaryGapStart = addDays(spClassEnd, -14); // 制作＆テスト直前
@@ -245,7 +255,7 @@ export function buildAcademicYear(ay, opts = {}) {
     }
   }
 
-  return { entries: E, diary, fav };
+  return { entries: E, diary, fav, collected };
 }
 
 /* 表示中の日付が属する「学年（春スタートの年）」 */

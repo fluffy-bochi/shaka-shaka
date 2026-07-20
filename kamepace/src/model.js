@@ -68,7 +68,7 @@ export function serialize(st) {
   return {
     schema: 2,
     days,
-    collected: st.collected || [],
+    collected: (st.collected || []).filter(c => !c._sample), // サンプルの睡眠等は保存しない
     collectedSeen: st.collectedSeen || 0,
     templates: st.templates || {},
     sortMode: !!st.sortMode,

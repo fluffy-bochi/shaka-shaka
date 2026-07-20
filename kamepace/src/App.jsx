@@ -148,26 +148,28 @@ export default class App extends React.Component {
     const need = [];
     for (let y = ay - 1; y <= ay + 1; y++) if (!this._sampleYears.has(y)) need.push(y);
     if (!need.length) return;
-    let add = [];
+    let add = [], addColl = [];
     need.forEach(y => {
-      const { entries, diary, fav } = buildAcademicYear(y, { cycleOn: this.state.sampleCycleOn });
+      const { entries, diary, fav, collected } = buildAcademicYear(y, { cycleOn: this.state.sampleCycleOn });
       add = add.concat(entries);
+      addColl = addColl.concat(collected || []);
       Object.assign(this._sampleDiary, diary);
       Object.assign(this._sampleFav, fav);
       this._sampleYears.add(y);
     });
     this._pileLayout = null;
     // 関数型: 読込時の advancePlans 等のバッチ更新と競合しても最新の entries に足す
-    this.setState(prev => ({ entries: [...prev.entries, ...add] }));
+    this.setState(prev => ({ entries: [...prev.entries, ...add], collected: [...(prev.collected || []), ...addColl] }));
   }
   clearSample() {
     this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._pileLayout = null;
-    this.set({ entries: this.state.entries.filter(e => !e._sample) });
+    this.set({ entries: this.state.entries.filter(e => !e._sample), collected: (this.state.collected || []).filter(c => !c._sample) });
   }
   regenSample() { // 生理オン/オフの切替時など、作り直し
     const entries = this.state.entries.filter(e => !e._sample);
+    const collected = (this.state.collected || []).filter(c => !c._sample);
     this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._pileLayout = null;
-    this.set({ entries });
+    this.set({ entries, collected });
     setTimeout(() => this.ensureSample(this.homeDateStr()), 0);
   }
   toggleSample = () => {
@@ -290,11 +292,12 @@ export default class App extends React.Component {
       // ゲストの山の散らばりを持ち込まない
       this._pileLayout = null;
       // オンボ判定は「読み込んだデータ」で行う（this.set は非同期で this.state に即反映されないため）
-      let onboardDone;
+      let onboardDone, hadData = false;
       if (data) {
         const dd = deserialize(data);
         this.set({ ...dd, booted: true, screen: dd.mainScreen || 'shaka', dayOffset: 0 });
         onboardDone = dd.onboardDone;
+        hadData = (dd.entries || []).some(e => !e.sample && !e._sample) || (dd.collected || []).length > 0;
         this.restoreSampleMode(dd);
       } else {
         // 新規ユーザー（初めての登録）: ゲストのデータ（サンプル含む）は引き継がず、まっさらで開始
@@ -308,7 +311,11 @@ export default class App extends React.Component {
       clearInterval(this._schedT);
       this._schedT = setInterval(() => this.syncScheduleApp(), 5 * 60 * 1000);
       // 既にオンボ済みのログインユーザーには出さない。初回（未オンボ）だけ出す
-      if (!onboardDone) setTimeout(() => this.set({ screen: 'onboard', obStep: 1, obSel: {} }), 200);
+      // → オンボ後に操作チュートリアルも出す（記録がまだ無いユーザーのみ）
+      if (!onboardDone) {
+        this._tutorialAfterOnboard = !hadData;
+        setTimeout(() => this.set({ screen: 'onboard', obStep: 1, obSel: {} }), 200);
+      }
     } catch (err) {
       console.warn('[kamepace] load failed', err);
       this.set({ booted: true });
@@ -1640,10 +1647,10 @@ export default class App extends React.Component {
     }
     this.set(patch);
     this.save();
-    // 自分の記録がまだ無いゲストは、続けてチュートリアルへ
+    // 自分の記録がまだ無いユーザーは、続けてチュートリアルへ（ゲスト・ログイン両方）
     if (this._tutorialAfterOnboard) {
       this._tutorialAfterOnboard = false;
-      setTimeout(() => { if (!this.state.tutorial && !this.state.user) this.startTutorial(); }, 450);
+      setTimeout(() => { if (!this.state.tutorial) this.startTutorial(); }, 450);
     }
   }
 
