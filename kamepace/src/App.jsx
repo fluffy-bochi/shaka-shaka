@@ -110,12 +110,17 @@ export default class App extends React.Component {
     buffCfgId: null,
     buffCfgTitle: '',
     buffCfgKey: 'none',
-    /* 検索で見つからない→新しくつくる */
+    /* 検索で見つからない→新しくつくる（コピー式・大カテゴリ選択つき） */
     newActOpen: false,
     newActKwIndex: null,
     newActName: '',
     newActCatId: null,
     newActGlyph: 'std',
+    newActSrcId: null,
+    newActBodyIdx: 2,
+    newActMindIdx: 2,
+    /* ホームの記録を長押ししたときのメニュー（編集・ゴミ箱へ） */
+    recMenu: null,
     /* 操作チュートリアル（0=オフ、1〜12=ステップ）。実データは退避して終了時に復元 */
     tutorial: 0,
     tutFlags: {},
@@ -777,44 +782,65 @@ export default class App extends React.Component {
     if (timeMode && this.state.startTime) patch.endTime = this.addHm(this.state.startTime, total);
     this.set(patch);
   };
-  /* 検索で見つからないとき: タイトル・大カテゴリ・絵文字を選んでつくる */
+  /* 検索で見つからないとき: 「にているものをコピーして作る」と同じUI＋大カテゴリ選択で作る */
+  newActSrcList(catId) {
+    const cat = this.allCats().find(c => c.id === catId);
+    // 選んだ大カテゴリの行動をコピー元候補に。空カテゴリなら全行動から選べる
+    const items = (cat && cat.items.length) ? cat.items : this.allItems();
+    return items;
+  }
   addNewAction = (kwIndex, name) => {
     const visible = this.allCats().filter(c => !(this.state.hiddenCats || []).includes(c.id));
+    const catId = visible[0] ? visible[0].id : null;
+    const src = this.newActSrcList(catId)[0];
     this.set({
       newActOpen: true, newActKwIndex: kwIndex, newActName: name,
-      newActCatId: visible[0] ? visible[0].id : null, newActGlyph: 'std',
+      newActCatId: catId, newActGlyph: 'std',
+      newActSrcId: src ? src.id : null, newActBodyIdx: 2, newActMindIdx: 2,
     });
   };
   closeNewAct = () => this.set({ newActOpen: false });
   onNewActName = (e) => this.set({ newActName: e.target.value });
-  pickNewActCat = (id) => this.set({ newActCatId: id });
+  pickNewActCat = (id) => {
+    // 大カテゴリを変えたらコピー元候補もそのカテゴリのものに入れ替える
+    const src = this.newActSrcList(id)[0];
+    this.set({ newActCatId: id, newActSrcId: src ? src.id : null });
+  };
+  pickNewActSrc = (id) => this.set({ newActSrcId: id });
   pickNewActGlyph = (g) => this.set({ newActGlyph: g });
+  /* コピー元×倍率から（体, 心）を計算（行動をつくる=コピー式と同じ計算） */
+  newActCalc() {
+    const src = this.state.newActSrcId ? this.itemById(this.state.newActSrcId) : null;
+    if (!src) return null;
+    const bm = COMPARE_STEPS[this.state.newActBodyIdx].m;
+    const mm = COMPARE_STEPS[this.state.newActMindIdx].m;
+    const sb = typeof src.body === 'number' ? src.body : Math.abs(src.fh) / 2;
+    const sm = typeof src.mind === 'number' ? src.mind : Math.abs(src.fh) / 2;
+    let body = Math.round(sb * bm);
+    let mind = Math.round(sm * mm);
+    if (body + mind < 1) { if (sm >= sb) mind = 1; else body = 1; }
+    const recover = src.fh < 0;
+    return { src, body, mind, fh: (recover ? -1 : 1) * (body + mind), recover };
+  }
   createNewAct = () => {
     const cat = this.allCats().find(c => c.id === this.state.newActCatId);
+    const calc = this.newActCalc();
     const name = (this.state.newActName || '').trim();
-    if (!cat || !name) { this.set({ newActOpen: false }); return; }
-    // 疲労の初期値はそのカテゴリの行動の平均（あとで強度・時間で調整できる）
-    const items = cat.items.length ? cat.items : [{ body: 3, mind: 3, fh: 6, defMin: 30 }];
-    const avg = (f) => Math.max(1, Math.round(items.reduce((a, t) => a + Math.abs(f(t) || 0), 0) / items.length));
-    const body = avg(t => t.body != null ? t.body : Math.abs(t.fh) / 2);
-    const mind = avg(t => t.mind != null ? t.mind : Math.abs(t.fh) / 2);
-    const recover = (items[0].fh || 0) < 0;
-    // 時間は中央値（合宿480分のような外れ値に引っ張られないように）
-    const minsSorted = items.map(t => t.defMin || 30).sort((a, b) => a - b);
-    const median = minsSorted[Math.floor((minsSorted.length - 1) / 2)];
-    const defMin = Math.max(5, Math.round(median / 5) * 5);
-    const glyph = this.state.newActGlyph === 'std' ? (cat.glyph || '⭐') : this.state.newActGlyph;
-    const fh = (recover ? -1 : 1) * (body + mind);
-    const est = Math.max(1, Math.round((body + mind) * defMin / 60));
+    if (!cat || !calc || !name) { this.set({ newActOpen: false }); return; }
+    const glyph = this.state.newActGlyph === 'std' ? (cat.glyph || calc.src.glyph || '⭐') : this.state.newActGlyph;
+    const defMin = calc.src.defMin || 30;
+    const est = Math.max(1, Math.round((calc.body + calc.mind) * defMin / 60));
     const id = 'act' + Date.now();
     const item = {
-      id, glyph, icon: cat.icon, name, body, mind, fh, defMin,
-      last: `目安 ${recover ? '−' : '+'}${est}（${this.fmtMin(defMin)}）`,
-      kw: [cat.name, name],
+      id, glyph, icon: cat.icon, name,
+      body: calc.body, mind: calc.mind, fh: calc.fh, defMin,
+      last: `目安 ${calc.recover ? '−' : '+'}${est}（${this.fmtMin(defMin)}）`,
+      kw: [cat.name, ...(calc.src.kw || []), name],
+      copiedFrom: calc.src.id,
     };
     const customItems = { ...(this.state.customItems || {}) };
     customItems[cat.id] = [...(customItems[cat.id] || []), item];
-    const searchEntry = { name, glyph, fh, body, mind, defMin, kw: item.kw };
+    const searchEntry = { name, glyph, fh: calc.fh, body: calc.body, mind: calc.mind, defMin, kw: item.kw };
     this.set({
       customItems,
       customActions: [...(this.state.customActions || []), searchEntry],
@@ -1636,6 +1662,29 @@ export default class App extends React.Component {
   goTrash = () => this.set({ screen: 'trash' });
   goBuffLog = () => this.set({ screen: 'buffLog' });
 
+  /* ================= ホーム記録の長押しメニュー =================
+     時間帯カードの記録を長押し → 編集 or ゴミ箱へ移動を選べる小メニュー。 */
+  openRecMenu = (g) => this.set({ recMenu: g });
+  closeRecMenu = () => this.set({ recMenu: null });
+  recMenuEdit = () => {
+    const g = this.state.recMenu;
+    this.set({ recMenu: null });
+    if (g) (g.isFrame ? this.openFrameFill(g) : this.openEditFlow(g));
+  };
+  recMenuTrash = () => {
+    const g = this.state.recMenu;
+    this.set({ recMenu: null });
+    if (!g) return;
+    const idxs = g.isPlan ? (g.idxs || []) : (g.idx != null ? [g.idx] : []);
+    if (!idxs.length) return;
+    const set = new Set(idxs);
+    // 完全削除せず exp:true でゴミ箱へ（きろくの編集画面の「ゴミ箱へ」と同じ）
+    const entries = this.state.entries.map((e, i) => set.has(i) ? { ...e, exp: true, trashedAt: Date.now() } : e);
+    this.set({ entries, consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)) });
+    this.save();
+    this.toast('ゴミ箱に移動しました');
+  };
+
   /* ================= オンボーディング =================
      初回起動（onboardDone が立っていない）で表示する9問ウィザード。
      職業→カテゴリの初期表示、疲れやすさ4問→個人係数に反映 */
@@ -2034,6 +2083,8 @@ export default class App extends React.Component {
   appBack() {
     const s = this.state;
     // 手前に出ているポップアップ・シートを先に閉じる
+    if (s.recMenu) { this.closeRecMenu(); return true; }
+    if (s.newActOpen) { this.closeNewAct(); return true; }
     if (s.symAdjust) { this.dismissSymAdjust(); return true; }
     if (s.buffCfgId) { this.closeBuffCfg(); return true; }
     if (s.buffOpen) { this.closeBuffs(); return true; }
@@ -2765,7 +2816,7 @@ export default class App extends React.Component {
         sumText: empty ? '' : (sum >= 0 ? '+' + sum : '' + sum),
         circleBg: empty ? '#eef0e6' : '#eaf5c9',
         nameColor: empty ? '#8a8a82' : '#1b1b18',
-        groups: this.groupRecords(records).map(g => ({ ...g, onTap: () => (g.isFrame ? this.openFrameFill(g) : this.openEditFlow(g)) })),
+        groups: this.groupRecords(records).map(g => ({ ...g, onTap: () => (g.isFrame ? this.openFrameFill(g) : this.openEditFlow(g)), onLongPress: () => this.openRecMenu(g) })),
         onAdd: () => this.openRecord(sd.id),
       };
     });
@@ -2883,6 +2934,12 @@ export default class App extends React.Component {
     const actMindOpts = cmpRow(st.actMindIdx, (i) => this.set({ actMindIdx: i }));
     const actStdGlyph = actCat ? (actCat.glyph || '⭐') : '⭐';
     const actEstText = actCalc ? `${actCalc.recover ? '−' : '+'}${actCalc.body + actCalc.mind}/h（体${actCalc.body} 心${actCalc.mind}）` : '';
+    /* ---- 検索で見つからない→新しくつくる（コピー式・比較スライダー） ---- */
+    const newActCalc = st.newActOpen ? this.newActCalc() : null;
+    const newActIsRecoverV = !!(newActCalc && newActCalc.recover);
+    const newCmpRow = (curIdx, onPick) => COMPARE_STEPS.map((c, i) => ({
+      text: newActIsRecoverV ? REC_CMP_LABELS[i] : c.label, on: curIdx === i, onPick: () => onPick(i),
+    }));
     const subItems = (activeCat ? activeCat.items : []).map(t => {
       const e = st.cart[t.id]; const sel = !!e;
       const lm = this.lastMinOf(t.name);
@@ -3157,6 +3214,22 @@ export default class App extends React.Component {
         on: st.newActCatId === c.id, onPick: () => this.pickNewActCat(c.id),
       })),
       newActStdGlyph: (this.allCats().find(c => c.id === st.newActCatId) || {}).glyph || '⭐',
+      // コピー元（にているもの）＝選んだ大カテゴリの行動。比較スライダーで体・心を調整
+      newActSrcChoices: (st.newActOpen ? this.newActSrcList(st.newActCatId) : []).map(it2 => ({
+        id: it2.id, glyph: it2.glyph, name: it2.name,
+        on: st.newActSrcId === it2.id, onPick: () => this.pickNewActSrc(it2.id),
+      })),
+      newActIsRecover: !!(newActCalc && newActCalc.recover),
+      newActSrcName: newActCalc ? newActCalc.src.name : '',
+      newActBodyOpts: newCmpRow(st.newActBodyIdx, (i) => this.set({ newActBodyIdx: i })),
+      newActMindOpts: newCmpRow(st.newActMindIdx, (i) => this.set({ newActMindIdx: i })),
+      newActEstText: newActCalc ? `${newActCalc.recover ? '−' : '+'}${newActCalc.body + newActCalc.mind}/h（体${newActCalc.body} 心${newActCalc.mind}）` : '',
+      // ホーム記録の長押しメニュー
+      recMenuOpen: !!st.recMenu,
+      recMenuTitle: st.recMenu ? st.recMenu.title : '',
+      recMenuGlyph: st.recMenu ? st.recMenu.glyph : '',
+      recMenuIsPlan: st.recMenu ? !!st.recMenu.isPlan : false,
+      closeRecMenu: this.closeRecMenu, recMenuEdit: this.recMenuEdit, recMenuTrash: this.recMenuTrash,
       intensityOpen: !!intItem, intensityName: intItem ? intItem.name : '', intensityGlyph: intItem ? intItem.glyph : '',
       intensityFatText: (intFat >= 0 ? '+' + intFat : '' + intFat), intQuestions, closeIntensity: this.closeIntensity,
       prefOpts,
