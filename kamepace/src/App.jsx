@@ -1199,9 +1199,10 @@ export default class App extends React.Component {
   // 100個で画面全体を埋めるサイズ。100を超えたら縮小して画面に収める（あふれ対策）
   calcR(w, h, count) {
     const area = Math.max(1, w) * Math.max(1, h);
-    // 100個でその画面がちょうど満杯（上端まで）になる大きさ。画面の実寸(area)から計算するので機種で自動調整。
-    // 100を超えても縮小せず同じ大きさのまま画面の外（上）に積み上げる
-    const r = Math.sqrt(area * 0.8 / (100 * Math.PI));
+    // 【重要】絵文字100個でその画面が上から下まで満杯（100個の時は少し上にはみ出すくらい）になる大きさ。
+    // 画面の実寸(area)から計算するので機種で自動調整。100を超えても縮小せず同じ大きさのまま画面の外（上）へ積む。
+    // ※ memory: emoji-pile-fill-rule（何度も指摘される最重要ルール）
+    const r = Math.sqrt(area * 0.85 / (100 * Math.PI));
     return Math.max(8, Math.min(r, 60));
   }
   /* 今この画面で積む絵文字の数（シャカ・ホーム・睡眠で共通） */
@@ -2012,6 +2013,7 @@ export default class App extends React.Component {
     const W = rect.width || 350, H = rect.height || 700;
     const r = this.calcR(W, H, this.pileCount()); // ホーム/睡眠と同じ個数基準で縮小
     this.PR = r;
+    this._caseW = W; this._caseH = H;
     this.engine = Engine.create();
     this.engine.world.gravity.y = 1.2;
     this._tuneEngine(this.engine);
@@ -2048,9 +2050,10 @@ export default class App extends React.Component {
         y = Math.max(r, Math.min(H - r, saved[idx].y * H));
         angle = saved[idx].a || 0;
       } else {
+        // 初期配置は重なりを作らない（2r間隔）。重なると解消時に底が床を突き抜けて画面下へ弾かれる
         const row = Math.floor(idx / perRow), col = idx % perRow;
-        x = r + col * (2 * r) + (Math.random() - 0.5) * r * 0.5;
-        y = H - r - row * (2 * r * 0.92) + (Math.random() - 0.5) * r * 0.3;
+        x = r + col * (2 * r) + (Math.random() - 0.5) * r * 0.25;
+        y = H - r - row * (2 * r) + (Math.random() - 0.5) * r * 0.12;
       }
       const body = Bodies.circle(x, y, r, this.BODY_OPTS);
       if (angle) Matter.Body.setAngle(body, angle);
@@ -2082,8 +2085,13 @@ export default class App extends React.Component {
     this._phys = true;
     const loop = () => {
       if (!this._phys) return;
-      const rr = this.PR;
+      const rr = this.PR, cH = this._caseH || 700, cW = this._caseW || 350;
       this.bodies.forEach(({ body, el }) => {
+        // 高個数で底が床を突き抜けて画面下へ抜けたら、画面内に引き戻す（＝下に消えないように）
+        if (body.position.y > cH + rr * 1.5 || body.position.x < -rr * 2 || body.position.x > cW + rr * 2) {
+          Matter.Body.setPosition(body, { x: Math.max(rr, Math.min(cW - rr, body.position.x)), y: cH - rr });
+          Matter.Body.setVelocity(body, { x: 0, y: 0 });
+        }
         el.style.transform = `translate(${body.position.x - rr}px, ${body.position.y - rr}px) rotate(${body.angle}rad)`;
       });
       if (this.negBodies && this.negBodies.length) {
