@@ -537,8 +537,9 @@ export default function Bookshelf({ v }) {
   } : null;
   const landscape = (
     <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec', ...rotateStyle }}>
-      {/* 中央: 棚 */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      {/* 中央: 棚（zIndex:1 で独自のstacking contextを作り、背表紙内のハイライト(今日/選択枠)が
+          右の「その日」ページ(zIndex:3)より前に出ないようにする） */}
+      <div style={{ position: 'relative', zIndex: 1, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         {/* タイトル行（日別/月別・今日・回転を横に）＋その下に残りのボタンを1行で */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '20px 14px 0' }}>
           <div style={{ fontSize: 21, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 0 auto' }}>がんばりの本棚</div>
