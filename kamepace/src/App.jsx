@@ -211,6 +211,7 @@ export default class App extends React.Component {
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
       bookFav: s.bookFav, bookDiary: s.bookDiary,
+      trashedPlans: s.trashedPlans, purgedPlanIds: s.purgedPlanIds,
     };
   }
   save() {
@@ -397,7 +398,12 @@ export default class App extends React.Component {
     const tplPlans = Object.entries(this.state.templates || {})
       .filter(([, t]) => t && Array.isArray(t.tasks) && t.tasks.length)
       .map(([key, t]) => ({ id: 'tpl:' + key, name: key, tasks: t.tasks }));
-    return [...PLANS, ...(this.state.customPlans || []), ...tplPlans];
+    // ゴミ箱の予定・完全削除した予定はリストに出さない
+    const hidden = new Set([
+      ...(this.state.trashedPlans || []).map(t => t.plan.id),
+      ...(this.state.purgedPlanIds || []),
+    ]);
+    return [...PLANS, ...(this.state.customPlans || []), ...tplPlans].filter(p => !hidden.has(p.id));
   }
   planById(id) { return this.allPlans().find(p => p.id === id); }
   planMeta(p) {
@@ -1842,6 +1848,50 @@ export default class App extends React.Component {
     this.toast('完全に削除しました');
   };
 
+  /* ---- 予定のゴミ箱（記録入口の「予定から」リスト）----
+     entries と同じく完全削除せずゴミ箱へ。もどす／完全に削除ができる。 */
+  trashPlan = (id) => {
+    const p = this.allPlans().find(x => x.id === id);
+    if (!p) return;
+    const src = id.startsWith('tpl:') ? 'tpl' : ((this.state.customPlans || []).some(c => c.id === id) ? 'custom' : 'builtin');
+    this.set({ trashedPlans: [...(this.state.trashedPlans || []), { plan: { id: p.id, name: p.name, tasks: p.tasks }, src, trashedAt: Date.now() }] });
+    this.save();
+    this.toast('予定をゴミ箱に移動しました');
+  };
+  restorePlanTrash = (id) => {
+    const st = this.state;
+    const item = (st.trashedPlans || []).find(t => t.plan.id === id);
+    const patch = { trashedPlans: (st.trashedPlans || []).filter(t => t.plan.id !== id) };
+    // テンプレ由来の予定は、ゴミ箱に入れている間にテンプレ本体が消えていたらカスタム予定として復元
+    if (item && item.src === 'tpl') {
+      const key = id.slice(4);
+      const tpl = (st.templates || {})[key];
+      if (!tpl || !Array.isArray(tpl.tasks) || !tpl.tasks.length) {
+        patch.customPlans = [...(st.customPlans || []), { id: 'plan' + Date.now(), name: item.plan.name, tasks: item.plan.tasks }];
+      }
+    }
+    this.set(patch);
+    this.save();
+    this.toast('もどしました');
+  };
+  purgePlanTrash = (id) => {
+    const st = this.state;
+    const patch = { trashedPlans: (st.trashedPlans || []).filter(t => t.plan.id !== id) };
+    if ((st.customPlans || []).some(c => c.id === id)) {
+      patch.customPlans = st.customPlans.filter(c => c.id !== id);
+    } else if (id.startsWith('tpl:')) {
+      const templates = { ...(st.templates || {}) };
+      const key = id.slice(4);
+      if (templates[key]) { const { tasks, ...rest } = templates[key]; templates[key] = rest; }
+      patch.templates = templates;
+    } else {
+      patch.purgedPlanIds = [...(st.purgedPlanIds || []), id];
+    }
+    this.set(patch);
+    this.save();
+    this.toast('完全に削除しました');
+  };
+
   /* カレンダー枠に行動を入れる: 記録フローの入口から選ばせ、確定時に枠を置き換えてテンプレ保存 */
   openFrameFill = (g) => {
     const idx = g.idxs && g.idxs[0];
@@ -2724,7 +2774,7 @@ export default class App extends React.Component {
     const hiddenCats = st.hiddenCats || [];
     // 非表示カテゴリはリストから隠すだけ（検索・既存記録からは到達可能）
     const cats = this.allCats().filter(c => !hiddenCats.includes(c.id)).map(c => ({ id: c.id, name: c.name, sub: c.sub, icon: c.icon, color: c.color, onSelect: () => this.selectCat(c.id) }));
-    const plans = this.allPlans().map(p => { const m = this.planMeta(p); return { id: p.id, name: p.name, meta: m.metaText, onOpen: () => this.openPlan(p.id) }; });
+    const plans = this.allPlans().map(p => { const m = this.planMeta(p); return { id: p.id, name: p.name, meta: m.metaText, onOpen: () => this.openPlan(p.id), onTrash: () => this.trashPlan(p.id) }; });
     const detailPlan = st.planDetailId ? this.planById(st.planDetailId) : null;
     const detailMeta = detailPlan ? this.planMeta(detailPlan) : null;
     const planTasks = detailPlan ? detailPlan.tasks.map(t => ({ glyph: t.glyph, name: t.name, minText: this.fmtMin(t.min || 0), fatText: (t.fat >= 0 ? '+' + t.fat : '' + t.fat) })) : [];
@@ -2926,6 +2976,19 @@ export default class App extends React.Component {
         onRestore: () => this.restoreTrash(i),
         onPurge: () => this.purgeTrash(i),
       }));
+    const trashPlanRows = (st.trashedPlans || [])
+      .slice()
+      .sort((a, b) => (b.trashedAt || 0) - (a.trashedAt || 0))
+      .map(t => {
+        const m = this.planMeta(t.plan);
+        return {
+          id: t.plan.id, glyph: '📋', name: t.plan.name,
+          meta: '予定 · ' + t.plan.tasks.length + '件 · ' + this.fmtMin(m.min),
+          fatText: m.fatText,
+          onRestore: () => this.restorePlanTrash(t.plan.id),
+          onPurge: () => this.purgePlanTrash(t.plan.id),
+        };
+      });
 
     return {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
@@ -3069,7 +3132,7 @@ export default class App extends React.Component {
         : (isEditFlow ? 'へんこうする' : 'きろくする'),
       confirmTitle: isEditFlow ? 'きろくを編集' : '登録を確認',
       isEditFlow, trashOriginal: this.trashOriginal,
-      trashRows, trashCount: trashRows.length, goTrash: this.goTrash,
+      trashRows, trashPlanRows, trashCount: trashRows.length + trashPlanRows.length, goTrash: this.goTrash,
       /* マイページの設定サブ画面 */
       slotTimeRows, slotTimesSub, catRows, templateRows, sensSections,
       sensSub: '体×' + (st.bodyFatCoef || 1).toFixed(1) + ' ・ 心×' + (st.mindFatCoef || 1).toFixed(1),
