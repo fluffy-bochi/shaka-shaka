@@ -184,9 +184,11 @@ export default class App extends React.Component {
     if (this.state.sampleMode) setTimeout(() => this.regenSample(), 0);
     this.save();
   };
-  restoreSampleMode(data) {
+  restoreSampleMode(data, defaultOn = false) {
     const p = (data && data.prefs) || {};
-    if (!p.sampleMode) return;
+    // 未設定なら defaultOn（ゲストは true=最初からペルソナ1年表示）。明示 false は尊重
+    const on = p.sampleMode === undefined ? defaultOn : p.sampleMode;
+    if (!on) return;
     this.set({ sampleMode: true, sampleCycleOn: p.sampleCycleOn !== false });
     // advancePlans/sweepExpiredBuffs（読込直後の setState）が流れたあとに注入する
     setTimeout(() => this.ensureSample(this.homeDateStr()), 150);
@@ -237,8 +239,9 @@ export default class App extends React.Component {
   /* 日付が変わっていたらサンプルを今日ぶんに作り直す（当日中の編集は保持＝旧本番と同じ） */
   refreshGuestSamples(data) {
     const t = todayStr();
-    // ペルソナのサンプル表示中は、旧「ゲストの1日サンプル」は出さない（二重になるため）
-    if (data.prefs && data.prefs.sampleMode) {
+    // ゲストは標準でペルソナ1年サンプル。明示的に OFF にしたときだけ旧「今日1日」サンプルを出す
+    const personaOn = !(data.prefs && data.prefs.sampleMode === false);
+    if (personaOn) {
       const kept = (data.entries || []).filter(e => !e.sample);
       return { data: { ...data, entries: kept, sampleDay: t }, changed: (kept.length !== (data.entries || []).length) };
     }
@@ -263,7 +266,7 @@ export default class App extends React.Component {
     const { data, changed } = this.refreshGuestSamples(deserialize(g));
     this.set({ ...data, booted: true, screen: data.mainScreen || 'shaka' });
     if (changed) { this._pileLayout = null; this.save(); }
-    this.restoreSampleMode(data);
+    this.restoreSampleMode(data, true); // ゲストは標準でペルソナ1年サンプルを表示
     setTimeout(() => this.advancePlans(), 0); // アプリを閉じている間に進んだ予定をキャッチアップ
     setTimeout(() => this.sweepExpiredBuffs(), 0);
     // 初回はオンボーディング（9問）→ 記録のないゲストはそのあとチュートリアル。
@@ -272,7 +275,7 @@ export default class App extends React.Component {
       this._autoTutChecked = true;
       const hasData = (data.entries || []).some(e => !e.sample)
         || (data.collected && data.collected.length > 0)
-        || !!(data.prefs && data.prefs.sampleMode); // サンプル表示中はチュートリアル自動起動しない
+        || !(data.prefs && data.prefs.sampleMode === false); // ゲスト標準=ペルソナ表示中はチュートリアル自動起動しない
       if (!data.onboardDone) {
         this._tutorialAfterOnboard = !hasData;
         setTimeout(() => { if (!this.state.user) this.set({ screen: 'onboard', obStep: 1, obSel: {} }); }, 200);
