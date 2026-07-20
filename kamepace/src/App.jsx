@@ -35,6 +35,7 @@ import Tutorial from './screens/Tutorial';
 import Onboard from './screens/Onboard';
 import Cycle from './screens/Cycle';
 import Bookshelf from './screens/Bookshelf';
+import { buildAcademicYear, academicYearOf } from './sample';
 
 export default class App extends React.Component {
   state = {
@@ -127,9 +128,71 @@ export default class App extends React.Component {
     authErr: '',
     authBusy: false,
     booted: false,
+    /* サンプル（デモ）データ表示。生理周期はオン/オフ切替 */
+    sampleMode: false,
+    sampleCycleOn: true,
   };
 
+  /* サンプル生成の状態（保存しない・実行時のみ） */
+  _sampleYears = new Set();
+  _sampleDiary = {};
+  _sampleFav = {};
+
   set(patch) { this.setState(patch); }
+
+  /* 表示中の日付まわりの学年ぶんサンプルを生成して entries に混ぜる（毎年くりかえし）。
+     生成ずみの学年はスキップするので何度呼んでも軽い。保存時は _sample を除外。 */
+  ensureSample(centerStr) {
+    if (!this.state.sampleMode) return;
+    const ay = academicYearOf(centerStr || this.homeDateStr());
+    const need = [];
+    for (let y = ay - 1; y <= ay + 1; y++) if (!this._sampleYears.has(y)) need.push(y);
+    if (!need.length) return;
+    let add = [];
+    need.forEach(y => {
+      const { entries, diary, fav } = buildAcademicYear(y, { cycleOn: this.state.sampleCycleOn });
+      add = add.concat(entries);
+      Object.assign(this._sampleDiary, diary);
+      Object.assign(this._sampleFav, fav);
+      this._sampleYears.add(y);
+    });
+    this._pileLayout = null;
+    // 関数型: 読込時の advancePlans 等のバッチ更新と競合しても最新の entries に足す
+    this.setState(prev => ({ entries: [...prev.entries, ...add] }));
+  }
+  clearSample() {
+    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._pileLayout = null;
+    this.set({ entries: this.state.entries.filter(e => !e._sample) });
+  }
+  regenSample() { // 生理オン/オフの切替時など、作り直し
+    const entries = this.state.entries.filter(e => !e._sample);
+    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._pileLayout = null;
+    this.set({ entries });
+    setTimeout(() => this.ensureSample(this.homeDateStr()), 0);
+  }
+  toggleSample = () => {
+    const on = !this.state.sampleMode;
+    const prefs = { ...(this.state.prefs || {}), sampleMode: on, sampleCycleOn: this.state.sampleCycleOn };
+    if (on) { this.set({ sampleMode: true, prefs }); setTimeout(() => this.ensureSample(this.homeDateStr()), 0); }
+    else { this.set({ sampleMode: false, prefs }); setTimeout(() => this.clearSample(), 0); }
+    this.save();
+  };
+  toggleSampleCycle = () => {
+    const on = !this.state.sampleCycleOn;
+    const prefs = { ...(this.state.prefs || {}), sampleMode: this.state.sampleMode, sampleCycleOn: on };
+    this.set({ sampleCycleOn: on, prefs });
+    if (this.state.sampleMode) setTimeout(() => this.regenSample(), 0);
+    this.save();
+  };
+  restoreSampleMode(data, defaultOn = false) {
+    const p = (data && data.prefs) || {};
+    // 未設定なら defaultOn（ゲストは true=最初からペルソナ1年表示）。明示 false は尊重
+    const on = p.sampleMode === undefined ? defaultOn : p.sampleMode;
+    if (!on) return;
+    this.set({ sampleMode: true, sampleCycleOn: p.sampleCycleOn !== false });
+    // advancePlans/sweepExpiredBuffs（読込直後の setState）が流れたあとに注入する
+    setTimeout(() => this.ensureSample(this.homeDateStr()), 150);
+  }
 
   /* ================= persistence / auth ================= */
   dataState() {
@@ -176,6 +239,12 @@ export default class App extends React.Component {
   /* 日付が変わっていたらサンプルを今日ぶんに作り直す（当日中の編集は保持＝旧本番と同じ） */
   refreshGuestSamples(data) {
     const t = todayStr();
+    // ゲストは標準でペルソナ1年サンプル。明示的に OFF にしたときだけ旧「今日1日」サンプルを出す
+    const personaOn = !(data.prefs && data.prefs.sampleMode === false);
+    if (personaOn) {
+      const kept = (data.entries || []).filter(e => !e.sample);
+      return { data: { ...data, entries: kept, sampleDay: t }, changed: (kept.length !== (data.entries || []).length) };
+    }
     if (data.sampleDay === t) return { data, changed: false };
     const removed = (data.entries || []).filter(e => e.sample);
     const kept = (data.entries || []).filter(e => !e.sample);
@@ -197,6 +266,7 @@ export default class App extends React.Component {
     const { data, changed } = this.refreshGuestSamples(deserialize(g));
     this.set({ ...data, booted: true, screen: data.mainScreen || 'shaka' });
     if (changed) { this._pileLayout = null; this.save(); }
+    this.restoreSampleMode(data, true); // ゲストは標準でペルソナ1年サンプルを表示
     setTimeout(() => this.advancePlans(), 0); // アプリを閉じている間に進んだ予定をキャッチアップ
     setTimeout(() => this.sweepExpiredBuffs(), 0);
     // 初回はオンボーディング（9問）→ 記録のないゲストはそのあとチュートリアル。
@@ -204,7 +274,8 @@ export default class App extends React.Component {
     if (!this._autoTutChecked) {
       this._autoTutChecked = true;
       const hasData = (data.entries || []).some(e => !e.sample)
-        || (data.collected && data.collected.length > 0);
+        || (data.collected && data.collected.length > 0)
+        || !(data.prefs && data.prefs.sampleMode === false); // ゲスト標準=ペルソナ表示中はチュートリアル自動起動しない
       if (!data.onboardDone) {
         this._tutorialAfterOnboard = !hasData;
         setTimeout(() => { if (!this.state.user) this.set({ screen: 'onboard', obStep: 1, obSel: {} }); }, 200);
@@ -224,6 +295,7 @@ export default class App extends React.Component {
         const dd = deserialize(data);
         this.set({ ...dd, booted: true, screen: dd.mainScreen || 'shaka', dayOffset: 0 });
         onboardDone = dd.onboardDone;
+        this.restoreSampleMode(dd);
       } else {
         // 新規ユーザー（初めての登録）: ゲストのデータ（サンプル含む）は引き継がず、まっさらで開始
         this.set({ ...freshState(), booted: true, screen: 'shaka', dayOffset: 0 });
@@ -291,10 +363,10 @@ export default class App extends React.Component {
       .reduce((a, e) => a + entryMin(e), 0);
   }
   /* 日付ナビ */
-  homePrevDay = () => this.set({ homeDate: shiftDate(this.homeDateStr(), -1) });
-  homeNextDay = () => this.set({ homeDate: shiftDate(this.homeDateStr(), 1) });
-  setHomeDate = (e) => { const v = e.target.value; if (v) this.set({ homeDate: v }); };
-  goToday = () => this.set({ homeDate: todayStr() });
+  homePrevDay = () => { const day = shiftDate(this.homeDateStr(), -1); if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: day }); this.ensureSample(day); };
+  homeNextDay = () => { const day = shiftDate(this.homeDateStr(), 1); if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: day }); this.ensureSample(day); };
+  setHomeDate = (e) => { const v = e.target.value; if (v) { if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: v }); this.ensureSample(v); } };
+  goToday = () => { if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: todayStr() }); };
   hmToTs(hm) { const [h, m] = (hm || '0:0').split(':').map(Number); const d = new Date(); d.setHours(h || 0, m || 0, 0, 0); return d.getTime(); }
   tsToHm(ts) { const d = new Date(ts); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
   timeSpanMin() { const s = this.hmToTs(this.state.startTime), t = this.hmToTs(this.state.endTime); const d = Math.round((t - s) / 60000); return d < 1 ? 1 : d; }
@@ -826,6 +898,51 @@ export default class App extends React.Component {
   };
 
   /* ================= 記録の確定（統一確認UI → entries へ） ================= */
+  /* その日に同名の mylifecore タスク（ptask:/daily:）があれば累計キーを返す。
+     Googleタスク(gtask:)や手入力は対象外＝従来どおり別々の記録。 */
+  mylifeTaskKeyFor(title, date) {
+    const k = normTitle(title);
+    if (!k) return null;
+    const has = (this.state.tasks || []).some(t => t.date === date && normTitle(t.title) === k && /^(ptask:|daily:)/.test(String(t.srcId || '')));
+    return has ? ('mlt:' + k) : null;
+  }
+  /* mylifecoreタスクの累計: newEntries の taskKey ごとに、同じ taskKey の
+     既存記録（baseEntries）と、新規どうしの重複を1件へ合算（分・疲労を足す）。古いぶんは消す。 */
+  mergeTaskCumulative(baseEntries, newEntries, recDate, now, isToday, timeMode) {
+    const keys = [...new Set(newEntries.filter(e => e.taskKey).map(e => e.taskKey))];
+    if (!keys.length) return baseEntries;
+    let base = baseEntries;
+    keys.forEach(key => {
+      const group = newEntries.filter(e => e.taskKey === key);
+      if (!group.length) return;
+      const target = group[0];
+      // 同じ taskKey の新規どうしをまとめる（先頭へ集約し、残りは newEntries から除去）
+      for (let i = group.length - 1; i >= 1; i--) {
+        target.min = (target.min || 0) + (group[i].min || 0);
+        target.delta = (target.delta || 0) + (group[i].delta || 0);
+        const gi = newEntries.indexOf(group[i]); if (gi >= 0) newEntries.splice(gi, 1);
+      }
+      // 既存記録（その日・同 taskKey・未ゴミ箱）を吸収して消す
+      const olds = base.filter(e => e.taskKey === key && e.date === recDate && !e.exp);
+      olds.forEach(o => {
+        target.min = (target.min || 0) + (entryMin(o) || 0);
+        target.delta = (target.delta || 0) + (o.delta || 0);
+        const of = this.hmToTs(o.from || target.from), ot = this.hmToTs(o.to || target.to);
+        if (o.from && of < this.hmToTs(target.from)) target.from = o.from;
+        if (o.to && ot > this.hmToTs(target.to)) target.to = o.to;
+      });
+      if (olds.length) base = base.filter(e => !(e.taskKey === key && e.date === recDate && !e.exp));
+      // 時刻モードは累計後の予定/確定を to で判定し直す。所要時間モードは常に確定（即記録）
+      if (timeMode) {
+        const endTs = this.hmToTs(target.to);
+        const isPlanned = isToday && endTs > now;
+        if (isPlanned) { target.planned = true; target.dropped = planUnitsDue({ ...target, date: todayStr() }, now); target._new = target.dropped > 0; }
+        else { delete target.planned; delete target.dropped; target._new = true; }
+      } else { delete target.planned; delete target.dropped; target._new = true; }
+    });
+    return base;
+  }
+
   commitSearch = () => {
     const items = this.state.searchCart;
     // 編集モード: 元の記録を取り除いたうえで置き換える
@@ -865,7 +982,7 @@ export default class App extends React.Component {
       .filter(e => e.date === recDate && !e.exp && !e.planned && this.slotOf(e) === slotId)
       .reduce((a, e) => a + entryMin(e), 0);
     const learnMin = [];
-    const mkEntry = (t, min, fromHm, toHm, planned) => {
+    const mkEntry = (t, min, fromHm, toHm, planned, taskKey) => {
       const fat = Math.round(this.effFh(t) * (min / 60));
       const e = { ...baseEntry(t.name, fat, recDate), glyph: t.glyph, min, _new: true };
       if (this.state.framePlan) e.plan = this.state.framePlan; else if (t.plan) e.plan = t.plan;
@@ -873,29 +990,46 @@ export default class App extends React.Component {
       if (fromHm) { e.from = fromHm; e.to = toHm; }
       if (planned) { e.planned = true; e.dropped = planUnitsDue({ ...e, date: todayStr() }, now); e._new = e.dropped > 0; }
       if (t.symptom && t.symId) { e.symptom = true; e.symId = t.symId; e.level = (t.picks && t.picks[0] != null) ? t.picks[0] : 1; e.buffLv = t.buffLv; }
+      if (taskKey) e.taskKey = taskKey;
       return e;
     };
     const newEntries = [];
     items.forEach((t, i) => {
+      // mylifecore由来のタスクと同名なら「その日1件に累計」する（複数の時間帯も合算）
+      const taskKey = this.mylifeTaskKeyFor(t.name, recDate);
       if (timeMode) {
         // 各行動の時間範囲ごとに1件（同じ行動を複数の時間に記録できる）
         const ranges = (t.ranges && t.ranges.length) ? t.ranges : [{ from: this.state.startTime || this.tsToHm(now), to: this.addHm(this.state.startTime || this.tsToHm(now), t.defMin || 30) }];
-        let sum = 0;
-        ranges.forEach(r => {
-          const min = this.rangeMin(r);
-          sum += min;
-          const fromTs = this.hmToTs(r.from);
-          let toTs = this.hmToTs(r.to); if (toTs <= fromTs) toTs += 1440 * 60000;
-          newEntries.push(mkEntry(t, min, this.tsToHm(fromTs), this.tsToHm(toTs), isToday && toTs > now));
-        });
-        learnMin[i] = sum;
+        if (taskKey) {
+          // mylifecoreタスク: 全レンジを合算して1件（from=最初・to=最後）
+          let sum = 0, minFromTs = Infinity, maxToTs = -Infinity;
+          ranges.forEach(r => {
+            const min = this.rangeMin(r); sum += min;
+            const fromTs = this.hmToTs(r.from); let toTs = this.hmToTs(r.to); if (toTs <= fromTs) toTs += 1440 * 60000;
+            minFromTs = Math.min(minFromTs, fromTs); maxToTs = Math.max(maxToTs, toTs);
+          });
+          newEntries.push(mkEntry(t, sum, this.tsToHm(minFromTs), this.tsToHm(maxToTs), isToday && maxToTs > now, taskKey));
+          learnMin[i] = sum;
+        } else {
+          let sum = 0;
+          ranges.forEach(r => {
+            const min = this.rangeMin(r);
+            sum += min;
+            const fromTs = this.hmToTs(r.from);
+            let toTs = this.hmToTs(r.to); if (toTs <= fromTs) toTs += 1440 * 60000;
+            newEntries.push(mkEntry(t, min, this.tsToHm(fromTs), this.tsToHm(toTs), isToday && toTs > now));
+          });
+          learnMin[i] = sum;
+        }
       } else {
         const min = durMins[i];
-        const e = mkEntry(t, min, null, null, false);
+        const e = mkEntry(t, min, null, null, false, taskKey);
         e.slot = slotId; e.from = this.slotHm(slot, slotOffset); e.to = this.slotHm(slot, slotOffset + min);
         slotOffset += min; newEntries.push(e); learnMin[i] = min;
       }
     });
+    // mylifecoreタスクの累計: 同じ taskKey の既存記録があれば時間を合算して1件に更新（古いぶんは消す）
+    baseEntries = this.mergeTaskCumulative(baseEntries, newEntries, recDate, now, isToday, timeMode);
     // 前回つかった時間を学習（次回の初期値になる）
     const lastMins = { ...(this.state.lastMins || {}) };
     items.forEach((t, i) => { const k = normTitle(t.name); if (k) lastMins[k] = learnMin[i] || durMins[i] || 30; });
@@ -1071,17 +1205,30 @@ export default class App extends React.Component {
   /* 積む絵文字（旧本番 createPileBag と同じ考え方）:
      山＝全日付の正の疲労だけ。マイナス（回復）記録は山から直接引かず、
      マイナスの絵文字が降ってプラスにぶつかったぶん（consumed）だけ古い順に減る。 */
+  /* サンプル表示中は「山＝表示中の1日ぶんの負荷」に絞る（履歴は本棚で見る）。
+     全日付を積むと年ぶんで巨大になり重いため、サンプル分だけ当日にしぼる。 */
+  _sampleWindowDay() {
+    const s = this.state.screen;
+    return (s === 'home' || s === 'record' || s === 'sleep') ? this.homeDateStr() : todayStr();
+  }
   pileSource() {
+    const consumedRaw = this.state.consumed || 0;
+    const day = this.state.sampleMode ? this._sampleWindowDay() : null;
+    // 軽いキャッシュ（entries参照・consumed・当日が同じなら再計算しない）
+    if (this._psRef === this.state.entries && this._psConsumed === consumedRaw && this._psDay === day && this._psArr) return this._psArr;
+    const src = day ? this.state.entries.filter(e => !e._sample || e.date === day) : this.state.entries;
     const stack = [];
-    sortEntries(this.state.entries).forEach(r => {
+    sortEntries(src).forEach(r => {
       if (r.exp) return;
       if (r.delta > 0) {
         const n = r.planned ? (r.dropped || 0) : r.delta;
         for (let i = 0; i < n; i++) stack.push({ g: entryGlyph(r), isNew: !!r._new });
       }
     });
-    const consumed = Math.min(this.state.consumed || 0, stack.length);
-    return stack.slice(consumed);
+    const consumed = Math.min(consumedRaw, stack.length);
+    const out = stack.slice(consumed);
+    this._psRef = this.state.entries; this._psConsumed = consumedRaw; this._psDay = day; this._psArr = out;
+    return out;
   }
   /* 山の正の合計（consumed のキャップ用・旧本番 pilePositiveTotal） */
   pilePositiveTotal(entries) {
@@ -1197,7 +1344,7 @@ export default class App extends React.Component {
   goRecordNow = () => this.openRecord(this.slotNow());
   setMainScreen = (v) => { this.set({ mainScreen: v }); this.save(); };
   goMypage = () => this.set({ screen: 'mypage' });
-  goBookshelf = () => this.set({ screen: 'bookshelf' });
+  goBookshelf = () => { this.set({ screen: 'bookshelf' }); this.ensureSample(todayStr()); };
   setBookFav = (key) => {
     const bookFav = { ...(this.state.bookFav || {}) };
     if (bookFav[key]) delete bookFav[key]; else bookFav[key] = true;
@@ -2360,10 +2507,12 @@ export default class App extends React.Component {
         const fh = (t.linkFh != null) ? t.linkFh : null;
         const delta = fh != null ? Math.max(1, Math.round(fh * min / 60)) : IMPORT_DEFAULT_DELTA;
         const glyph = t.linkGlyph || ACT_EMOJI[guessAct(t.title)] || '📝';
+        const isMylife = /^(ptask:|daily:)/.test(String(srcId || ''));
         entries = sortEntries([...entries, {
           ...baseEntry(t.title, delta, todayStr()),
           act: t.linkAct || guessAct(t.title), glyph, min, srcId: recId, _new: true,
           slot: slotId, from: this.slotHm(slot, off), to: this.slotHm(slot, off + min),
+          ...(isMylife ? { taskKey: 'mlt:' + normTitle(t.title) } : {}),
         }]);
         this.toast('✅ ' + t.title + ' を' + slot.name + 'に記録しました');
       }
@@ -2774,9 +2923,10 @@ export default class App extends React.Component {
       navBookColor: st.screen === 'bookshelf' ? '#1b1b18' : '#8a8a82',
       navBookFill: st.screen === 'bookshelf' ? 1 : 0,
       goBookshelf: this.goBookshelf,
-      goBookDay: (dateStr) => this.set({ screen: 'home', homeDate: dateStr, dayOffset: 0 }),
+      goBookDay: (dateStr) => { if (st.sampleMode) this._pileLayout = null; this.set({ screen: 'home', homeDate: dateStr, dayOffset: 0 }); this.ensureSample(dateStr); },
       bookEntries: st.entries, bookSlotHours: st.slotHours, bookCollected: st.collected,
-      bookFav: st.bookFav || {}, bookDiary: st.bookDiary || {},
+      bookFav: st.sampleMode ? { ...this._sampleFav, ...(st.bookFav || {}) } : (st.bookFav || {}),
+      bookDiary: st.sampleMode ? { ...this._sampleDiary, ...(st.bookDiary || {}) } : (st.bookDiary || {}),
       setBookFav: this.setBookFav, setBookDiary: this.setBookDiary,
       navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? 1 : 0,
@@ -2880,6 +3030,8 @@ export default class App extends React.Component {
       mainScreen: st.mainScreen || 'shaka', setMainShaka: () => this.setMainScreen('shaka'), setMainHome: () => this.setMainScreen('home'),
       motionFixedBg: st.homeMotion ? '#fff' : '#1b1b18', motionFixedColor: st.homeMotion ? '#8a8a82' : '#fff',
       motionMoveBg: st.homeMotion ? '#1b1b18' : '#fff', motionMoveColor: st.homeMotion ? '#fff' : '#8a8a82',
+      sampleMode: !!st.sampleMode, toggleSample: this.toggleSample,
+      sampleCycleOn: st.sampleCycleOn !== false, toggleSampleCycle: this.toggleSampleCycle,
       addTotalM1: () => this.addTotal(-1), addTotalP1: () => this.addTotal(1), addTotalM10: () => this.addTotal(-10), addTotalP10: () => this.addTotal(10),
       searchTotalFatText: (searchTotalFat >= 0 ? '+' + searchTotalFat : '' + searchTotalFat),
       addMoreMenu: this.addMoreMenu, commitSearch: this.commitSearch, backFromConfirm: this.backFromConfirm,
