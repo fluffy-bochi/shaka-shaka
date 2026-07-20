@@ -255,7 +255,25 @@ export function buildAcademicYear(ay, opts = {}) {
     }
   }
 
-  return { entries: E, diary, fav, collected };
+  // 日ごとの疲労/回復/睡眠から「寝る前の山の量（前日からの繰り越し込み）」を計算。
+  // 睡眠で回復しきれなかったぶんが翌日へ引き継がれる。
+  const fatBy = {}, recBy = {}, sleepBy = {};
+  E.forEach(e => { if (e.exp) return; const v = e.delta || 0; if (v > 0) fatBy[e.date] = (fatBy[e.date] || 0) + v; else if (v < 0) recBy[e.date] = (recBy[e.date] || 0) + (-v); });
+  collected.forEach(c => { const ds = ymd(new Date(c.ts)); sleepBy[ds] = (sleepBy[ds] || 0) + (c.amount || 0); });
+  // 睡眠は「1晩で大半が回復」する想定（回復量は🌙の量×係数）。回復しきれないぶんが翌日へ繰り越す。
+  // よく寝た日はほぼリセット、テスト/制作で睡眠を削った日は多めに繰り越して山が高くなる。
+  // 繰り越しは最大50までに制限（現実には週末などで一度リセットされるため、青天井に貯めない）。
+  const SLEEP_RECOVER = 2.0, CARRY_MAX = 50;
+  const balanceByDay = {};
+  let carry = 0;
+  for (let d = new Date(D0); d < D1; d = addDays(d, 1)) {
+    const ds = ymd(d);
+    const before = Math.max(0, carry + (fatBy[ds] || 0) - (recBy[ds] || 0)); // 寝る前の山（繰り越し込み）
+    balanceByDay[ds] = before;
+    carry = Math.max(0, Math.min(CARRY_MAX, before - (sleepBy[ds] || 0) * SLEEP_RECOVER)); // 睡眠で回復した残りを翌日へ（上限あり）
+  }
+
+  return { entries: E, diary, fav, collected, balanceByDay };
 }
 
 /* 表示中の日付が属する「学年（春スタートの年）」 */

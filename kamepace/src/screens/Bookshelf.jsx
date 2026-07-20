@@ -94,8 +94,18 @@ function Fusen({ on, onClick }) {
   );
 }
 
+/* その日の3つの数値（寝る前の疲労・その日の頑張り・その日の回復） */
+function StatBox({ label, value, color, bg }) {
+  return (
+    <div style={{ flex: 1, background: bg, borderRadius: 10, padding: '9px 4px 8px', textAlign: 'center' }}>
+      <div style={{ fontFamily: MONO, fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 9, fontWeight: 700, color: '#8a8a82', marginTop: 5 }}>{label}</div>
+    </div>
+  );
+}
+
 /* ノート（その日／その月の中身）— 縦のシート・横の右ページ共通 */
-function NoteBody({ isMonth, day, month, names, slotHours, diary, onDiary, footLabel }) {
+function NoteBody({ isMonth, day, month, names, slotHours, diary, onDiary, footLabel, beforeSleepMap }) {
   if (isMonth) {
     return (<>
       <div style={{ padding: '8px 20px 8px' }}>
@@ -115,6 +125,10 @@ function NoteBody({ isMonth, day, month, names, slotHours, diary, onDiary, footL
   }
   const slots = daySlots(day, slotHours);
   const chart = dayChart(day, names);
+  const fat = day.fatSolid.length + day.fatGhost.length;
+  const rec = day.recSolid.length + day.recGhost.length;
+  // 寝る前の疲労は「前日からの繰り越し込み」の残量があればそれを使う（無ければその日単体の 疲労−回復）
+  const beforeSleep = (beforeSleepMap && beforeSleepMap[day.dateStr] != null) ? beforeSleepMap[day.dateStr] : Math.max(0, fat - rec);
   return (<>
     <div style={{ padding: '8px 20px 8px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -124,6 +138,11 @@ function NoteBody({ isMonth, day, month, names, slotHours, diary, onDiary, footL
       <div style={{ fontFamily: MONO, fontSize: 10, color: '#9d9b91', marginTop: 2 }}>この本の中身</div>
     </div>
     <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 14px' }}>
+      <div style={{ display: 'flex', gap: 7, marginBottom: 12 }}>
+        <StatBox label="寝る前の疲労" value={beforeSleep} color="#a85a55" bg="#f8eae9" />
+        <StatBox label="この日の頑張り" value={fat} color="#c96f6f" bg="#f8eae9" />
+        <StatBox label="この日の回復" value={rec} color="#6b8f36" bg="#eef5df" />
+      </div>
       <Timeline slots={slots} />
       <div style={{ fontSize: 11, fontWeight: 700, color: '#55554e', margin: '14px 0 8px' }}>絵文字のかず</div>
       <Chart chart={chart} />
@@ -456,6 +475,7 @@ export default function Bookshelf({ v }) {
   const noteProps = {
     isMonth, day: selDay, month: selMonth, names, slotHours,
     diary: diaries[selKey] || '', onDiary: (e) => v.setBookDiary(selKey, e.target.value), footLabel,
+    beforeSleepMap: v.bookBeforeSleep || null,
   };
 
   /* ======================= 縦持ち（1a） ======================= */

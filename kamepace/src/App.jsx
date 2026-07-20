@@ -137,6 +137,7 @@ export default class App extends React.Component {
   _sampleYears = new Set();
   _sampleDiary = {};
   _sampleFav = {};
+  _sampleBalance = {}; // 日別「寝る前の山の量（前日からの繰り越し込み）」
 
   set(patch) { this.setState(patch); }
 
@@ -150,11 +151,12 @@ export default class App extends React.Component {
     if (!need.length) return;
     let add = [], addColl = [];
     need.forEach(y => {
-      const { entries, diary, fav, collected } = buildAcademicYear(y, { cycleOn: this.state.sampleCycleOn });
+      const { entries, diary, fav, collected, balanceByDay } = buildAcademicYear(y, { cycleOn: this.state.sampleCycleOn });
       add = add.concat(entries);
       addColl = addColl.concat(collected || []);
       Object.assign(this._sampleDiary, diary);
       Object.assign(this._sampleFav, fav);
+      Object.assign(this._sampleBalance, balanceByDay || {});
       this._sampleYears.add(y);
     });
     this._pileLayout = null;
@@ -162,13 +164,13 @@ export default class App extends React.Component {
     this.setState(prev => ({ entries: [...prev.entries, ...add], collected: [...(prev.collected || []), ...addColl] }));
   }
   clearSample() {
-    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._pileLayout = null;
+    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._sampleBalance = {}; this._pileLayout = null;
     this.set({ entries: this.state.entries.filter(e => !e._sample), collected: (this.state.collected || []).filter(c => !c._sample) });
   }
   regenSample() { // 生理オン/オフの切替時など、作り直し
     const entries = this.state.entries.filter(e => !e._sample);
     const collected = (this.state.collected || []).filter(c => !c._sample);
-    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._pileLayout = null;
+    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._sampleBalance = {}; this._pileLayout = null;
     this.set({ entries, collected });
     setTimeout(() => this.ensureSample(this.homeDateStr()), 0);
   }
@@ -1202,7 +1204,7 @@ export default class App extends React.Component {
     // 【重要】絵文字100個でその画面が上から下まで満杯（100個の時は少し上にはみ出すくらい）になる大きさ。
     // 画面の実寸(area)から計算するので機種で自動調整。100を超えても縮小せず同じ大きさのまま画面の外（上）へ積む。
     // ※ memory: emoji-pile-fill-rule（何度も指摘される最重要ルール）
-    const r = Math.sqrt(area * 0.85 / (100 * Math.PI));
+    const r = Math.sqrt(area * 1.0 / (100 * Math.PI));
     return Math.max(8, Math.min(r, 60));
   }
   /* 今この画面で積む絵文字の数（シャカ・ホーム・睡眠で共通） */
@@ -1224,17 +1226,40 @@ export default class App extends React.Component {
     const day = this.state.sampleMode ? this._sampleWindowDay() : null;
     // 軽いキャッシュ（entries参照・consumed・当日が同じなら再計算しない）
     if (this._psRef === this.state.entries && this._psConsumed === consumedRaw && this._psDay === day && this._psArr) return this._psArr;
-    const src = day ? this.state.entries.filter(e => !e._sample || e.date === day) : this.state.entries;
-    const stack = [];
-    sortEntries(src).forEach(r => {
-      if (r.exp) return;
-      if (r.delta > 0) {
+    let out;
+    const bal = day != null && this._sampleBalance ? this._sampleBalance[day] : null;
+    if (day != null && bal != null) {
+      // サンプル: 前日からの繰り越し込みの「寝る前の山の量」= bal 個。直近の疲労絵文字から取る（逆順で必要数だけ）
+      const sorted = sortEntries(this.state.entries);
+      out = []; let need = bal;
+      for (let i = sorted.length - 1; i >= 0 && need > 0; i--) {
+        const r = sorted[i];
+        if (r.exp || !r._sample || r.date > day || (r.delta || 0) <= 0) continue;
         const n = r.planned ? (r.dropped || 0) : r.delta;
-        for (let i = 0; i < n; i++) stack.push({ g: entryGlyph(r), isNew: !!r._new });
+        const take = Math.min(n, need);
+        for (let k = 0; k < take; k++) out.push({ g: entryGlyph(r), isNew: false });
+        need -= take;
       }
-    });
-    const consumed = Math.min(consumedRaw, stack.length);
-    const out = stack.slice(consumed);
+      out.reverse(); // 古い→新しい
+      // 実ユーザーの記録（非サンプル）があれば上に足す
+      this.state.entries.forEach(r => {
+        if (r.exp || r._sample || (r.delta || 0) <= 0) return;
+        const n = r.planned ? (r.dropped || 0) : r.delta;
+        for (let k = 0; k < n; k++) out.push({ g: entryGlyph(r), isNew: !!r._new });
+      });
+    } else {
+      const src = day ? this.state.entries.filter(e => !e._sample || e.date === day) : this.state.entries;
+      const stack = [];
+      sortEntries(src).forEach(r => {
+        if (r.exp) return;
+        if (r.delta > 0) {
+          const n = r.planned ? (r.dropped || 0) : r.delta;
+          for (let i = 0; i < n; i++) stack.push({ g: entryGlyph(r), isNew: !!r._new });
+        }
+      });
+      const consumed = Math.min(consumedRaw, stack.length);
+      out = stack.slice(consumed);
+    }
     this._psRef = this.state.entries; this._psConsumed = consumedRaw; this._psDay = day; this._psArr = out;
     return out;
   }
@@ -1270,7 +1295,7 @@ export default class App extends React.Component {
       const target = glyphs.length;
       let compact = false;
       if (saved.length > target) { saved = saved.slice(saved.length - target); compact = true; }
-      const base = saved.slice(0, 160).map(sp => ({
+      const base = saved.slice(0, 200).map(sp => ({
         e: sp.g,
         x: Math.round(sp.x * W - r),
         y: Math.round(H - sp.y * H - r),
@@ -1279,7 +1304,7 @@ export default class App extends React.Component {
       }));
       // 下の絵文字が消えて上だけ残ると宙に浮くので、減った時は列ごとに下へ詰め直す。
       // 増えた分（記録直後にホームを見た時）は山の上に足す
-      const extras = glyphs.slice(saved.length, 160 > saved.length ? 160 : saved.length);
+      const extras = glyphs.slice(saved.length, 200 > saved.length ? 200 : saved.length);
       if (compact || extras.length) {
         const cols = Math.max(1, Math.floor(W / d));
         const colH = Array(cols).fill(0);
@@ -1306,7 +1331,7 @@ export default class App extends React.Component {
       }
       return base;
     }
-    const glyphs = this.pileGlyphs().slice(-160); // 上限は新しい側を残す
+    const glyphs = this.pileGlyphs().slice(-200); // 上限は新しい側を残す
     let s = seed; const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
     const cols = Math.max(1, Math.floor(W / d)), out = [];
     const n = glyphs.length;
@@ -2018,18 +2043,25 @@ export default class App extends React.Component {
     this.engine.world.gravity.y = 1.2;
     this._tuneEngine(this.engine);
     attachCollisionSound(this.engine);
-    const t = 80;
+    // 上に「蓋」つきの閉じた箱。絵文字は画面の少し上まであふれるが、蓋で止まって外へ飛び出さない。
+    // 満杯になると蓋との間でギチギチに詰まって動かなくなる。
+    const t = 120;
+    const over = H * 0.75;            // 画面上端より上へあふれてよい高さ（この上に蓋）
+    const lidY = -over;               // 蓋の位置（画面外・上）
+    this._lidY = lidY;
+    const wallCy = (H + lidY) / 2, wallH = (H - lidY) + t * 2;
     World.add(this.engine.world, [
-      Bodies.rectangle(W / 2, H + t / 2, W + t * 2, t, { isStatic: true }),
-      Bodies.rectangle(-t / 2, H / 2, t, H + t * 2, { isStatic: true }),
-      Bodies.rectangle(W + t / 2, H / 2, t, H + t * 2, { isStatic: true }),
+      Bodies.rectangle(W / 2, H + t / 2, W + t * 2, t, { isStatic: true }),        // 床
+      Bodies.rectangle(W / 2, lidY - t / 2, W + t * 2, t, { isStatic: true }),     // 蓋（上）
+      Bodies.rectangle(-t / 2, wallCy, t, wallH, { isStatic: true }),              // 左（蓋〜床）
+      Bodies.rectangle(W + t / 2, wallCy, t, wallH, { isStatic: true }),           // 右（蓋〜床）
     ]);
     this.bodies = [];
     // 表示上限は新しい側（末尾）を残す。画面に収まるのは約100個で、
     // それを超えたぶんは「あふれて」見える（=頑張りすぎの信号）。
     let marks;
-    if (this.state.dayOffset === 0) marks = this.pileGlyphsMarked().slice(-160);
-    else marks = this.currentBag().slice(-160).map(g => ({ g, isNew: false }));
+    if (this.state.dayOffset === 0) marks = this.pileGlyphsMarked().slice(-200);
+    else marks = this.currentBag().slice(-200).map(g => ({ g, isNew: false }));
     const newCount = marks.filter(m => m.isNew).length;
     const oldCount = marks.length - newCount;
     const perRow = Math.max(1, Math.floor(W / (2 * r)));
@@ -2085,11 +2117,11 @@ export default class App extends React.Component {
     this._phys = true;
     const loop = () => {
       if (!this._phys) return;
-      const rr = this.PR, cH = this._caseH || 700, cW = this._caseW || 350;
+      const rr = this.PR, cH = this._caseH || 700, cW = this._caseW || 350, lidY = this._lidY || -400;
       this.bodies.forEach(({ body, el }) => {
-        // 高個数で底が床を突き抜けて画面下へ抜けたら、画面内に引き戻す（＝下に消えないように）
-        if (body.position.y > cH + rr * 1.5 || body.position.x < -rr * 2 || body.position.x > cW + rr * 2) {
-          Matter.Body.setPosition(body, { x: Math.max(rr, Math.min(cW - rr, body.position.x)), y: cH - rr });
+        // まれに底/横をすり抜けた絵文字は、下から湧かせず「上（蓋の少し下）から落とし直す」＝自然な落下に見せる
+        if (body.position.y > cH + rr * 1.2 || body.position.y < lidY - rr || body.position.x < -rr * 2 || body.position.x > cW + rr * 2) {
+          Matter.Body.setPosition(body, { x: rr + Math.random() * (cW - 2 * rr), y: lidY + rr + Math.random() * rr * 3 });
           Matter.Body.setVelocity(body, { x: 0, y: 0 });
         }
         el.style.transform = `translate(${body.position.x - rr}px, ${body.position.y - rr}px) rotate(${body.angle}rad)`;
@@ -2303,7 +2335,7 @@ export default class App extends React.Component {
     if (!this.bodies) return;
     if (this.state.tutorial === 6 && !this.state.tutFlags.shaken) this.set({ tutFlags: { ...this.state.tutFlags, shaken: true } });
     this.enableMotion(); // 🔀タップ＝ユーザー操作のタイミングでセンサー許可を取る（iOS）
-    this.shakeImpulse(16);
+    this.shakeImpulse(9); // ボタンは軽めに（強すぎると絵文字が蓋まで飛びすぎる）
   };
 
   /* ---- スマホの加速度センサーで振る（旧本番 enableMotion/onMotion を移植） ---- */
@@ -2942,6 +2974,8 @@ export default class App extends React.Component {
       bookEntries: st.entries, bookSlotHours: st.slotHours, bookCollected: st.collected,
       bookFav: st.sampleMode ? { ...this._sampleFav, ...(st.bookFav || {}) } : (st.bookFav || {}),
       bookDiary: st.sampleMode ? { ...this._sampleDiary, ...(st.bookDiary || {}) } : (st.bookDiary || {}),
+      bookBeforeSleep: st.sampleMode ? this._sampleBalance : null, // 寝る前の疲労（繰り越し込み）
+
       setBookFav: this.setBookFav, setBookDiary: this.setBookDiary,
       navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? 1 : 0,
