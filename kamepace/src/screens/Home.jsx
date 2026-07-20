@@ -4,6 +4,31 @@ import Emo from '../fluent';
 const mono = { fontFamily: "'Space Mono',monospace" };
 const ndBtn = { width: 30, height: 30, background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#55554e', cursor: 'pointer', flex: '0 0 auto', padding: 0 };
 
+/* 記録の行: タップで編集、長押し（約450ms）でメニュー（編集・ゴミ箱へ）。
+   マウス長押し・タッチ長押し・右クリックに対応。長押しが出たらタップは無効化する。 */
+function RecordRow({ g, children, style }) {
+  const timer = React.useRef(null);
+  const fired = React.useRef(false);
+  const start = () => {
+    fired.current = false;
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => { fired.current = true; g.onLongPress && g.onLongPress(); }, 450);
+  };
+  const cancel = () => { clearTimeout(timer.current); };
+  const onClick = () => { if (fired.current) { fired.current = false; return; } g.onTap && g.onTap(); };
+  return (
+    <div
+      onClick={onClick}
+      onMouseDown={start} onMouseUp={cancel} onMouseLeave={cancel}
+      onTouchStart={start} onTouchEnd={cancel} onTouchMove={cancel}
+      onContextMenu={(e) => { e.preventDefault(); clearTimeout(timer.current); fired.current = true; g.onLongPress && g.onLongPress(); }}
+      style={style}
+    >
+      {children}
+    </div>
+  );
+}
+
 /* カレンダーで日付を選ぶボタン。input は1px不可視で置き、タップ時に showPicker で開く */
 function CalendarBtn({ value, onChange, white }) {
   const ref = React.useRef(null);
@@ -93,7 +118,7 @@ export default function Home({ v }) {
             {!closedSlots[s.id] && s.hasRecords && (
               <div style={{ borderTop: '1px solid #f1efe8' }}>
                 {s.groups.map((g, gi) => (
-                  <div key={gi} onClick={g.onTap} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '9px 15px', borderBottom: '1px solid #f1efe8', cursor: 'pointer' }}>
+                  <RecordRow key={gi} g={g} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '9px 15px', borderBottom: '1px solid #f1efe8', cursor: 'pointer', userSelect: 'none', WebkitTouchCallout: 'none' }}>
                     <span style={{ fontSize: 15, flex: '0 0 auto', marginTop: 1 }}>{g.glyph}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1b1b18', lineHeight: 1.4 }}>
@@ -103,7 +128,7 @@ export default function Home({ v }) {
                       {g.hasSub && <div style={{ ...mono, fontSize: 10, color: '#b4b2a8', marginTop: 1 }}>{g.subText}</div>}
                     </div>
                     <span style={{ ...mono, fontSize: 13, fontWeight: 700, color: g.fatColor, flex: '0 0 auto', whiteSpace: 'nowrap', marginTop: 1 }}>{g.fatText}</span>
-                  </div>
+                  </RecordRow>
                 ))}
               </div>
             )}
@@ -139,7 +164,30 @@ export default function Home({ v }) {
       {v.buffOpen && <BuffSheet v={v} />}
       {v.buffCheckOpen && <BuffCheckSheet v={v} />}
       {v.taskEditOpen && <TaskEditPopup v={v} />}
+      {v.recMenuOpen && <RecordMenu v={v} />}
     </>
+  );
+}
+
+/* 記録を長押ししたときのメニュー（編集する / ゴミ箱へ移動） */
+function RecordMenu({ v }) {
+  return (
+    <div onClick={v.closeRecMenu} style={{ position: 'absolute', inset: 0, zIndex: 9, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: '#fff', borderRadius: '22px 22px 0 0', padding: '10px 14px calc(14px + env(safe-area-inset-bottom))', boxShadow: '0 -12px 40px rgba(27,27,24,.3)' }}>
+        <div style={{ width: 38, height: 4, borderRadius: 999, background: '#e4e1d8', margin: '2px auto 12px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '2px 6px 12px' }}>
+          <span style={{ fontSize: 22, flex: '0 0 auto' }}>{v.recMenuGlyph}</span>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 800, lineHeight: 1.35 }}>{v.recMenuTitle}</div>
+        </div>
+        <button onClick={v.recMenuEdit} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 11, border: 'none', background: '#f7f4ec', borderRadius: 13, padding: '13px 14px', fontSize: 14, fontWeight: 700, color: '#1b1b18', cursor: 'pointer', marginBottom: 8 }}>
+          <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#55554e' }}>edit</span>編集する
+        </button>
+        <button onClick={v.recMenuTrash} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 11, border: 'none', background: '#fdeef0', borderRadius: 13, padding: '13px 14px', fontSize: 14, fontWeight: 700, color: '#c0395e', cursor: 'pointer' }}>
+          <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#c0395e' }}>delete</span>ゴミ箱へ移動{v.recMenuIsPlan ? '（予定ごと）' : ''}
+        </button>
+        <button onClick={v.closeRecMenu} style={{ width: '100%', marginTop: 10, border: 'none', background: 'none', padding: '12px 0', fontSize: 13.5, fontWeight: 700, color: '#8a8a82', cursor: 'pointer' }}>キャンセル</button>
+      </div>
+    </div>
   );
 }
 

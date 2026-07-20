@@ -536,10 +536,21 @@ function ActAddPopup({ v }) {
   );
 }
 
-/* ---- 検索で見つからない→行動を新しくつくる popup（タイトル・大カテゴリ・絵文字） ---- */
+/* ---- 検索で見つからない→行動を新しくつくる popup ----
+   「にているものをコピーして作る」(ActAddPopup)と同じコピー式UI。
+   ただし検索起点なので、コピー元だけでなく大カテゴリも選べるようにしている。 */
 function NewActPopup({ v }) {
   const [catOpen, setCatOpen] = React.useState(false);
+  const [srcOpen, setSrcOpen] = React.useState(false);
   const cur = v.newActCatChoices.find(c => c.on) || v.newActCatChoices[0];
+  const curSrc = v.newActSrcChoices.find(sc => sc.on) || v.newActSrcChoices[0];
+  const cmpBtns = (opts) => (
+    <div style={{ display: 'flex', gap: 5, marginTop: 8 }}>
+      {opts.map((o, oi) => (
+        <button key={oi} onClick={o.onPick} style={{ flex: 1, textAlign: 'center', border: o.on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: o.on ? '#fbfdf0' : '#fff', borderRadius: 10, padding: '9px 0', fontSize: 10.5, fontWeight: o.on ? 900 : 700, cursor: 'pointer', lineHeight: 1.3 }}>{o.text}</button>
+      ))}
+    </div>
+  );
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 7, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div className="nos" style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: '#fff', borderRadius: '22px 22px 0 0', padding: '16px 18px 20px', boxShadow: '0 -12px 40px rgba(27,27,24,.3)' }}>
@@ -547,19 +558,19 @@ function NewActPopup({ v }) {
           <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>行動を新しくつくる</div>
           <button onClick={v.closeNewAct} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
         </div>
-        {/* タイトル */}
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>タイトル</div>
+        {/* なまえ */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>なまえ</div>
         <input value={v.newActName} onChange={v.onNewActName} placeholder="例：ピアノの練習" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
-        {/* 大カテゴリ（プルダウン） */}
+        {/* 大カテゴリ（プルダウン）＝検索起点だけの追加項目 */}
         <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>大カテゴリ</div>
         <div style={{ position: 'relative', marginTop: 8 }}>
-          <button onClick={() => setCatOpen(!catOpen)} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, border: '1.5px solid #e4e1d8', background: '#fff', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}>
+          <button onClick={() => { setCatOpen(!catOpen); setSrcOpen(false); }} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, border: '1.5px solid #e4e1d8', background: '#fff', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}>
             {cur && <span style={{ ...msIcon(20, cur.color), flex: '0 0 auto' }}>{cur.icon}</span>}
             <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>{cur ? cur.name : ''}</span>
             <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 19, color: '#8a8a82' }}>{catOpen ? 'expand_less' : 'expand_more'}</span>
           </button>
           {catOpen && (
-            <div className="nos" style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)', zIndex: 5, background: '#fff', border: '1px solid #efece3', borderRadius: 14, boxShadow: '0 12px 28px rgba(27,27,24,.2)', padding: 6, maxHeight: 220, overflowY: 'auto' }}>
+            <div className="nos" style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)', zIndex: 6, background: '#fff', border: '1px solid #efece3', borderRadius: 14, boxShadow: '0 12px 28px rgba(27,27,24,.2)', padding: 6, maxHeight: 220, overflowY: 'auto' }}>
               {v.newActCatChoices.map(c => (
                 <button key={c.id} onClick={() => { c.onPick(); setCatOpen(false); }} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: c.on ? '#fbfdf0' : '#fff', border: 'none', borderRadius: 10, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
                   <span style={{ ...msIcon(19, c.color), flex: '0 0 auto' }}>{c.icon}</span>
@@ -571,7 +582,7 @@ function NewActPopup({ v }) {
           )}
         </div>
         {/* 絵文字（カテゴリ標準 or 検索して選ぶ） */}
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>絵文字</div>
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>絵文字（カテゴリ標準か、この行動だけの絵文字）</div>
         <EmojiPicker
           value={v.newActGlyph === 'std' ? null : v.newActGlyph}
           onPick={v.pickNewActGlyph}
@@ -582,8 +593,35 @@ function NewActPopup({ v }) {
             </button>
           )}
         />
-        <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 8, lineHeight: 1.6 }}>疲労のめやすは選んだカテゴリに合わせて自動で決まります（時間・強度・すききらいであとから調整できます）</div>
-        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+        {/* コピー元を選ぶ（にているもの＝選んだ大カテゴリの行動） */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>にているものをえらぶ（コピー元）</div>
+        <div style={{ position: 'relative', marginTop: 8 }}>
+          <button onClick={() => { setSrcOpen(!srcOpen); setCatOpen(false); }} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, border: '1.5px solid #e4e1d8', background: '#fff', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}>
+            <span style={{ fontSize: 17 }}>{curSrc ? curSrc.glyph : ''}</span>
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>{curSrc ? curSrc.name : ''}</span>
+            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 19, color: '#8a8a82' }}>{srcOpen ? 'expand_less' : 'expand_more'}</span>
+          </button>
+          {srcOpen && (
+            <div className="nos" style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)', zIndex: 5, background: '#fff', border: '1px solid #efece3', borderRadius: 14, boxShadow: '0 12px 28px rgba(27,27,24,.2)', padding: 6, maxHeight: 210, overflowY: 'auto' }}>
+              {v.newActSrcChoices.map(sc => (
+                <button key={sc.id} onClick={() => { sc.onPick(); setSrcOpen(false); }} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: sc.on ? '#fbfdf0' : '#fff', border: 'none', borderRadius: 10, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ fontSize: 16 }}>{sc.glyph}</span>
+                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: '#1b1b18' }}>{sc.name}</span>
+                  {sc.on && <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 17, color: '#7a9a00' }}>check</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* くらべてどう？（体・心それぞれ） */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>「{v.newActSrcName}」と同じ時間やったとして、{v.newActIsRecover ? 'からだの回復は？' : 'からだは？'}</div>
+        {cmpBtns(v.newActBodyOpts)}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 12, color: '#55554e' }}>{v.newActIsRecover ? 'こころの回復は？' : 'こころは？'}</div>
+        {cmpBtns(v.newActMindOpts)}
+        <div style={{ background: '#c4f000', borderRadius: 12, padding: '9px 14px', marginTop: 12, textAlign: 'center' }}>
+          <span style={{ ...mono, fontSize: 13, fontWeight: 700, color: '#2f3a00' }}>{v.newActIsRecover ? '回復の目安' : '目安'} {v.newActEstText}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
           <button onClick={v.closeNewAct} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>キャンセル</button>
           <button onClick={v.createNewAct} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>つくって記録</button>
         </div>
