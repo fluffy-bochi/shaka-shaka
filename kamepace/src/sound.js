@@ -1,90 +1,54 @@
-/* シャカシャカ効果音（Web Audio 版）。
-   iOS(WebKit)対策: HTMLAudioElement.play()/currentTime=0 の連打はメインスレッドをカクつかせるため、
-   mp3 を一度だけ decodeAudioData してバッファ化し、衝突ごとに軽量な AudioBufferSourceNode で鳴らす。
-   Web Audio は重ね再生・GC が軽く、iOS でも詰まりにくい。 */
+/* シャカシャカ効果音。
+   ※ 再生は HTMLAudioElement（プール）方式に戻した。
+   Web Audio 版は iOS Safari で音が「砂ノイズ」になる不具合があり（Androidは正常）、
+   perf改善前の HTMLAudio 版は iOS でも正しく鳴っていたため、こちらを採用する。
+   パフォーマンス改善の主因は物理の fixed timestep 化（App.jsx）なので、音方式を戻しても軽さは維持される。 */
 import Matter from 'matter-js';
 
+const SHAKA_POOL_SIZE = 6;       // 同時に重ねて鳴らせる数
 const SHAKA_MIN_SPEED = 4.2;     // この相対速度未満の接触は鳴らさない（積もって接しているだけ＝無音）
-const SHAKA_COOLDOWN = 45;       // 連続発音の最小間隔(ms)
-const SHAKA_MAX_CONCURRENT = 5;  // 同時に鳴らす最大数（重なりすぎ防止）
+const SHAKA_COOLDOWN = 50;       // 連続発音の最小間隔(ms)。少し広げて iOS の play() 連打を抑える
 
-let ctx = null;                  // AudioContext（初回ユーザー操作で resume）
-let buffer = null;               // デコード済み音声
-let masterGain = null;
+const shakaPool = [];
+let shakaPoolIdx = 0;
+let shakaUnlocked = false;
 let lastShakaPlay = 0;
-let liveCount = 0;               // 再生中ソース数
-let unlocked = false;
-let htmlFallback = null;         // Web Audio 不可のときだけ使う予備
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
 export function initShakaSound() {
-  if (ctx || htmlFallback) return;
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) {
-    // 予備: Web Audio 非対応環境のみ HTMLAudio（ほぼ来ない）
-    htmlFallback = new Audio('/sound/syakasyaka.mp3');
-    htmlFallback.preload = 'auto';
-    return;
+  if (shakaPool.length) return;
+  for (let i = 0; i < SHAKA_POOL_SIZE; i++) {
+    const a = new Audio('/sound/syakasyaka.mp3');
+    a.preload = 'auto';
+    a.volume = 0;
+    shakaPool.push(a);
   }
-  ctx = new AC();
-  masterGain = ctx.createGain();
-  masterGain.gain.value = 1;
-  masterGain.connect(ctx.destination);
-  // 音源は WAV(PCM) を使う。iOS Safari の Web Audio は一部の mp3(48kHz/joint-stereo等)を
-  // ノイズ化してデコードするため、デコーダを介さない WAV なら iOS でもクリアに鳴る。
-  // decodeAudioData はコールバック形＝古いiOSでも動く。
-  fetch('/sound/syakasyaka.wav')
-    .then(r => r.arrayBuffer())
-    .then(ab => new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)))
-    .then(buf => { buffer = buf; })
-    .catch(() => { /* 取得失敗時は無音でよい */ });
-
-  // iOS(WebKit)は初回ユーザー操作の中で AudioContext を解錠する必要がある。
-  // resume() だけでは足りないことがあるため、無音の1サンプルバッファを鳴らして確実に解錠する。
+  // モバイルは初回ユーザー操作で音声を解錠する必要がある
   const unlock = () => {
-    if (!ctx) return;
-    if (ctx.state !== 'running') ctx.resume().catch(() => {});
-    if (!unlocked) {
-      try {
-        const b = ctx.createBufferSource();
-        b.buffer = ctx.createBuffer(1, 1, 22050);
-        b.connect(ctx.destination);
-        b.start(0);
-        unlocked = true;
-      } catch (e) { /* ignore */ }
-    }
+    if (shakaUnlocked) return;
+    shakaUnlocked = true;
+    shakaPool.forEach(a => { a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {}); });
   };
-  // once にしない: 解錠が1回で決まらない端末でもタップ毎に再試行する
   window.addEventListener('pointerdown', unlock, { once: false });
   window.addEventListener('touchstart', unlock, { once: false });
 }
 
 export function playShaka(speed) {
+  if (!shakaPool.length) return;
   const now = performance.now();
   if (now - lastShakaPlay < SHAKA_COOLDOWN) return;
   lastShakaPlay = now;
+  const a = shakaPool[shakaPoolIdx];
+  shakaPoolIdx = (shakaPoolIdx + 1) % SHAKA_POOL_SIZE;
+  // 衝突の強さで音量を調整
   const v = clamp((speed - SHAKA_MIN_SPEED) / 14, 0.15, 1);
-
-  if (ctx && buffer) {
-    if (ctx.state !== 'running') ctx.resume().catch(() => {}); // 眠っていたら起こす（return せず鳴らしにいく）
-    if (liveCount >= SHAKA_MAX_CONCURRENT) return; // 重なりすぎは間引く
-    try {
-      const src = ctx.createBufferSource();
-      src.buffer = buffer;
-      const g = ctx.createGain();
-      g.gain.value = v;
-      src.connect(g); g.connect(masterGain);
-      liveCount++;
-      src.onended = () => { liveCount--; try { src.disconnect(); g.disconnect(); } catch (e) { /* ignore */ } };
-      src.start();
-    } catch (e) { /* ignore */ }
-    return;
-  }
-  // 予備（HTMLAudio）
-  if (htmlFallback) {
-    try { htmlFallback.volume = v; htmlFallback.currentTime = 0; const p = htmlFallback.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ }
-  }
+  try {
+    a.volume = v;
+    a.currentTime = 0;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) { /* ignore */ }
 }
 
 /* 絵文字どうしが「ぶつかった瞬間」だけ鳴らす。collisionStart は新規接触時のみ発火。
@@ -101,7 +65,6 @@ export function attachCollisionSound(engine) {
       const s = dvx * dvx + dvy * dvy; // sqrt は最後に1回だけ
       if (s > best) best = s;
     }
-    const relSpeed = Math.sqrt(best);
-    if (relSpeed >= SHAKA_MIN_SPEED) playShaka(relSpeed);
+    if (best >= SHAKA_MIN_SPEED * SHAKA_MIN_SPEED) playShaka(Math.sqrt(best));
   });
 }
