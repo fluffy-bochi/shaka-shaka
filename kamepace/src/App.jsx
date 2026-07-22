@@ -2256,11 +2256,19 @@ export default class App extends React.Component {
       // iOS(WebKit)対策: 動く絵文字に filter:drop-shadow を付けると DPR²(iPhoneは最大3)でフレーム毎に再ラスタライズされ非常に重い。
       // 3D絵文字自体に陰影があるため影は外す（perf実験・見た目は影が消えるのみ）。
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none';
-      // 未来の予定は灰色（グレースケール＋半透明）で「これから積む分」を示す。数は少なめなので filter コストは限定的。
-      if (m.gray) { d.style.filter = 'grayscale(1)'; d.style.opacity = '0.42'; }
+      // 未来の予定は灰色（グレースケール＋半透明）で「これから積む分」を示す。
+      // opacity は will-change と併用OKなので親に付ける。
+      if (m.gray) d.style.opacity = '0.45';
       d.style.width = d.style.height = (2 * r) + 'px';
       d.style.fontSize = Math.round(r * 1.6) + 'px';
       appendGlyph(d, glyph, Math.round(r * 1.9));
+      // iOS(WebKit)対策: will-change:transform の要素に filter を付けると効かないことがあるため、
+      // グレースケールは中の <img>（合成レイヤー化されていない子）側に付ける。テキスト時のみ親に付ける。
+      if (m.gray) {
+        const im = d.firstChild;
+        if (im && im.tagName === 'IMG') im.style.filter = 'grayscale(1)';
+        else d.style.filter = 'grayscale(1)';
+      }
       el.appendChild(d);
       this.bodies.push({ body, el: d, glyph, gray: !!m.gray });
     });
