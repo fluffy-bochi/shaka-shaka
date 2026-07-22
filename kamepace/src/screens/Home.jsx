@@ -55,7 +55,7 @@ export default function Home({ v }) {
       {/* 背景の積もった絵文字（ボカシ） */}
       <div style={{ position: 'absolute', inset: 0, top: 0, bottom: 64, zIndex: 0, filter: 'blur(1.5px)', pointerEvents: 'none' }}>
         {v.pile.map((p, i) => (
-          <span key={i} style={{ position: 'absolute', left: p.x, bottom: p.y, fontSize: p.s, transform: `rotate(${p.r2}deg)`, filter: 'drop-shadow(0 4px 6px rgba(27,27,24,.14))' }}><Emo e={p.e} size={p.s * 1.2} /></span>
+          <span key={i} style={{ position: 'absolute', left: p.x, bottom: p.y, fontSize: p.s, transform: `rotate(${p.r2}deg)` }}><Emo e={p.e} size={p.s * 1.2} /></span>
         ))}
       </div>
       <div className="nos" style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', padding: '0 0 12px' }}>
@@ -139,27 +139,32 @@ export default function Home({ v }) {
             )}
           </div>
         ))}
-        {/* タスク（mylifecore / Google ToDo）: 夜の下 */}
-        {v.homeTasks.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 18, margin: '0 16px 12px', boxShadow: '0 1px 3px rgba(27,27,24,.06)', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px 10px' }}>
-              <div style={{ width: 42, height: 42, flex: '0 0 auto', borderRadius: '50%', background: '#eef0e6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📝</div>
-              <span style={{ fontSize: 15, fontWeight: 800, flex: 1 }}>タスク</span>
-              <span style={{ ...mono, fontSize: 11, color: '#9d9b91' }}>{v.homeTasks.filter(t => t.done).length}/{v.homeTasks.length}</span>
-            </div>
+        {/* タスク（mylifecore / Google ToDo / かめペースで手動追加）: 時間軸の下。
+            チェックするとその時間帯に「行動」として記録される（紐づけた行動 or タスク名で推測） */}
+        <div style={{ background: '#fff', borderRadius: 18, margin: '0 16px 12px', boxShadow: '0 1px 3px rgba(27,27,24,.06)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px 10px' }}>
+            <div style={{ width: 42, height: 42, flex: '0 0 auto', borderRadius: '50%', background: '#eef0e6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📝</div>
+            <span style={{ fontSize: 15, fontWeight: 800, flex: 1 }}>タスク</span>
+            {v.homeTasks.length > 0 && <span style={{ ...mono, fontSize: 11, color: '#9d9b91' }}>{v.homeTasks.filter(t => t.done).length}/{v.homeTasks.length}</span>}
+          </div>
+          {v.homeTasks.length > 0 && (
             <div style={{ borderTop: '1px solid #f1efe8' }}>
               {v.homeTasks.map((t) => (
                 <div key={t.srcId} onClick={t.onToggle} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 15px', borderBottom: '1px solid #f1efe8', cursor: 'pointer', userSelect: 'none' }}>
                   <span style={{ width: 22, height: 22, flex: '0 0 auto', borderRadius: '50%', border: t.done ? 'none' : '2px solid #d8d5cb', background: t.done ? '#c4f000' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 14, color: '#2f3a00' }}>{t.done ? 'check' : ''}</span>
                   {t.glyph && <span style={{ flex: '0 0 auto', display: 'inline-flex' }}><Emo e={t.glyph} size={17} /></span>}
                   <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: t.done ? '#b4b2a8' : '#1b1b18', textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</span>
-                  <span style={{ ...mono, fontSize: 9, color: '#b4b2a8', flex: '0 0 auto' }}>{t.srcLabel}</span>
+                  {t.srcLabel && <span style={{ ...mono, fontSize: 9, color: '#b4b2a8', flex: '0 0 auto' }}>{t.srcLabel}</span>}
                   <button onClick={(e) => { e.stopPropagation(); t.onEdit(); }} style={{ flex: '0 0 auto', width: 26, height: 26, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'Material Symbols Rounded', fontSize: 16, color: '#c9c7bf', padding: 0 }}>edit</button>
+                  <button onClick={(e) => { e.stopPropagation(); t.onDelete(); }} aria-label="タスクを消す" style={{ flex: '0 0 auto', width: 26, height: 26, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'Material Symbols Rounded', fontSize: 16, color: '#d8b4ba', padding: 0 }}>delete</button>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+          <button onClick={v.onAddTask} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '11px 0', border: 'none', borderTop: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#7a9a00' }}>
+            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 16 }}>add</span>タスクを追加
+          </button>
+        </div>
       </div>
       {v.buffOpen && <BuffSheet v={v} />}
       {v.buffCheckOpen && <BuffCheckSheet v={v} />}
@@ -197,11 +202,11 @@ function TaskEditPopup({ v }) {
     <div style={{ position: 'absolute', inset: 0, zIndex: 9, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
       <div style={{ width: '100%', background: '#fff', borderRadius: 22, padding: '16px 20px 20px', boxShadow: '0 24px 60px rgba(27,27,24,.35)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>タスクを編集</div>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>{v.taskEditIsNew ? 'タスクを追加' : 'タスクを編集'}</div>
           <button onClick={v.closeTaskEdit} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
         </div>
         <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>タスク名</div>
-        <input value={v.taskEditTitle} onChange={v.onTaskEditTitle} style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
+        <input value={v.taskEditTitle} onChange={v.onTaskEditTitle} autoFocus={v.taskEditIsNew} placeholder="例：レポート提出、皿洗い" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
         <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>行動と紐づけ<span style={{ fontSize: 10.5, color: '#9d9b91', marginLeft: 6 }}>チェックしたらこの行動として記録</span></div>
         {v.taskEditLinkName ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, background: '#fbfdf0', border: '2px solid #c4de52', borderRadius: 12, padding: '10px 12px' }}>
@@ -222,7 +227,12 @@ function TaskEditPopup({ v }) {
             </div>
           </>
         )}
-        <button onClick={v.saveTaskEdit} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 15, padding: 14, cursor: 'pointer' }}>ほぞんする</button>
+        <button onClick={v.saveTaskEdit} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 15, padding: 14, cursor: 'pointer' }}>{v.taskEditIsNew ? '追加する' : 'ほぞんする'}</button>
+        {!v.taskEditIsNew && (
+          <button onClick={v.deleteTaskEdit} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#b4645a', fontWeight: 700, fontSize: 13, padding: '11px 0', cursor: 'pointer' }}>
+            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 18 }}>delete</span>このタスクを消す
+          </button>
+        )}
       </div>
     </div>
   );

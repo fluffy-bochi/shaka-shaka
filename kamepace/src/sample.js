@@ -133,17 +133,17 @@ export function buildAcademicYear(ay, opts = {}) {
     // ---- バイト（ファミレス・ホール／配膳 5h） ----
     let baito = false;
     if ((inSpringClass || inFallClass) && (wd === 2 || wd === 4)) { // 平日は火・木の夜
-      add(date, '17:00', '22:00', 'バイト（ホール・配膳）', '🍽', D(13, 300)); baito = true; hadClassOrWork = true;
+      add(date, '17:00', '22:00', 'バイト（ホール・配膳）', '🍽', D(8, 300)); baito = true; hadClassOrWork = true;
     }
     // 土日: どっちも or どっちか
     if (wd === 6 || wd === 0) {
       const pat = pick('wend' + date, ['both', 'both', 'sat', 'sun', 'sun']);
       const work = (pat === 'both') || (pat === 'sat' && wd === 6) || (pat === 'sun' && wd === 0);
-      if (work) { add(date, '11:00', '16:00', 'バイト（ホール・配膳）', '🍽', D(13, 300)); baito = true; hadClassOrWork = true; }
+      if (work) { add(date, '11:00', '16:00', 'バイト（ホール・配膳）', '🍽', D(8, 300)); baito = true; hadClassOrWork = true; }
     }
     // 長期休みは平日昼にも入る
     if (isBreak && !inWinterGap && isWeekday && rnd('bb' + date) < 0.4) {
-      add(date, '11:00', '16:00', 'バイト（ホール・配膳）', '🍽', D(13, 300)); baito = true;
+      add(date, '11:00', '16:00', 'バイト（ホール・配膳）', '🍽', D(8, 300)); baito = true;
     }
     if (baito && !tt) add(date, '16:20', '16:50', '通勤（電車バス）', '🚃', D(9, 30));
 
@@ -262,8 +262,8 @@ export function buildAcademicYear(ay, opts = {}) {
   collected.forEach(c => { const ds = ymd(new Date(c.ts)); sleepBy[ds] = (sleepBy[ds] || 0) + (c.amount || 0); });
   // 睡眠は「1晩で大半が回復」する想定（回復量は🌙の量×係数）。回復しきれないぶんが翌日へ繰り越す。
   // よく寝た日はほぼリセット、テスト/制作で睡眠を削った日は多めに繰り越して山が高くなる。
-  // 繰り越しは最大50までに制限（現実には週末などで一度リセットされるため、青天井に貯めない）。
-  const SLEEP_RECOVER = 2.0, CARRY_MAX = 50;
+  // 繰り越しは最大20までに制限（睡眠でしっかり消して積もりすぎを防ぐ。以前は50で山が高くなりすぎた）。
+  const SLEEP_RECOVER = 2.6, CARRY_MAX = 20;
   const balanceByDay = {};
   let carry = 0;
   for (let d = new Date(D0); d < D1; d = addDays(d, 1)) {

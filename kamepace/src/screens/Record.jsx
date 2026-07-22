@@ -31,6 +31,15 @@ function MinEdit({ text, raw, onSet, style }) {
     </span>
   );
 }
+/* 時刻の±1時間ステッパー（分は type=time で1分刻み、時間はこのボタンで） */
+function HourStep({ dir, onClick }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={dir > 0 ? '1時間すすめる' : '1時間もどす'}
+      style={{ ...mono, flex: '0 0 auto', width: 24, height: 26, borderRadius: 7, border: '1.5px solid #e4e1d8', background: '#faf9f4', color: '#55554e', fontSize: 14, fontWeight: 700, lineHeight: 1, cursor: 'pointer', padding: 0 }}>
+      {dir > 0 ? '＋' : '−'}
+    </button>
+  );
+}
 const sectionLabel = { ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a8a82', padding: '14px 22px 6px' };
 
 export default function Record({ v }) {
@@ -312,13 +321,18 @@ function Confirm({ v }) {
               {s.timeMode && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 7, paddingLeft: 19 }}>
                   {s.ranges.map((r, ri) => (
-                    <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <input type="time" value={r.fromHm} onChange={(e) => e.target.value && r.onSetFrom(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 72, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
-                      <span style={{ color: '#8a8a82', fontSize: 12 }}>→</span>
-                      <input type="time" value={r.toHm} onChange={(e) => e.target.value && r.onSetTo(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 72, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
-                      {s.canRemoveRange && <button onClick={r.onRemove} style={{ width: 26, height: 26, border: 'none', background: 'none', fontSize: 16, color: '#c9c7bf', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>}
+                    <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
+                      <HourStep dir={-1} onClick={() => r.onStepFromH(-1)} />
+                      <input type="time" value={r.fromHm} onChange={(e) => e.target.value && r.onSetFrom(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
+                      <HourStep dir={1} onClick={() => r.onStepFromH(1)} />
+                      <span style={{ color: '#8a8a82', fontSize: 12, margin: '0 1px' }}>→</span>
+                      <HourStep dir={-1} onClick={() => r.onStepToH(-1)} />
+                      <input type="time" value={r.toHm} onChange={(e) => e.target.value && r.onSetTo(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
+                      <HourStep dir={1} onClick={() => r.onStepToH(1)} />
+                      {s.canRemoveRange && <button onClick={r.onRemove} style={{ width: 24, height: 26, border: 'none', background: 'none', fontSize: 15, color: '#c9c7bf', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>}
                     </div>
                   ))}
+                  <div style={{ fontSize: 10, color: '#b4b2a8', marginTop: -2 }}>−/＋ ボタンで1時間ずつ、数字を押すと分をキーボード入力</div>
                   <button onClick={s.onAddRange} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, border: '1.5px dashed #cfe08a', background: '#fbfdf0', borderRadius: 999, padding: '4px 11px', fontSize: 11, fontWeight: 700, color: '#5a7500', cursor: 'pointer' }}>＋ 時間を追加</button>
                 </div>
               )}

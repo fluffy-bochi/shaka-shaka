@@ -217,6 +217,7 @@ export default class App extends React.Component {
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
       bookFav: s.bookFav, bookDiary: s.bookDiary,
       trashedPlans: s.trashedPlans, purgedPlanIds: s.purgedPlanIds,
+      purgedTaskIds: s.purgedTaskIds,
     };
   }
   save() {
@@ -283,9 +284,10 @@ export default class App extends React.Component {
     // ログアウトで戻ってきた同一セッションでは出さない（起動時の1回だけ判定）
     if (!this._autoTutChecked) {
       this._autoTutChecked = true;
+      // 「自分の記録」がある人にはチュートリアルを出さない。ペルソナ表示中(標準)は“自分の記録”ではないので
+      // ここには数えない＝初回ゲストにもチュートリアルを出す（チュートリアルは自前サンプルで動くので安全）。
       const hasData = (data.entries || []).some(e => !e.sample)
-        || (data.collected && data.collected.length > 0)
-        || !(data.prefs && data.prefs.sampleMode === false); // ゲスト標準=ペルソナ表示中はチュートリアル自動起動しない
+        || (data.collected && data.collected.length > 0);
       if (!data.onboardDone) {
         this._tutorialAfterOnboard = !hasData;
         setTimeout(() => { if (!this.state.user) this.set({ screen: 'onboard', obStep: 1, obSel: {} }); }, 200);
@@ -765,8 +767,14 @@ export default class App extends React.Component {
     const id = 'sc' + Date.now() + Math.floor(Math.random() * 1000);
     const newMin = this.initialMinOf(item);
     const newItem = { id, name: item.name, glyph: item.glyph, fh: item.fh, body: item.body, mind: item.mind, defMin: newMin, kw: item.kw, picks, symId: item.id, symptom: item.symptom, buffLv: item.buffLv };
-    // 時刻モードなら初期の時間範囲を付ける（現在時刻から defMin ぶん）
-    if (this.state.confirmMode === 'time') { const f = this.tsToHm(Date.now()); newItem.ranges = [{ from: f, to: this.addHm(f, newMin) }]; }
+    // 枠フィル（mylifecore/カレンダー取り込みの予定に行動を入れる）: 最初の行動は
+    // 行動固有の初期時間ではなく、枠にもともと記録されている時刻(from→to)まるごとを使う。
+    const frameFill = this.state.framePlan && this.state.startTime && this.state.endTime;
+    // 時刻モードなら初期の時間範囲を付ける
+    if (this.state.confirmMode === 'time') {
+      if (frameFill && n0 === 0) { newItem.ranges = [{ from: this.state.startTime, to: this.state.endTime }]; } // 枠の時刻まるごと
+      else { const f = this.tsToHm(Date.now()); newItem.ranges = [{ from: f, to: this.addHm(f, newMin) }]; } // 現在時刻から defMin ぶん
+    }
     const cart = [...prev, newItem];
     const resolved = kwIndex == null ? this.state.resolvedIdx : [...this.state.resolvedIdx, kwIndex];
     const remaining = this.remainingKw(resolved);
@@ -778,8 +786,9 @@ export default class App extends React.Component {
     const mins = n0 ? [...prevMins, newMin] : [newMin];
     const total = mins.reduce((a, b) => a + b, 0) || 30;
     const patch = { searchCart: cart, resolvedIdx: resolved, moreKw: null, searchStep: remaining.length ? 'results' : 'confirm', searchTotalMin: total, searchFracs: mins.map(m => m / total) };
-    // 時間モードなら、開始はそのまま・終了を伸ばして既存の割り当てを保つ
-    if (timeMode && this.state.startTime) patch.endTime = this.addHm(this.state.startTime, total);
+    // 時間モードなら、開始はそのまま・終了を伸ばして既存の割り当てを保つ。
+    // ただし枠フィルの最初の1件は枠の時刻(from→to)をそのまま使うので終了は動かさない。
+    if (timeMode && this.state.startTime && !(frameFill && n0 === 0)) patch.endTime = this.addHm(this.state.startTime, total);
     this.set(patch);
   };
   /* 検索で見つからないとき: 「にているものをコピーして作る」と同じUI＋大カテゴリ選択で作る */
@@ -1236,7 +1245,10 @@ export default class App extends React.Component {
     // 【重要】絵文字100個でその画面が上から下まで満杯（100個の時は少し上にはみ出すくらい）になる大きさ。
     // 画面の実寸(area)から計算するので機種で自動調整。100を超えても縮小せず同じ大きさのまま画面の外（上）へ積む。
     // ※ memory: emoji-pile-fill-rule（何度も指摘される最重要ルール）
-    const r = Math.sqrt(area * 1.0 / (100 * Math.PI));
+    // FILL_UNIT: この個数で画面いっぱいになる。物理でこんもり積む都合で実効の詰まりが良く、
+    // 100だと6〜7割の量でも8割の高さまで来て「大きすぎ」に見えたため 125 に。100個で概ね満杯・少数でも高く見えすぎない。
+    const FILL_UNIT = 125;
+    const r = Math.sqrt(area * 1.0 / (FILL_UNIT * Math.PI));
     return Math.max(8, Math.min(r, 60));
   }
   /* 今この画面で積む絵文字の数（シャカ・ホーム・睡眠で共通） */
@@ -1741,6 +1753,7 @@ export default class App extends React.Component {
     this.stopPhysics(); // 先に止める（stopPhysics は _pileLayout を上書きするため）
     this._tutBackup = JSON.parse(JSON.stringify(this.dataState()));
     this._tutLayoutBackup = this._pileLayout || null;
+    this._tutSampleBackup = this.state.sampleMode; // チュートリアル中はペルソナサンプルを止め、終了時に戻す
     this._pileLayout = null;
     const t = todayStr();
     // 学生サンプル: 午前まで記入済み
@@ -1750,7 +1763,7 @@ export default class App extends React.Component {
       { from: '10:40', to: '11:40', title: '自習', act: '勉強', mood: '🙂', delta: 6, exp: false, date: t, glyph: '📚', min: 60, slot: 'am' },
     ];
     this.set({
-      ...freshState(), entries,
+      ...freshState(), entries, sampleMode: false, // ペルソナ注入を止める（ensureSample は sampleMode で判定）
       tutorial: 1, tutFlags: {},
       screen: 'home', dayOffset: 0, slotId: null, catId: null, cart: {},
       searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [],
@@ -1763,8 +1776,10 @@ export default class App extends React.Component {
     this._tutBackup = null;
     this._pileLayout = this._tutLayoutBackup || null;
     this._tutLayoutBackup = null;
+    const sampleBack = this._tutSampleBackup; this._tutSampleBackup = null;
     this.set({
       ...(b || {}),
+      sampleMode: !!sampleBack, // チュートリアル前のペルソナ表示状態に戻す
       tutorial: 0, tutFlags: {},
       screen: 'home', dayOffset: 0, slotId: null, catId: null, cart: {},
       searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [],
@@ -2192,7 +2207,9 @@ export default class App extends React.Component {
       if (angle) Matter.Body.setAngle(body, angle);
       World.add(this.engine.world, body);
       const d = document.createElement('div');
-      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))';
+      // iOS(WebKit)対策: 動く絵文字に filter:drop-shadow を付けると DPR²(iPhoneは最大3)でフレーム毎に再ラスタライズされ非常に重い。
+      // 3D絵文字自体に陰影があるため影は外す（perf実験・見た目は影が消えるのみ）。
+      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none';
       d.style.width = d.style.height = (2 * r) + 'px';
       d.style.fontSize = Math.round(r * 1.6) + 'px';
       appendGlyph(d, glyph, Math.round(r * 1.9));
@@ -2309,7 +2326,7 @@ export default class App extends React.Component {
       const body = Bodies.circle(x, y, r, this.BODY_OPTS);
       World.add(this.engine.world, body);
       const d = document.createElement('div');
-      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))';
+      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none'; // drop-shadow除去(iOS DPR対策)
       d.style.width = d.style.height = (2 * r) + 'px'; d.style.fontSize = Math.round(r * 1.6) + 'px';
       appendGlyph(d, g, Math.round(r * 1.9));
       el.appendChild(d);
@@ -2338,7 +2355,9 @@ export default class App extends React.Component {
       body.isNegative = true;
       World.add(this.engine.world, body);
       const d = document.createElement('div');
-      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none;filter:drop-shadow(0 4px 5px rgba(27,27,24,.2))';
+      // iOS(WebKit)対策: 動く絵文字に filter:drop-shadow を付けると DPR²(iPhoneは最大3)でフレーム毎に再ラスタライズされ非常に重い。
+      // 3D絵文字自体に陰影があるため影は外す（perf実験・見た目は影が消えるのみ）。
+      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none';
       d.style.width = d.style.height = (2 * r) + 'px';
       d.style.fontSize = Math.round(r * 1.6) + 'px';
       appendGlyph(d, g, Math.round(r * 1.9));
@@ -2674,18 +2693,54 @@ export default class App extends React.Component {
     if (dm) completeDailyTask(dm[1], dm[2]).catch(e => console.warn('[kamepace] daily task complete sync failed', e));
   };
 
+  /* かめペース内でタスクを追加（mylifecore/Google と同じ「タスク」欄に出る・行動と紐づけ可）。
+     作ってすぐ編集ポップアップを開き、名前を付けずに閉じたら破棄する。 */
+  addLocalTask = () => {
+    const srcId = 'local:' + Date.now();
+    const tasks = [...(this.state.tasks || []), { srcId, title: '', done: false, date: this.homeDateStr() }];
+    this.set({ tasks, taskEdit: srcId, taskEditTitle: '', taskEditKw: '', taskEditLinkName: '', taskEditIsNew: true });
+  };
   /* タスクの編集（名前・行動との紐づけ） */
   openTaskEdit = (srcId) => {
     const t = (this.state.tasks || []).find(x => x.srcId === srcId);
     if (!t) return;
-    this.set({ taskEdit: srcId, taskEditTitle: t.title, taskEditKw: '', taskEditLinkName: t.linkName || '' });
+    this.set({ taskEdit: srcId, taskEditTitle: t.title, taskEditKw: '', taskEditLinkName: t.linkName || '', taskEditIsNew: false });
   };
-  closeTaskEdit = () => this.set({ taskEdit: null });
+  closeTaskEdit = () => {
+    // 新規タスクを名前なしで閉じたら破棄する
+    if (this.state.taskEditIsNew && !(this.state.taskEditTitle || '').trim()) {
+      const srcId = this.state.taskEdit;
+      this.set({ tasks: (this.state.tasks || []).filter(t => t.srcId !== srcId), taskEdit: null, taskEditIsNew: false });
+      return;
+    }
+    this.set({ taskEdit: null, taskEditIsNew: false });
+  };
   saveTaskEdit = () => {
     const srcId = this.state.taskEdit;
     const title = (this.state.taskEditTitle || '').trim();
+    if (this.state.taskEditIsNew && !title) { // 名前なしの新規は破棄
+      this.set({ tasks: (this.state.tasks || []).filter(t => t.srcId !== srcId), taskEdit: null, taskEditIsNew: false });
+      return;
+    }
     const tasks = (this.state.tasks || []).map(t => (t.srcId === srcId && title ? { ...t, title } : t));
-    this.set({ tasks, taskEdit: null });
+    this.set({ tasks, taskEdit: null, taskEditIsNew: false });
+    this.save();
+  };
+  /* タスクを削除（mylifecore/Google から取り込んだものも、かめペースで追加したものも消せる）。
+     取り込み元(mylifecore)は再同期で戻らないよう purge リストに覚えておく。 */
+  deleteTaskEdit = () => {
+    const srcId = this.state.taskEdit;
+    if (!srcId) return;
+    this.deleteTask(srcId);
+    this.set({ taskEdit: null, taskEditIsNew: false });
+  };
+  deleteTask = (srcId) => {
+    const tasks = (this.state.tasks || []).filter(t => t.srcId !== srcId);
+    // 同期で復活しないように、取り込み系(ptask/daily/Google)の id は purge に記録
+    const purged = /^(ptask:|daily:|cal:|tasks:|goog)/.test(String(srcId || ''))
+      ? Array.from(new Set([...(this.state.purgedTaskIds || []), srcId]))
+      : (this.state.purgedTaskIds || []);
+    this.set({ tasks, purgedTaskIds: purged });
     this.save();
   };
   linkTaskAct = (item) => {
@@ -2780,10 +2835,11 @@ export default class App extends React.Component {
   importTasks(items) {
     if (!Array.isArray(items)) return 0;
     let tasks = Array.isArray(this.state.tasks) ? [...this.state.tasks] : [];
+    const purged = new Set(this.state.purgedTaskIds || []); // 手動で消したタスクは再取り込みしない
     const idx = new Map(tasks.map((t, i) => [t.srcId, i]));
     let added = 0; let changed = false;
     items.forEach(it => {
-      if (!it || !it.srcId) return;
+      if (!it || !it.srcId || purged.has(it.srcId)) return;
       const i = idx.get(it.srcId);
       if (i != null) {
         // 既存: mylifecore側で完了になっていたらこちらもチェック（タイトル変更も追従）
@@ -2885,6 +2941,9 @@ export default class App extends React.Component {
         fromHm: r.from, toHm: r.to,
         onSetFrom: (hm) => this.setRange(idx, ri, 'from', hm),
         onSetTo: (hm) => this.setRange(idx, ri, 'to', hm),
+        // ±1時間ステッパー（分は type=time で1分刻み、時間はこのボタンでまとめて動かす）
+        onStepFromH: (dir) => this.setRange(idx, ri, 'from', this.addHm(r.from, dir * 60)),
+        onStepToH: (dir) => this.setRange(idx, ri, 'to', this.addHm(r.to, dir * 60)),
         onRemove: () => this.removeRange(idx, ri),
       })) : null;
       return {
@@ -3110,14 +3169,17 @@ export default class App extends React.Component {
         : this.homeDateStr() === shiftDate(todayStr(), 1) ? '明日' : '',
       homePrevDay: this.homePrevDay, homeNextDay: this.homeNextDay,
       setHomeDate: this.setHomeDate, goToday: this.goToday,
-      // 夜の下に出すタスク（mylifecore / GoogleのToDo）
+      // 時間軸の下に出すタスク（mylifecore / GoogleのToDo / かめペースで手動追加）
       homeTasks: (st.tasks || []).filter(t => t.date === this.homeDateStr()).map(t => ({
         srcId: t.srcId, title: t.title, done: !!t.done,
         glyph: t.linkGlyph || null, linkName: t.linkName || '',
-        srcLabel: String(t.srcId || '').startsWith('ptask:') ? 'mylifecore' : 'Google',
+        srcLabel: /^(ptask:|daily:)/.test(String(t.srcId || '')) ? 'mylifecore'
+          : /^local:/.test(String(t.srcId || '')) ? '' : 'Google',
         onToggle: () => this.toggleHomeTask(t.srcId),
         onEdit: () => this.openTaskEdit(t.srcId),
+        onDelete: () => this.deleteTask(t.srcId),
       })),
+      onAddTask: this.addLocalTask,
       // タスク編集ポップアップ
       taskEditOpen: !!st.taskEdit,
       taskEditTitle: st.taskEditTitle || '',
@@ -3132,7 +3194,8 @@ export default class App extends React.Component {
           }))
         : [],
       clearTaskLink: () => this.linkTaskAct(null),
-      saveTaskEdit: this.saveTaskEdit, closeTaskEdit: this.closeTaskEdit,
+      taskEditIsNew: !!st.taskEditIsNew,
+      saveTaskEdit: this.saveTaskEdit, closeTaskEdit: this.closeTaskEdit, deleteTaskEdit: this.deleteTaskEdit,
       // mylifecore 連携（同じFirebaseなのでログインしていれば自動連携中）
       mylifeConnected: !!st.user,
       mylifeStatusText: st.user
