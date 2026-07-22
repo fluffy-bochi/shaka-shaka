@@ -2036,8 +2036,10 @@ export default class App extends React.Component {
   /* スイカゲーム風の「硬い」物理: 跳ねない・よく噛む・沈まない */
   BODY_OPTS = { restitution: 0.12, friction: 0.4, frictionStatic: 0.6, frictionAir: 0.012, density: 0.01, slop: 0.01, sleepThreshold: 30 };
   _tuneEngine(engine) {
-    engine.positionIterations = 16; // めり込み解消の反復を増やす（沈み防止の要）
-    engine.velocityIterations = 10;
+    // iOS(WebKit)軽量化: 反復は既定(6/4)の約2.6倍だと重い。fixed timestep＋スリープと併用して
+    // 沈み防止を保ちつつ 10/6 に下げる（solver コストを約4割削減）。沈むようなら少し戻す。
+    engine.positionIterations = 10; // めり込み解消の反復（沈み防止）
+    engine.velocityIterations = 6;
     // 静止した絵文字は完全にスリープさせ、山の圧縮クリープ（じわじわ沈む）を止める
     engine.enableSleeping = true;
   }
@@ -2217,7 +2219,9 @@ export default class App extends React.Component {
       this.bodies.push({ body, el: d, glyph });
     });
     this.negBodies = [];
-    this.runner = Runner.create();
+    // iOS(WebKit)軽量化: fixed timestep（固定16.6ms）にする。可変デルタだとフレーム落ち時に
+    // 1ステップが重くなり山が沈む→眠れず回り続ける悪循環になる。固定なら1フレーム=1ステップに固定。
+    this.runner = Runner.create({ isFixed: true });
     Runner.run(this.runner, this.engine);
     this._running = true;
     if (newCount > 0) { clearTimeout(this._newT); this._newT = setTimeout(() => this.clearNewFlags(), 2600); }
@@ -2566,7 +2570,7 @@ export default class App extends React.Component {
       stackEl.appendChild(d);
       this.collectBodies.push({ body, el: d });
     });
-    this.collectRunner = Runner.create();
+    this.collectRunner = Runner.create({ isFixed: true }); // iOS軽量化: 固定timestep
     Runner.run(this.collectRunner, this.collectEngine);
     this._collectPhys = true;
     const loop = () => {
