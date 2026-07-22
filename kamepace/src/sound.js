@@ -31,19 +31,29 @@ export function initShakaSound() {
   masterGain = ctx.createGain();
   masterGain.gain.value = 1;
   masterGain.connect(ctx.destination);
-  // mp3 を一度だけ取得・デコード
+  // mp3 を一度だけ取得・デコード（decodeAudioData はコールバック形＝古いiOSでも動く）
   fetch('/sound/syakasyaka.mp3')
     .then(r => r.arrayBuffer())
-    .then(ab => ctx.decodeAudioData(ab))
+    .then(ab => new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)))
     .then(buf => { buffer = buf; })
     .catch(() => { /* 取得失敗時は無音でよい */ });
 
-  // モバイルは初回ユーザー操作で AudioContext を解錠する必要がある
+  // iOS(WebKit)は初回ユーザー操作の中で AudioContext を解錠する必要がある。
+  // resume() だけでは足りないことがあるため、無音の1サンプルバッファを鳴らして確実に解錠する。
   const unlock = () => {
-    if (unlocked) return;
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-    if (ctx.state === 'running') unlocked = true;
+    if (!ctx) return;
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (!unlocked) {
+      try {
+        const b = ctx.createBufferSource();
+        b.buffer = ctx.createBuffer(1, 1, 22050);
+        b.connect(ctx.destination);
+        b.start(0);
+        unlocked = true;
+      } catch (e) { /* ignore */ }
+    }
   };
+  // once にしない: 解錠が1回で決まらない端末でもタップ毎に再試行する
   window.addEventListener('pointerdown', unlock, { once: false });
   window.addEventListener('touchstart', unlock, { once: false });
 }
@@ -55,7 +65,7 @@ export function playShaka(speed) {
   const v = clamp((speed - SHAKA_MIN_SPEED) / 14, 0.15, 1);
 
   if (ctx && buffer) {
-    if (ctx.state === 'suspended') { ctx.resume().catch(() => {}); return; }
+    if (ctx.state !== 'running') ctx.resume().catch(() => {}); // 眠っていたら起こす（return せず鳴らしにいく）
     if (liveCount >= SHAKA_MAX_CONCURRENT) return; // 重なりすぎは間引く
     try {
       const src = ctx.createBufferSource();
