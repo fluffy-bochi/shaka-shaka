@@ -31,8 +31,10 @@ export function initShakaSound() {
   masterGain = ctx.createGain();
   masterGain.gain.value = 1;
   masterGain.connect(ctx.destination);
-  // mp3 を一度だけ取得・デコード（decodeAudioData はコールバック形＝古いiOSでも動く）
-  fetch('/sound/syakasyaka.mp3')
+  // 音源は WAV(PCM) を使う。iOS Safari の Web Audio は一部の mp3(48kHz/joint-stereo等)を
+  // ノイズ化してデコードするため、デコーダを介さない WAV なら iOS でもクリアに鳴る。
+  // decodeAudioData はコールバック形＝古いiOSでも動く。
+  fetch('/sound/syakasyaka.wav')
     .then(r => r.arrayBuffer())
     .then(ab => new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)))
     .then(buf => { buffer = buf; })
