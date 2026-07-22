@@ -1405,6 +1405,17 @@ export default class App extends React.Component {
     });
     return g;
   }
+  /* まだ来ていない予定（planned のうち、まだ降っていない残り）の絵文字。シャカでは灰色で積む。
+     未来の日はまるごと灰色・今日はこれから来る予定ぶんだけ灰色になる。 */
+  futurePlanGlyphs(dateStr) {
+    const out = [];
+    this.state.entries.forEach(r => {
+      if (r.exp || !r.planned || (r.delta || 0) <= 0 || r.date !== dateStr) return;
+      const remaining = r.delta - (r.dropped || 0);
+      for (let i = 0; i < remaining; i++) out.push(entryGlyph(r));
+    });
+    return out;
+  }
   rebuildPhysics() {
     this.stopPhysics();
     requestAnimationFrame(() => {
@@ -1412,8 +1423,34 @@ export default class App extends React.Component {
       if (el && !this.engine) this.startPhysics(el);
     });
   }
-  prevDay = () => { if (this.state.dayOffset <= -3) return; this.set({ dayOffset: this.state.dayOffset - 1 }); this.rebuildPhysics(); };
-  nextDay = () => { if (this.state.dayOffset >= 0) return; this.set({ dayOffset: this.state.dayOffset + 1 }); this.rebuildPhysics(); };
+  /* シャカで前後に動ける範囲。データがある最古〜最新の日（未来の予定も含む）をオフセットで返す。
+     サンプル表示中は「毎年くりかえし」を1年ぶんたどれるよう広めにとり、移動時に ensureSample で生成する。 */
+  dayOffsetRange() {
+    const t = todayStr();
+    let min = 0, max = 0;
+    for (const e of this.state.entries) {
+      if (e.exp || !(e.delta > 0 || e.planned)) continue;
+      const off = Math.round((strToDate(e.date).getTime() - strToDate(t).getTime()) / 86400000);
+      if (off < min) min = off;
+      if (off > max) max = off;
+    }
+    if (this.state.sampleMode) { min = Math.min(min, -366); max = Math.max(max, 31); }
+    return { min, max };
+  }
+  prevDay = () => {
+    const { min } = this.dayOffsetRange();
+    if (this.state.dayOffset <= min) return;
+    const off = this.state.dayOffset - 1;
+    if (this.state.sampleMode) this.ensureSample(shiftDate(todayStr(), off));
+    this.set({ dayOffset: off }); this.rebuildPhysics();
+  };
+  nextDay = () => {
+    const { max } = this.dayOffsetRange();
+    if (this.state.dayOffset >= max) return;
+    const off = this.state.dayOffset + 1;
+    if (this.state.sampleMode) this.ensureSample(shiftDate(todayStr(), off));
+    this.set({ dayOffset: off }); this.rebuildPhysics();
+  };
 
   /* ================= navigation ================= */
   goHome = () => this.set({ screen: 'home' });
@@ -2177,9 +2214,16 @@ export default class App extends React.Component {
     this.bodies = [];
     // 表示上限は新しい側（末尾）を残す。画面に収まるのは約100個で、
     // それを超えたぶんは「あふれて」見える（=頑張りすぎの信号）。
-    let marks;
-    if (this.state.dayOffset === 0) marks = this.pileGlyphsMarked().slice(-200);
-    else marks = this.currentBag().slice(-200).map(g => ({ g, isNew: false }));
+    // 実際に積んだ絵文字（solid）＋ まだ来ていない予定（gray）。予定は灰色で settled（降らせない）。
+    const viewDate = this.state.dayOffset === 0 ? todayStr() : shiftDate(todayStr(), this.state.dayOffset);
+    const baseMarks = this.state.dayOffset === 0
+      ? this.pileGlyphsMarked()
+      : this.currentBag().map(g => ({ g, isNew: false }));
+    const oldSolid = baseMarks.filter(m => !m.isNew);
+    const newSolid = baseMarks.filter(m => m.isNew);
+    const grayMarks = this.futurePlanGlyphs(viewDate).map(g => ({ g, isNew: false, gray: true }));
+    // 並び: [積み済み(old) → 未来予定(gray, settled) → 新規(new, 上から降る)]。新規を末尾に置く
+    let marks = [...oldSolid, ...grayMarks, ...newSolid].slice(-200);
     const newCount = marks.filter(m => m.isNew).length;
     const oldCount = marks.length - newCount;
     const perRow = Math.max(1, Math.floor(W / (2 * r)));
@@ -2212,11 +2256,13 @@ export default class App extends React.Component {
       // iOS(WebKit)対策: 動く絵文字に filter:drop-shadow を付けると DPR²(iPhoneは最大3)でフレーム毎に再ラスタライズされ非常に重い。
       // 3D絵文字自体に陰影があるため影は外す（perf実験・見た目は影が消えるのみ）。
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none';
+      // 未来の予定は灰色（グレースケール＋半透明）で「これから積む分」を示す。数は少なめなので filter コストは限定的。
+      if (m.gray) { d.style.filter = 'grayscale(1)'; d.style.opacity = '0.42'; }
       d.style.width = d.style.height = (2 * r) + 'px';
       d.style.fontSize = Math.round(r * 1.6) + 'px';
       appendGlyph(d, glyph, Math.round(r * 1.9));
       el.appendChild(d);
-      this.bodies.push({ body, el: d, glyph });
+      this.bodies.push({ body, el: d, glyph, gray: !!m.gray });
     });
     this.negBodies = [];
     // iOS(WebKit)軽量化: fixed timestep（固定16.6ms）にする。可変デルタだとフレーム落ち時に
@@ -2292,7 +2338,9 @@ export default class App extends React.Component {
     const el = document.getElementById('shakacase');
     const rect = el ? el.getBoundingClientRect() : null;
     const W = (rect && rect.width) || 350, H = (rect && rect.height) || 700;
-    const layout = this.bodies.map(({ body, el: d, glyph }) => ({
+    // 灰色（未来の予定）は保存しない。_pileLayout は Home/睡眠の背景でも使われるため、
+    // 予定の絵文字が実績としてそれらに写り込まないようにする。
+    const layout = this.bodies.filter(b => !b.gray).map(({ body, el: d, glyph }) => ({
       g: glyph || d.textContent,
       x: Math.max(0, Math.min(1, body.position.x / W)),
       y: Math.max(0, Math.min(1, body.position.y / H)),
@@ -3037,6 +3085,7 @@ export default class App extends React.Component {
 
     const activeSlot = this.slotDef(st.slotId || this.slotNow());
     const viewDateStr = shiftDate(todayStr(), st.dayOffset);
+    this._dayRange = this.dayOffsetRange(); // シャカの前後移動の可動範囲（ボタン色に使用）
 
     const isEditFlow = st.confirmOrigin === 'edit';
 
@@ -3414,8 +3463,8 @@ export default class App extends React.Component {
       shakaDate: st.dayOffset === 0 ? formatDateShort(todayStr()) : formatDateShort(viewDateStr),
       clockHm: st.clockHm || this.tsToHm(Date.now()),
       prevDay: this.prevDay, nextDay: this.nextDay,
-      prevColor: st.dayOffset <= -3 ? '#d8d5cb' : '#55554e',
-      nextColor: st.dayOffset >= 0 ? '#d8d5cb' : '#55554e',
+      prevColor: st.dayOffset <= this._dayRange.min ? '#d8d5cb' : '#55554e',
+      nextColor: st.dayOffset >= this._dayRange.max ? '#d8d5cb' : '#55554e',
       showToast: !!st.toast, toastText: st.toast || '',
       /* auth / mypage */
       user: st.user,
