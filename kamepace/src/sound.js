@@ -1,53 +1,71 @@
-/* シャカシャカ効果音。
-   ※ 再生は HTMLAudioElement（プール）方式に戻した。
-   Web Audio 版は iOS Safari で音が「砂ノイズ」になる不具合があり（Androidは正常）、
-   perf改善前の HTMLAudio 版は iOS でも正しく鳴っていたため、こちらを採用する。
-   パフォーマンス改善の主因は物理の fixed timestep 化（App.jsx）なので、音方式を戻しても軽さは維持される。 */
+/* シャカシャカ効果音（Web Audio 版・iOSノイズ対策済み）。
+   重さ対策で Web Audio を採用（HTMLAudio の play() 連打は iOS でメインスレッドを詰まらせる）。
+   iOS Safari で音が「砂ノイズ」になる問題は、AudioContext をページ読み込み時に生成していたのが原因。
+   → AudioContext は「最初のユーザー操作の中で」生成する（howler.js 等と同じ回避策）。 */
 import Matter from 'matter-js';
 
-const SHAKA_POOL_SIZE = 6;       // 同時に重ねて鳴らせる数
-const SHAKA_MIN_SPEED = 4.2;     // この相対速度未満の接触は鳴らさない（積もって接しているだけ＝無音）
-const SHAKA_COOLDOWN = 50;       // 連続発音の最小間隔(ms)。少し広げて iOS の play() 連打を抑える
+const SHAKA_MIN_SPEED = 4.2;     // この相対速度未満の接触は鳴らさない
+const SHAKA_COOLDOWN = 45;       // 連続発音の最小間隔(ms)
+const SHAKA_MAX_CONCURRENT = 5;  // 同時に鳴らす最大数
 
-const shakaPool = [];
-let shakaPoolIdx = 0;
-let shakaUnlocked = false;
-let lastShakaPlay = 0;
+let ctx = null, buffer = null, masterGain = null;
+let lastShakaPlay = 0, liveCount = 0, listenersAdded = false;
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
+/* 初回ユーザー操作の中で呼ぶ: ここで AudioContext を生成・解錠・デコード開始する（iOSのノイズ対策の要）。 */
+function ensureContext() {
+  if (ctx) { if (ctx.state !== 'running') ctx.resume().catch(() => {}); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  ctx = new AC();
+  masterGain = ctx.createGain();
+  masterGain.gain.value = 1;
+  masterGain.connect(ctx.destination);
+  // ウォームアップ: コンテキストのサンプルレートで無音1サンプルを鳴らして完全解錠
+  try {
+    const b = ctx.createBufferSource();
+    b.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+    b.connect(ctx.destination);
+    b.start(0);
+  } catch (e) { /* ignore */ }
+  // 音源を取得してデコード（コールバック形＝古いiOSでも動く）
+  fetch('/sound/syakasyaka.mp3')
+    .then(r => r.arrayBuffer())
+    .then(ab => new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)))
+    .then(buf => { buffer = buf; })
+    .catch(() => { /* 取得失敗時は無音でよい */ });
+}
+
 export function initShakaSound() {
-  if (shakaPool.length) return;
-  for (let i = 0; i < SHAKA_POOL_SIZE; i++) {
-    const a = new Audio('/sound/syakasyaka.mp3');
-    a.preload = 'auto';
-    a.volume = 0;
-    shakaPool.push(a);
-  }
-  // モバイルは初回ユーザー操作で音声を解錠する必要がある
-  const unlock = () => {
-    if (shakaUnlocked) return;
-    shakaUnlocked = true;
-    shakaPool.forEach(a => { a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {}); });
-  };
-  window.addEventListener('pointerdown', unlock, { once: false });
-  window.addEventListener('touchstart', unlock, { once: false });
+  if (listenersAdded) return;
+  listenersAdded = true;
+  // AudioContext は「最初の操作の中」で作る。once にせず、状態が眠ったら起こし直せるようにする。
+  const onGesture = () => ensureContext();
+  window.addEventListener('pointerdown', onGesture, { once: false });
+  window.addEventListener('touchstart', onGesture, { once: false });
+  window.addEventListener('mousedown', onGesture, { once: false });
+  window.addEventListener('keydown', onGesture, { once: false });
 }
 
 export function playShaka(speed) {
-  if (!shakaPool.length) return;
+  // まだ用意できていなければ鳴らさない（AudioContext の生成はユーザー操作の中でだけ行う）
+  if (!ctx || !buffer) return;
+  if (ctx.state !== 'running') ctx.resume().catch(() => {});
   const now = performance.now();
   if (now - lastShakaPlay < SHAKA_COOLDOWN) return;
   lastShakaPlay = now;
-  const a = shakaPool[shakaPoolIdx];
-  shakaPoolIdx = (shakaPoolIdx + 1) % SHAKA_POOL_SIZE;
-  // 衝突の強さで音量を調整
+  if (liveCount >= SHAKA_MAX_CONCURRENT) return;
   const v = clamp((speed - SHAKA_MIN_SPEED) / 14, 0.15, 1);
   try {
-    a.volume = v;
-    a.currentTime = 0;
-    const p = a.play();
-    if (p && p.catch) p.catch(() => {});
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const g = ctx.createGain();
+    g.gain.value = v;
+    src.connect(g); g.connect(masterGain);
+    liveCount++;
+    src.onended = () => { liveCount--; try { src.disconnect(); g.disconnect(); } catch (e) { /* ignore */ } };
+    src.start();
   } catch (e) { /* ignore */ }
 }
 
