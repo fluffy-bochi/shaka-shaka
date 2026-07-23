@@ -2126,10 +2126,10 @@ export default class App extends React.Component {
   /* スイカゲーム風の「硬い」物理: 跳ねない・よく噛む・沈まない */
   BODY_OPTS = { restitution: 0.12, friction: 0.4, frictionStatic: 0.6, frictionAir: 0.012, density: 0.01, slop: 0.01, sleepThreshold: 30 };
   _tuneEngine(engine) {
-    // iOS(WebKit)軽量化: 反復は既定(6/4)の約2.6倍だと重い。fixed timestep＋スリープと併用して
-    // 沈み防止を保ちつつ 10/6 に下げる（solver コストを約4割削減）。沈むようなら少し戻す。
-    engine.positionIterations = 10; // めり込み解消の反復（沈み防止）
-    engine.velocityIterations = 6;
+    // iOS(WebKit)軽量化: 反復を更に削減（10/6→8/4）。fixed timestep＋スリープ＋硬めのボディで沈みを防ぎつつ
+    // 振った時の solver コストを下げる。沈むようなら positionIterations を少し戻す。
+    engine.positionIterations = 8; // めり込み解消の反復（沈み防止）
+    engine.velocityIterations = 4;
     // 静止した絵文字は完全にスリープさせ、山の圧縮クリープ（じわじわ沈む）を止める
     engine.enableSleeping = true;
   }
@@ -2350,6 +2350,7 @@ export default class App extends React.Component {
       if (!this._phys) return;
       const rr = this.PR, cH = this._caseH || 700, cW = this._caseW || 350, lidY = this._lidY || -400;
       this.bodies.forEach(({ body, el }) => {
+        if (body.isSleeping) return; // 静止した絵文字はDOM(transform)更新をしない＝iOSの描画負荷を下げる
         // まれに底/横をすり抜けた絵文字は、下から湧かせず「上（蓋の少し下）から落とし直す」＝自然な落下に見せる
         if (body.position.y > cH + rr * 1.2 || body.position.y < lidY - rr || body.position.x < -rr * 2 || body.position.x > cW + rr * 2) {
           Matter.Body.setPosition(body, { x: rr + Math.random() * (cW - 2 * rr), y: lidY + rr + Math.random() * rr * 3 });
@@ -2612,8 +2613,9 @@ export default class App extends React.Component {
       if (ag && ag.x != null) {
         const clamp = (v) => Math.max(-1, Math.min(1, v));
         const G = 1.4;
-        // iOSとAndroidで加速度の符号が逆（全軸）。iOSは反転する。左右(x)も上下(y)と同じ補正。
-        const xGrav = IS_IOS_DEVICE ? -ag.x : ag.x;
+        // 実機検証: 上下(y)は iOS=-ag.y / Android=+ag.y で正しい。左右(x)は両方とも逆だったので
+        // x は y と逆の割り当て（iOS=+ag.x / Android=-ag.x）にする＝左に傾けたら左に集まる。
+        const xGrav = IS_IOS_DEVICE ? ag.x : -ag.x;
         const yGrav = IS_IOS_DEVICE ? -ag.y : ag.y;
         const gx = clamp((xGrav || 0) / 9.8) * G;
         const gy = clamp((yGrav || 0) / 9.8) * G;
