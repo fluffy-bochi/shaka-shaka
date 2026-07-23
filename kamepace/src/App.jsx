@@ -720,21 +720,26 @@ export default class App extends React.Component {
   setConfirmMode = (mode) => {
     const items = this.state.searchCart || [];
     const n = items.length;
+    // 枠（取り込み予定）がある時は、開始＝枠のstartTime から連続配置し、全体時刻(startTime→endTime)は変えない。
+    const frameFill = this.state.framePlan && this.state.startTime && this.state.endTime;
     if (mode === 'time' && this.state.confirmMode !== 'time') {
-      // いまの分の割り当てを初期の時間範囲に（現在時刻から連続配置。以後は各行を自由に編集できる）
+      // いまの分の割り当てを初期の時間範囲に（枠がある時は枠の開始から・無ければ現在時刻から連続配置）
       const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(n ? 1 / n : 0);
-      const total = this.state.searchTotalMin || (n * 30) || 30;
-      let cur = new Date(); cur.setSeconds(0, 0);
-      const startHm = this.tsToHm(cur.getTime());
+      const total = (frameFill ? this.timeSpanMin() : this.state.searchTotalMin) || (n * 30) || 30;
+      const startHm = frameFill ? this.state.startTime : this.tsToHm((() => { const d = new Date(); d.setSeconds(0, 0); return d.getTime(); })());
+      let curMin = 0;
       const withRanges = items.map((it, i) => {
         const min = Math.max(1, Math.round((fr[i] || (n ? 1 / n : 1)) * total));
-        const from = this.tsToHm(cur.getTime());
-        cur = new Date(cur.getTime() + min * 60000);
-        return { ...it, ranges: [{ from, to: this.tsToHm(cur.getTime()) }] };
+        const from = this.addHm(startHm, curMin);
+        curMin += min;
+        return { ...it, ranges: [{ from, to: this.addHm(startHm, curMin) }] };
       });
-      this.set({ confirmMode: 'time', startTime: startHm, endTime: this.tsToHm(cur.getTime()), searchCart: withRanges });
+      // 全体時刻: 枠がある時は枠のまま、無ければ配置に合わせる
+      const patch = { confirmMode: 'time', searchCart: withRanges };
+      if (!frameFill) { patch.startTime = startHm; patch.endTime = this.addHm(startHm, curMin); }
+      this.set(patch);
     } else if (mode !== 'time' && this.state.confirmMode === 'time') {
-      // 所要時間モードへ戻す: ranges の合計を分に、比率も更新
+      // 所要時間モードへ戻す: ranges の合計を分に、比率も更新。全体時刻は保持する（枠を壊さない）。
       const mins = items.map(it => (it.ranges || []).reduce((a, r) => a + this.rangeMin(r), 0) || it.defMin || 30);
       const total = Math.max(1, mins.reduce((a, b) => a + b, 0));
       const stripped = items.map(it => { const { ranges, ...rest } = it; return rest; });
@@ -785,8 +790,13 @@ export default class App extends React.Component {
     const frameFill = this.state.framePlan && this.state.startTime && this.state.endTime;
     // 時刻モードなら初期の時間範囲を付ける
     if (this.state.confirmMode === 'time') {
-      if (frameFill && n0 === 0) { newItem.ranges = [{ from: this.state.startTime, to: this.state.endTime }]; } // 枠の時刻まるごと
-      else { const f = this.tsToHm(Date.now()); newItem.ranges = [{ from: f, to: this.addHm(f, newMin) }]; } // 現在時刻から defMin ぶん
+      if (frameFill) {
+        // 枠（取り込み予定）内では、前の行動の終わりから連続して置く（初期値。各行はあとで自由に編集できる）。
+        // 枠の全体時刻(startTime→endTime)は動かさない。
+        const lastEnd = prev.length ? (((prev[prev.length - 1].ranges || []).slice(-1)[0] || {}).to) : this.state.startTime;
+        const from = lastEnd || this.state.startTime;
+        newItem.ranges = [{ from, to: this.addHm(from, newMin) }];
+      } else { const f = this.tsToHm(Date.now()); newItem.ranges = [{ from: f, to: this.addHm(f, newMin) }]; } // 現在時刻から defMin ぶん
     }
     const cart = [...prev, newItem];
     const resolved = kwIndex == null ? this.state.resolvedIdx : [...this.state.resolvedIdx, kwIndex];
@@ -800,8 +810,8 @@ export default class App extends React.Component {
     const total = mins.reduce((a, b) => a + b, 0) || 30;
     const patch = { searchCart: cart, resolvedIdx: resolved, moreKw: null, searchStep: remaining.length ? 'results' : 'confirm', searchTotalMin: total, searchFracs: mins.map(m => m / total) };
     // 時間モードなら、開始はそのまま・終了を伸ばして既存の割り当てを保つ。
-    // ただし枠フィルの最初の1件は枠の時刻(from→to)をそのまま使うので終了は動かさない。
-    if (timeMode && this.state.startTime && !(frameFill && n0 === 0)) patch.endTime = this.addHm(this.state.startTime, total);
+    // ただし枠（取り込み予定）がある時は「全体の時刻」を勝手に変えない（手動でだけ変更可）。
+    if (timeMode && this.state.startTime && !this.state.framePlan) patch.endTime = this.addHm(this.state.startTime, total);
     this.set(patch);
   };
   /* 検索で見つからないとき: 「にているものをコピーして作る」と同じUI＋大カテゴリ選択で作る */
@@ -1037,9 +1047,11 @@ export default class App extends React.Component {
       if (oe && oe.date) recDate = oe.date;
     }
     const isToday = recDate === todayStr();
-    // 所要時間モードの各行の分（比率×合計）
+    // 所要時間モードの各行の分（比率×合計）。枠（取り込み予定）がある時は合計＝全体の時間(startTime→endTime)。
+    const frameFill = this.state.framePlan && this.state.startTime && this.state.endTime;
+    let frameCursor = 0; // 枠内での経過分（所要時間モードで枠の開始から連続配置）
     const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(1 / n);
-    const durTotal = this.state.searchTotalMin || (n * 30);
+    const durTotal = frameFill ? this.timeSpanMin() : (this.state.searchTotalMin || (n * 30));
     const durMins = fr.map(f => Math.max(1, Math.round(f * durTotal)));
     if (durMins.length) { const d = durTotal - durMins.reduce((a, b) => a + b, 0); durMins[n - 1] = Math.max(1, durMins[n - 1] + d); }
     // 通常記録の配置位置: 同スロットの使用済み分（編集中は元の記録を除いて数える）
@@ -1086,6 +1098,14 @@ export default class App extends React.Component {
           });
           learnMin[i] = sum;
         }
+      } else if (frameFill) {
+        // 枠（取り込み予定）: 全体の時刻(startTime→endTime)の中に、開始から連続して割り当てる
+        const min = durMins[i];
+        const fromHm = this.addHm(this.state.startTime, frameCursor);
+        const toHm = this.addHm(this.state.startTime, frameCursor + min);
+        const planned = isToday && hmToTsOn(recDate, toHm) > now;
+        newEntries.push(mkEntry(t, min, fromHm, toHm, planned, taskKey));
+        frameCursor += min; learnMin[i] = min;
       } else {
         const min = durMins[i];
         const e = mkEntry(t, min, null, null, false, taskKey);
@@ -3036,7 +3056,9 @@ export default class App extends React.Component {
     const scCount = scItems.length;
     const fr0 = (st.searchFracs && st.searchFracs.length === scCount && scCount) ? st.searchFracs : Array(scCount).fill(scCount ? 1 / scCount : 0);
     const timeMode = st.confirmMode === 'time';
-    const totalMin = timeMode ? this.timeSpanMin() : (st.searchTotalMin || (scCount * 30) || 30);
+    // 枠（取り込み予定）がある時は「全体の時間(startTime→endTime)」を合計に使う＝その中で分配する
+    const overallActive = !!(st.framePlan && st.startTime && st.endTime);
+    const totalMin = (timeMode || overallActive) ? this.timeSpanMin() : (st.searchTotalMin || (scCount * 30) || 30);
     const mins = fr0.map(f => Math.max(1, Math.round(f * totalMin)));
     if (mins.length) { const d = totalMin - mins.reduce((a, b) => a + b, 0); mins[mins.length - 1] = Math.max(1, mins[mins.length - 1] + d); }
     // 各行動の分: 時刻モードは range 合計、所要時間モードは配分
@@ -3381,6 +3403,14 @@ export default class App extends React.Component {
       durTabBg: timeMode ? '#fff' : '#1b1b18', durTabColor: timeMode ? '#8a8a82' : '#fff',
       timeTabBg: timeMode ? '#1b1b18' : '#fff', timeTabColor: timeMode ? '#fff' : '#8a8a82',
       startTime: st.startTime, endTime: st.endTime, onStartTime: this.onStartTime, onEndTime: this.onEndTime,
+      // 全体の時間（取り込み予定＝枠がある時に表示。手動で変えられる。勝手には変わらない）
+      hasOverallTime: overallActive,
+      overallFromHm: st.startTime, overallToHm: st.endTime,
+      onOverallFrom: (hm) => { if (hm) this.set({ startTime: hm }); },
+      onOverallTo: (hm) => { if (hm) this.set({ endTime: hm }); },
+      onOverallStepFromH: (dir) => this.set({ startTime: this.addHm(st.startTime || '9:00', dir * 60) }),
+      onOverallStepToH: (dir) => this.set({ endTime: this.addHm(st.endTime || '10:00', dir * 60) }),
+      overallSpanText: overallActive ? this.fmtMin(this.timeSpanMin()) : '',
       commitLabel: (timeMode && this.hmToTs(st.endTime) > Date.now())
         ? (isEditFlow ? '予定にへんこう' : '予定を追加')
         : (isEditFlow ? 'へんこうする' : 'きろくする'),
