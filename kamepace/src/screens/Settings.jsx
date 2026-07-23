@@ -40,27 +40,53 @@ export function SlotTimes({ v }) {
 }
 
 /* カテゴリの管理: 表示/非表示トグル＋自作カテゴリの削除 */
+function CatRow({ c, last }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div style={{ borderBottom: last ? 'none' : '1px solid #f1efe8' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', opacity: c.hidden ? 0.55 : 1 }}>
+        <span style={{ ...msIcon(21, c.color), width: 24, textAlign: 'center' }}>{c.icon}</span>
+        <button onClick={() => setOpen(!open)} style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', padding: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>{c.name}
+            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 17, color: '#c9c7bf', verticalAlign: 'middle', marginLeft: 4 }}>{open ? 'expand_less' : 'expand_more'}</span>
+          </div>
+          <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 1 }}>{c.sub}</div>
+        </button>
+        {c.onDelete && (
+          <button onClick={c.onDelete} style={{ border: 'none', background: 'none', fontSize: 12, fontWeight: 700, color: '#b4645a', cursor: 'pointer', flex: '0 0 auto' }}>削除</button>
+        )}
+        <button onClick={c.onToggle} aria-label="カテゴリの表示切替" style={{ width: 44, height: 26, borderRadius: 999, border: 'none', background: c.hidden ? '#e4e1d8' : '#c4f000', position: 'relative', cursor: 'pointer', flex: '0 0 auto' }}>
+          <span style={{ position: 'absolute', top: 3, left: c.hidden ? 3 : 22, width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)' }} />
+        </button>
+      </div>
+      {open && (
+        <div style={{ padding: '2px 12px 10px 40px' }}>
+          {c.acts.length === 0 && <div style={{ fontSize: 11.5, color: '#b4b2a8', padding: '4px 4px 8px' }}>まだ行動がありません。記録画面の「＋にているものをコピーして作る」から追加できます。</div>}
+          {c.acts.map(a => (
+            <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 4px', opacity: a.hidden ? 0.5 : 1 }}>
+              <span style={{ fontSize: 15, flex: '0 0 auto' }}>{a.glyph}</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: '#1b1b18' }}>{a.name}{a.isCustom && <span style={{ fontSize: 9.5, fontWeight: 500, color: '#a5a39a', marginLeft: 6 }}>自作</span>}</span>
+              <button onClick={a.onToggleHidden} style={{ border: '1.5px solid #e4e1d8', background: a.hidden ? '#efece3' : '#fff', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>{a.hidden ? '表示する' : '非表示'}</button>
+              {a.onDelete && (
+                <button onClick={a.onDelete} aria-label="行動を削除" style={{ width: 26, height: 26, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'Material Symbols Rounded', fontSize: 16, color: '#d8b4ba', flex: '0 0 auto', padding: 0 }}>delete</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CatsManage({ v }) {
   return (
-    <Page v={v} title="🏷 カテゴリの管理">
+    <Page v={v} title="🏷 カテゴリ・行動の管理">
       <div style={card}>
         {v.catRows.map((c, i) => (
-          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderBottom: i < v.catRows.length - 1 ? '1px solid #f1efe8' : 'none', opacity: c.hidden ? 0.55 : 1 }}>
-            <span style={{ ...msIcon(21, c.color), width: 24, textAlign: 'center' }}>{c.icon}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{c.name}</div>
-              <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 1 }}>{c.sub}</div>
-            </div>
-            {c.onDelete && (
-              <button onClick={c.onDelete} style={{ border: 'none', background: 'none', fontSize: 12, fontWeight: 700, color: '#b4645a', cursor: 'pointer', flex: '0 0 auto' }}>削除</button>
-            )}
-            <button onClick={c.onToggle} style={{ width: 44, height: 26, borderRadius: 999, border: 'none', background: c.hidden ? '#e4e1d8' : '#c4f000', position: 'relative', cursor: 'pointer', flex: '0 0 auto' }}>
-              <span style={{ position: 'absolute', top: 3, left: c.hidden ? 3 : 22, width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)' }} />
-            </button>
-          </div>
+          <CatRow key={c.id} c={c} last={i === v.catRows.length - 1} />
         ))}
       </div>
-      <div style={{ fontSize: 11, color: '#b4b2a8', margin: '10px 6px 0', lineHeight: 1.7 }}>非表示にしても消えません。検索やこれまでの記録からは引き続き使えます。</div>
+      <div style={{ fontSize: 11, color: '#b4b2a8', margin: '10px 6px 0', lineHeight: 1.7 }}>カテゴリ名をタップすると中の行動を管理できます。非表示にしても消えず、これまでの記録からは引き続き使えます。自作の行動は削除できます。</div>
     </Page>
   );
 }

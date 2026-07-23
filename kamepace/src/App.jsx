@@ -211,7 +211,7 @@ export default class App extends React.Component {
       templates: s.templates, sortMode: s.sortMode, consumed: s.consumed, sampleDay: s.sampleDay,
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
-      prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats,
+      prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
       onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, mainScreen: s.mainScreen,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
@@ -418,7 +418,12 @@ export default class App extends React.Component {
     const fat = p.tasks.reduce((a, t) => a + (t.fat || 0), 0);
     return { min, fat, minText: this.fmtMin(min), fatText: (fat >= 0 ? '+' + fat : '' + fat), metaText: p.tasks.length + '件 · ' + this.fmtMin(min) };
   }
-  searchPool() { return SEARCH_DB.concat(this.state.customActions || []); }
+  /* 非表示にした行動（名前で管理＝カテゴリ側の item と検索側の entry の両方に効く） */
+  hiddenActSet() { return new Set((this.state.hiddenActs || []).map(n => normTitle(n))); }
+  searchPool() {
+    const hidden = this.hiddenActSet();
+    return SEARCH_DB.concat(this.state.customActions || []).filter(e => !hidden.has(normTitle(e.name)));
+  }
   /* 前回つかった時間（行動名ごとに学習）。あれば標準所要時間より優先 */
   lastMinOf(name) {
     const m = (this.state.lastMins || {})[normTitle(name)];
@@ -792,16 +797,19 @@ export default class App extends React.Component {
     this.set(patch);
   };
   /* 検索で見つからないとき: 「にているものをコピーして作る」と同じUI＋大カテゴリ選択で作る */
-  newActSrcList(catId) {
-    const cat = this.allCats().find(c => c.id === catId);
-    // 選んだ大カテゴリの行動をコピー元候補に。空カテゴリなら全行動から選べる
-    const items = (cat && cat.items.length) ? cat.items : this.allItems();
-    return items;
+  newActSrcList() {
+    // コピー元候補は「全カテゴリの行動」から選べる（他のカテゴリの似た行動も参照できる）。
+    // 追加先カテゴリ(newActCatId)とは独立。非表示にした行動は候補から除く。
+    const hidden = this.hiddenActSet();
+    return this.allItems().filter(it => !hidden.has(normTitle(it.name)));
   }
   addNewAction = (kwIndex, name) => {
     const visible = this.allCats().filter(c => !(this.state.hiddenCats || []).includes(c.id));
     const catId = visible[0] ? visible[0].id : null;
-    const src = this.newActSrcList(catId)[0];
+    // コピー元は名前が近いものを初期選択（無ければ先頭）。全カテゴリから選べる。
+    const list = this.newActSrcList();
+    const guess = list.find(it => it.name && name && (it.name.includes(name) || name.includes(it.name)));
+    const src = guess || list[0];
     this.set({
       newActOpen: true, newActKwIndex: kwIndex, newActName: name,
       newActCatId: catId, newActGlyph: 'std',
@@ -811,9 +819,8 @@ export default class App extends React.Component {
   closeNewAct = () => this.set({ newActOpen: false });
   onNewActName = (e) => this.set({ newActName: e.target.value });
   pickNewActCat = (id) => {
-    // 大カテゴリを変えたらコピー元候補もそのカテゴリのものに入れ替える
-    const src = this.newActSrcList(id)[0];
-    this.set({ newActCatId: id, newActSrcId: src ? src.id : null });
+    // 追加先カテゴリを変えるだけ。コピー元(newActSrcId)は全カテゴリ共通なのでそのまま保持する。
+    this.set({ newActCatId: id });
   };
   pickNewActSrc = (id) => this.set({ newActSrcId: id });
   pickNewActGlyph = (g) => this.set({ newActGlyph: g });
@@ -1519,9 +1526,8 @@ export default class App extends React.Component {
     const id = 'cust' + Date.now();
     const color = CAT_COLOR_CHOICES[(this.state.customCats || []).length % CAT_COLOR_CHOICES.length];
     const glyph = this.state.newCatGlyph || '⭐';
-    const cat = { id, icon: this.state.newCatIcon, color, glyph, name, sub: 'じぶんで追加', items: [
-      { id: id + '_a', glyph, icon: this.state.newCatIcon, name, last: '目安 +6/h', fh: 6, body: 3, mind: 3 },
-    ] };
+    // カテゴリ名を冠した行動は自動生成しない（空で作る）。行動は「＋行動を追加」から自分で足す。
+    const cat = { id, icon: this.state.newCatIcon, color, glyph, name, sub: 'じぶんで追加', items: [] };
     this.set({ customCats: [...(this.state.customCats || []), cat], catAddOpen: false, catId: id });
     this.save();
   };
@@ -1529,8 +1535,8 @@ export default class App extends React.Component {
   /* ================= 行動をつくる（コピー式・設計書§2） =================
      コピー元を選ぶ → 「くらべてどう？」（体・心それぞれ5段階）→ 名前・絵文字 → 保存 */
   openActAdd = () => {
-    const cat = this.allCats().find(c => c.id === this.state.catId);
-    const first = cat && cat.items[0];
+    // コピー元の初期選択は全カテゴリの先頭（空カテゴリでも選べる）
+    const first = this.newActSrcList()[0];
     this.set({ actAddOpen: true, actSrcId: first ? first.id : null, actName: '', actGlyph: 'std', actBodyIdx: 2, actMindIdx: 2 });
   };
   closeActAdd = () => this.set({ actAddOpen: false });
@@ -1927,6 +1933,25 @@ export default class App extends React.Component {
     this.set({ customCats: (this.state.customCats || []).filter(c => c.id !== id), customItems });
     this.save();
     this.toast('カテゴリを削除しました');
+  };
+  /* 行動を非表示/表示（名前で管理・組み込みも自作も可・記録や検索からは消えるだけで元データは残る） */
+  toggleActHidden = (name) => {
+    const key = normTitle(name);
+    const cur = this.state.hiddenActs || [];
+    const has = cur.some(n => normTitle(n) === key);
+    this.set({ hiddenActs: has ? cur.filter(n => normTitle(n) !== key) : [...cur, name] });
+    this.save();
+  };
+  /* 自作の行動を完全に削除（customItems の該当カテゴリから id で・検索側 customActions から名前で） */
+  deleteCustomAct = (catId, id, name) => {
+    const customItems = { ...(this.state.customItems || {}) };
+    if (customItems[catId]) customItems[catId] = customItems[catId].filter(it => it.id !== id);
+    const key = normTitle(name || '');
+    const customActions = (this.state.customActions || []).filter(a => normTitle(a.name) !== key);
+    const hiddenActs = (this.state.hiddenActs || []).filter(n => normTitle(n) !== key);
+    this.set({ customItems, customActions, hiddenActs });
+    this.save();
+    this.toast('行動を削除しました');
   };
   deleteTemplate = (key) => {
     const templates = { ...(this.state.templates || {}) };
@@ -3039,8 +3064,9 @@ export default class App extends React.Component {
     const actCat = activeCat;
     const actCalc = st.actAddOpen ? this.actAddCalc() : null;
     const actIsRecover = !!(actCalc && actCalc.recover);
-    const actSrcChoices = (actCat ? actCat.items : []).map(it2 => ({
-      id: it2.id, glyph: it2.glyph, name: it2.name,
+    // コピー元は全カテゴリの行動から選べる（他カテゴリの似た行動も参照できる）。非表示分は除く。
+    const actSrcChoices = (st.actAddOpen ? this.newActSrcList() : []).map(it2 => ({
+      id: it2.id, glyph: it2.glyph, name: it2.name, catName: it2.catId ? (this.allCats().find(c => c.id === it2.catId) || {}).name : '',
       on: st.actSrcId === it2.id,
       onPick: () => this.pickActSrc(it2.id),
     }));
@@ -3059,7 +3085,8 @@ export default class App extends React.Component {
     const newCmpRow = (curIdx, onPick) => COMPARE_STEPS.map((c, i) => ({
       text: newActIsRecoverV ? REC_CMP_LABELS[i] : c.label, on: curIdx === i, onPick: () => onPick(i),
     }));
-    const subItems = (activeCat ? activeCat.items : []).map(t => {
+    const hiddenActs = this.hiddenActSet();
+    const subItems = (activeCat ? activeCat.items.filter(t => !hiddenActs.has(normTitle(t.name))) : []).map(t => {
       const e = st.cart[t.id]; const sel = !!e;
       const lm = this.lastMinOf(t.name);
       const lastText = lm
@@ -3108,13 +3135,24 @@ export default class App extends React.Component {
       onInc: () => this.adjustSlotHour(i, 1),
     }));
     const slotTimesSub = sh.map(x => x).join(' / ');
+    const hiddenActSet = this.hiddenActSet();
+    const customItemsById = st.customItems || {};
     const catRows = this.allCats().map(c => {
       const hidden = hiddenCats.includes(c.id);
       const isCustom = (st.customCats || []).some(x => x.id === c.id);
+      const customIds = new Set((customItemsById[c.id] || []).map(it => it.id));
+      // このカテゴリの行動一覧（非表示トグル＋自作は削除）
+      const acts = c.items.map(it => ({
+        id: it.id, name: it.name, glyph: it.glyph,
+        hidden: hiddenActSet.has(normTitle(it.name)),
+        isCustom: customIds.has(it.id),
+        onToggleHidden: () => this.toggleActHidden(it.name),
+        onDelete: customIds.has(it.id) ? () => this.deleteCustomAct(c.id, it.id, it.name) : null,
+      }));
       return {
         id: c.id, name: c.name, icon: c.icon, color: c.color,
         sub: c.items.length + '件の行動' + (isCustom ? ' ・ じぶんで追加' : ''),
-        hidden, isCustom,
+        hidden, isCustom, acts,
         onToggle: () => this.toggleCatHidden(c.id),
         onDelete: isCustom ? () => this.deleteCustomCat(c.id) : null,
       };
@@ -3338,9 +3376,9 @@ export default class App extends React.Component {
         on: st.newActCatId === c.id, onPick: () => this.pickNewActCat(c.id),
       })),
       newActStdGlyph: (this.allCats().find(c => c.id === st.newActCatId) || {}).glyph || '⭐',
-      // コピー元（にているもの）＝選んだ大カテゴリの行動。比較スライダーで体・心を調整
-      newActSrcChoices: (st.newActOpen ? this.newActSrcList(st.newActCatId) : []).map(it2 => ({
-        id: it2.id, glyph: it2.glyph, name: it2.name,
+      // コピー元（にているもの）＝全カテゴリの行動から選べる（他カテゴリの似た行動も参照可）。比較スライダーで体・心を調整
+      newActSrcChoices: (st.newActOpen ? this.newActSrcList() : []).map(it2 => ({
+        id: it2.id, glyph: it2.glyph, name: it2.name, catName: it2.catId ? (this.allCats().find(c => c.id === it2.catId) || {}).name : '',
         on: st.newActSrcId === it2.id, onPick: () => this.pickNewActSrc(it2.id),
       })),
       newActIsRecover: !!(newActCalc && newActCalc.recover),

@@ -526,7 +526,7 @@ function ActAddPopup({ v }) {
               {v.actSrcChoices.map(sc => (
                 <button key={sc.id} onClick={() => { sc.onPick(); setSrcOpen(false); }} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: sc.on ? '#fbfdf0' : '#fff', border: 'none', borderRadius: 10, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
                   <span style={{ fontSize: 16 }}>{sc.glyph}</span>
-                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: '#1b1b18' }}>{sc.name}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: '#1b1b18' }}>{sc.name}{sc.catName && <span style={{ fontSize: 10.5, fontWeight: 500, color: '#a5a39a', marginLeft: 6 }}>{sc.catName}</span>}</span>
                   {sc.on && <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 17, color: '#7a9a00' }}>check</span>}
                 </button>
               ))}
@@ -620,7 +620,7 @@ function NewActPopup({ v }) {
               {v.newActSrcChoices.map(sc => (
                 <button key={sc.id} onClick={() => { sc.onPick(); setSrcOpen(false); }} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: sc.on ? '#fbfdf0' : '#fff', border: 'none', borderRadius: 10, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
                   <span style={{ fontSize: 16 }}>{sc.glyph}</span>
-                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: '#1b1b18' }}>{sc.name}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: '#1b1b18' }}>{sc.name}{sc.catName && <span style={{ fontSize: 10.5, fontWeight: 500, color: '#a5a39a', marginLeft: 6 }}>{sc.catName}</span>}</span>
                   {sc.on && <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 17, color: '#7a9a00' }}>check</span>}
                 </button>
               ))}
