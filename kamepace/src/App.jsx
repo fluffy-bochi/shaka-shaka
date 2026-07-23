@@ -2086,9 +2086,21 @@ export default class App extends React.Component {
     return pile;
   }
   sleepCount() { this.makeSleepPile(); return this._sleepN; }
+  /* 回復落下が終わったら、ジャイロの閉じた箱（上辺で止める形）に戻す */
+  _scheduleGyroRebuild() {
+    if (!this.state.gyroMode) return;
+    clearTimeout(this._recoverRebuildT);
+    this._recoverRebuildT = setTimeout(() => {
+      if (this.state.gyroMode && this.state.screen === 'shaka') { this._pileLayout = null; this.rebuildPhysics(); }
+    }, 6300);
+  }
   finishSleep = () => {
     const recovered = Math.max(0, this.sleepCount() - this.state.residual);
     if (recovered <= 0) { this.set({ screen: 'home' }); return; }
+    // 回復の🌙が落下中は、ジャイロ（傾き）でも重力を真下に固定する（横に流れて山に当たらず消えないのを防ぐ）
+    this._recoverUntil = Date.now() + 6000;
+    if (this.engine) { this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2; }
+    this._scheduleGyroRebuild();
     // 他の回復と同じ: 🌙をシャカに降らせて、プラスの絵文字に触れたぶんだけ消す
     // （consumed・ためた回復への加算は衝突時に行われる）。多いときは複数回に分けて降らす
     this._pendingNeg = [...(this._pendingNeg || []), ...Array.from({ length: Math.min(recovered, 160) }, () => '🌙')];
@@ -2256,7 +2268,9 @@ export default class App extends React.Component {
     const t = 120;
     // ジャイロ（傾き）モードは上辺でも絵文字を止める＝画面ぴったりの閉じた箱（蓋を画面上端に）。
     // 通常モードは画面上へあふれてよいので蓋を画面外の上に置く。
-    const over = this.state.gyroMode ? 0 : H * 0.75;
+    // ただし回復（睡眠含む）の落下中は、🌙が画面の上から落ちて山に届くよう、ジャイロでも開いた箱にする。
+    const recovering = Date.now() < (this._recoverUntil || 0);
+    const over = (this.state.gyroMode && !recovering) ? 0 : H * 0.75;
     const lidY = -over;               // 蓋の位置（通常=画面外・上／ジャイロ=画面上端）
     this._lidY = lidY;
     const wallCy = (H + lidY) / 2, wallH = (H - lidY) + t * 2;
@@ -2460,6 +2474,9 @@ export default class App extends React.Component {
       this._pendingNeg = [...(this._pendingNeg || []), ...glyphs];
       return;
     }
+    // 回復落下中は傾き(ジャイロ)を無視して重力を真下に固定
+    this._recoverUntil = Date.now() + 6000;
+    if (this.state.gyroMode) { this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2; this._scheduleGyroRebuild(); }
     const { World, Bodies } = Matter;
     const rect = el.getBoundingClientRect();
     const W = rect.width || 350, H = rect.height || 700, r = this.PR;
@@ -2612,6 +2629,12 @@ export default class App extends React.Component {
   _onDeviceMotion = (event) => {
     // ジャイロ（傾き）モード: 実世界の下方向へ重力を向ける。逆さにすると上辺側へ絵文字が集まる。
     if (this.state.gyroMode && this.engine && this.state.screen === 'shaka') {
+      // 回復（睡眠含む）の🌙が落下中は傾きを無視して重力を真下に固定（回復が確実に消費されるように）
+      if (Date.now() < (this._recoverUntil || 0)) {
+        this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2;
+        if (!this._running) this.resumeMotion();
+        return;
+      }
       const ag = event.accelerationIncludingGravity;
       if (ag && ag.x != null) {
         const clamp = (v) => Math.max(-1, Math.min(1, v));
