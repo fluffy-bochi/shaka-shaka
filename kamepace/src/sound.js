@@ -21,8 +21,8 @@ function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 let lastShakaPlay = 0;
 
 /* ========== iOS: HTMLAudio 版（確実に鳴る・頻度を絞って軽く） ========== */
-const HTML_POOL_SIZE = 6;
-const HTML_COOLDOWN = 120;       // iOSの play() は重いので広め＝発音回数を減らす
+const HTML_POOL_SIZE = 4;
+const HTML_COOLDOWN = 200;       // iOSの play() は重いので広め＝発音回数を減らす（重さ対策で更に間引き）
 const htmlPool = [];
 let htmlIdx = 0, htmlUnlocked = false;
 
