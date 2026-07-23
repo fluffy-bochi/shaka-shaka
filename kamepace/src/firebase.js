@@ -144,9 +144,15 @@ export async function fetchDailyTasks(days = 8) {
     const key = ymd(d);
     reads.push(getDoc(doc(db, 'users', uid, 'dailyData', key)).then((snap) => {
       if (!snap.exists()) return;
-      (snap.data().tasks || []).forEach((t) => {
+      const data = snap.data() || {};
+      // mylifecore は毎日ページのメインのタスクを taskList に、終日予定由来を tasks に入れる。両方読む。
+      const arr = [...(data.taskList || []), ...(data.tasks || [])];
+      const seen = new Set();
+      arr.forEach((t) => {
         if (!t || !t.title) return;
-        out.push({ srcId: 'daily:' + key + ':' + (t.id || t.title), title: t.title, date: key, done: !!t.completed });
+        const id = t.id || t.title;
+        if (seen.has(id)) return; seen.add(id);
+        out.push({ srcId: 'daily:' + key + ':' + id, title: t.title, date: key, done: !!t.completed });
       });
     }).catch(() => { /* その日のdocが無い等は無視 */ }));
   }
@@ -160,8 +166,16 @@ export async function completeDailyTask(dateKey, taskId) {
   const ref = doc(db, 'users', auth.currentUser.uid, 'dailyData', dateKey);
   const snap = await getDoc(ref);
   if (!snap.exists()) return;
-  const tasks = (snap.data().tasks || []).map((t) => (t.id === taskId ? { ...t, completed: true } : t));
-  await setDoc(ref, { tasks }, { merge: true });
+  const data = snap.data() || {};
+  const patch = {};
+  // taskList / tasks のどちらに入っていても完了にする（mylifecore はメインを taskList に保存）
+  if ((data.taskList || []).some((t) => t.id === taskId)) {
+    patch.taskList = data.taskList.map((t) => (t.id === taskId ? { ...t, completed: true } : t));
+  }
+  if ((data.tasks || []).some((t) => t.id === taskId)) {
+    patch.tasks = data.tasks.map((t) => (t.id === taskId ? { ...t, completed: true } : t));
+  }
+  if (Object.keys(patch).length) await setDoc(ref, patch, { merge: true });
 }
 
 /* かめペースでチェックしたら mylifecore 側のタスクも完了にする */
