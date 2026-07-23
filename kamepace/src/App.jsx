@@ -2612,9 +2612,10 @@ export default class App extends React.Component {
       if (ag && ag.x != null) {
         const clamp = (v) => Math.max(-1, Math.min(1, v));
         const G = 1.4;
-        // iOSとAndroidで y の符号が逆。iOS: 上向きが正でag.y≈-9.8(上up時) → 下向き重力に。
+        // iOSとAndroidで加速度の符号が逆（全軸）。iOSは反転する。左右(x)も上下(y)と同じ補正。
+        const xGrav = IS_IOS_DEVICE ? -ag.x : ag.x;
         const yGrav = IS_IOS_DEVICE ? -ag.y : ag.y;
-        const gx = clamp((ag.x || 0) / 9.8) * G;
+        const gx = clamp((xGrav || 0) / 9.8) * G;
         const gy = clamp((yGrav || 0) / 9.8) * G;
         const prev = this._gyroGrav || { x: 0, y: G };
         this.engine.world.gravity.x = gx;
