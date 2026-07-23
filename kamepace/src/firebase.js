@@ -109,18 +109,25 @@ export async function fetchScheduleEvents(dayCount = 2) {
   return out;
 }
 
-/* mylifecore のタスク（projectTasks）: 未完了で「今日やる(assignedDate=今日)」or 締切が今日のもの。
-   前日以前のもの（期限切れ）は取り込まない */
-export async function fetchScheduleTasks() {
+/* mylifecore のタスク（projectTasks）: 未完了で日付が紐づいているもの（assignedDate or 締切）を
+   今日〜+7日ぶん取り込む。各タスクにその日付(date)を付けるので、かめペース側でも日付ごとに表示される。
+   前日以前（期限切れ）は取り込まない。 */
+export async function fetchScheduleTasks(days = 8) {
   if (!auth.currentUser) return [];
-  const today = ymd(new Date());
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const horizon = new Date(start); horizon.setDate(horizon.getDate() + days - 1);
+  const t0 = ymd(start), tH = ymd(horizon);
   const col = collection(db, 'users', auth.currentUser.uid, 'projectTasks');
   const snap = await getDocs(query(col, where('completed', '==', false)));
   const out = [];
   snap.forEach((d) => {
     const t = d.data();
     const dl = tsToDate(t.deadline);
-    if (t.assignedDate === today || (dl && ymd(dl) === today)) out.push({ srcId: 'ptask:' + d.id, title: t.title || '(無題のタスク)' });
+    const dlKey = dl ? ymd(dl) : null;
+    // 紐づく日付＝assignedDate を優先、無ければ締切。今日〜horizon の範囲のものだけ取り込む。
+    const dateKey = (t.assignedDate && t.assignedDate >= t0 && t.assignedDate <= tH) ? t.assignedDate
+      : (dlKey && dlKey >= t0 && dlKey <= tH) ? dlKey : null;
+    if (dateKey) out.push({ srcId: 'ptask:' + d.id, title: t.title || '(無題のタスク)', date: dateKey });
   });
   return out;
 }
