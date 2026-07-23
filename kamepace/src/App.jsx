@@ -2535,11 +2535,14 @@ export default class App extends React.Component {
     if (hits) {
       const now = Date.now();
       const add = collectedAdd.map(g => ({ act: EMOJI_ACT[g] || '', glyph: g, amount: 1, ts: now }));
-      this.set({
-        collected: [...this.state.collected, ...add],
+      const cap = this.pilePositiveTotal();
+      // 関数型 setState で確実に累積する。毎フレーム呼ばれるため this.state を直接読むと
+      // 非同期バッチで古い値のまま上書きされ、消したぶん(consumed)が数個しか永続化されない不具合になる。
+      this.setState(prev => ({
+        collected: [...(prev.collected || []), ...add],
         // マイナスで消したぶんを永続化（山を再構築しても戻らないように）
-        consumed: Math.min((this.state.consumed || 0) + hits, this.pilePositiveTotal()),
-      });
+        consumed: Math.min((prev.consumed || 0) + hits, cap),
+      }));
       this.save();
     }
   }
