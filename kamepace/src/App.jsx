@@ -37,6 +37,12 @@ import Cycle from './screens/Cycle';
 import Bookshelf from './screens/Bookshelf';
 import { buildAcademicYear, academicYearOf } from './sample';
 
+// iOSとAndroidで加速度センサーの符号が違うため、傾き（ジャイロ）重力の向き補正に使う
+const IS_IOS_DEVICE = typeof navigator !== 'undefined' && (
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+);
+
 export default class App extends React.Component {
   state = {
     screen: 'shaka',
@@ -84,6 +90,8 @@ export default class App extends React.Component {
     startTime: '',
     endTime: '',
     homeMotion: (() => { try { return localStorage.getItem('shaka_home_motion') === '1'; } catch (e) { return false; } })(),
+    // シャカの動かし方: false=加速度センサー（振る）／true=ジャイロ（傾き＝逆さで上辺に集まる）
+    gyroMode: (() => { try { return localStorage.getItem('shaka_gyro_mode') === '1'; } catch (e) { return false; } })(),
     slotMenuOpen: false,
     /* ---- auth ---- */
     /* ---- 記録の編集（確認画面フローで置き換える対象の entries インデックス） ---- */
@@ -1461,7 +1469,7 @@ export default class App extends React.Component {
 
   /* ================= navigation ================= */
   goHome = () => this.set({ screen: 'home' });
-  goShaka = () => { this.set({ screen: 'shaka' }); requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el && !this.engine) this.startPhysics(el); }); };
+  goShaka = () => { this.set({ screen: 'shaka' }); if (this.state.gyroMode) this.enableMotion(); requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el && !this.engine) this.startPhysics(el); }); };
   goRecordNow = () => this.openRecord(this.slotNow());
   setMainScreen = (v) => { this.set({ mainScreen: v }); this.save(); };
   goMypage = () => this.set({ screen: 'mypage' });
@@ -2312,7 +2320,7 @@ export default class App extends React.Component {
     }
     // 固定モードなら落下が落ち着いてから演算を止める（絵文字は積もったまま静止）
     clearTimeout(this._settleT);
-    if (!this.state.homeMotion) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
+    if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
   }
   _startLoop() {
     this._phys = true;
@@ -2340,7 +2348,7 @@ export default class App extends React.Component {
   /* 固定モードの停止判定: マイナス絵文字が残っている間・まだ動いている絵文字がある間は止めない
      （振りすぎたとき空中で固まらないように、静止を確認してから凍結する） */
   _maybeFreeze(tries = 0) {
-    if (this.state.homeMotion) return;
+    if (this.state.homeMotion || this.state.gyroMode) return; // ジャイロ中は傾きに追従するため止めない
     if ((this.negBodies || []).some(n => !n.consumed)) {
       this._settleT = setTimeout(() => this._maybeFreeze(), 1000);
       return;
@@ -2418,7 +2426,7 @@ export default class App extends React.Component {
       this.bodies.push({ body, el: d, glyph: g });
     });
     clearTimeout(this._settleT);
-    if (!this.state.homeMotion) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
+    if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
   }
   /* ---- マイナス（回復）絵文字: 降らせて、プラスに触れたら両方消して「ためた回復」へ ---- */
   dropNegativeBodies(glyphs) {
@@ -2460,7 +2468,7 @@ export default class App extends React.Component {
       }, 30000);
     });
     clearTimeout(this._settleT);
-    if (!this.state.homeMotion) this._settleT = setTimeout(() => this._maybeFreeze(), 2500);
+    if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2500);
   }
   /* 距離判定: マイナスがプラスに触れたら両方消して collected へ・consumed を加算（旧本番と同一挙動） */
   checkNegativeCollisions() {
@@ -2534,7 +2542,7 @@ export default class App extends React.Component {
       Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.4);
     });
     clearTimeout(this._settleT);
-    if (!this.state.homeMotion) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
+    if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
   }
   shake = () => {
     if (!this.bodies) return;
@@ -2561,7 +2569,34 @@ export default class App extends React.Component {
       attach();
     }
   }
+  /* シャカの動かし方を切替（加速度＝振る／ジャイロ＝傾きで重力の向きが変わる） */
+  setGyroMode = (on) => {
+    if (this.state.gyroMode === on) return;
+    this.set({ gyroMode: on });
+    try { localStorage.setItem('shaka_gyro_mode', on ? '1' : '0'); } catch (e) { /* ignore */ }
+    if (this.state.screen === 'shaka' && this.engine) {
+      if (on) { clearTimeout(this._settleT); this.resumeMotion(); } // 傾きに追従するため動かし続ける
+      else { this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2; } // 通常の下向きに戻す
+    }
+    this.enableMotion(); // センサー未許可なら許可を促す
+  };
   _onDeviceMotion = (event) => {
+    // ジャイロ（傾き）モード: 実世界の下方向へ重力を向ける。逆さにすると上辺側へ絵文字が集まる。
+    if (this.state.gyroMode && this.engine && this.state.screen === 'shaka') {
+      const ag = event.accelerationIncludingGravity;
+      if (ag && ag.x != null) {
+        const clamp = (v) => Math.max(-1, Math.min(1, v));
+        const G = 1.4;
+        // iOSとAndroidで y の符号が逆。iOS: 上向きが正でag.y≈-9.8(上up時) → 下向き重力に。
+        const yGrav = IS_IOS_DEVICE ? -ag.y : ag.y;
+        this.engine.world.gravity.x = clamp((ag.x || 0) / 9.8) * G;
+        this.engine.world.gravity.y = clamp((yGrav || 0) / 9.8) * G;
+        if (!this._running) this.resumeMotion();
+      }
+      this._lastMotion = { x: event.acceleration ? event.acceleration.x : 0, y: 0, z: 0 };
+      return; // 傾きモード中は「振り」検出はしない
+    }
+    // 加速度（振る）モード: 従来どおり、大きく振ったらシャッフル
     const a = event.acceleration || event.accelerationIncludingGravity;
     if (!a || a.x == null) return;
     const lm = this._lastMotion;
@@ -3361,6 +3396,10 @@ export default class App extends React.Component {
       mainScreen: st.mainScreen || 'shaka', setMainShaka: () => this.setMainScreen('shaka'), setMainHome: () => this.setMainScreen('home'),
       motionFixedBg: st.homeMotion ? '#fff' : '#1b1b18', motionFixedColor: st.homeMotion ? '#8a8a82' : '#fff',
       motionMoveBg: st.homeMotion ? '#1b1b18' : '#fff', motionMoveColor: st.homeMotion ? '#fff' : '#8a8a82',
+      // シャカの動かし方: 加速度（振る）／ジャイロ（傾き）
+      gyroMode: st.gyroMode, setSensorAccel: () => this.setGyroMode(false), setSensorGyro: () => this.setGyroMode(true),
+      sensorAccelBg: st.gyroMode ? '#fff' : '#1b1b18', sensorAccelColor: st.gyroMode ? '#8a8a82' : '#fff',
+      sensorGyroBg: st.gyroMode ? '#1b1b18' : '#fff', sensorGyroColor: st.gyroMode ? '#fff' : '#8a8a82',
       sampleMode: !!st.sampleMode, toggleSample: this.toggleSample,
       sampleCycleOn: st.sampleCycleOn !== false, toggleSampleCycle: this.toggleSampleCycle,
       addTotalM1: () => this.addTotal(-1), addTotalP1: () => this.addTotal(1), addTotalM10: () => this.addTotal(-10), addTotalP10: () => this.addTotal(10),
