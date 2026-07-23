@@ -285,11 +285,11 @@ function Confirm({ v }) {
               <button onClick={v.setTimeMode} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.timeTabBg, color: v.timeTabColor }}>時刻</button>
             </div>
           </div>
-          {/* 全体の時間（取り込み予定＝枠。勝手に変わらない・手動で変更可） */}
+          {/* 全体の時間（取り込み予定＝枠。手動で変更可） */}
           {v.hasOverallTime && (
-            <div style={{ marginTop: 12, background: '#f7f9ee', border: '1.5px solid #e4eec2', borderRadius: 12, padding: '10px 12px' }}>
+            <div style={{ marginTop: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#5a7500' }}>予定の全体の時間</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#55554e' }}>予定の全体の時間</span>
                 <span style={{ ...mono, fontSize: 11, color: '#8a8a82' }}>{v.overallSpanText}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
@@ -301,7 +301,6 @@ function Confirm({ v }) {
                 <input type="time" value={v.overallToHm} onChange={(e) => e.target.value && v.onOverallTo(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
                 <HourStep dir={1} onClick={() => v.onOverallStepToH(1)} />
               </div>
-              <div style={{ fontSize: 10.5, color: '#8a9a6a', marginTop: 6, lineHeight: 1.5 }}>{v.isDurationMode ? 'この時間の中で行動を分けます。中が埋まっていなくても全体の時刻は変わりません。' : '行動ごとに時刻を決めます。全体の時刻は自動では変わりません（手動で変更できます）。'}</div>
             </div>
           )}
           {v.isDurationMode && !v.hasOverallTime && (

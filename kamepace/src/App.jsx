@@ -2254,8 +2254,10 @@ export default class App extends React.Component {
     // 上に「蓋」つきの閉じた箱。絵文字は画面の少し上まであふれるが、蓋で止まって外へ飛び出さない。
     // 満杯になると蓋との間でギチギチに詰まって動かなくなる。
     const t = 120;
-    const over = H * 0.75;            // 画面上端より上へあふれてよい高さ（この上に蓋）
-    const lidY = -over;               // 蓋の位置（画面外・上）
+    // ジャイロ（傾き）モードは上辺でも絵文字を止める＝画面ぴったりの閉じた箱（蓋を画面上端に）。
+    // 通常モードは画面上へあふれてよいので蓋を画面外の上に置く。
+    const over = this.state.gyroMode ? 0 : H * 0.75;
+    const lidY = -over;               // 蓋の位置（通常=画面外・上／ジャイロ=画面上端）
     this._lidY = lidY;
     const wallCy = (H + lidY) / 2, wallH = (H - lidY) + t * 2;
     World.add(this.engine.world, [
@@ -2594,11 +2596,14 @@ export default class App extends React.Component {
     if (this.state.gyroMode === on) return;
     this.set({ gyroMode: on });
     try { localStorage.setItem('shaka_gyro_mode', on ? '1' : '0'); } catch (e) { /* ignore */ }
-    if (this.state.screen === 'shaka' && this.engine) {
-      if (on) { clearTimeout(this._settleT); this.resumeMotion(); } // 傾きに追従するため動かし続ける
-      else { this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2; } // 通常の下向きに戻す
+    if (this.state.screen === 'shaka') {
+      // 箱の形（蓋の位置）がモードで変わるので作り直す。ジャイロ中は傾きに追従して動かし続ける。
+      this._pileLayout = null;
+      this.rebuildPhysics();
+      if (on) setTimeout(() => { clearTimeout(this._settleT); this.resumeMotion(); }, 60);
+      else if (this.engine) { this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2; }
     }
-    this.enableMotion(); // センサー未許可なら許可を促す
+    if (on) this.enableMotion(); // センサー未許可なら許可を促す
   };
   _onDeviceMotion = (event) => {
     // ジャイロ（傾き）モード: 実世界の下方向へ重力を向ける。逆さにすると上辺側へ絵文字が集まる。
@@ -2609,8 +2614,16 @@ export default class App extends React.Component {
         const G = 1.4;
         // iOSとAndroidで y の符号が逆。iOS: 上向きが正でag.y≈-9.8(上up時) → 下向き重力に。
         const yGrav = IS_IOS_DEVICE ? -ag.y : ag.y;
-        this.engine.world.gravity.x = clamp((ag.x || 0) / 9.8) * G;
-        this.engine.world.gravity.y = clamp((yGrav || 0) / 9.8) * G;
+        const gx = clamp((ag.x || 0) / 9.8) * G;
+        const gy = clamp((yGrav || 0) / 9.8) * G;
+        const prev = this._gyroGrav || { x: 0, y: G };
+        this.engine.world.gravity.x = gx;
+        this.engine.world.gravity.y = gy;
+        // 重力の向きが変わっても寝ている絵文字は自動では起きないので、変化があれば起こす
+        if (Math.abs(gx - prev.x) + Math.abs(gy - prev.y) > 0.08) {
+          (this.bodies || []).forEach(({ body }) => { if (body.isSleeping) Matter.Sleeping.set(body, false); });
+        }
+        this._gyroGrav = { x: gx, y: gy };
         if (!this._running) this.resumeMotion();
       }
       this._lastMotion = { x: event.acceleration ? event.acceleration.x : 0, y: 0, z: 0 };
