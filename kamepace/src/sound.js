@@ -1,20 +1,39 @@
-/* シャカシャカ効果音（Web Audio 版・iOSノイズ対策済み）。
-   重さ対策で Web Audio を採用（HTMLAudio の play() 連打は iOS でメインスレッドを詰まらせる）。
-   iOS Safari で音が「砂ノイズ」になる問題は、AudioContext をページ読み込み時に生成していたのが原因。
-   → AudioContext は「最初のユーザー操作の中で」生成する（howler.js 等と同じ回避策）。 */
+/* シャカシャカ効果音。
+   iOS実機での切り分け結果:
+     - HTMLAudio … 音は正しいが play() 連打でメインスレッドが重い
+     - Web Audio  … 軽いが iOS で「砂ノイズ」or「無音」になり安定しない（Androidは完璧）
+   → プラットフォームで分ける:
+     - Android等 … Web Audio（軽い＋正しい）
+     - iOS(Safari) … HTMLAudio（確実に鳴る）＋クールダウンを広げて play() 回数を減らし軽く保つ */
 import Matter from 'matter-js';
 
 const SHAKA_MIN_SPEED = 4.2;     // この相対速度未満の接触は鳴らさない
-const SHAKA_COOLDOWN = 45;       // 連続発音の最小間隔(ms)
-const SHAKA_MAX_CONCURRENT = 5;  // 同時に鳴らす最大数
+const SRC = '/sound/syakasyaka.mp3';
 
-let ctx = null, buffer = null, masterGain = null;
-let lastShakaPlay = 0, liveCount = 0, listenersAdded = false;
+// iOS(iPadOSはMac扱いになるのでタッチ数でも判定)
+const IS_IOS = typeof navigator !== 'undefined' && (
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+);
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
-/* 初回ユーザー操作の中で呼ぶ: ここで AudioContext を生成・解錠・デコード開始する（iOSのノイズ対策の要）。 */
-function ensureContext() {
+let lastShakaPlay = 0;
+
+/* ========== iOS: HTMLAudio 版（確実に鳴る・頻度を絞って軽く） ========== */
+const HTML_POOL_SIZE = 6;
+const HTML_COOLDOWN = 120;       // iOSの play() は重いので広め＝発音回数を減らす
+const htmlPool = [];
+let htmlIdx = 0, htmlUnlocked = false;
+
+/* ========== 他: Web Audio 版（軽い・AudioContextは初回操作の中で生成） ========== */
+const WA_COOLDOWN = 45;
+const WA_MAX_CONCURRENT = 5;
+let ctx = null, buffer = null, masterGain = null, liveCount = 0;
+
+let listenersAdded = false;
+
+function ensureContext() { // Web Audio: 初回ユーザー操作の中で生成（iOS配慮の作法・Androidでも安全）
   if (ctx) { if (ctx.state !== 'running') ctx.resume().catch(() => {}); return; }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
@@ -22,46 +41,57 @@ function ensureContext() {
   masterGain = ctx.createGain();
   masterGain.gain.value = 1;
   masterGain.connect(ctx.destination);
-  // ウォームアップ: コンテキストのサンプルレートで無音1サンプルを鳴らして完全解錠
-  try {
-    const b = ctx.createBufferSource();
-    b.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
-    b.connect(ctx.destination);
-    b.start(0);
-  } catch (e) { /* ignore */ }
-  // 音源を取得してデコード（コールバック形＝古いiOSでも動く）
-  fetch('/sound/syakasyaka.mp3')
-    .then(r => r.arrayBuffer())
+  fetch(SRC).then(r => r.arrayBuffer())
     .then(ab => new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)))
     .then(buf => { buffer = buf; })
-    .catch(() => { /* 取得失敗時は無音でよい */ });
+    .catch(() => {});
 }
 
 export function initShakaSound() {
   if (listenersAdded) return;
   listenersAdded = true;
-  // AudioContext は「最初の操作の中」で作る。once にせず、状態が眠ったら起こし直せるようにする。
-  const onGesture = () => ensureContext();
-  window.addEventListener('pointerdown', onGesture, { once: false });
-  window.addEventListener('touchstart', onGesture, { once: false });
-  window.addEventListener('mousedown', onGesture, { once: false });
-  window.addEventListener('keydown', onGesture, { once: false });
+  if (IS_IOS) {
+    for (let i = 0; i < HTML_POOL_SIZE; i++) {
+      const a = new Audio(SRC); a.preload = 'auto'; a.volume = 0; htmlPool.push(a);
+    }
+    const unlock = () => {
+      if (htmlUnlocked) return;
+      htmlUnlocked = true;
+      htmlPool.forEach(a => { a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {}); });
+    };
+    window.addEventListener('pointerdown', unlock, { once: false });
+    window.addEventListener('touchstart', unlock, { once: false });
+  } else {
+    const onGesture = () => ensureContext();
+    window.addEventListener('pointerdown', onGesture, { once: false });
+    window.addEventListener('touchstart', onGesture, { once: false });
+    window.addEventListener('mousedown', onGesture, { once: false });
+    window.addEventListener('keydown', onGesture, { once: false });
+  }
 }
 
 export function playShaka(speed) {
-  // まだ用意できていなければ鳴らさない（AudioContext の生成はユーザー操作の中でだけ行う）
+  const now = performance.now();
+  const cooldown = IS_IOS ? HTML_COOLDOWN : WA_COOLDOWN;
+  if (now - lastShakaPlay < cooldown) return;
+  const v = clamp((speed - SHAKA_MIN_SPEED) / 14, 0.15, 1);
+
+  if (IS_IOS) {
+    if (!htmlPool.length) return;
+    lastShakaPlay = now;
+    const a = htmlPool[htmlIdx];
+    htmlIdx = (htmlIdx + 1) % HTML_POOL_SIZE;
+    try { a.volume = v; a.currentTime = 0; const p = a.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ }
+    return;
+  }
+  // Web Audio
   if (!ctx || !buffer) return;
   if (ctx.state !== 'running') ctx.resume().catch(() => {});
-  const now = performance.now();
-  if (now - lastShakaPlay < SHAKA_COOLDOWN) return;
   lastShakaPlay = now;
-  if (liveCount >= SHAKA_MAX_CONCURRENT) return;
-  const v = clamp((speed - SHAKA_MIN_SPEED) / 14, 0.15, 1);
+  if (liveCount >= WA_MAX_CONCURRENT) return;
   try {
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
-    const g = ctx.createGain();
-    g.gain.value = v;
+    const src = ctx.createBufferSource(); src.buffer = buffer;
+    const g = ctx.createGain(); g.gain.value = v;
     src.connect(g); g.connect(masterGain);
     liveCount++;
     src.onended = () => { liveCount--; try { src.disconnect(); g.disconnect(); } catch (e) { /* ignore */ } };
@@ -69,8 +99,7 @@ export function playShaka(speed) {
   } catch (e) { /* ignore */ }
 }
 
-/* 絵文字どうしが「ぶつかった瞬間」だけ鳴らす。collisionStart は新規接触時のみ発火。
-   1イベントにつき最大1回（最速のペアで代表）＝ループも軽く保つ */
+/* 絵文字どうしが「ぶつかった瞬間」だけ鳴らす。1イベント最大1回。 */
 export function attachCollisionSound(engine) {
   Matter.Events.on(engine, 'collisionStart', (ev) => {
     let best = 0;
@@ -80,7 +109,7 @@ export function attachCollisionSound(engine) {
       if (a.isStatic || b.isStatic) continue;
       const dvx = a.velocity.x - b.velocity.x;
       const dvy = a.velocity.y - b.velocity.y;
-      const s = dvx * dvx + dvy * dvy; // sqrt は最後に1回だけ
+      const s = dvx * dvx + dvy * dvy;
       if (s > best) best = s;
     }
     if (best >= SHAKA_MIN_SPEED * SHAKA_MIN_SPEED) playShaka(Math.sqrt(best));
