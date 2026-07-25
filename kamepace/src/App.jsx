@@ -2366,7 +2366,13 @@ export default class App extends React.Component {
     // 保留中のマイナス絵文字（回復記録・予定の進行分）を降らせる
     if (this._pendingNeg && this._pendingNeg.length) {
       const pend = this._pendingNeg.splice(0);
-      this.dropNegativeBodies(pend);
+      // 山を積み直した直後は、まだ落ち着いていない山を🌙がすり抜けて消費されない。
+      // 山が落ち着くのを待ってから降らせる（記録画面から回復を記録したときに1個しか消えない不具合の対策）。
+      clearTimeout(this._negDropT);
+      this._negDropT = setTimeout(() => {
+        if (this.engine && this.state.screen === 'shaka') this.dropNegativeBodies(pend);
+        else this._pendingNeg = [...pend, ...(this._pendingNeg || [])]; // 画面を離れていたら次に降らせる
+      }, 850);
     }
     // 固定モードなら落下が落ち着いてから演算を止める（絵文字は積もったまま静止）
     clearTimeout(this._settleT);
