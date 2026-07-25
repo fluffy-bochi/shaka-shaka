@@ -495,6 +495,11 @@ export default class App extends React.Component {
     }
     return base * m;
   }
+  /* 行動の疲労/回復（分ぶん）。四捨五入で0になっても最低±1にする（記録する行動は必ず±1以上）。 */
+  effFat(item, min) {
+    const r = Math.round(this.effFh(item) * (min / 60));
+    return r || (this.effFh(item) < 0 ? -1 : 1);
+  }
   /* ===== 月経周期（cycle: {last, cycleLen, periodLen, preMult:{bodyFat,mindFat}, periodMult:{...}, preDays}） ===== */
   cyclePhase() {
     const c = this.state.cycle;
@@ -1065,7 +1070,7 @@ export default class App extends React.Component {
       .reduce((a, e) => a + entryMin(e), 0);
     const learnMin = [];
     const mkEntry = (t, min, fromHm, toHm, planned, taskKey) => {
-      const fat = Math.round(this.effFh(t) * (min / 60));
+      const fat = this.effFat(t, min);
       const e = { ...baseEntry(t.name, fat, recDate), glyph: t.glyph, min, _new: true };
       if (this.state.framePlan) e.plan = this.state.framePlan; else if (t.plan) e.plan = t.plan;
       if (t.after) e.after = Math.round(t.after * (min / 60));
@@ -1230,7 +1235,7 @@ export default class App extends React.Component {
     const totalMin = timeMode ? this.timeSpanMin() : (this.state.searchTotalMin || (n * 30));
     const mins = fr.map(f => Math.max(1, Math.round(f * totalMin)));
     const d = totalMin - mins.reduce((a, b) => a + b, 0); mins[n - 1] = Math.max(1, mins[n - 1] + d);
-    const tasks = items.map((t, i) => ({ name: t.name, glyph: t.glyph, min: mins[i], fat: Math.round(this.effFh(t) * (mins[i] / 60)) }));
+    const tasks = items.map((t, i) => ({ name: t.name, glyph: t.glyph, min: mins[i], fat: this.effFat(t, mins[i]) }));
     const templates = { ...(this.state.templates || {}) };
     templates[k] = { act: guessAct(name) || '', delta: tasks.reduce((a, t) => a + t.fat, 0), tasks };
     this.set({ templates, tplOpen: false });
@@ -2994,7 +2999,7 @@ export default class App extends React.Component {
           const last = k === tmpl.tasks.length - 1;
           const min = Math.max(1, last ? spanMin - cursorMin : Math.round(spanMin * (task.min || 30) / tmplTotal));
           const fh = task.min ? (task.fat * 60 / task.min) : (task.fat || 0);
-          const delta = Math.round(fh * min / 60);
+          const delta = Math.round(fh * min / 60) || (fh < 0 ? -1 : 1); // 四捨五入で0でも最低±1
           const e = {
             from: this.addHm(from, cursorMin), to: this.addHm(from, cursorMin + min),
             title: task.name, act: guessAct(task.name) || tmpl.act || '', mood: '🙂',
@@ -3115,7 +3120,7 @@ export default class App extends React.Component {
     // 各行動の分: 時刻モードは range 合計、所要時間モードは配分
     const itemMinAt = (it, idx) => timeMode ? ((it.ranges || []).reduce((a, r) => a + this.rangeMin(r), 0) || it.defMin || 30) : mins[idx];
     const searchCartRows = scItems.map((it, idx) => {
-      const fat = Math.round(this.effFh(it) * (itemMinAt(it, idx) / 60));
+      const fat = this.effFat(it, itemMinAt(it, idx));
       return {
         id: it.id, name: it.name, glyph: it.glyph,
         intensityText: this.intensitySummary(it) || '強度',
@@ -3127,7 +3132,7 @@ export default class App extends React.Component {
     let segCursor = 0;
     const allocSegs = scItems.map((it, idx) => {
       const min = itemMinAt(it, idx);
-      const fat = Math.round(this.effFh(it) * (min / 60));
+      const fat = this.effFat(it, min);
       let widthPct = (fr0[idx] * 100) + '%';
       // 時刻モード: 各行動が持つ独立した時間範囲（複数可）
       const ranges = timeMode ? (it.ranges && it.ranges.length ? it.ranges : [{ from: st.startTime, to: this.addHm(st.startTime, it.defMin || 30) }]).map((r, ri) => ({
@@ -3150,14 +3155,14 @@ export default class App extends React.Component {
     // 配分つまみ（つまみドラッグ）は所要時間モードのみ
     const allocHandles = [];
     if (!timeMode) { let cum = 0; for (let k = 0; k < scCount - 1; k++) { cum += fr0[k]; allocHandles.push({ leftPct: (cum * 100) + '%', onDrag: this.onFracDrag(k) }); } }
-    const searchTotalFat = scItems.reduce((a, it, idx) => a + Math.round(this.effFh(it) * (itemMinAt(it, idx) / 60)), 0);
+    const searchTotalFat = scItems.reduce((a, it, idx) => a + this.effFat(it, itemMinAt(it, idx)), 0);
     const searchTotalMinAll = scItems.reduce((a, it, idx) => a + itemMinAt(it, idx), 0);
     const intItem = st.intensityId ? scItems.find(x => x.id === st.intensityId) : null;
     const intQuestions = intItem ? this.intensityQuestions(intItem).map((q, qi) => ({
       label: q.label,
       opts: q.opts.map((o, oi) => { const on = (intItem.picks || [])[qi] === oi; return { text: o, onPick: () => this.setIntensityPick(qi, oi), border: on ? '#1b1b18' : '#e4e1d8', bg: on ? '#fbfdf0' : '#fff', color: on ? '#1b1b18' : '#55554e', weight: on ? '900' : '700' }; }),
     })) : [];
-    const intFat = intItem ? Math.round(this.effFh(intItem) * (itemMinAt(intItem, scItems.indexOf(intItem)) / 60)) : 0;
+    const intFat = intItem ? this.effFat(intItem, itemMinAt(intItem, scItems.indexOf(intItem))) : 0;
     // 好き嫌い（行動ごとに永続・強度ポップアップで設定）
     const curPref = intItem ? ((st.prefs || {})[normTitle(intItem.name)] || 'normal') : 'normal';
     const prefOpts = intItem ? [
