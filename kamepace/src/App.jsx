@@ -285,6 +285,8 @@ export default class App extends React.Component {
     const { data, changed } = this.refreshGuestSamples(deserialize(g));
     this.set({ ...data, booted: true, screen: data.mainScreen || 'shaka' });
     if (changed) { this._pileLayout = null; this.save(); }
+    // 直前（ログイン中）の物理エンジン・山を捨てて、ゲストのデータで組み直す
+    this.stopPhysics(); this._pileLayout = null;
     this.restoreSampleMode(data, true); // ゲストは標準でペルソナ1年サンプルを表示
     setTimeout(() => this.advancePlans(), 0); // アプリを閉じている間に進んだ予定をキャッチアップ
     setTimeout(() => this.sweepExpiredBuffs(), 0);
@@ -323,6 +325,9 @@ export default class App extends React.Component {
         this.save();
         onboardDone = false;
       }
+      // ログイン前（ゲスト）の物理エンジン・山を必ず捨てて、このユーザーのデータで組み直す。
+      // 残したままだと前の山が居座って「ぎっちぎち」になる（再起動で直る症状の原因）。
+      this.stopPhysics(); this._pileLayout = null;
       setTimeout(() => this.advancePlans(), 0);
       // カレンダーアプリ(my-schedule-app)の予定を自動取り込み（ログイン時＋以後5分ごと）
       setTimeout(() => this.syncScheduleApp(), 400);
@@ -1141,7 +1146,10 @@ export default class App extends React.Component {
     newEntries.forEach(e => {
       if (!e.planned && e.delta < 0) { for (let i = 0; i < -e.delta; i++) negGlyphs.push(e.glyph || entryGlyph(e)); }
     });
-    this.set({
+    // ★ 物理の組み直しは setState のコールバック（state 反映後）で行う。
+    // set は非同期のため、直後に startPhysics すると「新しい記録が入る前の古い山」で組んでしまい、
+    // 記録した絵文字が降ってこない（何度かシャカに移動すると降る）不具合になっていた。
+    this.setState({
       entries, lastMins, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null,
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
@@ -1149,13 +1157,14 @@ export default class App extends React.Component {
       consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)),
       // 症状のつらさが変わったら、デバフの強さも合わせるか確認
       symAdjust: symLevelChange,
+    }, () => {
+      if (anyImmediate) {
+        this.stopPhysics();
+        if (negGlyphs.length) this._pendingNeg = [...(this._pendingNeg || []), ...negGlyphs];
+        requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
+      }
     });
     this.save();
-    if (anyImmediate) {
-      this.stopPhysics();
-      if (negGlyphs.length) this._pendingNeg = [...(this._pendingNeg || []), ...negGlyphs];
-      requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
-    }
     clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1800);
   };
 
@@ -2638,7 +2647,7 @@ export default class App extends React.Component {
       const ag = event.accelerationIncludingGravity;
       if (ag && ag.x != null) {
         const clamp = (v) => Math.max(-1, Math.min(1, v));
-        const G = 1.4;
+        const G = 3.2; // 重力を強めに（ふわふわ防止・傾け/振りでしっかり動く）
         // 実機検証: 上下(y)は iOS=-ag.y / Android=+ag.y で正しい。左右(x)は両方とも逆だったので
         // x は y と逆の割り当て（iOS=+ag.x / Android=-ag.x）にする＝左に傾けたら左に集まる。
         const xGrav = IS_IOS_DEVICE ? ag.x : -ag.x;
