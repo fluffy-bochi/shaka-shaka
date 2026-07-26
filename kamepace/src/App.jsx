@@ -1164,6 +1164,10 @@ export default class App extends React.Component {
       symAdjust: symLevelChange,
     }, () => {
       if (anyImmediate) {
+        // 回復(🌙)を降らせるときは、startPhysics が箱を組む前に「回復中」フラグを立てておく。
+        // こうしないとジャイロの閉じた箱で組んでしまい、🌙が蓋に阻まれて数個しか消えない。
+        // 回復中は箱を開け・重力を真下に固定・傾き/振りセンサーを無視する。
+        if (negGlyphs.length) this._recoverUntil = Date.now() + 9000;
         this.stopPhysics();
         if (negGlyphs.length) this._pendingNeg = [...(this._pendingNeg || []), ...negGlyphs];
         requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
