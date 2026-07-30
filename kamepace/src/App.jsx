@@ -1170,7 +1170,11 @@ export default class App extends React.Component {
         if (negGlyphs.length) this._recoverUntil = Date.now() + 9000;
         this.stopPhysics();
         if (negGlyphs.length) this._pendingNeg = [...(this._pendingNeg || []), ...negGlyphs];
-        requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
+        // startPhysics を確実に1回走らせる（rAFが遅れる/バックグラウンド等でも setTimeout で補完）。
+        // !this.engine ガードで二重起動しない。記録直後に山が組まれず「降ってこない」不具合の対策。
+        const runStart = () => { const el = document.getElementById('shakacase'); if (el && !this.engine) this.startPhysics(el); };
+        requestAnimationFrame(() => requestAnimationFrame(runStart));
+        setTimeout(runStart, 160);
       }
     });
     this.save();
@@ -2323,8 +2327,12 @@ export default class App extends React.Component {
       const isNew = idx >= oldCount;
       let x, y, angle = 0;
       if (isNew) {
-        x = r + Math.random() * (W - 2 * r);
-        y = -r - Math.random() * (H * 0.6);
+        // 新規記録分は「画面上端のすぐ上」から段積みで落とす＝全部そろってすぐ降ってくる。
+        // 以前は最大0.6画面ぶん上に散らばり、遠くから1個ずつ降ってくるように見えていた（往復で徐々に出る症状）。
+        const ni = idx - oldCount;
+        const col = ni % perRow, row = Math.floor(ni / perRow);
+        x = r + col * (2 * r) + (Math.random() - 0.5) * r * 0.4;
+        y = -r - row * (2 * r) - Math.random() * r * 0.4;
       } else if (saved && saved[idx]) {
         // 保存した位置・角度を復元（勝手に整列し直さない）
         x = Math.max(r, Math.min(W - r, saved[idx].x * W));
