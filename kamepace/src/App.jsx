@@ -760,8 +760,14 @@ export default class App extends React.Component {
   onEndTime = (e) => this.set({ endTime: e.target.value });
   setRange = (ii, ri, key, hm) => {
     if (!hm) return;
-    const cart = (this.state.searchCart || []).map((it, i) => i !== ii ? it
-      : { ...it, ranges: (it.ranges || []).map((r, j) => j === ri ? { ...r, [key]: hm } : r) });
+    const cart = (this.state.searchCart || []).map((it, i) => {
+      if (i !== ii) return it;
+      // ranges が未設定/空のとき、表示（allocSegs）はフォールバックの初期レンジ（startTime基準）を出すが、
+      // ここで空配列を触ると入力が捨てられ「勝手に元の時刻に戻る」不具合になる。表示と同じ初期レンジを土台にする。
+      const s = this.state.startTime || '09:00';
+      const rs = (it.ranges && it.ranges.length) ? it.ranges : [{ from: s, to: this.addHm(s, it.defMin || 30) }];
+      return { ...it, ranges: rs.map((r, j) => j === ri ? { ...r, [key]: hm } : r) };
+    });
     this.set({ searchCart: cart });
   };
   addRange = (ii) => {
