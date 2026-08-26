@@ -285,6 +285,13 @@ function Confirm({ v }) {
               <button onClick={v.setTimeMode} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.timeTabBg, color: v.timeTabColor }}>時刻</button>
             </div>
           </div>
+          {/* 記録する日付（時刻モード。前日ぶんを後から記録するとき用） */}
+          {v.isTimeMode && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#55554e' }}>日付</span>
+              <input type="date" value={v.recordDate} onChange={(e) => e.target.value && v.onRecordDate(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 8px', color: '#1b1b18', background: '#fff' }} />
+            </div>
+          )}
           {/* 全体の時間（取り込み予定＝枠。手動で変更可） */}
           {v.hasOverallTime && (
             <div style={{ marginTop: 12 }}>
@@ -311,9 +318,6 @@ function Confirm({ v }) {
               <button onClick={v.addTotalP1} style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid #1b1b18', background: '#fff', fontSize: 17, color: '#1b1b18', cursor: 'pointer' }}>＋</button>
               <button onClick={v.addTotalP10} style={{ width: 32, height: 32, borderRadius: 9, border: '1.5px solid #e4e1d8', background: '#fff', ...mono, fontSize: 11, fontWeight: 700, color: '#55554e', cursor: 'pointer' }}>+10</button>
             </div>
-          )}
-          {v.isTimeMode && (
-            <div style={{ fontSize: 11, color: '#6f8fbf', marginTop: 10, lineHeight: 1.5 }}>行動ごとに「開始→終了の時刻」を設定。同じ行動を別の時間にも入れられます（＋時間）。まだ来ていない時刻は「予定」として時間どおりに記録されます</div>
           )}
           {/* 所要時間モードのみ: 配分バー（つまみドラッグ） */}
           {v.isDurationMode && (

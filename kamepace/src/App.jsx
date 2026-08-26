@@ -89,6 +89,7 @@ export default class App extends React.Component {
     confirmMode: 'duration',
     startTime: '',
     endTime: '',
+    recordDate: null, // 記録する日付（確認画面で指定・null=ホーム表示日）。前日の記録などに使う
     homeMotion: (() => { try { return localStorage.getItem('shaka_home_motion') === '1'; } catch (e) { return false; } })(),
     // シャカの動かし方: false=加速度センサー（振る）／true=ジャイロ（傾き＝逆さで上辺に集まる）
     gyroMode: (() => { try { return localStorage.getItem('shaka_gyro_mode') === '1'; } catch (e) { return false; } })(),
@@ -1056,8 +1057,9 @@ export default class App extends React.Component {
     const now = Date.now();
     const slotId = this.state.slotId || this.slotNow();
     const slot = this.slotDef(slotId);
-    // 記録先＝ホームで見ている日付。編集フローは元の記録の日付を維持する
-    let recDate = this.homeDateStr();
+    // 記録先の日付: 確認画面で指定した日付(recordDate) > ホームで見ている日付。
+    // 編集フローは元の記録の日付を維持する。
+    let recDate = this.state.recordDate || this.homeDateStr();
     if (isEdit && Array.isArray(this.state.editIdxs) && this.state.editIdxs.length) {
       const oe = this.state.entries[this.state.editIdxs[0]];
       if (oe && oe.date) recDate = oe.date;
@@ -1161,7 +1163,7 @@ export default class App extends React.Component {
     // set は非同期のため、直後に startPhysics すると「新しい記録が入る前の古い山」で組んでしまい、
     // 記録した絵文字が降ってこない（何度かシャカに移動すると降る）不具合になっていた。
     this.setState({
-      entries, lastMins, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null,
+      entries, lastMins, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null,
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
       // 編集で山が縮んだ場合に consumed が超過しないように
@@ -2895,8 +2897,9 @@ export default class App extends React.Component {
         const delta = fh != null ? Math.max(1, Math.round(fh * min / 60)) : IMPORT_DEFAULT_DELTA;
         const glyph = t.linkGlyph || ACT_EMOJI[guessAct(t.title)] || '📝';
         const isMylife = /^(ptask:|daily:)/.test(String(srcId || ''));
+        const recDate = t.date || todayStr(); // タスクに紐づく日付に記録（当日固定にしない）
         entries = sortEntries([...entries, {
-          ...baseEntry(t.title, delta, todayStr()),
+          ...baseEntry(t.title, delta, recDate),
           act: t.linkAct || guessAct(t.title), glyph, min, srcId: recId, _new: true,
           slot: slotId, from: this.slotHm(slot, off), to: this.slotHm(slot, off + min),
           ...(isMylife ? { taskKey: 'mlt:' + normTitle(t.title) } : {}),
@@ -3483,6 +3486,9 @@ export default class App extends React.Component {
       durTabBg: timeMode ? '#fff' : '#1b1b18', durTabColor: timeMode ? '#8a8a82' : '#fff',
       timeTabBg: timeMode ? '#1b1b18' : '#fff', timeTabColor: timeMode ? '#fff' : '#8a8a82',
       startTime: st.startTime, endTime: st.endTime, onStartTime: this.onStartTime, onEndTime: this.onEndTime,
+      // 記録する日付（時刻モードで表示・当日以外＝前日の記録などに使う）
+      recordDate: st.recordDate || this.homeDateStr(),
+      onRecordDate: (v) => { if (v) this.set({ recordDate: v }); },
       // 全体の時間（取り込み予定＝枠がある時に表示。手動で変えられる。勝手には変わらない）
       hasOverallTime: overallActive,
       overallFromHm: st.startTime, overallToHm: st.endTime,
@@ -3491,7 +3497,7 @@ export default class App extends React.Component {
       onOverallStepFromH: (dir) => this.set({ startTime: this.addHm(st.startTime || '9:00', dir * 60) }),
       onOverallStepToH: (dir) => this.set({ endTime: this.addHm(st.endTime || '10:00', dir * 60) }),
       overallSpanText: overallActive ? this.fmtMin(this.timeSpanMin()) : '',
-      commitLabel: (timeMode && this.hmToTs(st.endTime) > Date.now())
+      commitLabel: (timeMode && hmToTsOn(st.recordDate || this.homeDateStr(), st.endTime) > Date.now())
         ? (isEditFlow ? '予定にへんこう' : '予定を追加')
         : (isEditFlow ? 'へんこうする' : 'きろくする'),
       confirmTitle: isEditFlow ? 'きろくを編集' : '登録を確認',
