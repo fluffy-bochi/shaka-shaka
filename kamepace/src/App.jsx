@@ -56,7 +56,7 @@ export default class App extends React.Component {
     cart: {},
     degreeItem: null,
     degreeIdx: 1,
-    wakeDraft: { cond: null, mood: null, fat: null }, // 起床後記録の入力中の値
+    wakeDraft: { cond: null, mood: null, fat: null, bed: '23:00', up: '08:00' }, // 起床後記録の入力中の値
     predictOpen: false, predictT: 0, // シャカの予測バー
     wakeFlow: false, // 起床後記録の「つぎへ」待ち（シャカで🌙が降っている間）
     dayOffset: 0,
@@ -1538,11 +1538,16 @@ export default class App extends React.Component {
   };
   /* 起床後記録: 1) 体調・気分・残りの疲労を入力 → 2) シャカで🌙が降って残りの量まで減る → 3) 昨日のふりかえり → 4) 今日の予定 */
   _enterWake() {
-    // 今日すでに記録していれば、入力した内容をそのまま出す
+    // 今日すでに記録していれば、入力した内容をそのまま出す。起床時刻の初期値は「いま（この画面を開いた時刻）」、就寝は前回の就寝時刻（なければ23:00）
     const w = (this.state.wakeLog || []).find(x => x.date === todayStr());
-    this.set({ screen: 'wake1', wakeDraft: w ? { cond: w.cond, mood: w.mood, fat: w.fatigue } : { cond: null, mood: null, fat: null }, wakeFlow: false, buffCheckOpen: false });
+    const last = [...(this.state.wakeLog || [])].reverse().find(x => x.bed);
+    const nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes());
+    const draft = w
+      ? { cond: w.cond, mood: w.mood, fat: w.fatigue, bed: w.bed || (last && last.bed) || '23:00', up: w.up || this.tsToHm(w.ts) }
+      : { cond: null, mood: null, fat: null, bed: (last && last.bed) || '23:00', up: nowHm };
+    this.set({ screen: 'wake1', wakeDraft: draft, wakeFlow: false, buffCheckOpen: false });
   }
-  setWakeDraft = (k, val) => this.set({ wakeDraft: { ...this.state.wakeDraft, [k]: val } });
+  setWakeDraft = (k, val) => this.setState(prev => ({ wakeDraft: { ...prev.wakeDraft, [k]: val } }));
   /* 継続確認シート */
   buffCheckKeep = (id) => { /* 維持＝何もしない */ void id; };
   buffCheckEnd = (id) => {
@@ -2112,7 +2117,9 @@ export default class App extends React.Component {
     const d = this.state.wakeDraft;
     if (d.fat == null) return;
     const today = todayStr();
-    const wakeLog = [...(this.state.wakeLog || []).filter(w => w.date !== today), { date: today, ts: Date.now(), cond: d.cond, mood: d.mood, fatigue: d.fat }];
+    const up = d.up || (pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes()));
+    // ts=起床時刻（予測バーの左端になる）。bed=就寝時刻(HH:MM)。就寝〜起床の時間は bed/up から出せる
+    const wakeLog = [...(this.state.wakeLog || []).filter(w => w.date !== today), { date: today, ts: hmToTsOn(today, up), bed: d.bed || null, up, cond: d.cond, mood: d.mood, fatigue: d.fat }];
     this._sleepPile = null;
     const n = this.sleepCount();
     const recovered = Math.max(0, n - d.fat); // いまの山 − 残りの疲労 ＝ 消す数
