@@ -3802,8 +3802,8 @@ export default class App extends React.Component {
       goConfirm: (count === 0 && scCount > 0) ? this.goSearchConfirm : this.goConfirm,
       toggleTemplateToast: this.toggleTemplateToast, shake: this.shake,
       shakaDate: st.dayOffset === 0 ? formatDateShort(todayStr()) : formatDateShort(viewDateStr),
-      // 予測バーを開いている間は、大きい時計をスライダーの時刻にして、その時間にやっていた/やっている/やる予定の行動を下に出す
-      clockHm: (st.screen === 'shaka' && st.predictOpen && st.dayOffset === 0) ? this.tsToHm(st.predictT || Date.now()) : (st.clockHm || this.tsToHm(Date.now())),
+      clockHm: st.clockHm || this.tsToHm(Date.now()), // 大きい時計は常に現在時刻
+      // 予測バーを開いている間は、スライダーの時刻にやっていた/やっている/やる予定の行動を時計の下に出す
       predictActs: (st.screen === 'shaka' && st.predictOpen && st.dayOffset === 0) ? (() => {
         const T = st.predictT || Date.now(), t0 = todayStr();
         return st.entries.filter(e => e.date === t0 && !e.exp && !e.wakeAdd && e.title && e.from && e.to && entryStartTs(e) <= T && T < entryEndTs(e))
