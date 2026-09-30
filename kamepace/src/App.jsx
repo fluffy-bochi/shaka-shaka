@@ -22,7 +22,8 @@ import { initShakaSound, attachCollisionSound } from './sound';
 import { appendGlyph } from './fluent';
 import Home from './screens/Home';
 import Record from './screens/Record';
-import Sleep from './screens/Sleep';
+import { WakeCheck, WakeReview, WakePlan } from './screens/Wake';
+import { daySummary, reviewLine, planLine } from './wake';
 import Shaka from './screens/Shaka';
 import Collect from './screens/Collect';
 import MyPage from './screens/MyPage';
@@ -54,12 +55,11 @@ export default class App extends React.Component {
     cart: {},
     degreeItem: null,
     degreeIdx: 1,
-    residual: 0,
+    wakeDraft: { cond: null, mood: null, fat: null }, // 起床後記録の入力中の値
+    wakeFlow: false, // 起床後記録の「つぎへ」待ち（シャカで🌙が降っている間）
     dayOffset: 0,
     homeDate: todayStr(), // ホームで閲覧中の日付
     toast: null,
-    sleepAnim: false,
-    moons: [],
     catAddOpen: false,
     newCatName: '',
     newCatIcon: 'category',
@@ -152,6 +152,7 @@ export default class App extends React.Component {
   _sampleDiary = {};
   _sampleFav = {};
   _sampleBalance = {}; // 日別「寝る前の山の量（前日からの繰り越し込み）」
+  _sampleWake = {}; // 日別の起床後記録（サンプル）
 
   set(patch) { this.setState(patch); }
 
@@ -165,12 +166,13 @@ export default class App extends React.Component {
     if (!need.length) return;
     let add = [], addColl = [];
     need.forEach(y => {
-      const { entries, diary, fav, collected, balanceByDay } = buildAcademicYear(y, { cycleOn: this.state.sampleCycleOn });
+      const { entries, diary, fav, collected, balanceByDay, wakeByDay } = buildAcademicYear(y, { cycleOn: this.state.sampleCycleOn });
       add = add.concat(entries);
       addColl = addColl.concat(collected || []);
       Object.assign(this._sampleDiary, diary);
       Object.assign(this._sampleFav, fav);
       Object.assign(this._sampleBalance, balanceByDay || {});
+      Object.assign(this._sampleWake, wakeByDay || {});
       this._sampleYears.add(y);
     });
     this._pileLayout = null;
@@ -178,13 +180,13 @@ export default class App extends React.Component {
     this.setState(prev => ({ entries: [...prev.entries, ...add], collected: [...(prev.collected || []), ...addColl] }));
   }
   clearSample() {
-    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._sampleBalance = {}; this._pileLayout = null;
+    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._sampleBalance = {}; this._sampleWake = {}; this._pileLayout = null;
     this.set({ entries: this.state.entries.filter(e => !e._sample), collected: (this.state.collected || []).filter(c => !c._sample) });
   }
   regenSample() { // 生理オン/オフの切替時など、作り直し
     const entries = this.state.entries.filter(e => !e._sample);
     const collected = (this.state.collected || []).filter(c => !c._sample);
-    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._sampleBalance = {}; this._pileLayout = null;
+    this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._sampleBalance = {}; this._sampleWake = {}; this._pileLayout = null;
     this.set({ entries, collected });
     setTimeout(() => this.ensureSample(this.homeDateStr()), 0);
   }
@@ -221,7 +223,7 @@ export default class App extends React.Component {
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
       prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
-      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, mainScreen: s.mainScreen,
+      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, wakeLog: s.wakeLog, mainScreen: s.mainScreen,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
       bookFav: s.bookFav, bookDiary: s.bookDiary,
@@ -1328,7 +1330,7 @@ export default class App extends React.Component {
      全日付を積むと年ぶんで巨大になり重いため、サンプル分だけ当日にしぼる。 */
   _sampleWindowDay() {
     const s = this.state.screen;
-    return (s === 'home' || s === 'record' || s === 'sleep') ? this.homeDateStr() : todayStr();
+    return (s === 'home' || s === 'record' || s === 'wake1') ? this.homeDateStr() : todayStr();
   }
   pileSource() {
     const consumedRaw = this.state.consumed || 0;
@@ -1540,13 +1542,13 @@ export default class App extends React.Component {
       this.set({ buffCheckOpen: true });
       return;
     }
-    this._enterSleep();
+    this._enterWake();
   };
-  _enterSleep() {
-    this._sleepPile = null;
-    const n = this.sleepCount(); // 表示上限(160)を反映した実数
-    this.set({ screen: 'sleep', residual: n, buffCheckOpen: false });
+  /* 起床後記録: 1) 体調・気分・残りの疲労を入力 → 2) シャカで🌙が降って残りの量まで減る → 3) 昨日のふりかえり → 4) 今日の予定 */
+  _enterWake() {
+    this.set({ screen: 'wake1', wakeDraft: { cond: null, mood: null, fat: null }, wakeFlow: false, buffCheckOpen: false });
   }
+  setWakeDraft = (k, val) => this.set({ wakeDraft: { ...this.state.wakeDraft, [k]: val } });
   /* 継続確認シート */
   buffCheckKeep = (id) => { /* 維持＝何もしない */ void id; };
   buffCheckEnd = (id) => {
@@ -1555,7 +1557,7 @@ export default class App extends React.Component {
     this.set({ activeBuffs: rest, buffLog: en ? this.pushBuffLog(en, todayStr()) : this.state.buffLog });
     this.save();
   };
-  finishBuffCheck = () => { this.set({ lastBuffCheck: todayStr() }); this.save(); this._enterSleep(); };
+  finishBuffCheck = () => { this.set({ lastBuffCheck: todayStr() }); this.save(); this._enterWake(); };
   /* 症状のつらさ変更に合わせてデバフ倍率を更新するか */
   applySymAdjust = () => {
     const sa = this.state.symAdjust;
@@ -1908,7 +1910,6 @@ export default class App extends React.Component {
       this._pileLayout = null;
     }
     if (n === 9) patch.screen = 'home';
-    if (n === 10) patch.tutFlags = { res0: this.state.residual };
     this.set(patch);
   };
   tutNext = () => {
@@ -1949,13 +1950,10 @@ export default class App extends React.Component {
         // 🔀を押したら shake() が tutFlags.shaken を立てる → カードに「次へ」が出る
         break;
       case 9:
-        if (s.screen === 'sleep') this.gotoTutStep(10);
+        if (s.screen === 'wake1') this.gotoTutStep(10);
         break;
       case 10:
-        if (s.tutFlags.res0 != null && s.residual !== s.tutFlags.res0) this.gotoTutStep(11);
-        break;
-      case 11:
-        if (!s.tutFlags.slept && prev.screen === 'sleep' && s.screen !== 'sleep') this.set({ tutFlags: { ...s.tutFlags, slept: true } });
+        if (s.screen === 'shaka' && s.wakeFlow) { this.gotoTutStep(11); this.set({ tutFlags: { slept: true } }); }
         break;
       default:
         break;
@@ -2092,15 +2090,6 @@ export default class App extends React.Component {
   };
 
   /* ================= 睡眠（回復は consumed に積む＝日をまたいで持ち越し） ================= */
-  onSleepDrag = (e) => {
-    if (this.state.sleepAnim) return;
-    if (e.type === 'pointermove' && e.buttons === 0) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const N = this.sleepCount();
-    const frac = 1 - (e.clientY - rect.top) / rect.height;
-    const r = Math.max(0, Math.min(N, Math.round(frac * N)));
-    this.set({ residual: r });
-  };
   /* 睡眠画面の山＝ホーム/シャカと完全に同じ配置（makePile）。
      下から積まれた順（y昇順）に rank を振り、残量ぶんを下から残す演出に使う。 */
   makeSleepPile() {
@@ -2124,20 +2113,52 @@ export default class App extends React.Component {
       if (this.state.gyroMode && this.state.screen === 'shaka') { this._pileLayout = null; this.rebuildPhysics(); }
     }, 6300);
   }
-  finishSleep = () => {
-    const recovered = Math.max(0, this.sleepCount() - this.state.residual);
-    if (recovered <= 0) { this.set({ screen: 'home' }); return; }
-    // 回復の🌙が落下中は、ジャイロ（傾き）でも重力を真下に固定する（横に流れて山に当たらず消えないのを防ぐ）
-    this._recoverUntil = Date.now() + 6000;
-    if (this.engine) { this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2; }
-    this._scheduleGyroRebuild();
-    // 他の回復と同じ: 🌙をシャカに降らせて、プラスの絵文字に触れたぶんだけ消す
-    // （consumed・ためた回復への加算は衝突時に行われる）。多いときは複数回に分けて降らす
-    this._pendingNeg = [...(this._pendingNeg || []), ...Array.from({ length: Math.min(recovered, 160) }, () => '🌙')];
+  /* 画面1「つぎへ」: 入力を保存し、残りの疲労（山が満杯=100個）になるまで🌙を降らせる */
+  finishWake1 = () => {
+    const d = this.state.wakeDraft;
+    if (d.fat == null) return;
+    const today = todayStr();
+    const wakeLog = [...(this.state.wakeLog || []).filter(w => w.date !== today), { date: today, ts: Date.now(), cond: d.cond, mood: d.mood, fatigue: d.fat }];
+    this._sleepPile = null;
+    const recovered = Math.max(0, this.sleepCount() - d.fat); // いまの山 − 残りの疲労 ＝ 消す数
+    this.set({ wakeLog, wakeFlow: true }); this.save();
+    this.dropRecovery(recovered);
+  };
+  dropRecovery(recovered) {
+    if (recovered > 0) {
+      // 回復の🌙が落下中は、ジャイロ（傾き）でも重力を真下に固定する（横に流れて山に当たらず消えないのを防ぐ）
+      this._recoverUntil = Date.now() + 6000;
+      if (this.engine) { this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2; }
+      this._scheduleGyroRebuild();
+      // 他の回復と同じ: 🌙をシャカに降らせて、プラスの絵文字に触れたぶんだけ消す
+      // （consumed・ためた回復への加算は衝突時に行われる）。多いときは複数回に分けて降らす
+      this._pendingNeg = [...(this._pendingNeg || []), ...Array.from({ length: Math.min(recovered, 160) }, () => '🌙')];
+    }
     this.set({ screen: 'shaka', dayOffset: 0 });
     this.stopPhysics();
     requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
-  };
+  }
+  goWake2 = () => { this.stopPhysics(); this.set({ screen: 'wake2', wakeFlow: false }); };
+  goWake3 = () => this.set({ screen: 'wake3' });
+  backWake = (to) => () => this.set({ screen: to });
+  /* 起床後記録の記録一覧（実記録＋サンプル）。日付ごとに1件・新しい7件 */
+  wakeRecords() {
+    const st = this.state, today = todayStr();
+    const by = {};
+    if (st.sampleMode) Object.keys(this._sampleWake).forEach(d => { if (d <= today) { const w = this._sampleWake[d]; by[d] = { date: d, ts: hmToTsOn(d, '00:00') + w.min * 60000, cond: w.cond, mood: w.mood, fatigue: w.fatigue }; } });
+    (st.wakeLog || []).forEach(w => { by[w.date] = w; });
+    return Object.keys(by).sort().map(d => by[d]).slice(-7);
+  }
+  /* 画面3・4に出す値 */
+  wakeVals() {
+    const st = this.state, today = todayStr(), y = shiftDate(today, -1);
+    const recs = this.wakeRecords();
+    const yRec = recs.find(w => w.date === y);
+    const sum = daySummary(st.entries, y, yRec ? yRec.fatigue : 0);
+    const plans = sortEntries(st.entries.filter(e => e.date === today && !e.exp && e.title)).map(e => ({ title: e.title, from: e.from, to: e.to, glyph: entryGlyph(e), delta: e.delta }));
+    const tasks = (st.tasks || []).filter(t => t.date === today && t.title);
+    return { recs, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks };
+  }
 
   /* ================= 予定の時間進行（旧本番と統一） ================= */
   advancePlans() {
@@ -2253,7 +2274,9 @@ export default class App extends React.Component {
         if (s.searchStep) { this.set({ searchStep: null }); return true; }
         if (s.catId) { this.set({ catId: null }); return true; }
         this.goHome(); return true; // 入口の✕と同じ
-      case 'sleep': this.set({ screen: 'home' }); return true;
+      case 'wake1': this.set({ screen: 'home' }); return true;
+      case 'wake2': this.set({ screen: 'shaka' }); return true;
+      case 'wake3': this.set({ screen: 'wake2' }); return true;
       case 'collect': this.goShaka(); return true;
       case 'trash': case 'buffLog': case 'slotTimes': case 'catsManage':
       case 'templates': case 'sensitivity': case 'help':
@@ -3255,9 +3278,6 @@ export default class App extends React.Component {
     const count = items.length;
     const cartFat = items.reduce((a, t) => a + Math.round(this.cartFh(t) * ((t.defMin || 30) / 60)), 0);
 
-    const sleepN = this.sleepCount();
-    const recovered = Math.max(0, sleepN - st.residual);
-
     const activeSlot = this.slotDef(st.slotId || this.slotNow());
     const viewDateStr = shiftDate(todayStr(), st.dayOffset);
     this._dayRange = this.dayOffsetRange(); // シャカの前後移動の可動範囲（ボタン色に使用）
@@ -3348,7 +3368,18 @@ export default class App extends React.Component {
     return {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
       isHome: st.screen === 'home', isRecord: st.screen === 'record',
-      isSleep: st.screen === 'sleep', isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
+      isWake: ['wake1', 'wake2', 'wake3'].includes(st.screen), isWake1: st.screen === 'wake1', isWake2: st.screen === 'wake2', isWake3: st.screen === 'wake3',
+      wakeDraft: st.wakeDraft, setWakeDraft: this.setWakeDraft, finishWake1: this.finishWake1,
+      wakeFlow: st.wakeFlow && st.screen === 'shaka', goWake2: this.goWake2, goWake3: this.goWake3, backWake: this.backWake,
+      wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null,
+      wakeHeader: (() => {
+        if (!st.screen.startsWith('wake')) return '';
+        const t = todayStr(), d = strToDate(t);
+        const firsts = [...st.entries.filter(e => !e._sample).map(e => e.date), ...(st.wakeLog || []).map(w => w.date)].filter(Boolean).sort();
+        const n = firsts.length ? Math.round((d - strToDate(firsts[0])) / 86400000) + 1 : 1;
+        return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + '日月火水木金土'[d.getDay()] + '曜日 ' + Math.max(1, n) + '日目';
+      })(),
+      isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
       isTrash: st.screen === 'trash', isBuffLog: st.screen === 'buffLog',
       isBookshelf: st.screen === 'bookshelf',
       isSlotTimes: st.screen === 'slotTimes', isCatsManage: st.screen === 'catsManage',
@@ -3380,9 +3411,9 @@ export default class App extends React.Component {
       tutorial: st.tutorial, tutFlags: st.tutFlags,
       startTutorial: this.startTutorial, endTutorial: this.endTutorial, tutNext: this.tutNext,
       isCollect: st.screen === 'collect', collectedTotal: this.collectedTotal(),
-      goCollect: this.goCollect, goRecordNow: this.goRecordNow, finishSleep: this.finishSleep,
-      navHomeColor: ['home', 'record', 'sleep'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
-      navHomeFill: ['home', 'record', 'sleep'].includes(st.screen) ? 1 : 0,
+      goCollect: this.goCollect, goRecordNow: this.goRecordNow,
+      navHomeColor: ['home', 'record'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
+      navHomeFill: ['home', 'record'].includes(st.screen) ? 1 : 0,
       navShakaColor: ['shaka', 'collect'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navShakaFill: ['shaka', 'collect'].includes(st.screen) ? 1 : 0,
       navBookColor: st.screen === 'bookshelf' ? '#1b1b18' : '#8a8a82',
@@ -3450,22 +3481,6 @@ export default class App extends React.Component {
       pile: st.screen === 'home' ? this.makePile(7) : [],
       // 山が高く積み上がって上部UI（時計・日付ナビ）に重なる量になったら白文字にする
       pileHigh: this.pileCount() >= 90,
-      // 残量ライン（rank）より上の絵文字が消える。ホーム/シャカと同じ配置
-      sleepPile: st.screen === 'sleep' ? this.makeSleepPile().map((p, i) => ({
-        ...p,
-        op: p.rank < st.residual ? 1 : (st.sleepAnim ? 0 : 0.82),
-        delay: st.sleepAnim ? (0.35 + (i % 12) * 0.07).toFixed(2) + 's' : '0s',
-      })) : [],
-      moons: st.moons || [],
-      sleepAnim: !!st.sleepAnim,
-      residualPct: (() => {
-        const arr = this._sleepYByRank || [];
-        if (st.residual <= 0 || !arr.length) return '4px';
-        // 残す絵文字の一番上（rank=residual-1 の粒）の上端にラインを置く
-        const topY = arr[Math.min(st.residual, arr.length) - 1] || 0;
-        return (topY + (this._sleepFont || 40) * 0.65 + 4).toFixed(0) + 'px';
-      })(),
-      onSleepDrag: this.onSleepDrag,
       slots,
       plans,
       planDetailOpen: !!detailPlan, planDetailName: detailPlan ? detailPlan.name : '', planDetailMeta: detailMeta ? detailMeta.metaText : '', planDetailFat: detailMeta ? detailMeta.fatText : '', planTasks,
@@ -3581,8 +3596,6 @@ export default class App extends React.Component {
       cartFatText: count > 0
         ? ((cartFat + searchTotalFat) >= 0 ? '+' + (cartFat + searchTotalFat) : '' + (cartFat + searchTotalFat))
         : (searchTotalFat >= 0 ? '+' + searchTotalFat : '' + searchTotalFat),
-      residual: st.residual,
-      recoveredAbs: recovered,
       goHome: this.goHome, goShaka: this.goShaka, goMypage: this.goMypage, goSleep: this.goSleep,
       moodOpen: !!st.moodOpen, openMood: this.openMood, closeMood: this.closeMood, commitMood: this.commitMood,
       moodNote: st.moodNote || '', onMoodNote: this.onMoodNote,
@@ -3688,7 +3701,9 @@ export default class App extends React.Component {
         {!v.isOnboard && <>
         {v.isHome && <Home v={v} />}
         {v.isRecord && <Record v={v} />}
-        {v.isSleep && <Sleep v={v} />}
+        {v.isWake1 && <WakeCheck v={v} />}
+        {v.isWake2 && <WakeReview v={v} />}
+        {v.isWake3 && <WakePlan v={v} />}
         {v.isShaka && <Shaka v={v} />}
         {v.isCollect && <Collect v={v} />}
         {v.isMypage && <MyPage v={v} />}
@@ -3716,7 +3731,7 @@ export default class App extends React.Component {
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}
-        {!v.isBookshelf && <Nav v={v} />}
+        {!v.isBookshelf && !v.isWake && <Nav v={v} />}
         </>}
       </div>
     );
