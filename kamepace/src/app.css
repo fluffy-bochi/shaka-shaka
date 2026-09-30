@@ -138,5 +138,5 @@ body.kame-book-land .app-status-spacer { height: env(safe-area-inset-top); }
   body.kame-book-land .phone .app-screen { width: 812px; height: 410px; }
 }
 
-/* シャカの予測バー: 右端から左へ0.2秒で展開 */
-@keyframes predOpen { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
+/* シャカの予測バー: 右端から左へ0.2秒でスライドイン */
+@keyframes predOpen { from { transform: translateX(100%); } to { transform: translateX(0); } }
