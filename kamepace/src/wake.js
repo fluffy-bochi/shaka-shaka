@@ -18,7 +18,7 @@ function pick(seed, arr) { return arr[hash(seed) % arr.length]; }
 /* その日の疲労の推移（10分刻み・移動平均で滑らかに）。朝の残り疲労 startFat から、
    各記録の from→to に疲労ぶんを等分に足し引きして 0〜100 に収める。 */
 export function fatigueCurve(entries, dateStr, startFat) {
-  const list = (entries || []).filter(e => e.date === dateStr && !e.exp && e.delta && e.from && e.to);
+  const list = (entries || []).filter(e => e.date === dateStr && !e.exp && !e.wakeAdd && e.delta && e.from && e.to);
   const t0 = hmToTsOn(dateStr, '00:00');
   const STEP = 10 * 60000;
   const raw = [];
@@ -58,7 +58,7 @@ export function typeOfCurve(curve) {
 /* 昨日のまとめ: タイプ・一番力を入れた行動・一番回復した行動 */
 export function daySummary(entries, dateStr, startFat) {
   const curve = fatigueCurve(entries, dateStr, startFat);
-  const list = (entries || []).filter(e => e.date === dateStr && !e.exp && e.delta && e.title);
+  const list = (entries || []).filter(e => e.date === dateStr && !e.exp && !e.wakeAdd && e.delta && e.title);
   let up = null, rec = null;
   list.forEach(e => {
     if (e.delta > 0 && (!up || e.delta > up.delta)) up = e;

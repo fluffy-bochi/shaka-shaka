@@ -350,14 +350,14 @@ export default class App extends React.Component {
 
   /* ================= derived: entries → slots ================= */
   homeDateStr() { return this.state.homeDate || todayStr(); }
-  todayEntries() { const t = this.homeDateStr(); return sortEntries(this.state.entries).filter(e => e.date === t && !e.exp); }
+  todayEntries() { const t = this.homeDateStr(); return sortEntries(this.state.entries).filter(e => e.date === t && !e.exp && !e.wakeAdd); }
   slotRecords() {
     const out = { asa: [], am: [], pm: [], yoru: [] };
     const t = this.homeDateStr();
     // 編集用に state.entries 内のインデックスを添えて、from 順で各スロットへ
     const rows = this.state.entries
       .map((e, i) => ({ e, i }))
-      .filter(({ e }) => e.date === t && !e.exp)
+      .filter(({ e }) => e.date === t && !e.exp && !e.wakeAdd)
       .sort((a, b) => (a.e.from || '').localeCompare(b.e.from || ''));
     rows.forEach(({ e, i }) => {
       const sid = this.slotOf(e);
@@ -2120,8 +2120,20 @@ export default class App extends React.Component {
     const today = todayStr();
     const wakeLog = [...(this.state.wakeLog || []).filter(w => w.date !== today), { date: today, ts: Date.now(), cond: d.cond, mood: d.mood, fatigue: d.fat }];
     this._sleepPile = null;
-    const recovered = Math.max(0, this.sleepCount() - d.fat); // いまの山 − 残りの疲労 ＝ 消す数
-    this.set({ wakeLog, wakeFlow: true }); this.save();
+    const n = this.sleepCount();
+    const recovered = Math.max(0, n - d.fat); // いまの山 − 残りの疲労 ＝ 消す数
+    const patch = { wakeLog, wakeFlow: true };
+    if (d.fat > n) {
+      // 残りの疲労のほうが多い: 使った行動の絵文字からランダムに選んで、選んだ数まで増やす（山に降ってくる）
+      const pool = this.state.entries.filter(e => !e.exp && e.delta > 0 && !e.wakeAdd).map(e => entryGlyph(e));
+      const cnt = {};
+      for (let i = 0; i < d.fat - n; i++) { const g = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '😮‍💨'; cnt[g] = (cnt[g] || 0) + 1; }
+      const now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+      const add = Object.keys(cnt).map(g => ({ ...baseEntry('起床時の疲労', cnt[g], today), glyph: g, from: hm, to: hm, wakeAdd: true, _new: true }));
+      patch.entries = sortEntries([...this.state.entries, ...add]);
+    }
+    this.set(patch); this.save();
+    this._sleepPile = null;
     this.dropRecovery(recovered);
   };
   dropRecovery(recovered) {
@@ -2155,7 +2167,7 @@ export default class App extends React.Component {
     const recs = this.wakeRecords();
     const yRec = recs.find(w => w.date === y);
     const sum = daySummary(st.entries, y, yRec ? yRec.fatigue : 0);
-    const plans = sortEntries(st.entries.filter(e => e.date === today && !e.exp && e.title)).map(e => ({ title: e.title, from: e.from, to: e.to, glyph: entryGlyph(e), delta: e.delta }));
+    const plans = sortEntries(st.entries.filter(e => e.date === today && !e.exp && !e.wakeAdd && e.title)).map(e => ({ title: e.title, from: e.from, to: e.to, glyph: entryGlyph(e), delta: e.delta }));
     const tasks = (st.tasks || []).filter(t => t.date === today && t.title);
     return { recs, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks };
   }
