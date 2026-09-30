@@ -1169,7 +1169,7 @@ export default class App extends React.Component {
     // set は非同期のため、直後に startPhysics すると「新しい記録が入る前の古い山」で組んでしまい、
     // 記録した絵文字が降ってこない（何度かシャカに移動すると降る）不具合になっていた。
     this.setState({
-      entries, lastMins, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null,
+      entries, lastMins, tapLine: isEdit ? this.state.tapLine : null, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null,
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
       // 編集で山が縮んだ場合に consumed が超過しないように
@@ -1549,7 +1549,7 @@ export default class App extends React.Component {
       : { cond: null, mood: null, fat: null, bed: (last && last.bed) || '23:00', up: nowHm };
     this.set({ screen: 'wake1', wakeDraft: draft, wakeFlow: false, buffCheckOpen: false });
   }
-  /* ホームのおねえさんをタップ: 時間帯・その日の話題・雑談から、直前と同じにならないように言う。
+  /* ホームのおねえさんをタップ: 時間帯・その日の話題・雑談から、直前と同じにならないように言う（自動では元に戻さない）。
      TAP_ANNOY_WINDOW_SEC 秒のうちに TAP_ANNOY_FROM 回以上タップされたら、心配するセリフ（深呼吸の誘導など） */
   tapCharacter = () => {
     const now = Date.now();
@@ -1557,9 +1557,7 @@ export default class App extends React.Component {
     this._tapTimes.push(now);
     const text = tapLine(new Date(), this._tapRecent || [], this._tapTimes.length >= TAP_ANNOY_FROM);
     this._tapRecent = [...(this._tapRecent || []), text].slice(-8);
-    clearTimeout(this._tapT);
-    this.set({ tapLine: text });
-    this._tapT = setTimeout(() => this.set({ tapLine: null }), text.length > 50 ? 16000 : 9000); // 長いセリフは長めに出す
+    this.set({ tapLine: text }); // 次にタップするまで（または記録するまで）そのまま出しておく
   };
   setWakeDraft = (k, val) => this.setState(prev => ({ wakeDraft: { ...prev.wakeDraft, [k]: val } }));
   /* 継続確認シート */
