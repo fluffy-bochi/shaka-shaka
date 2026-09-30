@@ -23,7 +23,7 @@ import { appendGlyph } from './fluent';
 import Home from './screens/Home';
 import Record from './screens/Record';
 import { WakeCheck, WakeReview, WakePlan } from './screens/Wake';
-import { predictUnits } from './predict';
+import { predictUnits, pastAfter } from './predict';
 import { daySummary, reviewLine, planLine, homeLine } from './wake';
 import Shaka from './screens/Shaka';
 import Collect from './screens/Collect';
@@ -2416,7 +2416,7 @@ export default class App extends React.Component {
       this.bodies.push({ body, el: d, glyph, gray: !!m.gray });
     });
     this.negBodies = [];
-    this.predBodies = [];
+    this.predBodies = []; this.restBodies = [];
     if (this.state.predictOpen) setTimeout(() => this._applyPredict(this.state.predictT), 0);
     // iOS(WebKit)軽量化: fixed timestep（固定16.6ms）にする。可変デルタだとフレーム落ち時に
     // 1ステップが重くなり山が沈む→眠れず回り続ける悪循環になる。固定なら1フレーム=1ステップに固定。
@@ -2531,21 +2531,36 @@ export default class App extends React.Component {
   openPredict = () => {
     const now = Date.now();
     this._pred = predictUnits(this.state.entries, todayStr());
+    this._predToday = this.state.entries.filter(e => e.date === todayStr() && !e.exp);
+    this._predPool = this._consumedTail(80);
     this.set({ predictOpen: true, predictT: now });
     // 既存の未来予定（灰色）は外して、予測の時刻に合わせて足し直す
     const { World } = Matter;
     if (this.engine) {
       this.bodies = (this.bodies || []).filter(b => { if (!b.gray) return true; try { World.remove(this.engine.world, b.body); } catch (e) { /* noop */ } b.el.remove(); return false; });
-      this.predBodies = [];
+      this.predBodies = []; this.restBodies = [];
     }
     this._applyPredict(now);
   };
-  closePredict = () => { this.set({ predictOpen: false }); this._pred = null; this.rebuildPhysics(); };
+  closePredict = () => { this.set({ predictOpen: false }); this._pred = null; this._predToday = null; this.rebuildPhysics(); };
   setPredictT = (t) => {
     const t0 = todayStr(), wk = (this.state.wakeLog || []).find(w => w.date === t0);
-    const T = Math.max(Date.now(), wk ? wk.ts : hmToTsOn(t0, '08:00'), t);
+    const T = Math.max(wk ? wk.ts : hmToTsOn(t0, '08:00'), t);
     this.set({ predictT: T }); this._applyPredict(T);
   };
+  /* 消費ずみ（山の下から消えた）絵文字の直近ぶん。過去へ動かしたとき、まだ消えていない状態に戻すのに使う */
+  _consumedTail(k) {
+    const stack = [];
+    sortEntries(this.state.entries).forEach(r => {
+      if (r.exp || (r.delta || 0) <= 0) return;
+      const n = r.planned ? (r.dropped || 0) : r.delta;
+      for (let i = 0; i < n; i++) stack.push(entryGlyph(r));
+    });
+    const c = Math.min(this.state.consumed || 0, stack.length);
+    const tail = stack.slice(Math.max(0, c - k), c);
+    while (tail.length < k) tail.unshift(tail[0] || '😮‍💨');
+    return tail;
+  }
   _applyPredict(T) {
     if (!this.engine || !this._pred) return;
     const { World, Bodies } = Matter;
@@ -2576,9 +2591,46 @@ export default class App extends React.Component {
         this.bodies.push(pb); this.predBodies.push(pb);
       }
     }
+    // 過去へ動かしたとき: T より後に積もる疲労ぶんは外し、T より後に消える回復ぶんは戻す
+    const pa = pastAfter(this._predToday, T), pn = pastAfter(this._predToday, Date.now());
+    const past = { hide: Math.max(0, pa.hide - pn.hide), restore: Math.max(0, pa.restore - pn.restore) }; // 「いま」との差だけ（未来時刻なのに予定扱いでない記録の影響を除く）
+    const solidAll = this.bodies.filter(b => !b.gray);
+    const M = Math.min(past.hide, solidAll.length);
+    const rect0 = el.getBoundingClientRect(); const W0 = rect0.width || 350; const r0 = this.PR;
+    solidAll.forEach((b, i) => {
+      const hide = i >= solidAll.length - M;
+      if (hide && !b.hidden) { try { World.remove(this.engine.world, b.body); } catch (e) { /* noop */ } b.el.style.opacity = '0'; b.hidden = true; }
+      else if (!hide && b.hidden) {
+        Matter.Body.setPosition(b.body, { x: r0 + Math.random() * (W0 - 2 * r0), y: -r0 });
+        Matter.Body.setVelocity(b.body, { x: 0, y: 0 });
+        World.add(this.engine.world, b.body); b.el.style.opacity = ''; b.hidden = false; this.resumeMotion();
+      }
+    });
+    this.restBodies = this.restBodies || [];
+    const wantRest = Math.min(60, past.restore);
+    while (this.restBodies.length > wantRest) {
+      const rb = this.restBodies.pop();
+      try { World.remove(this.engine.world, rb.body); } catch (e) { /* noop */ }
+      rb.el.remove(); this.bodies = this.bodies.filter(b => b !== rb);
+    }
+    while (this.restBodies.length < wantRest) {
+      const pool = this._predPool || [];
+      const g = pool[pool.length - 1 - this.restBodies.length] || '😮‍💨';
+      const r = this.PR;
+      const body = Bodies.circle(r + Math.random() * (W0 - 2 * r), -r, r, this.BODY_OPTS);
+      World.add(this.engine.world, body);
+      const d = document.createElement('div');
+      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;will-change:transform';
+      d.style.width = d.style.height = (2 * r) + 'px'; d.style.fontSize = Math.round(r * 1.6) + 'px';
+      appendGlyph(d, g, Math.round(r * 1.9));
+      el.appendChild(d);
+      const rb = { body, el: d, glyph: g, gray: true, predRest: true };
+      this.bodies.push(rb); this.restBodies.push(rb);
+      this.resumeMotion();
+    }
     // 消える回復ぶん: 古い（下の）絵文字から薄くする
     const k = this._pred.neg.filter(u => u.t <= T).length;
-    this.bodies.filter(b => !b.gray).forEach((b, i) => { b.el.style.opacity = i < k ? '0.25' : ''; });
+    this.bodies.filter(b => !b.gray && !b.hidden).forEach((b, i) => { b.el.style.opacity = i < k ? '0.25' : ''; });
     clearTimeout(this._settleT);
     if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
   }
@@ -2710,7 +2762,7 @@ export default class App extends React.Component {
     if (this.negBodies) this.negBodies.forEach(({ el }) => el.remove());
     const caseEl = document.getElementById('shakacase');
     if (caseEl) caseEl.innerHTML = '';
-    this.engine = null; this.runner = null; this.bodies = []; this.negBodies = []; this.predBodies = [];
+    this.engine = null; this.runner = null; this.bodies = []; this.negBodies = []; this.predBodies = []; this.restBodies = [];
   }
   /* 絵文字に散らばる勢いを与える（k=強さ） */
   shakeImpulse(k) {
@@ -3453,7 +3505,7 @@ export default class App extends React.Component {
         const wk = (st.wakeLog || []).find(w => w.date === t0);
         // 左端=今日の起床時刻（記入がなければ8時）、右端=寝る時刻（就寝の記録は未作成なので23:00）
         const start = wk ? wk.ts : hmToTsOn(t0, '08:00');
-        return { open: !!st.predictOpen, t: Math.max(st.predictT || 0, now, start), now, start, end: Math.max(hmToTsOn(t0, '23:00'), now + 30 * 60000, start + 60 * 60000) };
+        return { open: !!st.predictOpen, t: Math.max(st.predictT || now, start), now, start, end: Math.max(hmToTsOn(t0, '23:00'), now + 30 * 60000, start + 60 * 60000) };
       })() : null,
       openPredict: this.openPredict, closePredict: this.closePredict, setPredictT: this.setPredictT,
       wakeDraft: st.wakeDraft, setWakeDraft: this.setWakeDraft, finishWake1: this.finishWake1,

@@ -22,7 +22,7 @@ export default function PredictBar({ v }) {
   const onDown = (e) => { e.currentTarget.setPointerCapture && e.currentTarget.setPointerCapture(e.pointerId); setFromX(e); };
   const onMove = (e) => { if (e.buttons) setFromX(e); };
   const d = new Date(p.t);
-  const label = d.getHours() + '時' + String(d.getMinutes()).padStart(2, '0') + '分（' + (p.t <= p.now + 30000 ? '現在' : '予測') + '）';
+  const label = d.getHours() + '時' + String(d.getMinutes()).padStart(2, '0') + '分（' + (Math.abs(p.t - p.now) <= 30000 ? '現在' : p.t < p.now ? '記録' : '予測') + '）';
   const noon = new Date(p.start); noon.setHours(12, 0, 0, 0);
   const marks = [[p.start, hm(p.start)], ...(noon.getTime() > p.start && noon.getTime() < p.end ? [[noon.getTime(), '12:00']] : []), [p.end, hm(p.end).replace(/^(\d+):(\d+)$/, '$1:$2')]];
   return (
@@ -34,7 +34,7 @@ export default function PredictBar({ v }) {
         <div ref={trackRef} onPointerDown={onDown} onPointerMove={onMove} style={{ position: 'relative', height: 44, touchAction: 'none', cursor: 'ew-resize' }}>
           <div style={{ position: 'absolute', left: `${frac(p.t) * 100}%`, top: 0, height: 20, width: 2, background: '#c9c7bf', transform: 'translateX(-1px)' }} />
           <div style={{ position: 'absolute', left: 0, right: 0, top: 28, height: 2, background: INK, borderRadius: 1 }} />
-          <div style={{ position: 'absolute', left: 0, width: `${frac(p.now) * 100}%`, top: 24, height: 10, background: 'rgba(27,27,24,.15)', borderRadius: 3 }} />
+          <div style={{ position: 'absolute', left: `${frac(p.now) * 100}%`, top: 24, height: 10, width: 2, background: INK, transform: 'translateX(-1px)' }} />
           <div style={{ position: 'absolute', left: `${frac(p.t) * 100}%`, top: 20, width: 20, height: 20, borderRadius: '50%', background: INK, transform: 'translateX(-50%)', boxShadow: '0 2px 8px rgba(27,27,24,.3)' }} />
           {marks.map(([t, l], i) => <span key={i} style={{ position: 'absolute', top: 44, left: `${frac(t) * 100}%`, transform: i === 0 ? 'none' : i === marks.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)', fontSize: 9.5, color: '#55554e', fontFamily: "'Space Mono',monospace", whiteSpace: 'nowrap' }}>{l}</span>)}
         </div>
