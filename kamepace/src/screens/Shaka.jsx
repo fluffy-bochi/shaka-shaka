@@ -26,10 +26,14 @@ export default function Shaka({ v }) {
         <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#c4f000', color: '#2f3a00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>🏆</span>
         <span style={{ ...mono, fontSize: 9, fontWeight: 700, writingMode: 'vertical-rl', letterSpacing: '.1em' }}>ためた</span>
       </button>
+      {/* 起床後記録: 🌙が降っている間、下にある「つぎへ」で次の画面へ */}
+      {v.wakeFlow && (
+        <button onClick={v.goWake2} style={{ position: 'absolute', left: 20, right: 20, bottom: 84, zIndex: 4, border: 'none', borderRadius: 16, background: '#c4f000', color: '#2f3a00', fontWeight: 800, fontSize: 16, padding: '16px 0', cursor: 'pointer', boxShadow: '0 8px 22px rgba(122,154,0,.4)' }}>つぎへ</button>
+      )}
       {/* 右下の記録ボタン（＋） */}
-      <button onClick={v.goRecordNow} aria-label="記録する" style={{ position: 'absolute', right: 18, bottom: 84, zIndex: 3, width: 58, height: 58, borderRadius: '50%', background: '#c4f000', color: '#2f3a00', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 22px rgba(122,154,0,.4)' }}>
+      {!v.wakeFlow && <button onClick={v.goRecordNow} aria-label="記録する" style={{ position: 'absolute', right: 18, bottom: 84, zIndex: 3, width: 58, height: 58, borderRadius: '50%', background: '#c4f000', color: '#2f3a00', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 22px rgba(122,154,0,.4)' }}>
         <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 30, fontWeight: 700 }}>add</span>
-      </button>
+      </button>}
     </>
   );
 }

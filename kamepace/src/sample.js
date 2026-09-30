@@ -265,15 +265,23 @@ export function buildAcademicYear(ay, opts = {}) {
   // 繰り越しは最大20までに制限（睡眠でしっかり消して積もりすぎを防ぐ。以前は50で山が高くなりすぎた）。
   const SLEEP_RECOVER = 2.6, CARRY_MAX = 20;
   const balanceByDay = {};
+  const wakeByDay = {}; // 起床後記録（朝の体調・気分・残り疲労）。朝の残り疲労＝前日からの繰り越し
   let carry = 0;
   for (let d = new Date(D0); d < D1; d = addDays(d, 1)) {
     const ds = ymd(d);
+    const wf = Math.round(carry + rnd('wf' + ds) * 12); // 朝に残っている疲労（繰り越し＋ゆらぎ）
+    wakeByDay[ds] = {
+      fatigue: Math.max(0, Math.min(100, wf)),
+      cond: Math.max(1, Math.min(5, 5 - Math.round(wf / 14) + Math.round(rnd('wc' + ds) * 2 - 1))),
+      mood: Math.max(1, Math.min(5, 4 - Math.round(wf / 22) + Math.round(rnd('wm' + ds) * 3 - 1))),
+      min: 6 * 60 + 50 + Math.round(rnd('wt' + ds) * 60), // 起床の時刻(分)
+    };
     const before = Math.max(0, carry + (fatBy[ds] || 0) - (recBy[ds] || 0)); // 寝る前の山（繰り越し込み）
     balanceByDay[ds] = before;
     carry = Math.max(0, Math.min(CARRY_MAX, before - (sleepBy[ds] || 0) * SLEEP_RECOVER)); // 睡眠で回復した残りを翌日へ（上限あり）
   }
 
-  return { entries: E, diary, fav, collected, balanceByDay };
+  return { entries: E, diary, fav, collected, balanceByDay, wakeByDay };
 }
 
 /* 表示中の日付が属する「学年（春スタートの年）」 */
