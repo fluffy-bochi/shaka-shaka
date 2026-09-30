@@ -21,6 +21,19 @@ export default function Shaka({ v }) {
       <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '14px 26px 0', pointerEvents: 'none' }}>
         <div style={{ fontFamily: "'Archivo',sans-serif", fontWeight: 800, fontSize: 68, lineHeight: 1.02, letterSpacing: '.01em', color: v.pileHigh ? '#fff' : '#1b1b18', textShadow: v.pileHigh ? '0 2px 10px rgba(27,27,24,.35)' : 'none', transition: 'color .3s' }}>{v.clockHm}</div>
       </div>
+      {/* 予測バー中: その時間の行動（やっていた/やっている/やる予定） */}
+      {v.predictActs && v.predictActs.length > 0 && (
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '8px 26px 0', pointerEvents: 'none' }}>
+          {v.predictActs.slice(0, 4).map((a, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, maxWidth: '100%', background: 'rgba(255,255,255,.88)', borderRadius: 999, padding: '5px 12px', fontSize: 12.5, fontWeight: 700, color: '#1b1b18' }}>
+              <span style={{ fontSize: 14 }}>{a.glyph}</span>
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</span>
+              <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 10, color: '#8a8a82', flex: '0 0 auto' }}>{a.from}–{a.to}</span>
+            </div>
+          ))}
+          {v.predictActs.length > 4 && <div style={{ fontSize: 11, fontWeight: 700, color: '#55554e' }}>ほか{v.predictActs.length - 4}件</div>}
+        </div>
+      )}
       <div style={{ flex: 1 }} />
       {/* 右端の「ためた回復」タブ（画面右辺にくっつく） */}
       <button onClick={v.goCollect} aria-label="ためた回復" style={{ position: 'absolute', right: 0, top: '46%', transform: 'translateY(-50%)', zIndex: 2, background: '#1b1b18', color: '#fff', border: 'none', borderRadius: '14px 0 0 14px', padding: '11px 9px 11px 11px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', boxShadow: '0 4px 14px rgba(27,27,24,.2)' }}>

@@ -11,7 +11,7 @@ import {
 } from './data';
 import {
   todayStr, shiftDate, strToDate, dateToStr, formatDateCaps, formatDateShort, pad2, hmToTsOn,
-  entryToRecord, entryGlyph, entryMin, planUnitsDue, entryEndTs,
+  entryToRecord, entryGlyph, entryMin, planUnitsDue, entryStartTs, entryEndTs,
   serialize, deserialize, freshState, sortEntries, normTitle, getTemplate, baseEntry,
 } from './model';
 import {
@@ -3802,7 +3802,13 @@ export default class App extends React.Component {
       goConfirm: (count === 0 && scCount > 0) ? this.goSearchConfirm : this.goConfirm,
       toggleTemplateToast: this.toggleTemplateToast, shake: this.shake,
       shakaDate: st.dayOffset === 0 ? formatDateShort(todayStr()) : formatDateShort(viewDateStr),
-      clockHm: st.clockHm || this.tsToHm(Date.now()),
+      // 予測バーを開いている間は、大きい時計をスライダーの時刻にして、その時間にやっていた/やっている/やる予定の行動を下に出す
+      clockHm: (st.screen === 'shaka' && st.predictOpen && st.dayOffset === 0) ? this.tsToHm(st.predictT || Date.now()) : (st.clockHm || this.tsToHm(Date.now())),
+      predictActs: (st.screen === 'shaka' && st.predictOpen && st.dayOffset === 0) ? (() => {
+        const T = st.predictT || Date.now(), t0 = todayStr();
+        return st.entries.filter(e => e.date === t0 && !e.exp && !e.wakeAdd && e.title && e.from && e.to && entryStartTs(e) <= T && T < entryEndTs(e))
+          .sort((a, b) => a.from.localeCompare(b.from)).map(e => ({ glyph: entryGlyph(e), title: e.title, from: e.from, to: e.to }));
+      })() : [],
       prevDay: this.prevDay, nextDay: this.nextDay,
       prevColor: st.dayOffset <= this._dayRange.min ? '#d8d5cb' : '#55554e',
       nextColor: st.dayOffset >= this._dayRange.max ? '#d8d5cb' : '#55554e',
