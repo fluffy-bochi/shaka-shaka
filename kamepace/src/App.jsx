@@ -2541,7 +2541,11 @@ export default class App extends React.Component {
     this._applyPredict(now);
   };
   closePredict = () => { this.set({ predictOpen: false }); this._pred = null; this.rebuildPhysics(); };
-  setPredictT = (t) => { const T = Math.max(Date.now(), t); this.set({ predictT: T }); this._applyPredict(T); };
+  setPredictT = (t) => {
+    const t0 = todayStr(), wk = (this.state.wakeLog || []).find(w => w.date === t0);
+    const T = Math.max(Date.now(), wk ? wk.ts : hmToTsOn(t0, '08:00'), t);
+    this.set({ predictT: T }); this._applyPredict(T);
+  };
   _applyPredict(T) {
     if (!this.engine || !this._pred) return;
     const { World, Bodies } = Matter;
@@ -3447,7 +3451,9 @@ export default class App extends React.Component {
       predict: (st.screen === 'shaka' && st.dayOffset === 0) ? (() => {
         const now = Date.now(), t0 = todayStr();
         const wk = (st.wakeLog || []).find(w => w.date === t0);
-        return { open: !!st.predictOpen, t: st.predictT || now, now, start: wk && wk.ts < now ? wk.ts : now, end: Math.max(hmToTsOn(t0, '23:00'), now + 30 * 60000) };
+        // 左端=今日の起床時刻（記入がなければ8時）、右端=寝る時刻（就寝の記録は未作成なので23:00）
+        const start = wk ? wk.ts : hmToTsOn(t0, '08:00');
+        return { open: !!st.predictOpen, t: Math.max(st.predictT || 0, now, start), now, start, end: Math.max(hmToTsOn(t0, '23:00'), now + 30 * 60000, start + 60 * 60000) };
       })() : null,
       openPredict: this.openPredict, closePredict: this.closePredict, setPredictT: this.setPredictT,
       wakeDraft: st.wakeDraft, setWakeDraft: this.setWakeDraft, finishWake1: this.finishWake1,
