@@ -1,7 +1,7 @@
 import React from 'react';
 
 /* シャカの予測バー（雨雲レーダー風）: 右端の「予測」タブで開き、時刻スライダーを動かすと
-   その時刻までに積もる予定ぶんが灰色で山に足される。左端は起床後の入力時刻、右端は23:00。 */
+   その時刻までに積もる予定ぶんが灰色で山に足される。左端は起床時刻（記入がなければ8時）、右端は寝る時刻（未作成のあいだは23:00）。 */
 const INK = '#1b1b18';
 const hm = (ts) => { const d = new Date(ts); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
 const tabShape = (left) => ({ position: 'absolute', top: 0, bottom: 0, [left ? 'left' : 'right']: 0, width: 29, background: INK, color: '#fff', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, lineHeight: 1.15, clipPath: left ? 'polygon(0 12%, 100% 0, 100% 100%, 0 88%)' : 'polygon(0 0, 100% 12%, 100% 88%, 0 100%)' });
@@ -11,7 +11,7 @@ export default function PredictBar({ v }) {
   const trackRef = React.useRef(null);
   if (!p) return null;
   if (!p.open) {
-    return <button onClick={v.openPredict} aria-label="予測" style={{ ...tabShape(false), top: 'auto', bottom: 168, height: 100, zIndex: 4 }}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>予測</span></button>;
+    return <button onClick={v.openPredict} aria-label="予測" style={{ ...tabShape(false), clipPath: 'polygon(0 12%, 100% 0, 100% 100%, 0 88%)', top: 'auto', bottom: 120, height: 100, zIndex: 4 }}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>予測</span></button>;
   }
   const span = p.end - p.start;
   const frac = (t) => Math.max(0, Math.min(1, (t - p.start) / span));
@@ -26,10 +26,10 @@ export default function PredictBar({ v }) {
   const noon = new Date(p.start); noon.setHours(12, 0, 0, 0);
   const marks = [[p.start, hm(p.start)], ...(noon.getTime() > p.start && noon.getTime() < p.end ? [[noon.getTime(), '12:00']] : []), [p.end, hm(p.end).replace(/^(\d+):(\d+)$/, '$1:$2')]];
   return (
-    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 84, height: 100, zIndex: 4 }}>
+    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 120, height: 100, zIndex: 4 }}>
       <button onClick={v.closePredict} aria-label="予測を閉じる" style={{ ...tabShape(false) }}>▶</button>
       <div style={tabShape(true)}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>予測</span></div>
-      <div style={{ position: 'absolute', left: 41, right: 41, top: 0 }}>
+      <div style={{ position: 'absolute', left: 29, right: 29, top: 0, bottom: 0, background: 'rgba(0,0,0,.2)', padding: '0 12px' }}>
         <div style={{ height: 38, background: 'rgba(255,255,255,.94)', border: '1.5px solid ' + INK, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>{label}</div>
         <div ref={trackRef} onPointerDown={onDown} onPointerMove={onMove} style={{ position: 'relative', height: 44, touchAction: 'none', cursor: 'ew-resize' }}>
           <div style={{ position: 'absolute', left: `${frac(p.t) * 100}%`, top: 0, height: 20, width: 2, background: '#c9c7bf', transform: 'translateX(-1px)' }} />
