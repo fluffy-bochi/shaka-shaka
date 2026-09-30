@@ -2,6 +2,7 @@
    疲労度は 0〜100（山が100個で満杯）。0〜40=ゆったり / 41〜80=ほどほど / 81〜100=みちみち。
    1日の疲労の推移を滑らかな曲線にして、一番長く居たゾーンをその日のタイプにする。 */
 import { hmToTsOn, entryGlyph } from './model';
+import { REVIEW_BASE as BASE, REVIEW_CLOSER as CLOSER, HOME_BY_ZONE, REST_FROM, REST_INTRO, REST_TIPS, AFTER_FATIGUE, AFTER_RECOVER, AFTER_RECORD_MIN } from './serifu';
 
 export const WAKE_TYPES = [
   { id: 'yuttari', name: 'ゆったりタイプ', glyph: '🌿' },
@@ -67,19 +68,6 @@ export function daySummary(entries, dateStr, startFat) {
   return { type: typeOfCurve(curve), up: up && up.title, rec: rec && rec.title, upGlyph: up && entryGlyph(up), recGlyph: rec && entryGlyph(rec), has: list.length > 0 };
 }
 
-const BASE = {
-  yuttari: ['昨日はゆったり過ごせましたね。', 'のんびりした一日でしたね。', '疲れをためすぎない、やさしい一日でしたね。'],
-  hodohodo: ['昨日はほどよく頑張りましたね。', 'ちょうどいいペースの一日でしたね。', 'ほどほどに動いた一日でしたね。'],
-  michimichi: ['昨日はたくさん頑張りましたね！', 'みっちり動いた一日でしたね！', 'フル回転の一日、おつかれさまでした。'],
-  none: ['昨日の記録はまだありませんでした。', '昨日はお休みの日でしたか？'],
-};
-const CLOSER = {
-  yuttari: ['今日は少しペースを上げてもよさそうです。', '余力があるので、やりたいことに手を伸ばしてみましょう。'],
-  hodohodo: ['今日もこのペースでいきましょう。', '休みも挟みながら、いつも通りで大丈夫です。'],
-  michimichi: ['今日はその分ゆったり過ごしてみてはいかがでしょうか？', '今日は回復の時間も多めにとりましょう。'],
-  none: ['今日から少しずつ記録していきましょう。'],
-};
-
 /* 画面3: 昨日のふりかえりのセリフ */
 export function reviewLine(sum, dateStr) {
   const id = sum.type.id;
@@ -100,15 +88,21 @@ export function planLine(plans, tasks, sum, dateStr) {
   return parts.join('');
 }
 
-/* ホーム上部のコメント: 見ている日のいまの山の量（0〜100）と、次の予定 */
-export function homeLine(count, next, dateStr) {
-  const z = zoneOf(count);
-  const base = [
-    ['まだ余裕がありますね。', 'ゆったり進められています。'],
-    ['ほどよく疲れがたまってきました。', 'いいペースですね。'],
-    ['だいぶ疲れがたまっています。', '無理せず休みをはさみましょう。'],
-  ][z];
-  const parts = [pick(dateStr + 'h' + count, base)];
+/* ホーム上部のコメント。優先順:
+   1) 記録した直後: おつかれさま／疲れは取れましたか？（この先の予定は言わない）。山が REST_FROM 以上なら休み方も添える
+   2) 山が REST_FROM 以上: おすすめの休み方の提案
+   3) それ以外: 山の量に合わせた一言＋次の予定
+   セリフの文言は serifu.js */
+export function homeLine(count, next, dateStr, lastRec, now) {
+  const seed = dateStr + 'h' + count;
+  const tired = count >= REST_FROM;
+  const restLine = () => pick(seed + 'i', REST_INTRO) + 'おすすめは' + pick(seed + 't', REST_TIPS) + 'です。';
+  if (lastRec && now - lastRec.ts < AFTER_RECORD_MIN * 60000) {
+    const head = pick(seed + 'a' + lastRec.ts, lastRec.rec ? AFTER_RECOVER : AFTER_FATIGUE);
+    return head + (tired ? restLine() : '');
+  }
+  if (tired) return restLine();
+  const parts = [pick(seed, HOME_BY_ZONE[zoneOf(count) === 0 ? 0 : 1])];
   if (next) parts.push('次は' + next.title + '（' + next.from + '〜）です。');
   return parts.join('');
 }
