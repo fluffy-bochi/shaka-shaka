@@ -2,6 +2,7 @@ import React from 'react';
 
 /* シャカの予測バー（雨雲レーダー風）: 右端の「予測」タブで開き、時刻スライダーを動かすと
    その時刻までに積もる予定ぶんが灰色で山に足される。左端は起床時刻（記入がなければ8時）、右端は寝る時刻（未作成のあいだは23:00）。 */
+const MARK = 6; // 記録の印の太さ（つまみ20pxより小さい）
 const INK = '#1b1b18', LIME = '#c4f000', LIME_INK = '#2f3a00';
 const hm = (ts) => { const d = new Date(ts); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
 const tabShape = (left) => ({ position: 'absolute', top: 0, bottom: 0, [left ? 'left' : 'right']: 0, width: 29, background: INK, color: '#fff', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, lineHeight: 1.15, clipPath: left ? 'polygon(0 12%, 100% 0, 100% 100%, 0 88%)' : 'polygon(0 0, 100% 12%, 100% 88%, 0 100%)' });
@@ -38,10 +39,14 @@ export default function PredictBar({ v }) {
         <div style={{ height: 38, background: 'rgba(255,255,255,.94)', border: '1.5px solid ' + INK, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>{label}</div>
         <div ref={trackRef} onPointerDown={onDown} onPointerMove={onMove} style={{ position: 'relative', height: 44, touchAction: 'none', cursor: 'ew-resize' }}>
           <div style={{ position: 'absolute', left: `${frac(p.t) * 100}%`, top: 0, height: 20, width: 2, background: '#c9c7bf', transform: 'translateX(-1px)' }} />
-          <div style={{ position: 'absolute', left: 0, right: 0, top: 28, height: 4, background: LIME, borderRadius: 2 }} />
-          {/* 記録・予定のある時間: 短ければ点（丸）、長ければ、その時間の幅の棒（両端が半円） */}
-          {(p.marks || []).map((m, i) => { const a = frac(m.a), b = frac(m.b); return <div key={i} style={{ position: 'absolute', top: 25, height: 10, left: `${(a + b) / 2 * 100}%`, width: `max(10px, ${(b - a) * 100}%)`, transform: 'translateX(-50%)', borderRadius: 5, background: 'rgba(27,27,24,.5)' }} />; })}
-          <div style={{ position: 'absolute', left: `${frac(p.now) * 100}%`, top: 24, height: 10, width: 2, background: INK, transform: 'translateX(-1px)' }} />
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 29, height: 2, background: INK, borderRadius: 1 }} />
+          {/* 記録・予定のある時間: 短ければ点（丸）、長ければ、その時間の幅の棒（両端が半円）。つまみと重なったらライム */}
+          {(p.marks || []).map((m, i) => {
+            const a = frac(m.a), b = frac(m.b), tw = (trackRef.current && trackRef.current.clientWidth) || 250;
+            const half = Math.max(MARK / 2, (b - a) * tw / 2), c = (a + b) / 2 * tw, px = frac(p.t) * tw;
+            const hit = c + half >= px - 10 && c - half <= px + 10; // つまみ（半径10px）と重なる
+            return <div key={i} style={{ position: 'absolute', top: 30 - MARK / 2, height: MARK, left: `${(a + b) / 2 * 100}%`, width: `max(${MARK}px, ${(b - a) * 100}%)`, transform: 'translateX(-50%)', borderRadius: MARK / 2, background: hit ? LIME : INK }} />;
+          })}
           <div style={{ position: 'absolute', left: `${frac(p.t) * 100}%`, top: 20, width: 20, height: 20, borderRadius: '50%', background: LIME, border: '2.5px solid ' + LIME_INK, boxSizing: 'border-box', transform: 'translateX(-50%)', boxShadow: '0 2px 8px rgba(27,27,24,.3)' }} />
           {marks.map(([t, l], i) => <span key={i} style={{ position: 'absolute', top: 44, left: `${frac(t) * 100}%`, transform: i === 0 ? 'none' : i === marks.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)', fontSize: 9.5, color: '#55554e', fontFamily: "'Space Mono',monospace", whiteSpace: 'nowrap' }}>{l}</span>)}
         </div>
