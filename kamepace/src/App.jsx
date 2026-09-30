@@ -1403,39 +1403,29 @@ export default class App extends React.Component {
     // 振って変わった形が保存されていればそれを背景にも使う（勝手に整列しない）
     let saved = this._pileLayout;
     if (saved && saved.length) {
-      // 山が減っていたら（睡眠・ゴミ箱）古い側から間引いて量を合わせる
+      // シャカで見えていた並び・余裕をそのまま使う（詰め直さない）。
+      // 山が減っていたら（睡眠・ゴミ箱・消費）一番上の絵文字から外す。増えていたら（記録直後）山の上に足す。
       const glyphs = this.pileGlyphs();
       const target = glyphs.length;
-      let compact = false;
-      if (saved.length > target) { saved = saved.slice(saved.length - target); compact = true; }
-      const base = saved.slice(0, 200).map(sp => ({
+      let base = saved.slice(0, 200).map(sp => ({
         e: sp.g,
         x: Math.round(sp.x * W - r),
         y: Math.round(H - sp.y * H - r),
         r2: Math.round(((sp.a || 0) * 180) / Math.PI),
         s: font,
       }));
-      // 下の絵文字が消えて上だけ残ると宙に浮くので、減った時は列ごとに下へ詰め直す。
-      // 増えた分（記録直後にホームを見た時）は山の上に足す
-      const extras = glyphs.slice(saved.length, 200 > saved.length ? 200 : saved.length);
-      if (compact || extras.length) {
+      if (base.length > target) base = base.sort((p, q) => p.y - q.y).slice(0, target); // 低い（下の）ものを残す
+      if (base.length && base.length < target) {
+        const extras = glyphs.slice(base.length, Math.max(200, base.length));
         const cols = Math.max(1, Math.floor(W / d));
-        const colH = Array(cols).fill(0);
-        const items = base.map(p => ({ ...p })).sort((p, q) => p.y - q.y); // 下(小さいbottom)から積む
-        const out = [];
-        items.forEach(p => {
-          const c = Math.min(cols - 1, Math.max(0, Math.floor((p.x + r) / d)));
-          out.push({ ...p, y: Math.round(colH[c]) });
-          colH[c] += d * 0.9;
-        });
+        const colTop = Array(cols).fill(0); // 各列の、いまの山の上端（下端からの高さ）
+        base.forEach(p => { const c = Math.min(cols - 1, Math.max(0, Math.floor((p.x + r) / d))); colTop[c] = Math.max(colTop[c], p.y + d * 0.9); });
         let s2 = 11; const rng2 = () => { s2 = (s2 * 9301 + 49297) % 233280; return s2 / 233280; };
-        extras.forEach((g, i) => {
-          // いちばん低い列に積む（自然に山になる）
-          let c = 0; for (let k = 1; k < cols; k++) if (colH[k] < colH[c]) c = k;
-          out.push({ e: g, x: Math.round(c * d + (rng2() - 0.5) * d * 0.3), y: Math.round(colH[c]), r2: Math.round((rng2() - 0.5) * 54), s: font });
-          colH[c] += d * 0.9;
+        extras.forEach((g) => {
+          let c = 0; for (let k = 1; k < cols; k++) if (colTop[k] < colTop[c]) c = k; // いちばん低い列に積む（自然に山になる）
+          base.push({ e: g, x: Math.round(c * d + (rng2() - 0.5) * d * 0.3), y: Math.round(colTop[c]), r2: Math.round((rng2() - 0.5) * 54), s: font });
+          colTop[c] += d * 0.9;
         });
-        return out;
       }
       // 山全体が下端から浮いていたら（振った形の保存など）、形はそのままで下端に寄せて隙間を無くす
       if (base.length) {
@@ -2488,8 +2478,10 @@ export default class App extends React.Component {
     if (this.state.dayOffset !== 0) return;
     if (!this.bodies || !this.bodies.length) return;
     // 落下・散らばりの途中で画面を離れても「宙に浮いた形」を保存しない。
-    // 全員がスリープ（静止）するまで物理を先送りしてから位置を読む（最大4秒ぶん）
-    if (this.engine) {
+    // 全員がスリープ（静止）するまで物理を先送りしてから位置を読む（最大4秒ぶん）。
+    // ただし凍結中（止まって見えている状態）は先送りしない。先送りすると、見えていた並びより
+    // 下に沈んだ形が保存され、ホームでは押しつぶされ、シャカに戻ると上に戻って見える。
+    if (this.engine && this._running) {
       let steps = 0;
       while (steps < 240 && this.bodies.some(({ body }) => !body.isSleeping)) {
         Matter.Engine.update(this.engine, 1000 / 60); steps++;
