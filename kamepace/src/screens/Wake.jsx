@@ -69,7 +69,7 @@ export function WakeCheck({ v }) {
 function Speaker({ text }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 20px' }}>
-      <div style={{ flex: '0 0 auto', width: 108, height: 108, borderRadius: '50%', background: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 62 }}>🐢</div>
+      <img src="/wake/nurse.png" alt="" style={{ flex: '0 0 auto', width: 130, height: 130, objectFit: 'contain', objectPosition: 'bottom', mixBlendMode: 'multiply' }} />
       <div style={{ position: 'relative', flex: 1, background: '#fff', borderRadius: 18, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.75, boxShadow: '0 2px 10px rgba(27,27,24,.06)', marginBottom: 14 }}>
         {text}
         <span style={{ position: 'absolute', left: -6, bottom: 14, width: 12, height: 12, background: '#fff', transform: 'rotate(45deg)' }} />
@@ -157,7 +157,9 @@ export function WakeReview({ v }) {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <div style={{ textAlign: 'center', fontSize: 12.5, color: '#55554e', fontWeight: 700, marginTop: 4 }}>昨日のがんばりタイプ</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, margin: '8px 0 14px' }}>
-          <div style={{ width: 62, height: 62, borderRadius: '50%', background: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>{w.sum.type.glyph}</div>
+          {w.sum.type.id === 'michimichi'
+            ? <img src="/wake/fireball.svg" alt="" style={{ width: 62, height: 62 }} />
+            : <div style={{ width: 62, height: 62, borderRadius: '50%', background: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>{w.sum.type.glyph}</div>}
           <div style={{ fontSize: 24, fontWeight: 900 }}>{w.sum.type.name}</div>
         </div>
         <Speaker text={w.reviewText} />
