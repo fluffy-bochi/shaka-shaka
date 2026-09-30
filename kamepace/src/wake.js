@@ -99,3 +99,16 @@ export function planLine(plans, tasks, sum, dateStr) {
   parts.push(pick(dateStr + 'p', CLOSER[sum.type.id]));
   return parts.join('');
 }
+
+/* ホーム上部のコメント: 見ている日のいまの山の量（0〜100）と、次の予定 */
+export function homeLine(count, next, dateStr) {
+  const z = zoneOf(count);
+  const base = [
+    ['まだ余裕がありますね。', 'ゆったり進められています。'],
+    ['ほどよく疲れがたまってきました。', 'いいペースですね。'],
+    ['だいぶ疲れがたまっています。', '無理せず休みをはさみましょう。'],
+  ][z];
+  const parts = [pick(dateStr + 'h' + count, base)];
+  if (next) parts.push('次は' + next.title + '（' + next.from + '〜）です。');
+  return parts.join('');
+}
