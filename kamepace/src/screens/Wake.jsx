@@ -45,7 +45,27 @@ function Rating({ title, opts, value, onPick, labels }) {
   );
 }
 
-/* 1: 体調・気分・残っている疲労度 */
+/* 睡眠時間: 何時〜何時まで（就寝〜起床）。起床の初期値は入力画面を開いた時刻 */
+const toMin = (hm) => { const [h, m] = (hm || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+const timeBox = { border: 'none', background: '#f1efe8', borderRadius: 12, padding: '9px 10px', fontSize: 20, fontWeight: 800, color: INK, fontFamily: "'Space Mono',monospace", width: 118, textAlign: 'center', boxSizing: 'border-box' };
+function SleepCard({ d, set }) {
+  let dur = toMin(d.up) - toMin(d.bed); if (dur <= 0) dur += 1440; // 日をまたぐ
+  return (
+    <div style={{ background: '#fff', borderRadius: 18, margin: '0 20px 12px', padding: '14px 16px 14px', boxShadow: '0 2px 10px rgba(27,27,24,.05)' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 15, fontWeight: 800 }}>睡眠</span>
+        <span style={{ ...mono, fontSize: 13, fontWeight: 700, color: '#55554e' }}>{Math.floor(dur / 60)}時間{dur % 60}分</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+        <input type="time" value={d.bed || ''} onChange={(e) => set('bed', e.target.value)} aria-label="就寝時刻" style={timeBox} />
+        <span style={{ fontSize: 16, fontWeight: 800, color: '#8a8a82' }}>〜</span>
+        <input type="time" value={d.up || ''} onChange={(e) => set('up', e.target.value)} aria-label="起床時刻" style={timeBox} />
+      </div>
+    </div>
+  );
+}
+
+/* 1: 睡眠・体調・気分・残っている疲労度 */
 export function WakeCheck({ v }) {
   const d = v.wakeDraft;
   const ready = d.fat != null;
@@ -53,6 +73,7 @@ export function WakeCheck({ v }) {
     <div style={wrap}>
       <Head v={v} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingTop: 6 }}>
+        <SleepCard d={d} set={v.setWakeDraft} />
         <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setWakeDraft('cond', x)} />
         <Rating title="気分" opts={MOOD.map(([g], i) => [i + 1, g])} labels={MOOD.map(c => c[1])} value={d.mood} onPick={(x) => v.setWakeDraft('mood', x)} />
         <Rating title="残っている疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setWakeDraft('fat', x)} />
