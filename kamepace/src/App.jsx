@@ -3803,9 +3803,9 @@ export default class App extends React.Component {
       toggleTemplateToast: this.toggleTemplateToast, shake: this.shake,
       shakaDate: st.dayOffset === 0 ? formatDateShort(todayStr()) : formatDateShort(viewDateStr),
       clockHm: st.clockHm || this.tsToHm(Date.now()), // 大きい時計は常に現在時刻
-      // 予測バーを開いている間は、スライダーの時刻にやっていた/やっている/やる予定の行動を時計の下に出す
-      predictActs: (st.screen === 'shaka' && st.predictOpen && st.dayOffset === 0) ? (() => {
-        const T = st.predictT || Date.now(), t0 = todayStr();
+      // 時計の下に、いまやっている行動を出す（予測バーを開いている間は、スライダーの時刻にやっていた/やっている/やる予定の行動）
+      predictActs: (st.screen === 'shaka' && st.dayOffset === 0) ? (() => {
+        const T = st.predictOpen ? (st.predictT || Date.now()) : Date.now(), t0 = todayStr(); // 予測を開いていなければ「いま」
         return st.entries.filter(e => e.date === t0 && !e.exp && !e.wakeAdd && e.title && e.from && e.to && entryStartTs(e) <= T && T < entryEndTs(e))
           .sort((a, b) => a.from.localeCompare(b.from)).map(e => ({ glyph: entryGlyph(e), title: e.title, from: e.from, to: e.to }));
       })() : [],
