@@ -2201,6 +2201,21 @@ export default class App extends React.Component {
     engine.velocityIterations = 4;
     // 静止した絵文字は完全にスリープさせ、山の圧縮クリープ（じわじわ沈む）を止める
     engine.enableSleeping = true;
+    // ジャイロ（傾き）モードは重力が強く落下が速いので、着地でめり込んで沈み込みやすい。
+    // 硬く見せるために、①1ステップの移動量を絵文字の半径ぶんまでに抑える（速すぎて食い込むのを防ぐ）
+    // ②めり込み解消の反復を増やす、を傾きモードのときだけ行う。
+    Matter.Events.on(engine, 'beforeUpdate', () => {
+      const gyro = !!this.state.gyroMode;
+      engine.positionIterations = gyro ? 16 : 8;
+      engine.velocityIterations = gyro ? 8 : 4;
+      if (!gyro) return;
+      const vmax = Math.max(6, (this.PR || 18) * 0.8);
+      (this.bodies || []).forEach(({ body }) => {
+        if (body.isSleeping || body.isStatic) return;
+        const v = body.velocity, sp = Math.hypot(v.x, v.y);
+        if (sp > vmax) Matter.Body.setVelocity(body, { x: v.x * vmax / sp, y: v.y * vmax / sp });
+      });
+    });
   }
   componentDidMount() {
     initShakaSound();
