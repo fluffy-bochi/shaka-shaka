@@ -3493,7 +3493,9 @@ export default class App extends React.Component {
         const wk = (st.wakeLog || []).find(w => w.date === t0);
         // 左端=今日の起床時刻（記入がなければ8時）、右端=寝る時刻（就寝の記録は未作成なので23:00）
         const start = wk ? wk.ts : hmToTsOn(t0, '08:00');
-        return { open: !!st.predictOpen, t: Math.max(st.predictT || now, start), now, start, end: Math.max(hmToTsOn(t0, '23:00'), now + 30 * 60000, start + 60 * 60000) };
+        // スライダー上に印をつける、今日の記録・予定の時間帯
+        const marks = st.predictOpen ? st.entries.filter(e => e.date === t0 && !e.exp && !e.wakeAdd && e.title && e.from && e.to).map(e => ({ a: entryStartTs(e), b: entryEndTs(e) })) : [];
+        return { open: !!st.predictOpen, marks, t: Math.max(st.predictT || now, start), now, start, end: Math.max(hmToTsOn(t0, '23:00'), now + 30 * 60000, start + 60 * 60000) };
       })() : null,
       openPredict: this.openPredict, closePredict: this.closePredict, setPredictT: this.setPredictT,
       wakeDraft: st.wakeDraft, setWakeDraft: this.setWakeDraft, finishWake1: this.finishWake1,
