@@ -23,7 +23,7 @@ import { appendGlyph } from './fluent';
 import Home from './screens/Home';
 import Record from './screens/Record';
 import { WakeCheck, WakeReview, WakePlan } from './screens/Wake';
-import { predictUnits, pastAfter } from './predict';
+import { predictUnits, pastHide, consumedToday } from './predict';
 import { daySummary, reviewLine, planLine, homeLine } from './wake';
 import Shaka from './screens/Shaka';
 import Collect from './screens/Collect';
@@ -2532,7 +2532,7 @@ export default class App extends React.Component {
     const now = Date.now();
     this._pred = predictUnits(this.state.entries, todayStr());
     this._predToday = this.state.entries.filter(e => e.date === todayStr() && !e.exp);
-    this._predPool = this._consumedTail(80);
+    this._predRest = consumedToday(this.state.collected, (ts) => dateToStr(new Date(ts)) === todayStr());
     this.set({ predictOpen: true, predictT: now });
     // 既存の未来予定（灰色）は外して、予測の時刻に合わせて足し直す
     const { World } = Matter;
@@ -2542,25 +2542,12 @@ export default class App extends React.Component {
     }
     this._applyPredict(now);
   };
-  closePredict = () => { this.set({ predictOpen: false }); this._pred = null; this._predToday = null; this.rebuildPhysics(); };
+  closePredict = () => { this.set({ predictOpen: false }); this._pred = null; this._predToday = null; this._predRest = null; this.rebuildPhysics(); };
   setPredictT = (t) => {
     const t0 = todayStr(), wk = (this.state.wakeLog || []).find(w => w.date === t0);
     const T = Math.max(wk ? wk.ts : hmToTsOn(t0, '08:00'), t);
     this.set({ predictT: T }); this._applyPredict(T);
   };
-  /* 消費ずみ（山の下から消えた）絵文字の直近ぶん。過去へ動かしたとき、まだ消えていない状態に戻すのに使う */
-  _consumedTail(k) {
-    const stack = [];
-    sortEntries(this.state.entries).forEach(r => {
-      if (r.exp || (r.delta || 0) <= 0) return;
-      const n = r.planned ? (r.dropped || 0) : r.delta;
-      for (let i = 0; i < n; i++) stack.push(entryGlyph(r));
-    });
-    const c = Math.min(this.state.consumed || 0, stack.length);
-    const tail = stack.slice(Math.max(0, c - k), c);
-    while (tail.length < k) tail.unshift(tail[0] || '😮‍💨');
-    return tail;
-  }
   _applyPredict(T) {
     if (!this.engine || !this._pred) return;
     const { World, Bodies } = Matter;
@@ -2592,8 +2579,10 @@ export default class App extends React.Component {
       }
     }
     // 過去へ動かしたとき: T より後に積もる疲労ぶんは外し、T より後に消える回復ぶんは戻す
-    const pa = pastAfter(this._predToday, T), pn = pastAfter(this._predToday, Date.now());
-    const past = { hide: Math.max(0, pa.hide - pn.hide), restore: Math.max(0, pa.restore - pn.restore) }; // 「いま」との差だけ（未来時刻なのに予定扱いでない記録の影響を除く）
+    // 過去へ動かしたとき: 記録の時刻から、T より後に積もる疲労ぶんは外し、T より後に消えた絵文字は戻す（「いま」との差だけ）
+    const hideN = Math.max(0, pastHide(this._predToday, T) - pastHide(this._predToday, Date.now()));
+    const restList = (this._predRest || []).filter(x => x.ts > T);
+    const past = { hide: hideN, restore: restList.length };
     const solidAll = this.bodies.filter(b => !b.gray);
     const M = Math.min(past.hide, solidAll.length);
     const rect0 = el.getBoundingClientRect(); const W0 = rect0.width || 350; const r0 = this.PR;
@@ -2614,8 +2603,7 @@ export default class App extends React.Component {
       rb.el.remove(); this.bodies = this.bodies.filter(b => b !== rb);
     }
     while (this.restBodies.length < wantRest) {
-      const pool = this._predPool || [];
-      const g = pool[pool.length - 1 - this.restBodies.length] || '😮‍💨';
+      const g = restList[this.restBodies.length].g || '😮‍💨';
       const r = this.PR;
       const body = Bodies.circle(r + Math.random() * (W0 - 2 * r), -r, r, this.BODY_OPTS);
       World.add(this.engine.world, body);

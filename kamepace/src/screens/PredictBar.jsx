@@ -22,7 +22,7 @@ export default function PredictBar({ v }) {
   const onDown = (e) => { e.currentTarget.setPointerCapture && e.currentTarget.setPointerCapture(e.pointerId); setFromX(e); };
   const onMove = (e) => { if (e.buttons) setFromX(e); };
   const d = new Date(p.t);
-  const label = d.getHours() + '時' + String(d.getMinutes()).padStart(2, '0') + '分（' + (Math.abs(p.t - p.now) <= 30000 ? '現在' : p.t < p.now ? '記録' : '予測') + '）';
+  const label = d.getHours() + '時' + String(d.getMinutes()).padStart(2, '0') + '分（' + (Math.abs(p.t - p.now) <= 30000 ? '現在' : p.t < p.now ? '過去' : '予測') + '）';
   const noon = new Date(p.start); noon.setHours(12, 0, 0, 0);
   const marks = [[p.start, hm(p.start)], ...(noon.getTime() > p.start && noon.getTime() < p.end ? [[noon.getTime(), '12:00']] : []), [p.end, hm(p.end).replace(/^(\d+):(\d+)$/, '$1:$2')]];
   return (

@@ -17,16 +17,27 @@ export function predictUnits(entries, dateStr) {
   return { pos, neg };
 }
 
-/* 時刻 T の時点での山（過去に動かしたとき）: T より後に積もる疲労ぶん(hide)は山から外し、
-   T より後に消える回復ぶん(restore)は、まだ消えていない状態に戻す。 */
-export function pastAfter(entries, T) {
-  let hide = 0, restore = 0;
+/* 時刻 T の時点での山（過去に動かしたとき）: 各記録の from→to の時刻から、T より後に積もる疲労ぶん(hide)を数える。 */
+export function pastHide(entries, T) {
+  let hide = 0;
   (entries || []).forEach((e) => {
-    if (!e.delta) return;
-    const N = Math.abs(e.delta);
+    if ((e.delta || 0) <= 0) return;
+    const N = e.delta;
     const solid = e.planned ? Math.min(N, e.dropped || 0) : N;
-    const after = solid - Math.min(solid, planUnitsDue(e, T));
-    if (e.delta > 0) hide += after; else restore += after;
+    hide += solid - Math.min(solid, planUnitsDue(e, T));
   });
-  return { hide, restore };
+  return hide;
+}
+
+/* 今日「ためた回復」に入った、消えたプラスの絵文字（消えた時刻つき・新しい順）。
+   回復の絵文字がプラスに触れて消えるたびに、[回復, 消えたプラス] の組が同じ ts で記録される。 */
+export function consumedToday(collected, dateOf) {
+  const byTs = {};
+  (collected || []).forEach((c) => { if (!c._sample && c.ts) (byTs[c.ts] = byTs[c.ts] || []).push(c); });
+  const out = [];
+  Object.keys(byTs).forEach((ts) => {
+    if (!dateOf(Number(ts))) return;
+    byTs[ts].forEach((c, i) => { if (i % 2 === 1) out.push({ ts: Number(ts), g: c.glyph }); });
+  });
+  return out.sort((a, b) => b.ts - a.ts);
 }
