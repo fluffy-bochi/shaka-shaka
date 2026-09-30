@@ -2,7 +2,7 @@
    疲労度は 0〜100（山が100個で満杯）。0〜40=ゆったり / 41〜80=ほどほど / 81〜100=みちみち。
    1日の疲労の推移を滑らかな曲線にして、一番長く居たゾーンをその日のタイプにする。 */
 import { hmToTsOn, entryGlyph } from './model';
-import { REVIEW_BASE as BASE, REVIEW_CLOSER as CLOSER, HOME_BY_ZONE, REST_FROM, REST_INTRO, REST_TIPS, AFTER_FATIGUE, AFTER_RECOVER, AFTER_RECORD_MIN, TAP_NO_REPEAT, TAP_TIME, TAP_DATE, TAP_OCTOBER, TAP_CHAT, TAP_ANNOY } from './serifu';
+import { REVIEW_BASE as BASE, REVIEW_CLOSER as CLOSER, HOME_BY_ZONE, REST_FROM, REST_INTRO, REST_TIPS, AFTER_FATIGUE, AFTER_RECOVER, AFTER_RECORD_MIN, TAP_NO_REPEAT, TAP_TIME, TAP_DATE, TAP_OCTOBER, TAP_CHAT, TAP_ANNOY, NURSE_FACES, FACE_RULES } from './serifu';
 
 export const WAKE_TYPES = [
   { id: 'yuttari', name: 'ゆったりタイプ', glyph: '🌿' },
@@ -121,4 +121,11 @@ export function tapLine(now, recent, annoyed) {
   if (!cand.length) cand = pool.filter(x => x !== (recent || [])[recent.length - 1]);
   if (!cand.length) cand = pool;
   return cand[Math.floor(Math.random() * cand.length)];
+}
+
+/* セリフに合ったおねえさんのイラスト（表情）のURL。合うものがなければふだんの顔 */
+export function nurseSrc(text) {
+  const rule = FACE_RULES.find(([re]) => re.test(text || ''));
+  const file = NURSE_FACES[rule ? rule[1] : 'normal'] || NURSE_FACES.normal;
+  return '/wake/' + encodeURIComponent(file);
 }
