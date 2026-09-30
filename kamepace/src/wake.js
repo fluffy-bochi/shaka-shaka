@@ -2,7 +2,7 @@
    疲労度は 0〜100（山が100個で満杯）。0〜40=ゆったり / 41〜80=ほどほど / 81〜100=みちみち。
    1日の疲労の推移を滑らかな曲線にして、一番長く居たゾーンをその日のタイプにする。 */
 import { hmToTsOn, entryGlyph } from './model';
-import { REVIEW_BASE as BASE, REVIEW_CLOSER as CLOSER, HOME_BY_ZONE, REST_FROM, REST_INTRO, REST_TIPS, AFTER_FATIGUE, AFTER_RECOVER, AFTER_RECORD_MIN } from './serifu';
+import { REVIEW_BASE as BASE, REVIEW_CLOSER as CLOSER, HOME_BY_ZONE, REST_FROM, REST_INTRO, REST_TIPS, AFTER_FATIGUE, AFTER_RECOVER, AFTER_RECORD_MIN, TAP_NO_REPEAT, TAP_TIME, TAP_DATE, TAP_OCTOBER, TAP_CHAT, TAP_ANNOY } from './serifu';
 
 export const WAKE_TYPES = [
   { id: 'yuttari', name: 'ゆったりタイプ', glyph: '🌿' },
@@ -105,4 +105,20 @@ export function homeLine(count, next, dateStr, lastRec, now) {
   const parts = [pick(seed, HOME_BY_ZONE[zoneOf(count) === 0 ? 0 : 1])];
   if (next) parts.push('次は' + next.title + '（' + next.from + '〜）です。');
   return parts.join('');
+}
+
+/* ホームのおねえさんをタップしたときのセリフ。now=Date、recent=直近に言ったセリフ（連続を避ける）、annoyed=連続タップ中か */
+export function tapLine(now, recent, annoyed) {
+  const h = now.getHours();
+  const slot = h >= 5 && h < 11 ? 'morning' : h < 14 && h >= 11 ? 'noon' : h >= 14 && h < 17 ? 'afternoon' : h >= 17 && h < 21 ? 'evening' : h >= 21 ? 'night' : 'late';
+  const key = String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  const dated = TAP_DATE[key] || [];
+  let pool;
+  if (annoyed) pool = TAP_ANNOY;
+  else pool = [...TAP_TIME[slot], ...TAP_TIME[slot], ...dated, ...dated, ...(now.getMonth() === 9 ? TAP_OCTOBER : []), ...TAP_CHAT];
+  const avoid = new Set((recent || []).slice(-TAP_NO_REPEAT));
+  let cand = pool.filter(x => !avoid.has(x));
+  if (!cand.length) cand = pool.filter(x => x !== (recent || [])[recent.length - 1]);
+  if (!cand.length) cand = pool;
+  return cand[Math.floor(Math.random() * cand.length)];
 }

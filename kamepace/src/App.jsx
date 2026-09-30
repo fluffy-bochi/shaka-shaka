@@ -24,7 +24,8 @@ import Home from './screens/Home';
 import Record from './screens/Record';
 import { WakeCheck, WakeReview, WakePlan } from './screens/Wake';
 import { predictUnits, pastHide, consumedToday } from './predict';
-import { daySummary, reviewLine, planLine, homeLine } from './wake';
+import { daySummary, reviewLine, planLine, homeLine, tapLine } from './wake';
+import { TAP_ANNOY_FROM, TAP_ANNOY_WINDOW_SEC } from './serifu';
 import Shaka from './screens/Shaka';
 import Collect from './screens/Collect';
 import MyPage from './screens/MyPage';
@@ -58,6 +59,7 @@ export default class App extends React.Component {
     degreeIdx: 1,
     wakeDraft: { cond: null, mood: null, fat: null, bed: '23:00', up: '08:00' }, // 起床後記録の入力中の値
     predictOpen: false, predictT: 0, // シャカの予測バー
+    tapLine: null, // ホームのおねえさんをタップしたときのセリフ（しばらく出して元に戻る）
     wakeFlow: false, // 起床後記録の「つぎへ」待ち（シャカで🌙が降っている間）
     dayOffset: 0,
     homeDate: todayStr(), // ホームで閲覧中の日付
@@ -1547,6 +1549,18 @@ export default class App extends React.Component {
       : { cond: null, mood: null, fat: null, bed: (last && last.bed) || '23:00', up: nowHm };
     this.set({ screen: 'wake1', wakeDraft: draft, wakeFlow: false, buffCheckOpen: false });
   }
+  /* ホームのおねえさんをタップ: 時間帯・その日の話題・雑談から、直前と同じにならないように言う。
+     TAP_ANNOY_WINDOW_SEC 秒のうちに TAP_ANNOY_FROM 回以上タップされたら、心配するセリフ（深呼吸の誘導など） */
+  tapCharacter = () => {
+    const now = Date.now();
+    this._tapTimes = (this._tapTimes || []).filter(t => now - t < TAP_ANNOY_WINDOW_SEC * 1000);
+    this._tapTimes.push(now);
+    const text = tapLine(new Date(), this._tapRecent || [], this._tapTimes.length >= TAP_ANNOY_FROM);
+    this._tapRecent = [...(this._tapRecent || []), text].slice(-8);
+    clearTimeout(this._tapT);
+    this.set({ tapLine: text });
+    this._tapT = setTimeout(() => this.set({ tapLine: null }), text.length > 50 ? 16000 : 9000); // 長いセリフは長めに出す
+  };
   setWakeDraft = (k, val) => this.setState(prev => ({ wakeDraft: { ...prev.wakeDraft, [k]: val } }));
   /* 継続確認シート */
   buffCheckKeep = (id) => { /* 維持＝何もしない */ void id; };
@@ -3543,11 +3557,12 @@ export default class App extends React.Component {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
       isHome: st.screen === 'home', isRecord: st.screen === 'record',
       isWake: ['wake1', 'wake2', 'wake3'].includes(st.screen), isWake1: st.screen === 'wake1', isWake2: st.screen === 'wake2', isWake3: st.screen === 'wake3',
-      homeComment: st.screen === 'home' ? (() => {
+      homeComment: st.screen === 'home' ? (st.tapLine || (() => {
         const d = this.homeDateStr(), nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes());
         const next = sortEntries(st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.title && e.from && (d !== todayStr() || e.from > nowHm)))[0];
         return homeLine(Math.min(100, this.pileCount()), next, d, st.lastRec, Date.now());
-      })() : '',
+      })()) : '',
+      tapCharacter: this.tapCharacter,
       predict: (st.screen === 'shaka' && st.dayOffset === 0) ? (() => {
         const now = Date.now(), t0 = todayStr();
         const wk = (st.wakeLog || []).find(w => w.date === t0);
