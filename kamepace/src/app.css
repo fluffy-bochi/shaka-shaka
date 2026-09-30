@@ -138,5 +138,5 @@ body.kame-book-land .app-status-spacer { height: env(safe-area-inset-top); }
   body.kame-book-land .phone .app-screen { width: 812px; height: 410px; }
 }
 
-/* シャカの予測バー: 右端から左へ0.2秒でスライドイン */
-@keyframes predOpen { from { transform: translateX(100%); } to { transform: translateX(0); } }
+/* シャカの予測バー: 閉じていた「予測」タブの位置（右端）から左へ、タブが動いて帯がついてくる（0.2秒） */
+@keyframes predOpen { from { transform: translateX(calc(100% - 29px)); } to { transform: translateX(0); } }
