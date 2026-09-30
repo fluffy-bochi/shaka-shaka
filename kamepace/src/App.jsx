@@ -23,6 +23,7 @@ import { appendGlyph } from './fluent';
 import Home from './screens/Home';
 import Record from './screens/Record';
 import { WakeCheck, WakeReview, WakePlan } from './screens/Wake';
+import { predictUnits } from './predict';
 import { daySummary, reviewLine, planLine, homeLine } from './wake';
 import Shaka from './screens/Shaka';
 import Collect from './screens/Collect';
@@ -56,6 +57,7 @@ export default class App extends React.Component {
     degreeItem: null,
     degreeIdx: 1,
     wakeDraft: { cond: null, mood: null, fat: null }, // 起床後記録の入力中の値
+    predictOpen: false, predictT: 0, // シャカの予測バー
     wakeFlow: false, // 起床後記録の「つぎへ」待ち（シャカで🌙が降っている間）
     dayOffset: 0,
     homeDate: todayStr(), // ホームで閲覧中の日付
@@ -2309,6 +2311,7 @@ export default class App extends React.Component {
   }
   componentDidUpdate(prevProps, prevState) {
     if (this.state.tutorial) this.checkTutorial(prevState);
+    if (this.state.predictOpen && (this.state.screen !== 'shaka' || this.state.dayOffset !== 0)) { this._pred = null; this.set({ predictOpen: false }); }
   }
   componentWillUnmount() {
     clearInterval(this._tick); clearInterval(this._planT); clearInterval(this._clockT); clearInterval(this._schedT);
@@ -2357,7 +2360,7 @@ export default class App extends React.Component {
       : this.currentBag().map(g => ({ g, isNew: false }));
     const oldSolid = baseMarks.filter(m => !m.isNew);
     const newSolid = baseMarks.filter(m => m.isNew);
-    const grayMarks = this.futurePlanGlyphs(viewDate).map(g => ({ g, isNew: false, gray: true }));
+    const grayMarks = (this.state.predictOpen ? [] : this.futurePlanGlyphs(viewDate)).map(g => ({ g, isNew: false, gray: true }));
     // 並び: [積み済み(old) → 未来予定(gray, settled) → 新規(new, 上から降る)]。新規を末尾に置く
     let marks = [...oldSolid, ...grayMarks, ...newSolid].slice(-200);
     const newCount = marks.filter(m => m.isNew).length;
@@ -2413,6 +2416,8 @@ export default class App extends React.Component {
       this.bodies.push({ body, el: d, glyph, gray: !!m.gray });
     });
     this.negBodies = [];
+    this.predBodies = [];
+    if (this.state.predictOpen) setTimeout(() => this._applyPredict(this.state.predictT), 0);
     // iOS(WebKit)軽量化: fixed timestep（固定16.6ms）にする。可変デルタだとフレーム落ち時に
     // 1ステップが重くなり山が沈む→眠れず回り続ける悪循環になる。固定なら1フレーム=1ステップに固定。
     this.runner = Runner.create({ isFixed: true });
@@ -2522,6 +2527,57 @@ export default class App extends React.Component {
       else this.freezeMotion();
     }
   };
+  /* ---- 予測バー: 時刻 T までに積もる予定ぶんを灰色で足す（保存しない）。消える回復ぶんは古い絵文字を薄くする ---- */
+  openPredict = () => {
+    const now = Date.now();
+    this._pred = predictUnits(this.state.entries, todayStr());
+    this.set({ predictOpen: true, predictT: now });
+    // 既存の未来予定（灰色）は外して、予測の時刻に合わせて足し直す
+    const { World } = Matter;
+    if (this.engine) {
+      this.bodies = (this.bodies || []).filter(b => { if (!b.gray) return true; try { World.remove(this.engine.world, b.body); } catch (e) { /* noop */ } b.el.remove(); return false; });
+      this.predBodies = [];
+    }
+    this._applyPredict(now);
+  };
+  closePredict = () => { this.set({ predictOpen: false }); this._pred = null; this.rebuildPhysics(); };
+  setPredictT = (t) => { const T = Math.max(Date.now(), t); this.set({ predictT: T }); this._applyPredict(T); };
+  _applyPredict(T) {
+    if (!this.engine || !this._pred) return;
+    const { World, Bodies } = Matter;
+    const el = document.getElementById('shakacase'); if (!el) return;
+    this.predBodies = this.predBodies || [];
+    const want = Math.min(80, this._pred.pos.filter(u => u.t <= T).length);
+    while (this.predBodies.length > want) {
+      const pb = this.predBodies.pop();
+      try { World.remove(this.engine.world, pb.body); } catch (e) { /* noop */ }
+      pb.el.remove();
+      this.bodies = this.bodies.filter(b => b !== pb);
+    }
+    if (this.predBodies.length < want) {
+      const rect = el.getBoundingClientRect(); const W = rect.width || 350, H = rect.height || 700; const r = this.PR;
+      this.resumeMotion();
+      while (this.predBodies.length < want) {
+        const g = this._pred.pos[this.predBodies.length].g;
+        const body = Bodies.circle(r + Math.random() * (W - 2 * r), -r - Math.random() * (H * 0.3), r, this.BODY_OPTS);
+        World.add(this.engine.world, body);
+        const d = document.createElement('div');
+        d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;will-change:transform;opacity:.45';
+        d.style.width = d.style.height = (2 * r) + 'px'; d.style.fontSize = Math.round(r * 1.6) + 'px';
+        appendGlyph(d, g, Math.round(r * 1.9));
+        const im = d.firstChild;
+        if (im && im.tagName === 'IMG') im.style.filter = 'grayscale(1)'; else d.style.filter = 'grayscale(1)';
+        el.appendChild(d);
+        const pb = { body, el: d, glyph: g, gray: true, pred: true };
+        this.bodies.push(pb); this.predBodies.push(pb);
+      }
+    }
+    // 消える回復ぶん: 古い（下の）絵文字から薄くする
+    const k = this._pred.neg.filter(u => u.t <= T).length;
+    this.bodies.filter(b => !b.gray).forEach((b, i) => { b.el.style.opacity = i < k ? '0.25' : ''; });
+    clearTimeout(this._settleT);
+    if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
+  }
   addFallingBodies(glyphs) {
     if (!this.engine) return;
     const { World, Bodies } = Matter;
@@ -2650,7 +2706,7 @@ export default class App extends React.Component {
     if (this.negBodies) this.negBodies.forEach(({ el }) => el.remove());
     const caseEl = document.getElementById('shakacase');
     if (caseEl) caseEl.innerHTML = '';
-    this.engine = null; this.runner = null; this.bodies = []; this.negBodies = [];
+    this.engine = null; this.runner = null; this.bodies = []; this.negBodies = []; this.predBodies = [];
   }
   /* 絵文字に散らばる勢いを与える（k=強さ） */
   shakeImpulse(k) {
@@ -3388,6 +3444,12 @@ export default class App extends React.Component {
         const next = sortEntries(st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.title && e.from && (d !== todayStr() || e.from > nowHm)))[0];
         return homeLine(Math.min(100, this.pileCount()), next, d);
       })() : '',
+      predict: (st.screen === 'shaka' && st.dayOffset === 0) ? (() => {
+        const now = Date.now(), t0 = todayStr();
+        const wk = (st.wakeLog || []).find(w => w.date === t0);
+        return { open: !!st.predictOpen, t: st.predictT || now, now, start: wk && wk.ts < now ? wk.ts : now, end: Math.max(hmToTsOn(t0, '23:00'), now + 30 * 60000) };
+      })() : null,
+      openPredict: this.openPredict, closePredict: this.closePredict, setPredictT: this.setPredictT,
       wakeDraft: st.wakeDraft, setWakeDraft: this.setWakeDraft, finishWake1: this.finishWake1,
       wakeFlow: st.wakeFlow && st.screen === 'shaka', goWake2: this.goWake2, goWake3: this.goWake3, backWake: this.backWake,
       wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null,
