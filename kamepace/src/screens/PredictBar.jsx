@@ -26,9 +26,9 @@ export default function PredictBar({ v }) {
   const noon = new Date(p.start); noon.setHours(12, 0, 0, 0);
   const marks = [[p.start, hm(p.start)], ...(noon.getTime() > p.start && noon.getTime() < p.end ? [[noon.getTime(), '12:00']] : []), [p.end, hm(p.end).replace(/^(\d+):(\d+)$/, '$1:$2')]];
   return (
-    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 120, height: 100, zIndex: 4 }}>
+    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 120, height: 100, zIndex: 4, animation: 'predOpen .2s ease-out' }}>
       <button onClick={v.closePredict} aria-label="予測を閉じる" style={{ ...tabShape(false) }}>▶</button>
-      <div style={tabShape(true)}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>予測</span></div>
+      <button onClick={v.closePredict} aria-label="予測を閉じる" style={tabShape(true)}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>予測</span></button>
       <div style={{ position: 'absolute', left: 29, right: 29, top: 0, bottom: 0, background: 'rgba(0,0,0,.2)', padding: '0 12px' }}>
         <div style={{ height: 38, background: 'rgba(255,255,255,.94)', border: '1.5px solid ' + INK, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>{label}</div>
         <div ref={trackRef} onPointerDown={onDown} onPointerMove={onMove} style={{ position: 'relative', height: 44, touchAction: 'none', cursor: 'ew-resize' }}>
