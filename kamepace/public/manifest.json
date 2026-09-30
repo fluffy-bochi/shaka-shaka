@@ -1,6 +1,6 @@
 {
-  "name": "かめペース",
-  "short_name": "かめペース",
+  "name": "ほどほどふぉーと",
+  "short_name": "ほどふぉ",
   "description": "やったことを記録して、疲労を見える化するアプリ",
   "start_url": "./index.html",
   "display": "standalone",

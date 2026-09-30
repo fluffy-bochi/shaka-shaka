@@ -37,8 +37,8 @@ function Welcome({ v }) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
       <div style={{ width: 96, height: 96, borderRadius: 28, background: '#c4f000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 52, boxShadow: '0 16px 40px rgba(122,154,0,.3)' }}>🐢</div>
-      <div style={{ ...mono, fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: '#8a8a82', marginTop: 22 }}>KAMEPACE</div>
-      <div style={{ fontSize: 22, fontWeight: 900, marginTop: 6, lineHeight: 1.5 }}>かめペースへ<br />ようこそ</div>
+      <div style={{ ...mono, fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: '#8a8a82', marginTop: 22 }}>HodoHodo Effort</div>
+      <div style={{ fontSize: 22, fontWeight: 900, marginTop: 6, lineHeight: 1.5 }}>ほどほどふぉーとへ<br />ようこそ</div>
       <div style={{ fontSize: 13.5, color: '#55554e', lineHeight: 1.9, marginTop: 14 }}>あなたに合わせて疲労を記録します。<br />まずは <b>7つの質問</b> に答えてね。</div>
       <div style={{ ...mono, fontSize: 10.5, color: '#b4b2a8', marginTop: 10 }}>約1分 · あとで変更できます</div>
       <button onClick={v.obNext} style={{ width: '100%', marginTop: 26, border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 16, padding: 16, cursor: 'pointer' }}>はじめる</button>
@@ -100,7 +100,7 @@ function Done({ v }) {
         </div>
       )}
       <div style={{ fontSize: 11.5, color: '#b4b2a8', marginTop: 12 }}>いつでも <b>マイページ</b> から調整できます。</div>
-      <button onClick={v.finishOnboard} style={{ width: '100%', marginTop: 18, border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 16, padding: 16, cursor: 'pointer' }}>かめペースをはじめる</button>
+      <button onClick={v.finishOnboard} style={{ width: '100%', marginTop: 18, border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 16, padding: 16, cursor: 'pointer' }}>ほどほどふぉーとをはじめる</button>
     </div>
   );
 }

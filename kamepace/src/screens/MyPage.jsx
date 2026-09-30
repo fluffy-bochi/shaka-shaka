@@ -27,7 +27,7 @@ export default function MyPage({ v }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#fff', borderRadius: 16, padding: '14px 15px', boxShadow: '0 1px 3px rgba(27,27,24,.05)' }}>
           <div style={{ width: 48, height: 48, flex: '0 0 auto', borderRadius: 13, background: '#c4f000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>🐢</div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 900 }}>{u ? (u.displayName || 'かめペース') : 'ゲスト'}</div>
+            <div style={{ fontSize: 15, fontWeight: 900 }}>{u ? (u.displayName || 'ほどほどふぉーと') : 'ゲスト'}</div>
             <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 2 }}>{u ? (u.email || '') : 'ログインするとクラウドに保存されます'}</div>
           </div>
           {u ? (
