@@ -2550,6 +2550,8 @@ export default class App extends React.Component {
       .map(e => ({ e, a: entryStartTs(e), b: entryEndTs(e) })).sort((x, y) => x.e.from.localeCompare(y.e.from));
     return this._ttArr;
   }
+  /* 上から降らせる絵文字の出現高さ。通常は画面の上（蓋は画面外）から。ジャイロは箱が上辺で閉じているので、箱の中の上端付近から */
+  _spawnY(r, H) { return this.state.gyroMode ? r + Math.random() * r * 4 : -r - Math.random() * (H * 0.3); }
   /* ---- 予測バー: 時刻 T までに積もる予定ぶんを灰色で足す（保存しない）。消える回復ぶんは古い絵文字を薄くする ---- */
   openPredict = () => {
     const now = Date.now();
@@ -2582,7 +2584,7 @@ export default class App extends React.Component {
     const { World, Bodies } = Matter;
     const rect = el.getBoundingClientRect(); const W = rect.width || 350, H = rect.height || 700; const r = this.PR;
     this.futurePlanGlyphs(todayStr()).slice(0, 60).forEach((g) => {
-      const body = Bodies.circle(r + Math.random() * (W - 2 * r), -r - Math.random() * (H * 0.3), r, this.BODY_OPTS);
+      const body = Bodies.circle(r + Math.random() * (W - 2 * r), this._spawnY(r, H), r, this.BODY_OPTS);
       World.add(this.engine.world, body);
       const d = document.createElement('div');
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;will-change:transform;opacity:.45';
@@ -2619,7 +2621,7 @@ export default class App extends React.Component {
       this.resumeMotion();
       while (this.predBodies.length < want) {
         const g = this._pred.pos[this.predBodies.length].g;
-        const body = Bodies.circle(r + Math.random() * (W - 2 * r), -r - Math.random() * (H * 0.3), r, this.BODY_OPTS);
+        const body = Bodies.circle(r + Math.random() * (W - 2 * r), this._spawnY(r, H), r, this.BODY_OPTS);
         World.add(this.engine.world, body);
         const d = document.createElement('div');
         d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;will-change:transform;opacity:.45';
@@ -2644,8 +2646,12 @@ export default class App extends React.Component {
       const hide = i >= solidAll.length - M;
       if (hide && !b.hidden) { try { World.remove(this.engine.world, b.body); } catch (e) { /* noop */ } b.el.style.opacity = '0'; b.hidden = true; }
       else if (!hide && b.hidden) {
-        Matter.Body.setPosition(b.body, { x: r0 + Math.random() * (W0 - 2 * r0), y: -r0 });
-        Matter.Body.setVelocity(b.body, { x: 0, y: 0 });
+        // 眠っていた絵文字を起こし、上から降らせて戻す（眠ったままだと落ちずに元の場所へぱっと出る）
+        const nx = r0 + Math.random() * (W0 - 2 * r0), ny = this._spawnY(r0, rect0.height || 700);
+        Matter.Sleeping.set(b.body, false);
+        Matter.Body.setPosition(b.body, { x: nx, y: ny });
+        Matter.Body.setVelocity(b.body, { x: 0, y: 0 }); Matter.Body.setAngularVelocity(b.body, 0);
+        b.el.style.transform = `translate(${nx - r0}px, ${ny - r0}px)`;
         World.add(this.engine.world, b.body); b.el.style.opacity = ''; b.hidden = false; this.resumeMotion();
       }
     });
@@ -2659,7 +2665,7 @@ export default class App extends React.Component {
     while (this.restBodies.length < wantRest) {
       const g = restList[this.restBodies.length].g || '😮‍💨';
       const r = this.PR;
-      const body = Bodies.circle(r + Math.random() * (W0 - 2 * r), -r, r, this.BODY_OPTS);
+      const body = Bodies.circle(r + Math.random() * (W0 - 2 * r), this._spawnY(r, rect0.height || 700), r, this.BODY_OPTS);
       World.add(this.engine.world, body);
       const d = document.createElement('div');
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;will-change:transform';
