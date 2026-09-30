@@ -141,3 +141,6 @@ body.kame-book-land .app-status-spacer { height: env(safe-area-inset-top); }
 /* シャカの予測バー: 閉じていた「予測」タブの位置（右端）から左へ、タブが動いて帯がついてくる（0.2秒） */
 @keyframes predClose { from { transform: translateX(0); } to { transform: translateX(calc(100% - 29px)); } }
 @keyframes predOpen { from { transform: translateX(calc(100% - 29px)); } to { transform: translateX(0); } }
+
+/* おねえさんの吹き出しが変わるときの、ふわっと出る動き */
+@keyframes bubbleIn { from { opacity: .2; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
