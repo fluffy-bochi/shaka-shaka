@@ -2,6 +2,7 @@ import React from 'react';
 
 /* シャカの予測バー（雨雲レーダー風）: 右端の「予測」タブで開き、時刻スライダーを動かすと
    その時刻までに積もる予定ぶんが灰色で山に足される。左端は起床時刻（記入がなければ8時）、右端は寝る時刻（未作成のあいだは23:00）。 */
+const PLAY_SEC_1X = 15; // 1倍速で軸の端から端まで進む秒数
 const MARK = 6; // 記録の印の太さ（つまみ20pxより小さい）
 const INK = '#1b1b18', LIME = '#c4f000', LIME_INK = '#2f3a00';
 const hm = (ts) => { const d = new Date(ts); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
@@ -11,8 +12,33 @@ export default function PredictBar({ v }) {
   const p = v.predict;
   const trackRef = React.useRef(null);
   const [closing, setClosing] = React.useState(false);
+  // 自動再生: 1倍速=軸の端から端まで15秒。▶をもう一度押すたび 2倍→3倍→1倍。■で停止。バーに触れたらその時刻で止める
+  const [play, setPlay] = React.useState({ on: false, speed: 1 });
+  const playRef = React.useRef(play); playRef.current = play;
+  const pRef = React.useRef(p); pRef.current = p;
+  React.useEffect(() => {
+    if (!play.on) return undefined;
+    let raf, last = performance.now(), acc = 0, t = pRef.current.t;
+    const tick = (nowMs) => {
+      const dt = nowMs - last; last = nowMs;
+      const pp = pRef.current, span = pp.end - pp.start;
+      t += dt * (span / PLAY_SEC_1X / 1000) * playRef.current.speed;
+      if (t >= pp.end) { v.setPredictT(pp.end); setPlay({ on: false, speed: 1 }); return; }
+      acc += dt;
+      if (acc >= 40) { acc = 0; v.setPredictT(t); }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [play.on]); // eslint-disable-line react-hooks/exhaustive-deps
   const isOpen = !!(p && p.open);
-  React.useEffect(() => { if (!isOpen) setClosing(false); }, [isOpen]);
+  React.useEffect(() => { if (!isOpen) { setClosing(false); setPlay({ on: false, speed: 1 }); } }, [isOpen]);
+  const onPlay = () => {
+    if (!play.on) {
+      if (p.t >= p.end - 1000) v.setPredictT(p.start); // 最後まで来ていたら最初から
+      setPlay({ on: true, speed: 1 });
+    } else setPlay({ on: true, speed: play.speed % 3 + 1 });
+  };
   // 閉じる時も、タブが右へ戻るモーション（0.1秒）のあとで実際に閉じる
   const doClose = () => { if (closing) return; setClosing(true); setTimeout(v.closePredict, 100); };
   if (!p) return null;
@@ -25,7 +51,7 @@ export default function PredictBar({ v }) {
     const r = trackRef.current.getBoundingClientRect();
     v.setPredictT(p.start + Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * span);
   };
-  const onDown = (e) => { e.currentTarget.setPointerCapture && e.currentTarget.setPointerCapture(e.pointerId); setFromX(e); };
+  const onDown = (e) => { setPlay({ on: false, speed: 1 }); e.currentTarget.setPointerCapture && e.currentTarget.setPointerCapture(e.pointerId); setFromX(e); };
   const onMove = (e) => { if (e.buttons) setFromX(e); };
   const d = new Date(p.t);
   const label = d.getHours() + '時' + String(d.getMinutes()).padStart(2, '0') + '分（' + (Math.abs(p.t - p.now) <= 30000 ? '現在' : p.t < p.now ? '過去' : '予測') + '）';
@@ -36,7 +62,11 @@ export default function PredictBar({ v }) {
       <button onClick={doClose} aria-label="予測を閉じる" style={{ ...tabShape(false) }}>▶</button>
       <button onClick={doClose} aria-label="予測を閉じる" style={tabShape(true)}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>予測</span></button>
       <div style={{ position: 'absolute', left: 29, right: 29, top: 0, bottom: 0, background: 'rgba(0,0,0,.2)', padding: '0 12px' }}>
-        <div style={{ height: 38, background: 'rgba(255,255,255,.94)', border: '1.5px solid ' + INK, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>{label}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ flex: 1, minWidth: 0, height: 38, background: 'rgba(255,255,255,.94)', border: '1.5px solid ' + INK, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>{label}</div>
+          <button onClick={onPlay} aria-label="再生" style={{ position: 'relative', flex: '0 0 auto', width: 38, height: 38, borderRadius: 10, border: '1.5px solid ' + INK, background: play.on ? LIME : '#fff', color: INK, cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1 }}>▶{play.on && play.speed > 1 && <span style={{ position: 'absolute', right: 3, bottom: 1, fontSize: 9, fontWeight: 800, fontFamily: "'Space Mono',monospace" }}>×{play.speed}</span>}</button>
+          <button onClick={() => setPlay({ on: false, speed: 1 })} aria-label="停止" style={{ flex: '0 0 auto', width: 38, height: 38, borderRadius: 10, border: '1.5px solid ' + INK, background: '#fff', color: INK, cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: 1 }}>■</button>
+        </div>
         <div ref={trackRef} onPointerDown={onDown} onPointerMove={onMove} style={{ position: 'relative', height: 44, touchAction: 'none', cursor: 'ew-resize' }}>
           <div style={{ position: 'absolute', left: `${frac(p.t) * 100}%`, top: 0, height: 20, width: 2, background: '#c9c7bf', transform: 'translateX(-1px)' }} />
           <div style={{ position: 'absolute', left: 0, right: 0, top: 29, height: 2, background: INK, borderRadius: 1 }} />
