@@ -9,6 +9,7 @@ export const WAKE_TYPES = [
   { id: 'hodohodo', name: 'ほどほどタイプ', glyph: '☀️' },
   { id: 'michimichi', name: 'みちみちタイプ', glyph: '🔥' },
 ];
+const OUTDOOR = /歩|散歩|外に出|外の空気|外を/; // 夜は勧めない、外に出る系のセリフを見つける言葉
 export const NO_TYPE = { id: 'none', name: 'まだ記録なし', glyph: '🌱' };
 
 export function zoneOf(f) { return f <= 40 ? 0 : f <= 80 ? 1 : 2; }
@@ -96,7 +97,9 @@ export function planLine(plans, tasks, sum, dateStr) {
 export function homeLine(count, next, dateStr, lastRec, now) {
   const seed = dateStr + 'h' + count;
   const tired = count >= REST_FROM;
-  const restLine = () => pick(seed + 'i', REST_INTRO) + 'おすすめは' + pick(seed + 't', REST_TIPS) + 'です。';
+  const hr = new Date(now).getHours();
+  const tips = (hr >= 18 || hr < 6) ? REST_TIPS.filter(t => !OUTDOOR.test(t)) : REST_TIPS; // 夜（18時〜6時）は外に出る休み方は勧めない
+  const restLine = () => pick(seed + 'i', REST_INTRO) + 'おすすめは' + pick(seed + 't', tips) + 'です。';
   if (lastRec && now - lastRec.ts < AFTER_RECORD_MIN * 60000) {
     const head = pick(seed + 'a' + lastRec.ts, lastRec.rec ? AFTER_RECOVER : AFTER_FATIGUE);
     return head + (tired ? restLine() : '');
@@ -116,6 +119,7 @@ export function tapLine(now, recent, annoyed) {
   let pool;
   if (annoyed) pool = TAP_ANNOY;
   else pool = [...TAP_TIME[slot], ...TAP_TIME[slot], ...dated, ...dated, ...(now.getMonth() === 9 ? TAP_OCTOBER : []), ...TAP_CHAT];
+  if (h >= 18 || h < 6) pool = pool.filter(x => !OUTDOOR.test(x)); // 夜（18時〜6時）は、外を歩く・出かけるなどの提案は言わない
   const avoid = new Set((recent || []).slice(-TAP_NO_REPEAT));
   let cand = pool.filter(x => !avoid.has(x));
   if (!cand.length) cand = pool.filter(x => x !== (recent || [])[recent.length - 1]);
