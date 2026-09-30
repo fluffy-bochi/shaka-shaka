@@ -23,7 +23,7 @@ import { appendGlyph } from './fluent';
 import Home from './screens/Home';
 import Record from './screens/Record';
 import { WakeCheck, WakeReview, WakePlan } from './screens/Wake';
-import { daySummary, reviewLine, planLine } from './wake';
+import { daySummary, reviewLine, planLine, homeLine } from './wake';
 import Shaka from './screens/Shaka';
 import Collect from './screens/Collect';
 import MyPage from './screens/MyPage';
@@ -3383,6 +3383,11 @@ export default class App extends React.Component {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
       isHome: st.screen === 'home', isRecord: st.screen === 'record',
       isWake: ['wake1', 'wake2', 'wake3'].includes(st.screen), isWake1: st.screen === 'wake1', isWake2: st.screen === 'wake2', isWake3: st.screen === 'wake3',
+      homeComment: st.screen === 'home' ? (() => {
+        const d = this.homeDateStr(), nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes());
+        const next = sortEntries(st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.title && e.from && (d !== todayStr() || e.from > nowHm)))[0];
+        return homeLine(Math.min(100, this.pileCount()), next, d);
+      })() : '',
       wakeDraft: st.wakeDraft, setWakeDraft: this.setWakeDraft, finishWake1: this.finishWake1,
       wakeFlow: st.wakeFlow && st.screen === 'shaka', goWake2: this.goWake2, goWake3: this.goWake3, backWake: this.backWake,
       wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null,

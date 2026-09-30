@@ -66,10 +66,10 @@ export function WakeCheck({ v }) {
 }
 
 /* キャラ＋吹き出し */
-function Speaker({ text }) {
+export function Speaker({ text, size = 130 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 20px' }}>
-      <img src="/wake/nurse.png" alt="" style={{ flex: '0 0 auto', width: 130, height: 130, objectFit: 'contain', objectPosition: 'bottom', mixBlendMode: 'multiply' }} />
+      <img src="/wake/nurse.png" alt="" style={{ flex: '0 0 auto', width: size, height: size, objectFit: 'contain', objectPosition: 'bottom', mixBlendMode: 'multiply' }} />
       <div style={{ position: 'relative', flex: 1, background: '#fff', borderRadius: 18, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.75, boxShadow: '0 2px 10px rgba(27,27,24,.06)', marginBottom: 14 }}>
         {text}
         <span style={{ position: 'absolute', left: -6, bottom: 14, width: 12, height: 12, background: '#fff', transform: 'rotate(45deg)' }} />
