@@ -1167,7 +1167,7 @@ export default class App extends React.Component {
     // set は非同期のため、直後に startPhysics すると「新しい記録が入る前の古い山」で組んでしまい、
     // 記録した絵文字が降ってこない（何度かシャカに移動すると降る）不具合になっていた。
     this.setState({
-      entries, lastMins, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null,
+      entries, lastMins, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null,
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
       // 編集で山が縮んだ場合に consumed が超過しないように
@@ -3478,7 +3478,7 @@ export default class App extends React.Component {
       homeComment: st.screen === 'home' ? (() => {
         const d = this.homeDateStr(), nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes());
         const next = sortEntries(st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.title && e.from && (d !== todayStr() || e.from > nowHm)))[0];
-        return homeLine(Math.min(100, this.pileCount()), next, d);
+        return homeLine(Math.min(100, this.pileCount()), next, d, st.lastRec, Date.now());
       })() : '',
       predict: (st.screen === 'shaka' && st.dayOffset === 0) ? (() => {
         const now = Date.now(), t0 = todayStr();
