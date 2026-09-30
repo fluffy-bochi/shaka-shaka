@@ -2541,6 +2541,15 @@ export default class App extends React.Component {
       else this.freezeMotion();
     }
   };
+  /* 今日の、時刻つきの記録・予定（予測バーの印・時計の下の行動用）。entries が変わるまで使い回す（再生中の毎フレーム再計算を避ける） */
+  _timedToday() {
+    const t0 = todayStr();
+    if (this._ttRef === this.state.entries && this._ttDay === t0) return this._ttArr;
+    this._ttRef = this.state.entries; this._ttDay = t0;
+    this._ttArr = this.state.entries.filter(e => e.date === t0 && !e.exp && !e.wakeAdd && e.title && e.from && e.to)
+      .map(e => ({ e, a: entryStartTs(e), b: entryEndTs(e) })).sort((x, y) => x.e.from.localeCompare(y.e.from));
+    return this._ttArr;
+  }
   /* ---- 予測バー: 時刻 T までに積もる予定ぶんを灰色で足す（保存しない）。消える回復ぶんは古い絵文字を薄くする ---- */
   openPredict = () => {
     const now = Date.now();
@@ -2556,7 +2565,38 @@ export default class App extends React.Component {
     }
     this._applyPredict(now);
   };
-  closePredict = () => { this.set({ predictOpen: false }); this._pred = null; this._predToday = null; this._predRest = null; this.rebuildPhysics(); };
+  closePredict = () => {
+    // 過去や未来の時刻のまま閉じても、現在に戻すときと同じ動きで絵文字を元に戻す
+    // （外れていた絵文字は上から落ちて戻り、薄くしていたものも戻る。通常表示の灰色の予定も上から落として戻す）
+    if (this.engine && this._pred) {
+      this._applyPredict(Date.now());
+      this._restoreFutureGray();
+      this.set({ predictOpen: false, predictT: Date.now() });
+      this._pred = null; this._predToday = null; this._predRest = null;
+      return;
+    }
+    this.set({ predictOpen: false }); this._pred = null; this._predToday = null; this._predRest = null; this.rebuildPhysics();
+  };
+  _restoreFutureGray() {
+    const el = document.getElementById('shakacase'); if (!el || !this.engine) return;
+    const { World, Bodies } = Matter;
+    const rect = el.getBoundingClientRect(); const W = rect.width || 350, H = rect.height || 700; const r = this.PR;
+    this.futurePlanGlyphs(todayStr()).slice(0, 60).forEach((g) => {
+      const body = Bodies.circle(r + Math.random() * (W - 2 * r), -r - Math.random() * (H * 0.3), r, this.BODY_OPTS);
+      World.add(this.engine.world, body);
+      const d = document.createElement('div');
+      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;will-change:transform;opacity:.45';
+      d.style.width = d.style.height = (2 * r) + 'px'; d.style.fontSize = Math.round(r * 1.6) + 'px';
+      appendGlyph(d, g, Math.round(r * 1.9));
+      const im = d.firstChild;
+      if (im && im.tagName === 'IMG') im.style.filter = 'grayscale(1)'; else d.style.filter = 'grayscale(1)';
+      el.appendChild(d);
+      this.bodies.push({ body, el: d, glyph: g, gray: true });
+    });
+    this.resumeMotion();
+    clearTimeout(this._settleT);
+    if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
+  }
   setPredictT = (t) => {
     const t0 = todayStr(), wk = (this.state.wakeLog || []).find(w => w.date === t0);
     const T = Math.max(wk ? wk.ts : hmToTsOn(t0, '08:00'), t);
@@ -3508,7 +3548,7 @@ export default class App extends React.Component {
         // 左端=今日の起床時刻（記入がなければ8時）、右端=寝る時刻（就寝の記録は未作成なので23:00）
         const start = wk ? wk.ts : hmToTsOn(t0, '08:00');
         // スライダー上に印をつける、今日の記録・予定の時間帯
-        const marks = st.predictOpen ? st.entries.filter(e => e.date === t0 && !e.exp && !e.wakeAdd && e.title && e.from && e.to).map(e => ({ a: entryStartTs(e), b: entryEndTs(e) })) : [];
+        const marks = st.predictOpen ? this._timedToday().map(x => ({ a: x.a, b: x.b })) : [];
         return { open: !!st.predictOpen, marks, t: Math.max(st.predictT || now, start), now, start, end: Math.max(hmToTsOn(t0, '23:00'), now + 30 * 60000, start + 60 * 60000) };
       })() : null,
       openPredict: this.openPredict, closePredict: this.closePredict, setPredictT: this.setPredictT,
@@ -3821,9 +3861,8 @@ export default class App extends React.Component {
       clockHm: st.clockHm || this.tsToHm(Date.now()), // 大きい時計は常に現在時刻
       // 時計の下に、いまやっている行動を出す（予測バーを開いている間は、スライダーの時刻にやっていた/やっている/やる予定の行動）
       predictActs: (st.screen === 'shaka' && st.dayOffset === 0) ? (() => {
-        const T = st.predictOpen ? (st.predictT || Date.now()) : Date.now(), t0 = todayStr(); // 予測を開いていなければ「いま」
-        return st.entries.filter(e => e.date === t0 && !e.exp && !e.wakeAdd && e.title && e.from && e.to && entryStartTs(e) <= T && T < entryEndTs(e))
-          .sort((a, b) => a.from.localeCompare(b.from)).map(e => ({ glyph: entryGlyph(e), title: e.title, from: e.from, to: e.to }));
+        const T = st.predictOpen ? (st.predictT || Date.now()) : Date.now(); // 予測を開いていなければ「いま」
+        return this._timedToday().filter(x => x.a <= T && T < x.b).map(x => ({ glyph: entryGlyph(x.e), title: x.e.title, from: x.e.from, to: x.e.to }));
       })() : [],
       prevDay: this.prevDay, nextDay: this.nextDay,
       prevColor: st.dayOffset <= this._dayRange.min ? '#d8d5cb' : '#55554e',
