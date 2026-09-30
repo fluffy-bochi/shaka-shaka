@@ -26,7 +26,8 @@ export default function Shaka({ v }) {
         <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '8px 26px 0', pointerEvents: 'none' }}>
           {v.predictActs.slice(0, 4).map((a, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, maxWidth: '100%', fontSize: 12.5, fontWeight: 700, color: '#1b1b18', textShadow: '0 0 6px rgba(247,244,236,.95), 0 0 2px rgba(247,244,236,.95)' }}>
-              <span style={{ fontSize: 14 }}>{a.glyph}</span>
+              {a.plan && <span style={{ minWidth: 0, maxWidth: '38%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '0 1 auto' }}>{a.plan} -</span>}
+              <span style={{ fontSize: 14, flex: '0 0 auto' }}>{a.glyph}</span>
               <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</span>
               <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 10, color: '#8a8a82', flex: '0 0 auto' }}>{a.from}–{a.to}</span>
             </div>

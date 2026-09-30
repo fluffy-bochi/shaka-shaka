@@ -3868,7 +3868,13 @@ export default class App extends React.Component {
       // 時計の下に、いまやっている行動を出す（予測バーを開いている間は、スライダーの時刻にやっていた/やっている/やる予定の行動）
       predictActs: (st.screen === 'shaka' && st.dayOffset === 0) ? (() => {
         const T = st.predictOpen ? (st.predictT || Date.now()) : Date.now(); // 予測を開いていなければ「いま」
-        return this._timedToday().filter(x => x.a <= T && T < x.b).map(x => ({ glyph: entryGlyph(x.e), title: x.e.title, from: x.e.from, to: x.e.to }));
+        // 表示は「予定名 - 絵文字 行動名 開始–終了」。Googleカレンダーなどの予定（枠）に行動を入れたときは、
+        // 予定名を頭に付けて1行にまとめ、行動が入った枠そのもの（行動待ちの空枠）は重複するので出さない。
+        const all = this._timedToday();
+        const planHasActs = new Set(all.filter(x => x.e.plan && x.e.plan !== x.e.title && !x.e.needsSetup).map(x => x.e.plan));
+        return all.filter(x => x.a <= T && T < x.b)
+          .filter(x => !(x.e.needsSetup && !x.e.delta && planHasActs.has(x.e.plan)))
+          .map(x => ({ plan: (x.e.plan && x.e.plan !== x.e.title) ? x.e.plan : '', glyph: x.e.needsSetup && !x.e.delta ? '📅' : entryGlyph(x.e), title: x.e.title, from: x.e.from, to: x.e.to }));
       })() : [],
       prevDay: this.prevDay, nextDay: this.nextDay,
       prevColor: st.dayOffset <= this._dayRange.min ? '#d8d5cb' : '#55554e',
