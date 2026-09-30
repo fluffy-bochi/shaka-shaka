@@ -1546,7 +1546,9 @@ export default class App extends React.Component {
   };
   /* 起床後記録: 1) 体調・気分・残りの疲労を入力 → 2) シャカで🌙が降って残りの量まで減る → 3) 昨日のふりかえり → 4) 今日の予定 */
   _enterWake() {
-    this.set({ screen: 'wake1', wakeDraft: { cond: null, mood: null, fat: null }, wakeFlow: false, buffCheckOpen: false });
+    // 今日すでに記録していれば、入力した内容をそのまま出す
+    const w = (this.state.wakeLog || []).find(x => x.date === todayStr());
+    this.set({ screen: 'wake1', wakeDraft: w ? { cond: w.cond, mood: w.mood, fat: w.fatigue } : { cond: null, mood: null, fat: null }, wakeFlow: false, buffCheckOpen: false });
   }
   setWakeDraft = (k, val) => this.set({ wakeDraft: { ...this.state.wakeDraft, [k]: val } });
   /* 継続確認シート */
