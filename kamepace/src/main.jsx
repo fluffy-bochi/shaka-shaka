@@ -8,8 +8,8 @@ function Shell() {
   return (
     <div className="shell">
       <header className="shell-head">
-        <img src="/icon/kamepace-icon-180.png" alt="かめペース" />
-        <span>かめペース</span>
+        <img src="/icon/kamepace-icon-180.png" alt="ほどほどふぉーと" />
+        <span>ほどほどふぉーと</span>
       </header>
       <div className="shell-body">
         <div className="phone">
