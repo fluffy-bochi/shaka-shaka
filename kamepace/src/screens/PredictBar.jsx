@@ -9,6 +9,11 @@ const tabShape = (left) => ({ position: 'absolute', top: 0, bottom: 0, [left ? '
 export default function PredictBar({ v }) {
   const p = v.predict;
   const trackRef = React.useRef(null);
+  const [closing, setClosing] = React.useState(false);
+  const isOpen = !!(p && p.open);
+  React.useEffect(() => { if (!isOpen) setClosing(false); }, [isOpen]);
+  // 閉じる時も、タブが右へ戻るモーション（0.1秒）のあとで実際に閉じる
+  const doClose = () => { if (closing) return; setClosing(true); setTimeout(v.closePredict, 100); };
   if (!p) return null;
   if (!p.open) {
     return <button onClick={v.openPredict} aria-label="予測" style={{ ...tabShape(false), clipPath: 'polygon(0 12%, 100% 0, 100% 100%, 0 88%)', top: 'auto', bottom: 120, height: 100, zIndex: 4 }}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>予測</span></button>;
@@ -26,9 +31,9 @@ export default function PredictBar({ v }) {
   const noon = new Date(p.start); noon.setHours(12, 0, 0, 0);
   const marks = [[p.start, hm(p.start)], ...(noon.getTime() > p.start && noon.getTime() < p.end ? [[noon.getTime(), '12:00']] : []), [p.end, hm(p.end).replace(/^(\d+):(\d+)$/, '$1:$2')]];
   return (
-    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 120, height: 100, zIndex: 4, animation: 'predOpen .2s ease-out' }}>
-      <button onClick={v.closePredict} aria-label="予測を閉じる" style={{ ...tabShape(false) }}>▶</button>
-      <button onClick={v.closePredict} aria-label="予測を閉じる" style={tabShape(true)}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>予測</span></button>
+    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 120, height: 100, zIndex: 4, animation: closing ? 'predClose .1s ease-in forwards' : 'predOpen .2s ease-out' }}>
+      <button onClick={doClose} aria-label="予測を閉じる" style={{ ...tabShape(false) }}>▶</button>
+      <button onClick={doClose} aria-label="予測を閉じる" style={tabShape(true)}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>予測</span></button>
       <div style={{ position: 'absolute', left: 29, right: 29, top: 0, bottom: 0, background: 'rgba(0,0,0,.2)', padding: '0 12px' }}>
         <div style={{ height: 38, background: 'rgba(255,255,255,.94)', border: '1.5px solid ' + INK, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>{label}</div>
         <div ref={trackRef} onPointerDown={onDown} onPointerMove={onMove} style={{ position: 'relative', height: 44, touchAction: 'none', cursor: 'ew-resize' }}>
