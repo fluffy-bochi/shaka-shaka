@@ -2141,6 +2141,7 @@ export default class App extends React.Component {
   applyFatigue(fat, title, patch) {
     const today = todayStr();
     this._sleepPile = null;
+    this._fatTarget = fat; // 「つぎへ」で🌙の落下を待たずに進んでも、この数に山を合わせる
     const n = this.sleepCount();
     const recovered = Math.max(0, n - fat); // いまの山 − 残りの疲労 ＝ 消す数
     if (fat > n) {
@@ -2165,7 +2166,23 @@ export default class App extends React.Component {
     const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts: now.getTime(), hm, cond: d.cond, mood: d.mood, fatigue: d.fat }];
     this.applyFatigue(d.fat, '就寝時の疲労', { bedLog, bedFlow: true });
   };
-  goBed2 = () => { this.stopPhysics(); this.set({ screen: 'bed2', bedFlow: false }); };
+  /* 🌙が落ち切る前に「つぎへ」を押しても、選んだ疲労度の数まで山を減らす */
+  settleFatigue() {
+    const target = this._fatTarget;
+    this._fatTarget = null;
+    if (target == null) return;
+    const kept = this.pileSource();
+    const extra = kept.length - target;
+    if (extra <= 0) return;
+    const gone = kept.slice(kept.length - extra).map(x => x.g);
+    const now = Date.now();
+    const add = gone.flatMap(g => [{ act: EMOJI_ACT['🌙'] || '', glyph: '🌙', amount: 1, ts: now }, { act: EMOJI_ACT[g] || '', glyph: g, amount: 1, ts: now }]);
+    this.setState(prev => ({ collected: [...(prev.collected || []), ...add], consumed: Math.min((prev.consumed || 0) + extra, this.pilePositiveTotal()) }));
+    this._pendingNeg = [];
+    this._pileLayout = null; this._sleepPile = null;
+    this.save();
+  }
+  goBed2 = () => { this.settleFatigue(); this.stopPhysics(); this.set({ screen: 'bed2', bedFlow: false }); };
   dropRecovery(recovered) {
     if (recovered > 0) {
       // 回復の🌙が落下中は、ジャイロ（傾き）でも重力を真下に固定する（横に流れて山に当たらず消えないのを防ぐ）
@@ -2180,7 +2197,7 @@ export default class App extends React.Component {
     this.stopPhysics();
     requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
   }
-  goWake2 = () => { this.stopPhysics(); this.set({ screen: 'wake2', wakeFlow: false }); };
+  goWake2 = () => { this.settleFatigue(); this.stopPhysics(); this.set({ screen: 'wake2', wakeFlow: false }); };
   goWake3 = () => this.set({ screen: 'wake3' });
   backWake = (to) => () => this.set({ screen: to });
   /* 起床後記録の記録一覧（実記録＋サンプル）。日付ごとに1件・新しい7件 */
