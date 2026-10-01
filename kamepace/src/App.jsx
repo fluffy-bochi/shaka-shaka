@@ -1336,7 +1336,8 @@ export default class App extends React.Component {
      全日付を積むと年ぶんで巨大になり重いため、サンプル分だけ当日にしぼる。 */
   _sampleWindowDay() {
     const s = this.state.screen;
-    return (s === 'home' || s === 'record' || s === 'wake1' || s === 'bed1') ? this.homeDateStr() : todayStr();
+    if (s === 'bed1' || (s === 'shaka' && this.state.bedFlow)) return this.bedDay();
+    return (s === 'home' || s === 'record' || s === 'wake1') ? this.homeDateStr() : todayStr();
   }
   pileSource() {
     const consumedRaw = this.state.consumed || 0;
@@ -2138,8 +2139,8 @@ export default class App extends React.Component {
     this.applyFatigue(d.fat, '起床時の疲労', { wakeLog, wakeFlow: true });
   };
   /* 申告した疲労度に山を合わせる: 多ければ使った行動の絵文字から足し、少なければ差ぶんの🌙を降らせる */
-  applyFatigue(fat, title, patch) {
-    const today = todayStr();
+  applyFatigue(fat, title, patch, day) {
+    const today = day || todayStr();
     this._sleepPile = null;
     this._fatTarget = fat; // 「つぎへ」で🌙の落下を待たずに進んでも、この数に山を合わせる
     const n = this.sleepCount();
@@ -2170,15 +2171,17 @@ export default class App extends React.Component {
     this._sleepPile = null;
     this.dropRecovery(recovered);
   }
+  /* 就寝記録が属する日。0時を過ぎて（〜朝5時前に）記録したときは、まだ前の日の夜として扱う（日またぎ対策） */
+  bedDay() { return new Date().getHours() < 5 ? shiftDate(todayStr(), -1) : todayStr(); }
   /* 就寝記録: 1) 体調・気分・疲労度 → 2) シャカで山を合わせる → 3) 今日のがんばりタイプ。記録した時刻は翌朝の起床記録の就寝時刻になる */
   goBed = () => this.set({ screen: 'bed1', bedDraft: { cond: null, mood: null, fat: null }, bedFlow: false });
   setBedDraft = (k, val) => this.setState(prev => ({ bedDraft: { ...prev.bedDraft, [k]: val } }));
   finishBed1 = () => {
     const d = this.state.bedDraft;
     if (d.fat == null) return;
-    const today = todayStr(), now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    const today = this.bedDay(), now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
     const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts: now.getTime(), hm, cond: d.cond, mood: d.mood, fatigue: d.fat }];
-    this.applyFatigue(d.fat, '就寝時の疲労', { bedLog, bedFlow: true });
+    this.applyFatigue(d.fat, '就寝時の疲労', { bedLog, bedFlow: true, bedDay: today }, today);
   };
   /* 🌙が落ち切る前に「つぎへ」を押しても、選んだ疲労度の数まで山を減らす */
   settleFatigue() {
@@ -2224,7 +2227,7 @@ export default class App extends React.Component {
   }
   /* 就寝記録の最後: 今日のがんばりタイプ（朝の疲労を起点に今日の記録から判定） */
   bedVals() {
-    const st = this.state, today = todayStr();
+    const st = this.state, today = this.state.bedDay || this.bedDay();
     const wk = (st.wakeLog || []).find(w => w.date === today);
     const sum = daySummary(st.entries, today, wk ? wk.fatigue : 0);
     return { sum, reviewText: reviewLine(sum, today) };

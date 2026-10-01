@@ -73,8 +73,13 @@ export function daySummary(entries, dateStr, startFat) {
 export function reviewLine(sum, dateStr) {
   const id = sum.type.id;
   const parts = [pick(dateStr + 'b', BASE[id])];
-  if (sum.up) parts.push(sum.up + 'に力を入れましたね。');
-  if (sum.rec) parts.push(sum.rec + 'で一番回復しましたね。');
+  if (id === 'yuttari') {
+    // ゆったりの日は「何もしていない」前提にせず、回復の記録（休憩・睡眠など）で山が減ったときだけ休憩できたかを聞く
+    if (sum.rec) parts.push(sum.rec + 'で休憩できましたか？');
+  } else {
+    if (sum.up) parts.push(sum.up + 'に力を入れましたね。');
+    if (sum.rec) parts.push(sum.rec + 'で一番回復しましたね。');
+  }
   parts.push(pick(dateStr + 'c', CLOSER[id]));
   return parts.join('');
 }
