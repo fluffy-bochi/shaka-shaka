@@ -2145,11 +2145,25 @@ export default class App extends React.Component {
     const n = this.sleepCount();
     const recovered = Math.max(0, n - fat); // いまの山 − 残りの疲労 ＝ 消す数
     if (fat > n) {
-      const pool = this.state.entries.filter(e => !e.exp && e.delta > 0 && !e.wakeAdd).map(e => entryGlyph(e));
+      // 足りない分は、今日やった行動の疲労の比率で割り振る（勉強10・移動10なら半分ずつ）。今日の記録がなければ全期間からランダム
+      const todays = this.state.entries.filter(e => !e.exp && e.delta > 0 && !e.wakeAdd && e.date === today);
       const cnt = {};
-      for (let i = 0; i < fat - n; i++) { const g = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '😮‍💨'; cnt[g] = (cnt[g] || 0) + 1; }
+      const need = fat - n;
+      if (todays.length) {
+        const w = {};
+        todays.forEach(e => { const g = entryGlyph(e); w[g] = (w[g] || 0) + (e.planned ? (e.dropped || 0) : e.delta); });
+        const total = Object.values(w).reduce((a, b) => a + b, 0) || 1;
+        const parts = Object.keys(w).map(g => ({ g, q: need * w[g] / total }));
+        parts.forEach(x => { cnt[x.g] = Math.floor(x.q); });
+        let rest = need - Object.values(cnt).reduce((a, b) => a + b, 0);
+        parts.sort((a, b) => (b.q - Math.floor(b.q)) - (a.q - Math.floor(a.q)));
+        for (let i = 0; rest > 0; i = (i + 1) % parts.length, rest--) cnt[parts[i].g]++;
+      } else {
+        const pool = this.state.entries.filter(e => !e.exp && e.delta > 0 && !e.wakeAdd).map(e => entryGlyph(e));
+        for (let i = 0; i < need; i++) { const g = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '😮‍💨'; cnt[g] = (cnt[g] || 0) + 1; }
+      }
       const now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
-      const add = Object.keys(cnt).map(g => ({ ...baseEntry(title, cnt[g], today), glyph: g, from: hm, to: hm, wakeAdd: true, _new: true }));
+      const add = Object.keys(cnt).filter(g => cnt[g] > 0).map(g => ({ ...baseEntry(title, cnt[g], today), glyph: g, from: hm, to: hm, wakeAdd: true, _new: true }));
       patch.entries = sortEntries([...this.state.entries, ...add]);
     }
     this.set(patch); this.save();
