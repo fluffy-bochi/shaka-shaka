@@ -2,7 +2,7 @@
    疲労度は 0〜100（山が100個で満杯）。0〜40=ゆったり / 41〜80=ほどほど / 81〜100=みちみち。
    1日の疲労の推移を滑らかな曲線にして、一番長く居たゾーンをその日のタイプにする。 */
 import { hmToTsOn, entryGlyph } from './model';
-import { REVIEW_BASE as BASE, REVIEW_CLOSER as CLOSER, HOME_BY_ZONE, REST_FROM, REST_INTRO, REST_TIPS, AFTER_FATIGUE, AFTER_RECOVER, AFTER_RECORD_MIN, TAP_NO_REPEAT, TAP_TIME, TAP_DATE, TAP_OCTOBER, TAP_CHAT, TAP_ANNOY, NURSE_FACES, FACE_RULES } from './serifu';
+import { REVIEW_BASE as BASE, REVIEW_CLOSER as CLOSER, PLAN_CLOSER, HOME_BY_ZONE, REST_FROM, REST_INTRO, REST_TIPS, AFTER_FATIGUE, AFTER_RECOVER, AFTER_RECORD_MIN, TAP_NO_REPEAT, TAP_TIME, TAP_DATE, TAP_OCTOBER, TAP_CHAT, TAP_ANNOY, NURSE_FACES, FACE_RULES } from './serifu';
 
 export const WAKE_TYPES = [
   { id: 'yuttari', name: 'ゆったりタイプ', glyph: '🌿' },
@@ -73,8 +73,13 @@ export function daySummary(entries, dateStr, startFat) {
 export function reviewLine(sum, dateStr) {
   const id = sum.type.id;
   const parts = [pick(dateStr + 'b', BASE[id])];
-  if (sum.up) parts.push(sum.up + 'に力を入れましたね。');
-  if (sum.rec) parts.push(sum.rec + 'で一番回復しましたね。');
+  if (id === 'yuttari') {
+    // ゆったりの日は「何もしていない」前提にせず、回復の記録（休憩・睡眠など）で山が減ったときだけ休憩できたかを聞く
+    if (sum.rec) parts.push(sum.rec + 'で休憩できましたか？');
+  } else {
+    if (sum.up) parts.push(sum.up + 'に力を入れましたね。');
+    if (sum.rec) parts.push(sum.rec + 'で一番回復しましたね。');
+  }
   parts.push(pick(dateStr + 'c', CLOSER[id]));
   return parts.join('');
 }
@@ -85,7 +90,7 @@ export function planLine(plans, tasks, sum, dateStr) {
   if (plans.length) parts.push('今日の予定は' + plans.length + '件。' + plans[0].title + 'から始まります。');
   else parts.push('今日は予定が入っていません。');
   if (tasks.length) parts.push('タスクは' + tasks.length + '件あります。');
-  parts.push(pick(dateStr + 'p', CLOSER[sum.type.id]));
+  parts.push(pick(dateStr + 'p', PLAN_CLOSER));
   return parts.join('');
 }
 

@@ -1336,7 +1336,8 @@ export default class App extends React.Component {
      全日付を積むと年ぶんで巨大になり重いため、サンプル分だけ当日にしぼる。 */
   _sampleWindowDay() {
     const s = this.state.screen;
-    return (s === 'home' || s === 'record' || s === 'wake1' || s === 'bed1') ? this.homeDateStr() : todayStr();
+    if (s === 'bed1' || (s === 'shaka' && this.state.bedFlow)) return this.bedDay();
+    return (s === 'home' || s === 'record' || s === 'wake1') ? this.homeDateStr() : todayStr();
   }
   pileSource() {
     const consumedRaw = this.state.consumed || 0;
@@ -2138,34 +2139,67 @@ export default class App extends React.Component {
     this.applyFatigue(d.fat, '起床時の疲労', { wakeLog, wakeFlow: true });
   };
   /* 申告した疲労度に山を合わせる: 多ければ使った行動の絵文字から足し、少なければ差ぶんの🌙を降らせる */
-  applyFatigue(fat, title, patch) {
-    const today = todayStr();
+  applyFatigue(fat, title, patch, day) {
+    const today = day || todayStr();
     this._sleepPile = null;
+    this._fatTarget = fat; // 「つぎへ」で🌙の落下を待たずに進んでも、この数に山を合わせる
     const n = this.sleepCount();
     const recovered = Math.max(0, n - fat); // いまの山 − 残りの疲労 ＝ 消す数
     if (fat > n) {
-      const pool = this.state.entries.filter(e => !e.exp && e.delta > 0 && !e.wakeAdd).map(e => entryGlyph(e));
+      // 足りない分は、今日やった行動の疲労の比率で割り振る（勉強10・移動10なら半分ずつ）。今日の記録がなければ全期間からランダム
+      const todays = this.state.entries.filter(e => !e.exp && e.delta > 0 && !e.wakeAdd && e.date === today);
       const cnt = {};
-      for (let i = 0; i < fat - n; i++) { const g = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '😮‍💨'; cnt[g] = (cnt[g] || 0) + 1; }
+      const need = fat - n;
+      if (todays.length) {
+        const w = {};
+        todays.forEach(e => { const g = entryGlyph(e); w[g] = (w[g] || 0) + (e.planned ? (e.dropped || 0) : e.delta); });
+        const total = Object.values(w).reduce((a, b) => a + b, 0) || 1;
+        const parts = Object.keys(w).map(g => ({ g, q: need * w[g] / total }));
+        parts.forEach(x => { cnt[x.g] = Math.floor(x.q); });
+        let rest = need - Object.values(cnt).reduce((a, b) => a + b, 0);
+        parts.sort((a, b) => (b.q - Math.floor(b.q)) - (a.q - Math.floor(a.q)));
+        for (let i = 0; rest > 0; i = (i + 1) % parts.length, rest--) cnt[parts[i].g]++;
+      } else {
+        const pool = this.state.entries.filter(e => !e.exp && e.delta > 0 && !e.wakeAdd).map(e => entryGlyph(e));
+        for (let i = 0; i < need; i++) { const g = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '😮‍💨'; cnt[g] = (cnt[g] || 0) + 1; }
+      }
       const now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
-      const add = Object.keys(cnt).map(g => ({ ...baseEntry(title, cnt[g], today), glyph: g, from: hm, to: hm, wakeAdd: true, _new: true }));
+      const add = Object.keys(cnt).filter(g => cnt[g] > 0).map(g => ({ ...baseEntry(title, cnt[g], today), glyph: g, from: hm, to: hm, wakeAdd: true, _new: true }));
       patch.entries = sortEntries([...this.state.entries, ...add]);
     }
     this.set(patch); this.save();
     this._sleepPile = null;
     this.dropRecovery(recovered);
   }
+  /* 就寝記録が属する日。0時を過ぎて（〜朝5時前に）記録したときは、まだ前の日の夜として扱う（日またぎ対策） */
+  bedDay() { return new Date().getHours() < 5 ? shiftDate(todayStr(), -1) : todayStr(); }
   /* 就寝記録: 1) 体調・気分・疲労度 → 2) シャカで山を合わせる → 3) 今日のがんばりタイプ。記録した時刻は翌朝の起床記録の就寝時刻になる */
   goBed = () => this.set({ screen: 'bed1', bedDraft: { cond: null, mood: null, fat: null }, bedFlow: false });
   setBedDraft = (k, val) => this.setState(prev => ({ bedDraft: { ...prev.bedDraft, [k]: val } }));
   finishBed1 = () => {
     const d = this.state.bedDraft;
     if (d.fat == null) return;
-    const today = todayStr(), now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    const today = this.bedDay(), now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
     const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts: now.getTime(), hm, cond: d.cond, mood: d.mood, fatigue: d.fat }];
-    this.applyFatigue(d.fat, '就寝時の疲労', { bedLog, bedFlow: true });
+    this.applyFatigue(d.fat, '就寝時の疲労', { bedLog, bedFlow: true, bedDay: today }, today);
   };
-  goBed2 = () => { this.stopPhysics(); this.set({ screen: 'bed2', bedFlow: false }); };
+  /* 🌙が落ち切る前に「つぎへ」を押しても、選んだ疲労度の数まで山を減らす */
+  settleFatigue() {
+    const target = this._fatTarget;
+    this._fatTarget = null;
+    if (target == null) return;
+    const kept = this.pileSource();
+    const extra = kept.length - target;
+    if (extra <= 0) return;
+    const gone = kept.slice(kept.length - extra).map(x => x.g);
+    const now = Date.now();
+    const add = gone.flatMap(g => [{ act: EMOJI_ACT['🌙'] || '', glyph: '🌙', amount: 1, ts: now }, { act: EMOJI_ACT[g] || '', glyph: g, amount: 1, ts: now }]);
+    this.setState(prev => ({ collected: [...(prev.collected || []), ...add], consumed: Math.min((prev.consumed || 0) + extra, this.pilePositiveTotal()) }));
+    this._pendingNeg = [];
+    this._pileLayout = null; this._sleepPile = null;
+    this.save();
+  }
+  goBed2 = () => { this.settleFatigue(); this.stopPhysics(); this.set({ screen: 'bed2', bedFlow: false }); };
   dropRecovery(recovered) {
     if (recovered > 0) {
       // 回復の🌙が落下中は、ジャイロ（傾き）でも重力を真下に固定する（横に流れて山に当たらず消えないのを防ぐ）
@@ -2180,7 +2214,7 @@ export default class App extends React.Component {
     this.stopPhysics();
     requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
   }
-  goWake2 = () => { this.stopPhysics(); this.set({ screen: 'wake2', wakeFlow: false }); };
+  goWake2 = () => { this.settleFatigue(); this.stopPhysics(); this.set({ screen: 'wake2', wakeFlow: false }); };
   goWake3 = () => this.set({ screen: 'wake3' });
   backWake = (to) => () => this.set({ screen: to });
   /* 起床後記録の記録一覧（実記録＋サンプル）。日付ごとに1件・新しい7件 */
@@ -2193,7 +2227,7 @@ export default class App extends React.Component {
   }
   /* 就寝記録の最後: 今日のがんばりタイプ（朝の疲労を起点に今日の記録から判定） */
   bedVals() {
-    const st = this.state, today = todayStr();
+    const st = this.state, today = this.state.bedDay || this.bedDay();
     const wk = (st.wakeLog || []).find(w => w.date === today);
     const sum = daySummary(st.entries, today, wk ? wk.fatigue : 0);
     return { sum, reviewText: reviewLine(sum, today) };
