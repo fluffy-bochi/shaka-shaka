@@ -90,6 +90,7 @@ export function serialize(st) {
     cycle: st.cycle || null,
     lastBuffCheck: st.lastBuffCheck || null,
     wakeLog: st.wakeLog || [], // 起床後記録 [{date,ts,cond,mood,fatigue}]
+    bedLog: st.bedLog || [], // 就寝記録 [{date,ts,hm,cond,mood,fatigue}]（hm は翌朝の起床記録の就寝時刻になる）
     mainScreen: st.mainScreen || null,
     bodyFatCoef: st.bodyFatCoef || 1,
     mindFatCoef: st.mindFatCoef || 1,
@@ -147,6 +148,7 @@ export function deserialize(data) {
     cycle: (data.cycle && typeof data.cycle === 'object') ? data.cycle : null,
     lastBuffCheck: data.lastBuffCheck || null,
     wakeLog: Array.isArray(data.wakeLog) ? data.wakeLog : [],
+    bedLog: Array.isArray(data.bedLog) ? data.bedLog : [],
     mainScreen: (data.mainScreen === 'home' || data.mainScreen === 'shaka') ? data.mainScreen : null,
     // 体・心それぞれの個人係数。旧1軸フィールド(fatigueCoef/recoverCoef)からの移行も受ける
     bodyFatCoef: typeof data.bodyFatCoef === 'number' ? data.bodyFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
@@ -167,7 +169,7 @@ export function freshState() {
     collected: [], collectedSeen: 0, templates: {}, consumed: 0, sampleDay: null,
     customCats: [], customPlans: [], customActions: [], customItems: {}, prefs: {},
     slotHours: null, hiddenCats: [], hiddenActs: [],
-    onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null, wakeLog: [], mainScreen: null,
+    onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null, wakeLog: [], bedLog: [], mainScreen: null,
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1,
     bookFav: {}, bookDiary: {},
     trashedPlans: [], purgedPlanIds: [], purgedTaskIds: [],

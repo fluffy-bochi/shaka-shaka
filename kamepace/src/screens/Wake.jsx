@@ -87,6 +87,26 @@ export function WakeCheck({ v }) {
   );
 }
 
+/* 就寝記録 1: 体調・気分・疲労度（就寝時刻は記録した時刻が翌朝の起床記録に入る） */
+export function BedCheck({ v }) {
+  const d = v.bedDraft;
+  const ready = d.fat != null;
+  return (
+    <div style={wrap}>
+      <Head v={v} />
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingTop: 6 }}>
+        <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setBedDraft('cond', x)} />
+        <Rating title="気分" opts={MOOD.map(([g], i) => [i + 1, g])} labels={MOOD.map(c => c[1])} value={d.mood} onPick={(x) => v.setBedDraft('mood', x)} />
+        <Rating title="いまの疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setBedDraft('fat', x)} />
+      </div>
+      <div style={{ ...foot, justifyContent: 'space-between' }}>
+        <button onClick={v.goHome} style={btnSub}>やめる</button>
+        <button onClick={ready ? v.finishBed1 : undefined} style={btnMain(ready)}>つぎへ</button>
+      </div>
+    </div>
+  );
+}
+
 /* キャラ＋吹き出し */
 export function Speaker({ text, size = 130, onTap }) {
   const src = nurseSrc(text); // セリフに合った表情
@@ -171,21 +191,48 @@ function Chart({ recs }) {
   );
 }
 
-/* 2: 昨日のがんばりタイプ・セリフ・推移グラフ */
+/* がんばりタイプ（アイコン＋名前） */
+function TypeBlock({ sum, label }) {
+  return (
+    <>
+      <div style={{ textAlign: 'center', fontSize: 12.5, color: '#55554e', fontWeight: 700, marginTop: 4 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, margin: '8px 0 14px' }}>
+        {sum.type.id === 'michimichi'
+          ? <img src="/wake/fireball.svg" alt="" style={{ width: 62, height: 62 }} />
+          : <div style={{ width: 62, height: 62, borderRadius: '50%', background: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>{sum.type.glyph}</div>}
+        <div style={{ fontSize: 24, fontWeight: 900 }}>{sum.type.name}</div>
+      </div>
+    </>
+  );
+}
+
+/* 就寝記録 3: 今日のがんばりタイプ・セリフ・推移グラフ（がんばりタイプは就寝時に診断する） */
+export function BedReview({ v }) {
+  const b = v.bed;
+  return (
+    <div style={wrap}>
+      <Head v={v} />
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <TypeBlock sum={b.sum} label="今日のがんばりタイプ" />
+        <Speaker text={b.reviewText} />
+        <Chart recs={v.wakeRecs} />
+        <div style={{ height: 8 }} />
+      </div>
+      <div style={foot}>
+        <button onClick={v.backBed} style={btnSub}>もどる</button>
+        <button onClick={v.goHome} style={btnMain()}>ホームへ</button>
+      </div>
+    </div>
+  );
+}
+
+/* 起床 2: 推移グラフ（タイプ診断は就寝記録で行う） */
 export function WakeReview({ v }) {
   const w = v.wake;
   return (
     <div style={wrap}>
       <Head v={v} />
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-        <div style={{ textAlign: 'center', fontSize: 12.5, color: '#55554e', fontWeight: 700, marginTop: 4 }}>昨日のがんばりタイプ</div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, margin: '8px 0 14px' }}>
-          {w.sum.type.id === 'michimichi'
-            ? <img src="/wake/fireball.svg" alt="" style={{ width: 62, height: 62 }} />
-            : <div style={{ width: 62, height: 62, borderRadius: '50%', background: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>{w.sum.type.glyph}</div>}
-          <div style={{ fontSize: 24, fontWeight: 900 }}>{w.sum.type.name}</div>
-        </div>
-        <Speaker text={w.reviewText} />
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingTop: 10 }}>
         <Chart recs={w.recs} />
         <div style={{ height: 8 }} />
       </div>

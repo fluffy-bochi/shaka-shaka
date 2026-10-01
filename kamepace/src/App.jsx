@@ -22,7 +22,7 @@ import { initShakaSound, attachCollisionSound } from './sound';
 import { appendGlyph } from './fluent';
 import Home from './screens/Home';
 import Record from './screens/Record';
-import { WakeCheck, WakeReview, WakePlan } from './screens/Wake';
+import { WakeCheck, WakeReview, WakePlan, BedCheck, BedReview } from './screens/Wake';
 import { predictUnits, pastHide, consumedToday } from './predict';
 import { daySummary, reviewLine, planLine, homeLine, tapLine } from './wake';
 import { TAP_ANNOY_FROM, TAP_ANNOY_WINDOW_SEC } from './serifu';
@@ -60,6 +60,8 @@ export default class App extends React.Component {
     wakeDraft: { cond: null, mood: null, fat: null, bed: '23:00', up: '08:00' }, // 起床後記録の入力中の値
     predictOpen: false, predictT: 0, // シャカの予測バー
     tapLine: null, // ホームのおねえさんをタップしたときのセリフ（しばらく出して元に戻る）
+    bedFlow: false, // 就寝記録の「つぎへ」待ち
+    bedDraft: { cond: null, mood: null, fat: null },
     wakeFlow: false, // 起床後記録の「つぎへ」待ち（シャカで🌙が降っている間）
     dayOffset: 0,
     homeDate: todayStr(), // ホームで閲覧中の日付
@@ -227,7 +229,7 @@ export default class App extends React.Component {
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
       prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
-      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, wakeLog: s.wakeLog, mainScreen: s.mainScreen,
+      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, wakeLog: s.wakeLog, bedLog: s.bedLog, mainScreen: s.mainScreen,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
       bookFav: s.bookFav, bookDiary: s.bookDiary,
@@ -1334,7 +1336,7 @@ export default class App extends React.Component {
      全日付を積むと年ぶんで巨大になり重いため、サンプル分だけ当日にしぼる。 */
   _sampleWindowDay() {
     const s = this.state.screen;
-    return (s === 'home' || s === 'record' || s === 'wake1') ? this.homeDateStr() : todayStr();
+    return (s === 'home' || s === 'record' || s === 'wake1' || s === 'bed1') ? this.homeDateStr() : todayStr();
   }
   pileSource() {
     const consumedRaw = this.state.consumed || 0;
@@ -1542,7 +1544,8 @@ export default class App extends React.Component {
   _enterWake() {
     // 今日すでに記録していれば、入力した内容をそのまま出す。起床時刻の初期値は「いま（この画面を開いた時刻）」、就寝は前回の就寝時刻（なければ23:00）
     const w = (this.state.wakeLog || []).find(x => x.date === todayStr());
-    const last = [...(this.state.wakeLog || [])].reverse().find(x => x.bed);
+    const lastBed = [...(this.state.bedLog || [])].reverse().find(x => x.hm && Date.now() - x.ts < 30 * 3600000); // 前夜の就寝記録
+    const last = lastBed ? { bed: lastBed.hm } : [...(this.state.wakeLog || [])].reverse().find(x => x.bed);
     const nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes());
     const draft = w
       ? { cond: w.cond, mood: w.mood, fat: w.fatigue, bed: w.bed || (last && last.bed) || '23:00', up: w.up || this.tsToHm(w.ts) }
@@ -2132,23 +2135,37 @@ export default class App extends React.Component {
     const up = d.up || (pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes()));
     // ts=起床時刻（予測バーの左端になる）。bed=就寝時刻(HH:MM)。就寝〜起床の時間は bed/up から出せる
     const wakeLog = [...(this.state.wakeLog || []).filter(w => w.date !== today), { date: today, ts: hmToTsOn(today, up), bed: d.bed || null, up, cond: d.cond, mood: d.mood, fatigue: d.fat }];
+    this.applyFatigue(d.fat, '起床時の疲労', { wakeLog, wakeFlow: true });
+  };
+  /* 申告した疲労度に山を合わせる: 多ければ使った行動の絵文字から足し、少なければ差ぶんの🌙を降らせる */
+  applyFatigue(fat, title, patch) {
+    const today = todayStr();
     this._sleepPile = null;
     const n = this.sleepCount();
-    const recovered = Math.max(0, n - d.fat); // いまの山 − 残りの疲労 ＝ 消す数
-    const patch = { wakeLog, wakeFlow: true };
-    if (d.fat > n) {
-      // 残りの疲労のほうが多い: 使った行動の絵文字からランダムに選んで、選んだ数まで増やす（山に降ってくる）
+    const recovered = Math.max(0, n - fat); // いまの山 − 残りの疲労 ＝ 消す数
+    if (fat > n) {
       const pool = this.state.entries.filter(e => !e.exp && e.delta > 0 && !e.wakeAdd).map(e => entryGlyph(e));
       const cnt = {};
-      for (let i = 0; i < d.fat - n; i++) { const g = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '😮‍💨'; cnt[g] = (cnt[g] || 0) + 1; }
+      for (let i = 0; i < fat - n; i++) { const g = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '😮‍💨'; cnt[g] = (cnt[g] || 0) + 1; }
       const now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
-      const add = Object.keys(cnt).map(g => ({ ...baseEntry('起床時の疲労', cnt[g], today), glyph: g, from: hm, to: hm, wakeAdd: true, _new: true }));
+      const add = Object.keys(cnt).map(g => ({ ...baseEntry(title, cnt[g], today), glyph: g, from: hm, to: hm, wakeAdd: true, _new: true }));
       patch.entries = sortEntries([...this.state.entries, ...add]);
     }
     this.set(patch); this.save();
     this._sleepPile = null;
     this.dropRecovery(recovered);
+  }
+  /* 就寝記録: 1) 体調・気分・疲労度 → 2) シャカで山を合わせる → 3) 今日のがんばりタイプ。記録した時刻は翌朝の起床記録の就寝時刻になる */
+  goBed = () => this.set({ screen: 'bed1', bedDraft: { cond: null, mood: null, fat: null }, bedFlow: false });
+  setBedDraft = (k, val) => this.setState(prev => ({ bedDraft: { ...prev.bedDraft, [k]: val } }));
+  finishBed1 = () => {
+    const d = this.state.bedDraft;
+    if (d.fat == null) return;
+    const today = todayStr(), now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts: now.getTime(), hm, cond: d.cond, mood: d.mood, fatigue: d.fat }];
+    this.applyFatigue(d.fat, '就寝時の疲労', { bedLog, bedFlow: true });
   };
+  goBed2 = () => { this.stopPhysics(); this.set({ screen: 'bed2', bedFlow: false }); };
   dropRecovery(recovered) {
     if (recovered > 0) {
       // 回復の🌙が落下中は、ジャイロ（傾き）でも重力を真下に固定する（横に流れて山に当たらず消えないのを防ぐ）
@@ -2173,6 +2190,13 @@ export default class App extends React.Component {
     if (st.sampleMode) Object.keys(this._sampleWake).forEach(d => { if (d <= today) { const w = this._sampleWake[d]; by[d] = { date: d, ts: hmToTsOn(d, '00:00') + w.min * 60000, cond: w.cond, mood: w.mood, fatigue: w.fatigue }; } });
     (st.wakeLog || []).forEach(w => { by[w.date] = w; });
     return Object.keys(by).sort().map(d => by[d]).slice(-7);
+  }
+  /* 就寝記録の最後: 今日のがんばりタイプ（朝の疲労を起点に今日の記録から判定） */
+  bedVals() {
+    const st = this.state, today = todayStr();
+    const wk = (st.wakeLog || []).find(w => w.date === today);
+    const sum = daySummary(st.entries, today, wk ? wk.fatigue : 0);
+    return { sum, reviewText: reviewLine(sum, today) };
   }
   /* 画面3・4に出す値 */
   wakeVals() {
@@ -2314,7 +2338,8 @@ export default class App extends React.Component {
         if (s.searchStep) { this.set({ searchStep: null }); return true; }
         if (s.catId) { this.set({ catId: null }); return true; }
         this.goHome(); return true; // 入口の✕と同じ
-      case 'wake1': this.set({ screen: 'home' }); return true;
+      case 'wake1': case 'bed1': this.set({ screen: 'home' }); return true;
+      case 'bed2': this.set({ screen: 'shaka' }); return true;
       case 'wake2': this.set({ screen: 'shaka' }); return true;
       case 'wake3': this.set({ screen: 'wake2' }); return true;
       case 'collect': this.goShaka(); return true;
@@ -3555,6 +3580,9 @@ export default class App extends React.Component {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
       isHome: st.screen === 'home', isRecord: st.screen === 'record',
       isWake: ['wake1', 'wake2', 'wake3'].includes(st.screen), isWake1: st.screen === 'wake1', isWake2: st.screen === 'wake2', isWake3: st.screen === 'wake3',
+      isBed1: st.screen === 'bed1', isBed2: st.screen === 'bed2', isBed: ['bed1', 'bed2'].includes(st.screen),
+      bedDraft: st.bedDraft, setBedDraft: this.setBedDraft, finishBed1: this.finishBed1, goBed: this.goBed, goBed2: this.goBed2,
+      bedFlow: st.bedFlow && st.screen === 'shaka', backBed: () => this.set({ screen: 'shaka' }), wakeRecs: st.screen === 'bed2' ? this.wakeRecords() : [], bed: st.screen === 'bed2' ? this.bedVals() : null,
       homeComment: st.screen === 'home' ? (st.tapLine || (() => {
         const d = this.homeDateStr(), nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes());
         const next = sortEntries(st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.title && e.from && (d !== todayStr() || e.from > nowHm)))[0];
@@ -3575,7 +3603,7 @@ export default class App extends React.Component {
       wakeFlow: st.wakeFlow && st.screen === 'shaka', goWake2: this.goWake2, goWake3: this.goWake3, backWake: this.backWake,
       wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null,
       wakeHeader: (() => {
-        if (!st.screen.startsWith('wake')) return '';
+        if (!st.screen.startsWith('wake') && !st.screen.startsWith('bed')) return '';
         const t = todayStr(), d = strToDate(t);
         const firsts = [...st.entries.filter(e => !e._sample).map(e => e.date), ...(st.wakeLog || []).map(w => w.date)].filter(Boolean).sort();
         const n = firsts.length ? Math.round((d - strToDate(firsts[0])) / 86400000) + 1 : 1;
@@ -3917,6 +3945,8 @@ export default class App extends React.Component {
         {v.isWake1 && <WakeCheck v={v} />}
         {v.isWake2 && <WakeReview v={v} />}
         {v.isWake3 && <WakePlan v={v} />}
+        {v.isBed1 && <BedCheck v={v} />}
+        {v.isBed2 && <BedReview v={v} />}
         {v.isShaka && <Shaka v={v} />}
         {v.isCollect && <Collect v={v} />}
         {v.isMypage && <MyPage v={v} />}
@@ -3944,7 +3974,7 @@ export default class App extends React.Component {
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}
-        {!v.isBookshelf && !v.isWake && <Nav v={v} />}
+        {!v.isBookshelf && !v.isWake && !v.isBed && <Nav v={v} />}
         </>}
       </div>
     );

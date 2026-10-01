@@ -99,15 +99,18 @@ export default function Home({ v }) {
         <Speaker text={v.homeComment} size={140} onTap={v.tapCharacter} />
       </div>
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 0 12px' }}>
-        {/* sleep card */}
-        <button onClick={v.goSleep} style={{ display: 'block', textAlign: 'left', background: '#fff', border: 'none', borderRadius: 16, padding: '13px 14px', margin: '0 16px 10px', boxShadow: '0 1px 3px rgba(27,27,24,.05)', cursor: 'pointer', width: 'calc(100% - 32px)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* 就寝・起床の記録 */}
+        <div style={{ display: 'flex', gap: 10, margin: '0 16px 10px' }}>
+          <button onClick={v.goBed} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', background: '#fff', border: 'none', borderRadius: 16, padding: '13px 14px', boxShadow: '0 1px 3px rgba(27,27,24,.05)', cursor: 'pointer' }}>
+            <span style={{ fontSize: 15 }}>🌙</span>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>就寝</span>
+          </button>
+          <button onClick={v.goSleep} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', background: '#fff', border: 'none', borderRadius: 16, padding: '13px 14px', boxShadow: '0 1px 3px rgba(27,27,24,.05)', cursor: 'pointer' }}>
             <span style={{ fontSize: 15 }}>🛏</span>
-            <span style={{ fontSize: 13, fontWeight: 700, flex: 1, textAlign: 'left' }}>睡眠</span>
-            <span style={{ ...mono, fontSize: 10, color: '#8a8a82' }}>起床後の記録</span>
+            <span style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>起床</span>
             {v.sleepRecText && <span style={{ ...mono, fontSize: 13, fontWeight: 700, color: '#f5994e' }}>{v.sleepRecText}</span>}
-          </div>
-        </button>
+          </button>
+        </div>
         {/* slots */}
         {v.slots.map(s => (
           <div key={s.id} style={{ background: '#fff', borderRadius: 18, margin: '0 16px 12px', boxShadow: '0 1px 3px rgba(27,27,24,.06)', overflow: 'hidden' }}>
