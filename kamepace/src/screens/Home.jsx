@@ -145,6 +145,14 @@ export default function Home({ v }) {
             )}
           </div>
         ))}
+        {/* 就寝カード */}
+        <button onClick={v.goBed} style={{ display: 'block', textAlign: 'left', background: '#fff', border: 'none', borderRadius: 16, padding: '13px 14px', margin: '0 16px 10px', boxShadow: '0 1px 3px rgba(27,27,24,.05)', cursor: 'pointer', width: 'calc(100% - 32px)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 15 }}>🌙</span>
+            <span style={{ fontSize: 13, fontWeight: 700, flex: 1, textAlign: 'left' }}>就寝</span>
+            <span style={{ ...mono, fontSize: 10, color: '#8a8a82' }}>就寝前の記録</span>
+          </div>
+        </button>
         {/* タスク（mylifecore / Google ToDo / かめペースで手動追加）: 時間軸の下。
             チェックするとその時間帯に「行動」として記録される（紐づけた行動 or タスク名で推測） */}
         <div style={{ background: '#fff', borderRadius: 18, margin: '0 16px 12px', boxShadow: '0 1px 3px rgba(27,27,24,.06)', overflow: 'hidden' }}>

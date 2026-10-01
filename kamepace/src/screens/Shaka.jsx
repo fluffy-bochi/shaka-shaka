@@ -46,6 +46,9 @@ export default function Shaka({ v }) {
       {v.wakeFlow && (
         <button onClick={v.goWake2} style={{ position: 'absolute', left: 20, right: 20, bottom: 84, zIndex: 4, border: 'none', borderRadius: 16, background: '#c4f000', color: '#2f3a00', fontWeight: 800, fontSize: 16, padding: '16px 0', cursor: 'pointer', boxShadow: '0 8px 22px rgba(122,154,0,.4)' }}>つぎへ</button>
       )}
+      {v.bedFlow && (
+        <button onClick={v.goBed2} style={{ position: 'absolute', left: 20, right: 20, bottom: 84, zIndex: 4, border: 'none', borderRadius: 16, background: '#c4f000', color: '#2f3a00', fontWeight: 800, fontSize: 16, padding: '16px 0', cursor: 'pointer', boxShadow: '0 8px 22px rgba(122,154,0,.4)' }}>つぎへ</button>
+      )}
     </>
   );
 }
