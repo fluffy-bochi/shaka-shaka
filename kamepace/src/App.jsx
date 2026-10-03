@@ -1469,17 +1469,6 @@ export default class App extends React.Component {
     });
     return g;
   }
-  /* まだ来ていない予定（planned のうち、まだ降っていない残り）の絵文字。シャカでは灰色で積む。
-     未来の日はまるごと灰色・今日はこれから来る予定ぶんだけ灰色になる。 */
-  futurePlanGlyphs(dateStr) {
-    const out = [];
-    this.state.entries.forEach(r => {
-      if (r.exp || !r.planned || (r.delta || 0) <= 0 || r.date !== dateStr) return;
-      const remaining = r.delta - (r.dropped || 0);
-      for (let i = 0; i < remaining; i++) out.push(entryGlyph(r));
-    });
-    return out;
-  }
   rebuildPhysics() {
     this.stopPhysics();
     requestAnimationFrame(() => {
@@ -2437,15 +2426,13 @@ export default class App extends React.Component {
     // 表示上限は新しい側（末尾）を残す。画面に収まるのは約100個で、
     // それを超えたぶんは「あふれて」見える（=頑張りすぎの信号）。
     // 実際に積んだ絵文字（solid）＋ まだ来ていない予定（gray）。予定は灰色で settled（降らせない）。
-    const viewDate = this.state.dayOffset === 0 ? todayStr() : shiftDate(todayStr(), this.state.dayOffset);
     const baseMarks = this.state.dayOffset === 0
       ? this.pileGlyphsMarked()
       : this.currentBag().map(g => ({ g, isNew: false }));
     const oldSolid = baseMarks.filter(m => !m.isNew);
     const newSolid = baseMarks.filter(m => m.isNew);
-    const grayMarks = (this.state.predictOpen ? [] : this.futurePlanGlyphs(viewDate)).map(g => ({ g, isNew: false, gray: true }));
-    // 並び: [積み済み(old) → 未来予定(gray, settled) → 新規(new, 上から降る)]。新規を末尾に置く
-    let marks = [...oldSolid, ...grayMarks, ...newSolid].slice(-200);
+    // 並び: [積み済み(old) → 新規(new, 上から降る)]。新規を末尾に置く
+    let marks = [...oldSolid, ...newSolid].slice(-200);
     const newCount = marks.filter(m => m.isNew).length;
     const oldCount = marks.length - newCount;
     const perRow = Math.max(1, Math.floor(W / (2 * r)));
@@ -2640,36 +2627,15 @@ export default class App extends React.Component {
   };
   closePredict = () => {
     // 過去や未来の時刻のまま閉じても、現在に戻すときと同じ動きで絵文字を元に戻す
-    // （外れていた絵文字は上から落ちて戻り、薄くしていたものも戻る。通常表示の灰色の予定も上から落として戻す）
+    // （外れていた絵文字は上から落ちて戻り、薄くしていたものも戻る）
     if (this.engine && this._pred) {
       this._applyPredict(Date.now());
-      this._restoreFutureGray();
       this.set({ predictOpen: false, predictT: Date.now() });
       this._pred = null; this._predToday = null; this._predRest = null;
       return;
     }
     this.set({ predictOpen: false }); this._pred = null; this._predToday = null; this._predRest = null; this.rebuildPhysics();
   };
-  _restoreFutureGray() {
-    const el = document.getElementById('shakacase'); if (!el || !this.engine) return;
-    const { World, Bodies } = Matter;
-    const rect = el.getBoundingClientRect(); const W = rect.width || 350, H = rect.height || 700; const r = this.PR;
-    this.futurePlanGlyphs(todayStr()).slice(0, 60).forEach((g) => {
-      const body = Bodies.circle(r + Math.random() * (W - 2 * r), this._spawnY(r, H), r, this.BODY_OPTS);
-      World.add(this.engine.world, body);
-      const d = document.createElement('div');
-      d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;will-change:transform;opacity:.45';
-      d.style.width = d.style.height = (2 * r) + 'px'; d.style.fontSize = Math.round(r * 1.6) + 'px';
-      appendGlyph(d, g, Math.round(r * 1.9));
-      const im = d.firstChild;
-      if (im && im.tagName === 'IMG') im.style.filter = 'grayscale(1)'; else d.style.filter = 'grayscale(1)';
-      el.appendChild(d);
-      this.bodies.push({ body, el: d, glyph: g, gray: true });
-    });
-    this.resumeMotion();
-    clearTimeout(this._settleT);
-    if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
-  }
   setPredictT = (t) => {
     const t0 = todayStr(), wk = (this.state.wakeLog || []).find(w => w.date === t0);
     const T = Math.max(wk ? wk.ts : hmToTsOn(t0, '08:00'), t);
