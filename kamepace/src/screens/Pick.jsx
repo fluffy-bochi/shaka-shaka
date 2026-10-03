@@ -125,9 +125,7 @@ export default function Pick({ v }) {
   const [idx, setIdx] = React.useState(0); // 真ん中にある行（コピー込みの通し番号）
   const listRef = React.useRef(null);
   const want = React.useRef(mem.sel || null); // 次の描画で真ん中に置きたい行の key
-  const gesture = React.useRef({ peak: 0, lastT: 0, lastY: 0, dir: 0 });
   const endT = React.useRef(null);
-  const busy = React.useRef(0); // この時刻まではプログラムでスクロール中（スナップの再判定をしない）
 
   const rows = React.useMemo(() => {
     const out = [];
@@ -147,7 +145,6 @@ export default function Pick({ v }) {
   const centerIdx = () => { const box = listRef.current; return box ? Math.floor((box.scrollTop + box.clientHeight / 2) / ROW_H) : 0; };
   const scrollToIdx = (i, smooth) => {
     const box = listRef.current; if (!box) return;
-    if (smooth) busy.current = performance.now() + 700;
     box.scrollTo({ top: topFor(i), behavior: smooth ? 'smooth' : 'auto' });
     setIdx(i);
   };
@@ -165,36 +162,19 @@ export default function Pick({ v }) {
     if (v.pickCatId && cats.some(c => c.id === v.pickCatId)) { want.current = 'cat:' + v.pickCatId; setOpen(o => ({ ...o, [v.pickCatId]: true })); }
   }, [v.pickCatId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // スクロールが止まったら: 端のコピーにいればまんなかのコピーへ戻し（エンドレス）、行かカテゴリにスナップ
+  // スクロールが止まったら: 端のコピーにいればまんなかのコピーへ戻し（エンドレス）、行にぴったり合わせる
   const settle = () => {
     const box = listRef.current; if (!box) return;
-    const g = gesture.current;
     let i = centerIdx();
     const mid = Math.floor(COPIES / 2) * N;
     if (i < N || i >= (COPIES - 1) * N) { const ni = mid + (((i % N) + N) % N); box.scrollTop += (ni - i) * ROW_H; i = ni; }
-    const anyOpen = cats.some(c => open[c.id]);
-    if (performance.now() > busy.current && anyOpen && g.peak > 1.6 && g.dir) {
-      // 速くスクロールしたら、進んだ向きの次のカテゴリを中央へ
-      let j = i;
-      for (let k = 0; k < N; k++) { const r = rows[(((i + g.dir * k) % N) + N) % N]; if (r.type === 'cat') { j = i + g.dir * k; break; } }
-      g.peak = 0; g.dir = 0;
-      if (j !== i || Math.abs(box.scrollTop - topFor(i)) > 1) { scrollToIdx(j, true); return; }
-    }
-    g.peak = 0; g.dir = 0;
-    if (Math.abs(box.scrollTop - topFor(i)) > 1) { busy.current = performance.now() + 500; box.scrollTo({ top: topFor(i), behavior: 'smooth' }); }
+    if (Math.abs(box.scrollTop - topFor(i)) > 1) box.scrollTo({ top: topFor(i), behavior: 'smooth' });
     setIdx(i);
   };
   const onScroll = () => {
-    const box = listRef.current; if (!box) return;
-    const now = performance.now(), g = gesture.current;
-    if (g.lastT) {
-      const dt = now - g.lastT, dy = box.scrollTop - g.lastY;
-      if (dt > 0 && dt < 100) { const sp = Math.abs(dy) / dt; if (sp > g.peak) g.peak = sp; if (Math.abs(dy) > 2) g.dir = dy > 0 ? 1 : -1; }
-    }
-    g.lastT = now; g.lastY = box.scrollTop;
     const i = centerIdx(); if (i !== idx) setIdx(i);
     clearTimeout(endT.current);
-    endT.current = setTimeout(() => { g.lastT = 0; settle(); }, 140);
+    endT.current = setTimeout(settle, 140);
   };
 
   const tap = (r, i) => {
