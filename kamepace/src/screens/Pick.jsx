@@ -90,61 +90,145 @@ function Card({ row, cat, v }) {
   );
 }
 
+/* リストの1行（高さは全行共通の ROW_H。選択中は横に広げて目立たせるだけで高さは変えない＝スクロール位置から選択行を計算できる） */
+const ROW_H = 56, COPIES = 5;
+const Row = React.memo(function Row({ r, i, on, open, onTap }) {
+  const color = r.type === 'addcat' ? '#55554e' : r.cat.color;
+  return (
+    <div onClick={() => onTap(r, i)} style={{ height: ROW_H, display: 'flex', alignItems: 'center', padding: on ? '0 60px 0 62px' : '0 76px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
+      {r.type === 'item' ? (
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 10, height: on ? 54 : 44, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
+          <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 46 : 38, height: on ? 46 : 38, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+          <span style={{ position: 'relative', flex: '0 0 auto', marginLeft: 6 }}><Emo e={r.item.glyph} size={on ? 32 : 26} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: on ? 16.5 : 14.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.item.name}</div>
+            {on && <FatNums it={r.item} big />}
+          </div>
+          {!on && <FatNums it={r.item} />}
+        </div>
+      ) : (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 52 : 42, borderRadius: 10, padding: '0 14px', background: color, color: '#fff', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
+          <span style={{ fontSize: on ? 16 : 13 }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
+          <span style={{ flex: 1, textAlign: 'center', fontSize: on ? 18.5 : 15.5, fontWeight: 800, paddingRight: 20 }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
+        </div>
+      )}
+    </div>
+  );
+});
+
 export default function Pick({ v }) {
   const cats = v.pickCats;
   // 選択と開閉は確認画面から戻っても残す（v.pickMem に覚えておく）
   const mem = v.pickMem;
-  const [sel, setSel] = React.useState(() => mem.sel || (cats[0] ? 'cat:' + cats[0].id : null));
   const [open, setOpen] = React.useState(() => mem.open || {});
-  React.useEffect(() => { mem.sel = sel; mem.open = open; }, [sel, open]); // eslint-disable-line react-hooks/exhaustive-deps
   const [fil, setFil] = React.useState({});
+  const [idx, setIdx] = React.useState(0); // 真ん中にある行（コピー込みの通し番号）
   const listRef = React.useRef(null);
+  const want = React.useRef(mem.sel || null); // 次の描画で真ん中に置きたい行の key
+  const gesture = React.useRef({ peak: 0, lastT: 0, lastY: 0, dir: 0 });
+  const endT = React.useRef(null);
+  const busy = React.useRef(0); // この時刻まではプログラムでスクロール中（スナップの再判定をしない）
 
-  // カテゴリ追加・コピーして作る のあとは、そのカテゴリを開いて選ぶ
+  const rows = React.useMemo(() => {
+    const out = [];
+    cats.forEach(c => {
+      out.push({ key: 'cat:' + c.id, type: 'cat', cat: c });
+      if (open[c.id]) c.items.forEach(it => out.push({ key: it.key, type: 'item', cat: c, item: it }));
+    });
+    out.push({ key: 'addcat', type: 'addcat' });
+    return out;
+  }, [cats, open]);
+  const N = rows.length;
+  const selRow = rows[((idx % N) + N) % N];
+
+  React.useEffect(() => { mem.sel = selRow && selRow.key; mem.open = open; }, [selRow, open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const topFor = (i) => { const box = listRef.current; return i * ROW_H + ROW_H / 2 - (box ? box.clientHeight / 2 : 0); };
+  const centerIdx = () => { const box = listRef.current; return box ? Math.floor((box.scrollTop + box.clientHeight / 2) / ROW_H) : 0; };
+  const scrollToIdx = (i, smooth) => {
+    const box = listRef.current; if (!box) return;
+    if (smooth) busy.current = performance.now() + 700;
+    box.scrollTo({ top: topFor(i), behavior: smooth ? 'smooth' : 'auto' });
+    setIdx(i);
+  };
+
+  // 開閉・初回: 指定の行（なければ今の行）をまんなかのコピーで中央に置く
+  React.useLayoutEffect(() => {
+    const k = want.current || mem.sel; // mem.sel はまだ開閉前の選択（この後の effect で更新される）
+    want.current = null;
+    let i = rows.findIndex(r => r.key === k); if (i < 0) i = 0;
+    scrollToIdx(Math.floor(COPIES / 2) * N + i, false);
+  }, [rows]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // カテゴリ追加・コピーして作る のあとは、そのカテゴリを開いて中央に
   React.useEffect(() => {
-    if (v.pickCatId && cats.some(c => c.id === v.pickCatId)) { setOpen(o => ({ ...o, [v.pickCatId]: true })); setSel('cat:' + v.pickCatId); }
+    if (v.pickCatId && cats.some(c => c.id === v.pickCatId)) { want.current = 'cat:' + v.pickCatId; setOpen(o => ({ ...o, [v.pickCatId]: true })); }
   }, [v.pickCatId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rows = [];
-  cats.forEach(c => {
-    rows.push({ key: 'cat:' + c.id, type: 'cat', cat: c });
-    if (open[c.id]) c.items.forEach(it => rows.push({ key: it.key, type: 'item', cat: c, item: it }));
-  });
-  rows.push({ key: 'addcat', type: 'addcat' });
-  const selRow = rows.find(r => r.key === sel) || rows[0];
-  const selIdx = rows.indexOf(selRow);
-
-  // 選択中の行をリストのまんなかに寄せる
-  React.useEffect(() => {
+  // スクロールが止まったら: 端のコピーにいればまんなかのコピーへ戻し（エンドレス）、行かカテゴリにスナップ
+  const settle = () => {
     const box = listRef.current; if (!box) return;
-    const el = box.querySelector('[data-k="' + (selRow && selRow.key) + '"]'); if (!el) return;
-    box.scrollTo({ top: el.offsetTop - box.clientHeight / 2 + el.offsetHeight / 2, behavior: 'smooth' });
-  }, [sel, open]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const tap = (r) => {
-    if (r.type === 'addcat') { if (sel === r.key) v.openCatAdd(); else setSel(r.key); return; }
-    if (r.type === 'cat') { if (sel === r.key) setOpen(o => ({ ...o, [r.cat.id]: !o[r.cat.id] })); else setSel(r.key); return; }
-    if (sel === r.key) r.item.onStart(); else setSel(r.key);
+    const g = gesture.current;
+    let i = centerIdx();
+    const mid = Math.floor(COPIES / 2) * N;
+    if (i < N || i >= (COPIES - 1) * N) { const ni = mid + (((i % N) + N) % N); box.scrollTop += (ni - i) * ROW_H; i = ni; }
+    const anyOpen = cats.some(c => open[c.id]);
+    if (performance.now() > busy.current && anyOpen && g.peak > 1.6 && g.dir) {
+      // 速くスクロールしたら、進んだ向きの次のカテゴリを中央へ
+      let j = i;
+      for (let k = 0; k < N; k++) { const r = rows[(((i + g.dir * k) % N) + N) % N]; if (r.type === 'cat') { j = i + g.dir * k; break; } }
+      g.peak = 0; g.dir = 0;
+      if (j !== i || Math.abs(box.scrollTop - topFor(i)) > 1) { scrollToIdx(j, true); return; }
+    }
+    g.peak = 0; g.dir = 0;
+    if (Math.abs(box.scrollTop - topFor(i)) > 1) { busy.current = performance.now() + 500; box.scrollTo({ top: topFor(i), behavior: 'smooth' }); }
+    setIdx(i);
   };
-  const move = (d) => { const n = rows[Math.max(0, Math.min(rows.length - 1, selIdx + d))]; if (n) setSel(n.key); };
+  const onScroll = () => {
+    const box = listRef.current; if (!box) return;
+    const now = performance.now(), g = gesture.current;
+    if (g.lastT) {
+      const dt = now - g.lastT, dy = box.scrollTop - g.lastY;
+      if (dt > 0 && dt < 100) { const sp = Math.abs(dy) / dt; if (sp > g.peak) g.peak = sp; if (Math.abs(dy) > 2) g.dir = dy > 0 ? 1 : -1; }
+    }
+    g.lastT = now; g.lastY = box.scrollTop;
+    const i = centerIdx(); if (i !== idx) setIdx(i);
+    clearTimeout(endT.current);
+    endT.current = setTimeout(() => { g.lastT = 0; settle(); }, 140);
+  };
+
+  const tap = (r, i) => {
+    if (i !== idx) { scrollToIdx(i, true); return; }
+    if (r.type === 'addcat') { v.openCatAdd(); return; }
+    if (r.type === 'cat') { want.current = r.key; setOpen(o => ({ ...o, [r.cat.id]: !o[r.cat.id] })); return; }
+    r.item.onStart();
+  };
+  const tapRef = React.useRef(tap); tapRef.current = tap;
+  const onTap = React.useCallback((r, i) => tapRef.current(r, i), []);
+  const move = (d) => scrollToIdx(idx + d, true);
   const anyClosed = cats.some(c => !open[c.id]);
   const toggleAll = () => {
     if (anyClosed) { const o = {}; cats.forEach(c => { o[c.id] = true; }); setOpen(o); return; }
+    if (selRow && selRow.type === 'item') want.current = 'cat:' + selRow.cat.id;
     setOpen({});
-    if (selRow && selRow.type === 'item') setSel('cat:' + selRow.cat.id);
   };
   const side = (on) => ({ width: 36, height: 36, borderRadius: 10, border: 'none', boxShadow: '0 1px 3px rgba(27,27,24,.08)', background: on ? INK : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, marginBottom: 10 });
   const arrow = { position: 'absolute', left: 14, zIndex: 2, width: 36, height: 36, border: 'none', background: 'none', cursor: 'pointer', padding: 0 };
 
+  const all = [];
+  for (let c = 0; c < COPIES; c++) rows.forEach((r, i) => all.push({ r, i: c * N + i }));
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 12px' }}>
         <button onClick={v.goHome} aria-label="もどる" style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: '#e4e1d8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(26, INK, true)}>arrow_back</span></button>
         <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{v.pickDateText}</div>
         <SlotPill v={v} small />
       </div>
       <Card row={selRow} cat={selRow && selRow.cat} v={v} />
-      <div style={{ position: 'relative', flex: 1, minHeight: 0, marginTop: 14, background: '#efece3', borderRadius: '22px 22px 0 0', containerType: 'size' }}>
+      <div style={{ position: 'relative', flex: 1, minHeight: 0, marginTop: 14, background: '#efece3', borderRadius: '22px 22px 0 0', overflow: 'hidden' }}>
+        {/* まんなか＝選択中の印 */}
+        <span style={{ position: 'absolute', left: 22, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 0, height: 0, borderTop: '13px solid transparent', borderBottom: '13px solid transparent', borderLeft: '20px solid ' + INK, pointerEvents: 'none' }} />
         <button onClick={() => move(-1)} aria-label="上へ" style={{ ...arrow, top: 12 }}><span style={ms(34, '#8a8a82')}>keyboard_arrow_up</span></button>
         <button onClick={() => move(1)} aria-label="下へ" style={{ ...arrow, bottom: 12 }}><span style={ms(34, '#8a8a82')}>keyboard_arrow_down</span></button>
         <div style={{ position: 'absolute', right: 14, top: 36, zIndex: 2, display: 'flex', flexDirection: 'column' }}>
@@ -153,35 +237,10 @@ export default function Pick({ v }) {
           <button onClick={() => setFil(f => ({ ...f, req: !f.req }))} aria-label="必須" style={side(fil.req)}><span style={{ fontSize: 17, fontWeight: 900, color: fil.req ? '#fff' : INK }}>必</span></button>
           <button onClick={() => setFil(f => ({ ...f, fav: !f.fav }))} aria-label="お気に入り" style={side(fil.fav)}><span style={ms(20, fil.fav ? '#fff' : INK, fil.fav)}>favorite</span></button>
         </div>
-        <div ref={listRef} className="nos" style={{ position: 'absolute', inset: 0, overflowY: 'auto' }}>
-          {/* 先頭・末尾の行もまんなかまで寄せられるように、上下にリスト領域の半分の余白 */}
-          <div style={{ height: 'calc(50cqh - 30px)' }} />
-          {rows.map(r => {
-            const on = r.key === selRow.key;
-            const color = r.type === 'cat' ? r.cat.color : r.type === 'item' ? r.cat.color : '#55554e';
-            return (
-              <div key={r.key} data-k={r.key} onClick={() => tap(r)} style={{ position: 'relative', display: 'flex', alignItems: 'center', padding: on ? '6px 62px 6px 62px' : '5px 76px 5px 76px', cursor: 'pointer' }}>
-                {on && <span style={{ position: 'absolute', left: 22, top: '50%', transform: 'translateY(-50%)', width: 0, height: 0, borderTop: '13px solid transparent', borderBottom: '13px solid transparent', borderLeft: '20px solid ' + INK }} />}
-                {r.type === 'item' ? (
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 10, height: on ? 60 : 42, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
-                    <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 48 : 38, height: on ? 48 : 38, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
-                    <span style={{ position: 'relative', flex: '0 0 auto', marginLeft: 6 }}><Emo e={r.item.glyph} size={on ? 34 : 26} /></span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: on ? 17 : 14.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.item.name}</div>
-                      {on && <FatNums it={r.item} big />}
-                    </div>
-                    {!on && <FatNums it={r.item} />}
-                  </div>
-                ) : (
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 58 : 40, borderRadius: 10, padding: '0 14px', background: r.type === 'cat' && (on || open[r.cat.id]) ? color : r.type === 'addcat' && on ? INK : '#fff', color: (r.type === 'cat' && (on || open[r.cat.id])) || (r.type === 'addcat' && on) ? '#fff' : INK, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
-                    <span style={{ fontSize: on ? 18 : 13, color: r.type === 'cat' && !on && !open[r.cat.id] ? color : undefined }}>{r.type === 'addcat' ? '＋' : open[r.cat.id] ? '▼' : '▶'}</span>
-                    <span style={{ flex: 1, textAlign: 'center', fontSize: on ? 19 : 15.5, fontWeight: 800, paddingRight: 20 }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          <div style={{ height: 'calc(50cqh - 30px)' }} />
+        <div ref={listRef} onScroll={onScroll} className="nos" style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory', overscrollBehavior: 'contain' }}>
+          {all.map(({ r, i }) => (
+            <Row key={i} r={r} i={i} on={i === idx} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} />
+          ))}
         </div>
       </div>
     </div>

@@ -33,6 +33,8 @@ input { font-family: inherit; }
 /* ステータスバー用スペーサー。本棚の横向き時は詰めてナビ・棚を上端まで使う */
 .app-status-spacer { height: max(40px, env(safe-area-inset-top)); }
 body.kame-book-land .app-status-spacer { height: env(safe-area-inset-top); }
+/* 行動選択画面は上の余白を詰める（ノッチ分だけ残す） */
+.app-status-spacer.tight { height: env(safe-area-inset-top); }
 
 /* app fills the viewport like the prototype's phone screen.
    --app-vh は main.jsx が測る実可視高さ（Android下部ナビ/iOSホームインジケータ/URLバーを除いた領域）。
