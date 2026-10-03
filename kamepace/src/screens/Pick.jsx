@@ -7,6 +7,7 @@ import Emo from '../fluent';
    START・予定・記録・リストは、いまは全部「時間を選ぶ画面（確認）」へ進む。 */
 const INK = '#1b1b18';
 const ms = (size, color, fill = false) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: fill ? "'FILL' 1" : "'FILL' 0", fontSize: size, color, lineHeight: 1 });
+const CARD_H = 252; // 上のカードの高さはカテゴリ・行動・予定で共通（切り替わってもリストの位置が動かないように）
 const sg = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0');
 
 function FatNums({ it, big }) {
@@ -24,7 +25,7 @@ function FatNums({ it, big }) {
 
 /* 上のカード */
 function Card({ row, cat, v }) {
-  const wrap = { position: 'relative', margin: '0 16px', borderRadius: 18, overflow: 'hidden', background: '#fff', minHeight: 230, display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' };
+  const wrap = { position: 'relative', margin: '0 16px', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, flex: '0 0 auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' };
   if (!row) return <div style={wrap} />;
   if (row.type === 'cat' || row.type === 'addcat') {
     const color = row.type === 'cat' ? cat.color : '#55554e';
@@ -47,10 +48,10 @@ function Card({ row, cat, v }) {
     <div style={wrap}>
       <div style={{ position: 'absolute', left: 0, top: 0, width: '46%', height: 150, background: cat.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
       <span style={{ position: 'absolute', left: 14, top: 10, fontSize: 13, fontWeight: 800, color: '#fff' }}>{cat.name}</span>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: '30px 16px 10px 22px', flex: 1 }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: '30px 16px 10px 22px', flex: 1, minHeight: 0 }}>
         <span style={{ flex: '0 0 auto' }}><Emo e={it.glyph} size={92} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: it.name.length > 9 ? 17 : 23, fontWeight: 900, lineHeight: 1.3, wordBreak: 'break-all' }}>{it.name}</div>
+          <div style={{ fontSize: it.name.length > 9 ? 17 : 23, fontWeight: 900, lineHeight: 1.3, wordBreak: 'break-all', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.name}</div>
           {isAct && (
             <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
               <span style={{ ...chip, fontSize: 13, fontWeight: 900 }}>必</span>
@@ -107,7 +108,7 @@ const Row = React.memo(function Row({ r, i, on, open, onTap }) {
           {!on && <FatNums it={r.item} />}
         </div>
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 52 : 42, borderRadius: 10, padding: '0 14px', background: color, color: '#fff', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 54 : 44, borderRadius: 10, padding: '0 14px', background: color, color: '#fff', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
           <span style={{ fontSize: on ? 16 : 13 }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
           <span style={{ flex: 1, textAlign: 'center', fontSize: on ? 18.5 : 15.5, fontWeight: 800, paddingRight: 20 }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
         </div>
@@ -206,7 +207,7 @@ export default function Pick({ v }) {
         <SlotPill v={v} small />
       </div>
       <Card row={selRow} cat={selRow && selRow.cat} v={v} />
-      <div style={{ position: 'relative', flex: 1, minHeight: 0, marginTop: 14, background: '#efece3', borderRadius: '22px 22px 0 0', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', flex: 1, minHeight: 0, marginTop: 10, background: '#f7f4ec', overflow: 'hidden' }}>
         {/* まんなか＝選択中の印 */}
         <span style={{ position: 'absolute', left: 22, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 0, height: 0, borderTop: '13px solid transparent', borderBottom: '13px solid transparent', borderLeft: '20px solid ' + INK, pointerEvents: 'none' }} />
         <button onClick={() => move(-1)} aria-label="上へ" style={{ ...arrow, top: 12 }}><span style={ms(34, '#8a8a82')}>keyboard_arrow_up</span></button>
