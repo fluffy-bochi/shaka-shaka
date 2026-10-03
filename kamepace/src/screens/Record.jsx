@@ -50,7 +50,7 @@ export default function Record({ v }) {
       {v.searchResultsOpen && <SearchResults v={v} />}
       {v.searchMoreOpen && <SearchMore v={v} />}
       {v.searchConfirmOpen && <Confirm v={v} />}
-      {v.showCart && !v.searchConfirmOpen && <CartBar v={v} />}
+      {v.showCart && !v.searchConfirmOpen && !v.showCats && <CartBar v={v} />}
       {v.degreeOpen && <DegreePopup v={v} />}
       {v.catAddOpen && <CatAddPopup v={v} />}
       {v.actAddOpen && <ActAddPopup v={v} />}

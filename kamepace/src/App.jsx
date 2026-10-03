@@ -1706,7 +1706,8 @@ export default class App extends React.Component {
   closeDegree = () => this.set({ degreeItem: null });
   confirmDegree = () => {
     const id = this.state.degreeItem;
-    this.set({ cart: { ...this.state.cart, [id]: { degIdx: this.state.degreeIdx } }, degreeItem: null });
+    // 行動選択画面からは、程度を決めたらそのまま時間を選ぶ画面へ（下の「登録を確認」バーは出さない）
+    this.setState({ cart: { ...this.state.cart, [id]: { degIdx: this.state.degreeIdx } }, degreeItem: null }, () => { if (!this.state.searchStep) this.goConfirm(); });
   };
   cartFh(item) { const e = this.state.cart[item.id]; if (e && e.degIdx != null && item.degFh) return item.degFh[e.degIdx]; return item.fh; }
   goConfirm = () => {
