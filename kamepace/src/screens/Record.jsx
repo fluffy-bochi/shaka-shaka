@@ -2,6 +2,7 @@ import React from 'react';
 import SlotPill from './SlotPill';
 import EmojiPicker from './EmojiPicker';
 import Emo from '../fluent';
+import Pick from './Pick';
 
 const mono = { fontFamily: "'Space Mono',monospace" };
 const msIcon = (size, color, fill = true) => ({ fontFamily: 'Material Symbols Rounded', ...(fill ? { fontVariationSettings: "'FILL' 1" } : {}), fontSize: size, color });
@@ -40,18 +41,16 @@ function HourStep({ dir, onClick }) {
     </button>
   );
 }
-const sectionLabel = { ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a8a82', padding: '14px 22px 6px' };
 
 export default function Record({ v }) {
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff' }}>
-      {v.showCats && <Cats v={v} />}
+      {v.showCats && <Pick v={v} />}
       {v.searchInputOpen && <SearchInput v={v} />}
       {v.searchResultsOpen && <SearchResults v={v} />}
       {v.searchMoreOpen && <SearchMore v={v} />}
       {v.searchConfirmOpen && <Confirm v={v} />}
-      {v.showSub && <Sub v={v} />}
-      {v.showCart && !v.searchConfirmOpen && <CartBar v={v} />}
+      {v.showCart && !v.searchConfirmOpen && !v.showCats && <CartBar v={v} />}
       {v.degreeOpen && <DegreePopup v={v} />}
       {v.catAddOpen && <CatAddPopup v={v} />}
       {v.actAddOpen && <ActAddPopup v={v} />}
@@ -60,66 +59,6 @@ export default function Record({ v }) {
       {v.intensityOpen && <IntensityPopup v={v} />}
       {v.planDetailOpen && <PlanDetailPopup v={v} />}
       {v.planAddOpen && <PlanAddPopup v={v} />}
-    </div>
-  );
-}
-
-/* ---- STEP 1 : 入口（検索窓 → 予定から → 大カテゴリから） ---- */
-function Cats({ v }) {
-  return (
-    <div className="nos" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflowY: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 18px 12px 22px' }}>
-        <button onClick={v.goHome} style={{ background: 'none', border: 'none', fontSize: 19, color: '#8a8a82', cursor: 'pointer' }}>✕</button>
-        <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>記録</div>
-        <SlotPill v={v} />
-      </div>
-      <div style={{ padding: '0 16px' }}>
-        <button onClick={v.openSearch} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: '#efece3', border: 'none', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', textAlign: 'left' }}>
-          <span style={msIcon(19, '#8a8a82', false)}>search</span>
-          <span style={{ fontSize: 14, color: '#a5a39a' }}>なにをした？（例：皿洗い、会議）</span>
-        </button>
-        <button onClick={v.openMood} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 9, background: '#fff', border: '1.5px solid #e4e1d8', borderRadius: 12, padding: '11px 13px', marginTop: 9, cursor: 'pointer', textAlign: 'left' }}>
-          <span style={{ fontSize: 18 }}>💭</span>
-          <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>きもち・できごと</span>
-            <span style={{ display: 'block', fontSize: 11, color: '#9d9b91', marginTop: 1 }}>ショックなこと・うれしかったことを時間なしで</span>
-          </span>
-          <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
-        </button>
-      </div>
-      <div style={sectionLabel}>予定から</div>
-      <div style={{ padding: '0 0 2px' }}>
-        {v.plans.map(p => (
-          <div key={p.id} onClick={p.onOpen} style={{ display: 'flex', width: '100%', textAlign: 'left', alignItems: 'center', gap: 13, padding: '10px 12px 10px 22px', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer' }}>
-            <span style={{ width: 26, textAlign: 'center', flex: '0 0 auto', fontSize: 19 }}>📋</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>{p.name}</div>
-              <div style={{ ...mono, fontSize: 11, color: '#9d9b91', marginTop: 1 }}>{p.meta}</div>
-            </div>
-            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
-            <button onClick={(e) => { e.stopPropagation(); p.onTrash(); }} aria-label="ゴミ箱へ" style={{ width: 34, height: 34, border: 'none', background: 'none', cursor: 'pointer', flex: '0 0 auto', padding: 0 }}>
-              <span style={msIcon(18, '#c9c7bf', false)}>delete</span>
-            </button>
-          </div>
-        ))}
-        <button onClick={v.openPlanAdd} style={{ display: 'flex', width: 'calc(100% - 32px)', margin: '12px 16px 2px', alignItems: 'center', justifyContent: 'center', gap: 7, border: '1.5px dashed #d8d5cb', borderRadius: 12, padding: '12px 0', fontSize: 13, fontWeight: 700, color: '#8a8a82', background: '#fff', cursor: 'pointer' }}>
-          <span style={msIcon(18, '#8a8a82', false)}>calendar_add_on</span>予定をつくる
-        </button>
-      </div>
-      <div style={sectionLabel}>大カテゴリから</div>
-      <div style={{ padding: '0 0 10px' }}>
-        {v.cats.map(c => (
-          <button key={c.id} onClick={c.onSelect} style={{ display: 'flex', width: '100%', textAlign: 'left', alignItems: 'center', gap: 13, padding: '10px 22px', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer' }}>
-            <span style={{ ...msIcon(22, c.color), width: 26, textAlign: 'center', flex: '0 0 auto' }}>{c.icon}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#1b1b18' }}>{c.name}</div>
-              <div style={{ ...mono, fontSize: 11, color: '#9d9b91', marginTop: 1 }}>{c.sub}</div>
-            </div>
-            <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
-          </button>
-        ))}
-        <button onClick={v.openCatAdd} style={{ display: 'flex', width: 'calc(100% - 32px)', margin: '14px 16px 0', alignItems: 'center', justifyContent: 'center', gap: 7, border: '1.5px dashed #d8d5cb', borderRadius: 12, padding: '12px 0', fontSize: 13, fontWeight: 700, color: '#8a8a82', background: '#fff', cursor: 'pointer' }}>＋ 大カテゴリを追加</button>
-      </div>
     </div>
   );
 }
@@ -389,33 +328,6 @@ function Confirm({ v }) {
         {v.isEditFlow && (
           <button onClick={v.trashOriginal} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#b4645a', fontWeight: 700, fontSize: 13, padding: '11px 0', cursor: 'pointer' }}>🗑 この記録をゴミ箱へ</button>
         )}
-      </div>
-    </div>
-  );
-}
-
-/* ---- STEP 2 : 小カテゴリ ---- */
-function Sub({ v }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 22px 12px' }}>
-        <button onClick={v.backToCats} style={{ background: 'none', border: 'none', fontSize: 19, color: '#8a8a82', cursor: 'pointer' }}>‹</button>
-        <span style={{ ...msIcon(22, v.subColor), flex: '0 0 auto' }}>{v.subIcon}</span>
-        <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>{v.subName}</div>
-        <SlotPill v={v} small />
-      </div>
-      <div className="nos" style={{ flex: 1, overflowY: 'auto', padding: '2px 0 8px' }}>
-        {v.subItems.map(t => (
-          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '9px 22px', borderBottom: '1px solid #f1efe8', background: t.rowBg }}>
-            <span style={{ ...msIcon(22, t.color), width: 26, textAlign: 'center', flex: '0 0 auto' }}>{t.icon}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: t.weight, color: '#1b1b18' }}>{t.name}{t.degreeTag}</div>
-              <div style={{ ...mono, fontSize: 11, color: '#9d9b91', marginTop: 1 }}>{t.last}</div>
-            </div>
-            <button onClick={t.onTap} style={{ width: 30, height: 30, borderRadius: '50%', border: t.btnBorder, background: t.btnBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, fontWeight: 700, flex: '0 0 auto', cursor: 'pointer', color: t.btnColor }}>{t.btnLabel}</button>
-          </div>
-        ))}
-        <button onClick={v.openActAdd} style={{ display: 'flex', width: 'calc(100% - 32px)', alignItems: 'center', justifyContent: 'center', gap: 7, margin: '14px 16px 0', border: '1.5px dashed #d8d5cb', borderRadius: 12, padding: '11px 0', fontSize: 12.5, fontWeight: 700, color: '#8a8a82', background: '#fff', cursor: 'pointer' }}>＋ にているものをコピーして作る</button>
       </div>
     </div>
   );

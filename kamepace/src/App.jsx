@@ -504,6 +504,23 @@ export default class App extends React.Component {
     }
     return base * m;
   }
+  /* 行動選択画面に出す疲労の内訳: 標準時間(defMin)あたりの 体・心・合計。
+     その人の疲れやすさ（体/心の係数・バフ）と、好き嫌い（pref を渡すと保存済みの値の代わりに使う）を掛けた値。 */
+  actFatParts(item, pref) {
+    const st = this.state, bm = this.buffMult();
+    const recover = item.fh < 0;
+    const bc = recover ? (st.bodyRecCoef || 1) * bm.bodyRec : (st.bodyFatCoef || 1) * bm.bodyFat;
+    const mc = recover ? (st.mindRecCoef || 1) * bm.mindRec : (st.mindFatCoef || 1) * bm.mindFat;
+    const p = pref !== undefined ? pref : (st.prefs || {})[normTitle(item.name)];
+    const pm = p ? ({ dislike: recover ? 0.7 : 1.3, like: recover ? 1.3 : 0.7 }[p] || 1) : 1;
+    const min = item.defMin || 30;
+    let b, m;
+    if (typeof item.body === 'number' && typeof item.mind === 'number') { const sg = recover ? -1 : 1; b = item.body * bc * sg; m = item.mind * mc * sg; }
+    else { b = item.fh * bc / 2; m = item.fh * mc / 2; }
+    const k = pm * min / 60;
+    const tot = (b + m) * k;
+    return { body: Math.round(b * k), mind: Math.round(m * k), total: Math.round(tot) || (tot < 0 ? -1 : 1), min, minText: this.fmtMin(min) };
+  }
   /* 行動の疲労/回復（分ぶん）。四捨五入で0になっても最低±1にする（記録する行動は必ず±1以上）。 */
   effFat(item, min) {
     const r = Math.round(this.effFh(item) * (min / 60));
@@ -1573,7 +1590,7 @@ export default class App extends React.Component {
     this.toast('「' + sa.name + '」のデバフも調整しました');
   };
   dismissSymAdjust = () => this.set({ symAdjust: null });
-  openRecord(id) { this.set({ slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
+  openRecord(id) { this._pickMem = {}; this.set({ slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
   toggleSlotMenu = () => this.set({ slotMenuOpen: !this.state.slotMenuOpen });
   pickSlot = (id) => this.set({ slotId: id, slotMenuOpen: false });
   selectCat = (id) => this.set({ catId: id });
@@ -1644,7 +1661,7 @@ export default class App extends React.Component {
     this.set({
       customItems,
       customActions: [...(this.state.customActions || []), searchEntry],
-      actAddOpen: false,
+      actAddOpen: false, catId: null,
     });
     this.save();
     this.toast('「' + name + '」をつくりました');
@@ -1689,7 +1706,8 @@ export default class App extends React.Component {
   closeDegree = () => this.set({ degreeItem: null });
   confirmDegree = () => {
     const id = this.state.degreeItem;
-    this.set({ cart: { ...this.state.cart, [id]: { degIdx: this.state.degreeIdx } }, degreeItem: null });
+    // 行動選択画面からは、程度を決めたらそのまま時間を選ぶ画面へ（下の「登録を確認」バーは出さない）
+    this.setState({ cart: { ...this.state.cart, [id]: { degIdx: this.state.degreeIdx } }, degreeItem: null }, () => { if (!this.state.searchStep) this.goConfirm(); });
   };
   cartFh(item) { const e = this.state.cart[item.id]; if (e && e.degIdx != null && item.degFh) return item.degFh[e.degIdx]; return item.fh; }
   goConfirm = () => {
@@ -3338,6 +3356,32 @@ export default class App extends React.Component {
     const hiddenCats = st.hiddenCats || [];
     // 非表示カテゴリはリストから隠すだけ（検索・既存記録からは到達可能）
     const cats = this.allCats().filter(c => !hiddenCats.includes(c.id)).map(c => ({ id: c.id, name: c.name, sub: c.sub, icon: c.icon, color: c.color, onSelect: () => this.selectCat(c.id) }));
+    /* ---- 行動選択画面（カテゴリ＋行動のリスト）。予定・きもちもリストの一部として並べる ---- */
+    const startWith = (t) => () => {
+      if (t.degree) { this.set({ degreeItem: t.id, degreeIdx: 1, cart: {} }); return; }
+      this.setState({ cart: { [t.id]: { degIdx: null } } }, () => this.goConfirm());
+    };
+    const hiddenActs0 = this.hiddenActSet();
+    const pickCats = [
+      { id: '__plans', name: '予定', color: '#7a9a00', glyph: '📋', items: [
+        ...this.allPlans().map(p => ({ key: 'plan:' + p.id, kind: 'plan', name: p.name, glyph: '📋', meta: this.planMeta(p).metaText, onStart: () => this.openPlan(p.id), onTrash: () => this.trashPlan(p.id) })),
+        { key: 'newplan', kind: 'plan', name: '予定をつくる', glyph: '➕', meta: '', onStart: this.openPlanAdd },
+      ] },
+      ...this.allCats().filter(c => !(st.hiddenCats || []).includes(c.id)).map(c => ({
+        id: c.id, name: c.name, color: c.color, glyph: c.glyph || '⭐',
+        items: [
+          ...c.items.filter(t => !hiddenActs0.has(normTitle(t.name))).map(t => {
+            const pref = (st.prefs || {})[normTitle(t.name)] || 'normal';
+            const mk = (pf) => this.actFatParts(t, pf === 'normal' ? null : pf);
+            return { key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t) };
+          }),
+          { key: 'copy:' + c.id, kind: 'copy', name: 'にているものをコピーして作る', glyph: '➕', onStart: () => { this.set({ catId: c.id }); this.openActAdd(); } },
+        ],
+      })),
+      { id: '__mood', name: 'きもち', color: '#d97aa6', glyph: '💭', items: [
+        { key: 'mood', kind: 'mood', name: 'きもち・できごと', glyph: '💭', meta: '時間なしで記録', onStart: this.openMood },
+      ] },
+    ];
     const plans = this.allPlans().map(p => { const m = this.planMeta(p); return { id: p.id, name: p.name, meta: m.metaText, onOpen: () => this.openPlan(p.id), onTrash: () => this.trashPlan(p.id) }; });
     const detailPlan = st.planDetailId ? this.planById(st.planDetailId) : null;
     const detailMeta = detailPlan ? this.planMeta(detailPlan) : null;
@@ -3795,8 +3839,10 @@ export default class App extends React.Component {
       intensityOpen: !!intItem, intensityName: intItem ? intItem.name : '', intensityGlyph: intItem ? intItem.glyph : '',
       intensityFatText: (intFat >= 0 ? '+' + intFat : '' + intFat), intQuestions, closeIntensity: this.closeIntensity,
       prefOpts,
-      cats, showCats: st.screen === 'record' && !st.catId && !st.searchStep,
-      showSub: st.screen === 'record' && !!st.catId && !st.searchStep,
+      cats, showCats: st.screen === 'record' && !st.searchStep,
+      showSub: false,
+      pickCats, pickCatId: st.catId, pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
+      pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()), n = new Date(); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日　' + n.getHours() + ':' + pad2(n.getMinutes()); })(),
       subItems, subName: activeCat ? activeCat.name : '', subIcon: activeCat ? activeCat.icon : 'category', subColor: activeCat ? activeCat.color : '#8a8a82',
       degreeOpen: !!st.degreeItem,
       degreeName: degItem ? degItem.name : '', degreeIcon: degItem ? degItem.icon : '', degreeColor: degCat ? degCat.color : '#4fa88a',
