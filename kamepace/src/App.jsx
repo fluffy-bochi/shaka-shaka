@@ -3982,7 +3982,7 @@ export default class App extends React.Component {
     return (
       <div className="app-screen" ref={this._screenRef} style={{ background: v.screenBg, ...(v.isBookshelf ? { maxWidth: 'none' } : null) }}>
         {/* status bar spacer（本棚の横向きでは詰める＝下の kame-book-land ルール） */}
-        <div className="app-status-spacer" style={{ flex: '0 0 auto', zIndex: 5 }} />
+        <div className={'app-status-spacer' + (v.showCats ? ' tight' : '')} style={{ flex: '0 0 auto', zIndex: 5 }} />
         {v.isOnboard && <Onboard v={v} />}
         {v.isCycle && <Cycle v={v} />}
         {!v.isOnboard && <>
