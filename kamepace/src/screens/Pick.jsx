@@ -23,8 +23,73 @@ function FatNums({ it, big }) {
   );
 }
 
+/* りれき: 月カレンダー＋その月の 回数（目標に対して）・目標頻度・合計時間・平均時間 */
+const fmtMin = (m) => (m < 60 ? m + '分' : Math.floor(m / 60) + '時間' + (m % 60 ? (m % 60) + '分' : ''));
+function History({ it, cat, onClose }) {
+  const [off, setOff] = React.useState(0);
+  const now = new Date();
+  const base = new Date(now.getFullYear(), now.getMonth() + off, 1);
+  const y = base.getFullYear(), mo = base.getMonth();
+  const ym = y + '-' + String(mo + 1).padStart(2, '0');
+  const h = it.history(ym);
+  const dim = new Date(y, mo + 1, 0).getDate();
+  const target = it.goal ? Math.round(it.goal * dim / 7) : 0; // 週n回 → この月の目標回数
+  const lead = (base.getDay() + 6) % 7; // 月曜はじまり
+  const weeks = Math.ceil((lead + dim) / 7);
+  const cells = [];
+  for (let i = 0; i < weeks * 7; i++) cells.push(new Date(y, mo, i - lead + 1));
+  const isToday = (d) => d.toDateString() === now.toDateString();
+  const cellH = weeks > 5 ? 21 : 26;
+  const stat = { flex: 1, minWidth: 0, background: '#f7f4ec', borderRadius: 9, padding: '4px 6px 5px', display: 'flex', flexDirection: 'column', justifyContent: 'center' };
+  const lab = { fontSize: 8.5, fontWeight: 700, color: '#8a8a82', lineHeight: 1.2 };
+  const val = { fontSize: 13, fontWeight: 900, color: INK, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
+  const navBtn = { width: 22, height: 22, border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+  return (
+    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', padding: '8px 10px 8px', boxSizing: 'border-box' }}>
+      <div style={{ position: 'absolute', left: 0, top: 0, width: 54, height: 54, background: cat.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, height: 30 }}>
+        <span style={{ flex: '0 0 auto' }}><Emo e={it.glyph} size={26} /></span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>
+        <button onClick={() => setOff(off - 1)} aria-label="前の月" style={navBtn}><span style={ms(20, '#8a8a82')}>chevron_left</span></button>
+        <span style={{ fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap' }}><span style={{ fontSize: 10, color: '#8a8a82', marginRight: 3 }}>{y}</span>{mo + 1}月</span>
+        <button onClick={() => setOff(off + 1)} aria-label="次の月" style={navBtn}><span style={ms(20, '#8a8a82')}>chevron_right</span></button>
+        <button onClick={onClose} aria-label="もどる" style={{ ...navBtn, marginLeft: 4 }}><span style={ms(20, INK)}>undo</span></button>
+      </div>
+      <div style={{ display: 'flex', gap: 5, margin: '5px 0 6px' }}>
+        <div style={{ ...stat, flex: 1.15 }}>
+          <span style={lab}>回数</span>
+          <span style={val}>{h.count}{target ? <span style={{ fontSize: 10, color: '#8a8a82' }}> / {target}回</span> : '回'}</span>
+          {target > 0 && <span style={{ height: 3, borderRadius: 2, background: '#e4e1d8', marginTop: 2, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: Math.min(100, Math.round(h.count / target * 100)) + '%', background: h.count >= target ? '#7a9a00' : '#c4f000' }} /></span>}
+        </div>
+        <button onClick={it.onGoal} style={{ ...stat, border: '1.5px dashed ' + (it.goal ? 'transparent' : '#d8d5cb'), cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+          <span style={lab}>目標</span>
+          <span style={{ ...val, color: it.goal ? INK : '#a5a39a', fontSize: it.goal ? 13 : 11.5 }}>{it.goal ? '週' + it.goal + '回' : '未設定'}</span>
+        </button>
+        <div style={stat}><span style={lab}>合計</span><span style={{ ...val, fontSize: h.totalMin >= 60 ? 11 : 13 }}>{fmtMin(h.totalMin)}</span></div>
+        <div style={stat}><span style={lab}>平均</span><span style={{ ...val, fontSize: h.avgMin >= 60 ? 11 : 13 }}>{h.avgMin ? fmtMin(h.avgMin) : '—'}</span></div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, fontSize: 8.5, fontWeight: 700, textAlign: 'center', color: '#8a8a82', marginBottom: 2 }}>
+        {['月', '火', '水', '木', '金', '土', '日'].map((w, i) => <span key={w} style={{ color: i === 5 ? '#5b8fd4' : i === 6 ? '#d9534f' : undefined }}>{w}</span>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+        {cells.map((d, i) => {
+          const inMo = d.getMonth() === mo, n = inMo ? (h.days[d.getDate()] || 0) : 0, dw = d.getDay();
+          return (
+            <div key={i} style={{ position: 'relative', height: cellH, borderRadius: 5, background: inMo ? '#f7f4ec' : 'transparent', boxShadow: isToday(d) ? 'inset 0 0 0 1.5px ' + INK : 'none', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 3 }}>
+              <span style={{ position: 'absolute', left: 3, top: 1, fontSize: 8, fontWeight: 700, color: !inMo ? '#c9c5b8' : dw === 6 ? '#5b8fd4' : dw === 0 ? '#d9534f' : '#55554e' }}>{d.getDate()}</span>
+              {n > 0 && <Emo e={it.glyph} size={cellH - 6} />}
+              {n > 1 && <span style={{ position: 'absolute', right: 1, bottom: 0, fontSize: 7.5, fontWeight: 900, color: INK }}>×{n}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* 上のカード */
 function Card({ row, cat, v }) {
+  const [hist, setHist] = React.useState(false);
   const wrap = { position: 'relative', margin: '0 16px', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, flex: '0 0 auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' };
   if (!row) return <div style={wrap} />;
   if (row.type === 'cat' || row.type === 'addcat') {
@@ -41,6 +106,7 @@ function Card({ row, cat, v }) {
   }
   const it = row.item;
   const isAct = it.kind === 'act';
+  if (isAct && hist) return <div style={wrap}><History it={it} cat={cat} onClose={() => setHist(false)} /></div>;
   const parts = isAct ? it.prefParts[it.pref] : null;
   const chip = { display: 'inline-flex', alignItems: 'center', gap: 3, height: 26, background: '#efece3', borderRadius: 999, padding: '0 8px', fontSize: 11, fontWeight: 700, color: INK };
   const gray = { border: 'none', borderRadius: 12, background: '#efece3', color: '#55554e', fontSize: 14, fontWeight: 800, padding: '10px 14px', cursor: 'pointer' };
@@ -56,7 +122,7 @@ function Card({ row, cat, v }) {
             <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
               <span style={{ ...chip, fontSize: 13, fontWeight: 900 }}>必</span>
               <span style={chip}><span style={ms(15, INK, true)}>favorite</span></span>
-              <span style={chip}>りれき<span style={ms(15, INK)}>list</span><span style={ms(15, INK)}>calendar_month</span></span>
+              <button onClick={() => setHist(true)} style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>りれき<span style={ms(15, INK)}>list</span><span style={ms(15, INK)}>calendar_month</span></button>
             </div>
           )}
           {it.kind === 'plan' && it.meta && <div style={{ fontSize: 12, color: '#55554e', fontWeight: 700, marginTop: 8 }}>{it.meta}</div>}
@@ -206,7 +272,7 @@ export default function Pick({ v }) {
         <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{v.pickDateText}</div>
         <SlotPill v={v} small />
       </div>
-      <Card row={selRow} cat={selRow && selRow.cat} v={v} />
+      <Card key={selRow && selRow.key} row={selRow} cat={selRow && selRow.cat} v={v} />
       <div style={{ position: 'relative', flex: 1, minHeight: 0, marginTop: 10, background: '#f7f4ec', overflow: 'hidden' }}>
         {/* まんなか＝選択中の印 */}
         <span style={{ position: 'absolute', left: 22, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 0, height: 0, borderTop: '13px solid transparent', borderBottom: '13px solid transparent', borderLeft: '20px solid ' + INK, pointerEvents: 'none' }} />
