@@ -88,8 +88,7 @@ function History({ it, cat, onClose }) {
 }
 
 /* 上のカード */
-function Card({ row, cat, v }) {
-  const [hist, setHist] = React.useState(false);
+function Card({ row, cat, v, hist, setHist }) {
   const wrap = { position: 'relative', margin: '0 16px', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, flex: '0 0 auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' };
   if (!row) return <div style={wrap} />;
   if (row.type === 'cat' || row.type === 'addcat') {
@@ -158,14 +157,14 @@ function Card({ row, cat, v }) {
 }
 
 /* リストの1行（高さは全行共通の ROW_H。選択中は横に広げて目立たせるだけで高さは変えない＝スクロール位置から選択行を計算できる） */
-const ROW_H = 56, COPIES = 5;
+const ROW_H = 60, COPIES = 5;
 const Row = React.memo(function Row({ r, i, on, open, onTap }) {
   const color = r.type === 'addcat' ? '#55554e' : r.cat.color;
   return (
-    <div onClick={() => onTap(r, i)} style={{ height: ROW_H, display: 'flex', alignItems: 'center', padding: on ? '0 60px 0 62px' : '0 76px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
+    <div onClick={() => onTap(r, i)} style={{ height: ROW_H, display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
       {r.type === 'item' ? (
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 10, height: on ? 54 : 44, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
-          <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 46 : 38, height: on ? 46 : 38, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 10, height: on ? 58 : 48, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
+          <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 48 : 40, height: on ? 48 : 40, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
           <span style={{ position: 'relative', flex: '0 0 auto', marginLeft: 6 }}><Emo e={r.item.glyph} size={on ? 32 : 26} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: on ? 16.5 : 14.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.item.name}</div>
@@ -174,7 +173,7 @@ const Row = React.memo(function Row({ r, i, on, open, onTap }) {
           {!on && <FatNums it={r.item} />}
         </div>
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 54 : 44, borderRadius: 10, padding: '0 14px', background: color, color: '#fff', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 58 : 48, borderRadius: 10, padding: '0 14px', background: color, color: '#fff', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
           <span style={{ fontSize: on ? 16 : 13 }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
           <span style={{ flex: 1, textAlign: 'center', fontSize: on ? 18.5 : 15.5, fontWeight: 800, paddingRight: 20 }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
         </div>
@@ -189,6 +188,8 @@ export default function Pick({ v }) {
   const mem = v.pickMem;
   const [open, setOpen] = React.useState(() => mem.open || {});
   const [fil, setFil] = React.useState({});
+  const [hist, setHistS] = React.useState(() => !!mem.hist); // りれき表示中は、選択が変わってもりれきのまま
+  const setHist = (b) => { mem.hist = b; setHistS(b); };
   const [idx, setIdx] = React.useState(0); // 真ん中にある行（コピー込みの通し番号）
   const listRef = React.useRef(null);
   const want = React.useRef(mem.sel || null); // 次の描画で真ん中に置きたい行の key
@@ -260,7 +261,7 @@ export default function Pick({ v }) {
     setOpen({});
   };
   const side = (on) => ({ width: 36, height: 36, borderRadius: 10, border: 'none', boxShadow: '0 1px 3px rgba(27,27,24,.08)', background: on ? INK : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, marginBottom: 10 });
-  const arrow = { position: 'absolute', left: 14, zIndex: 2, width: 36, height: 36, border: 'none', background: 'none', cursor: 'pointer', padding: 0 };
+  const arrow = { position: 'absolute', left: 8, zIndex: 2, width: 26, height: 26, border: 'none', background: 'none', cursor: 'pointer', padding: 0 };
 
   const all = [];
   for (let c = 0; c < COPIES; c++) rows.forEach((r, i) => all.push({ r, i: c * N + i }));
@@ -272,12 +273,12 @@ export default function Pick({ v }) {
         <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{v.pickDateText}</div>
         <SlotPill v={v} small />
       </div>
-      <Card key={selRow && selRow.key} row={selRow} cat={selRow && selRow.cat} v={v} />
+      <Card key={selRow && selRow.key} row={selRow} cat={selRow && selRow.cat} v={v} hist={hist} setHist={setHist} />
       <div style={{ position: 'relative', flex: 1, minHeight: 0, marginTop: 10, background: '#f7f4ec', overflow: 'hidden' }}>
         {/* まんなか＝選択中の印 */}
-        <span style={{ position: 'absolute', left: 22, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 0, height: 0, borderTop: '13px solid transparent', borderBottom: '13px solid transparent', borderLeft: '20px solid ' + INK, pointerEvents: 'none' }} />
-        <button onClick={() => move(-1)} aria-label="上へ" style={{ ...arrow, top: 12 }}><span style={ms(34, '#8a8a82')}>keyboard_arrow_up</span></button>
-        <button onClick={() => move(1)} aria-label="下へ" style={{ ...arrow, bottom: 12 }}><span style={ms(34, '#8a8a82')}>keyboard_arrow_down</span></button>
+        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 0, height: 0, borderTop: '8px solid transparent', borderBottom: '8px solid transparent', borderLeft: '12px solid ' + INK, pointerEvents: 'none' }} />
+        <button onClick={() => move(-1)} aria-label="上へ" style={{ ...arrow, top: 12 }}><span style={ms(24, '#8a8a82')}>keyboard_arrow_up</span></button>
+        <button onClick={() => move(1)} aria-label="下へ" style={{ ...arrow, bottom: 12 }}><span style={ms(24, '#8a8a82')}>keyboard_arrow_down</span></button>
         <div style={{ position: 'absolute', right: 14, top: 36, zIndex: 2, display: 'flex', flexDirection: 'column' }}>
           <button onClick={v.openSearch} aria-label="しらべる" style={side(false)}><span style={ms(22, INK)}>search</span></button>
           <button onClick={toggleAll} aria-label={anyClosed ? 'カテゴリを全部開く' : 'カテゴリを全部閉じる'} style={side(false)}><span style={ms(22, INK)}>{anyClosed ? 'unfold_more' : 'unfold_less'}</span></button>
