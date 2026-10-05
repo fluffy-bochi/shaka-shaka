@@ -89,6 +89,23 @@ function History({ it, cat, onClose }) {
 
 /* 上のカード */
 function Card({ row, cat, v, hist, setHist }) {
+  // りれきを開く/閉じるときは、カードを裏返す（横に90度まわして中身を入れ替え、反対側から戻す）
+  const ref = React.useRef(null);
+  const flip = (b) => {
+    const el = ref.current;
+    if (!el || !el.animate) { setHist(b); return; }
+    const d = b ? 90 : -90, P = 'perspective(900px) ';
+    const a1 = el.animate([{ transform: P + 'rotateY(0deg)' }, { transform: P + `rotateY(${d}deg)` }], { duration: 170, easing: 'ease-in', fill: 'forwards' });
+    a1.onfinish = () => {
+      setHist(b);
+      requestAnimationFrame(() => {
+        const n = ref.current;
+        if (!n) return;
+        const a2 = n.animate([{ transform: P + `rotateY(${-d}deg)` }, { transform: P + 'rotateY(0deg)' }], { duration: 170, easing: 'ease-out' });
+        a2.onfinish = () => a1.cancel();
+      });
+    };
+  };
   const wrap = { position: 'relative', margin: '0 16px', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, flex: '0 0 auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' };
   if (!row) return <div style={wrap} />;
   if (row.type === 'cat' || row.type === 'addcat') {
@@ -105,12 +122,12 @@ function Card({ row, cat, v, hist, setHist }) {
   }
   const it = row.item;
   const isAct = it.kind === 'act';
-  if (isAct && hist) return <div style={wrap}><History it={it} cat={cat} onClose={() => setHist(false)} /></div>;
+  if (isAct && hist) return <div ref={ref} style={wrap}><History it={it} cat={cat} onClose={() => flip(false)} /></div>;
   const parts = isAct ? it.prefParts[it.pref] : null;
   const chip = { display: 'inline-flex', alignItems: 'center', gap: 3, height: 26, background: '#efece3', borderRadius: 999, padding: '0 8px', fontSize: 11, fontWeight: 700, color: INK };
   const gray = { border: 'none', borderRadius: 12, background: '#efece3', color: '#55554e', fontSize: 14, fontWeight: 800, padding: '10px 14px', cursor: 'pointer' };
   return (
-    <div style={wrap}>
+    <div ref={ref} style={wrap}>
       <div style={{ position: 'absolute', left: 0, top: 0, width: '46%', height: 150, background: cat.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
       <span style={{ position: 'absolute', left: 14, top: 10, fontSize: 13, fontWeight: 800, color: '#fff' }}>{cat.name}</span>
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: '30px 16px 10px 22px', flex: 1, minHeight: 0 }}>
@@ -121,7 +138,7 @@ function Card({ row, cat, v, hist, setHist }) {
             <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
               <span style={{ ...chip, fontSize: 13, fontWeight: 900 }}>必</span>
               <span style={chip}><span style={ms(15, INK, true)}>favorite</span></span>
-              <button onClick={() => setHist(true)} style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>りれき<span style={ms(15, INK)}>list</span><span style={ms(15, INK)}>calendar_month</span></button>
+              <button onClick={() => flip(true)} style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>りれき<span style={ms(15, INK)}>list</span><span style={ms(15, INK)}>calendar_month</span></button>
             </div>
           )}
           {it.kind === 'plan' && it.meta && <div style={{ fontSize: 12, color: '#55554e', fontWeight: 700, marginTop: 8 }}>{it.meta}</div>}
