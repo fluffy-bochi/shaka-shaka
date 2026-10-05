@@ -42,8 +42,9 @@ export default function PredictBar({ v }) {
   // 閉じる時も、タブが右へ戻るモーション（0.1秒）のあとで実際に閉じる
   const doClose = () => { if (closing) return; setClosing(true); setTimeout(v.closePredict, 100); };
   if (!p) return null;
+  const name = p.past ? '記録' : '予測'; // 過去の日は「記録」
   if (!p.open) {
-    return <button onClick={v.openPredict} aria-label="予測" style={{ ...tabShape(false), clipPath: 'polygon(0 12%, 100% 0, 100% 100%, 0 88%)', top: 'auto', bottom: 120, height: 100, zIndex: 4 }}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>予測</span></button>;
+    return <button onClick={v.openPredict} aria-label={name} style={{ ...tabShape(false), clipPath: 'polygon(0 12%, 100% 0, 100% 100%, 0 88%)', top: 'auto', bottom: 120, height: 100, zIndex: 4 }}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>{name}</span></button>;
   }
   const span = p.end - p.start;
   const frac = (t) => Math.max(0, Math.min(1, (t - p.start) / span));
@@ -54,13 +55,13 @@ export default function PredictBar({ v }) {
   const onDown = (e) => { setPlay({ on: false, speed: 1 }); e.currentTarget.setPointerCapture && e.currentTarget.setPointerCapture(e.pointerId); setFromX(e); };
   const onMove = (e) => { if (e.buttons) setFromX(e); };
   const d = new Date(p.t);
-  const label = d.getHours() + '時' + String(d.getMinutes()).padStart(2, '0') + '分（' + (Math.abs(p.t - p.now) <= 30000 ? '現在' : p.t < p.now ? '過去' : '予測') + '）';
+  const label = d.getHours() + '時' + String(d.getMinutes()).padStart(2, '0') + '分（' + (Math.abs(p.t - p.now) <= 30000 ? '現在' : p.t < p.now ? '記録' : '予測') + '）';
   const noon = new Date(p.start); noon.setHours(12, 0, 0, 0);
   const marks = [[p.start, hm(p.start)], ...(noon.getTime() > p.start && noon.getTime() < p.end ? [[noon.getTime(), '12:00']] : []), [p.end, hm(p.end).replace(/^(\d+):(\d+)$/, '$1:$2')]];
   return (
     <div style={{ position: 'absolute', left: 0, right: 0, bottom: 120, height: 100, zIndex: 4, animation: closing ? 'predClose .1s ease-in forwards' : 'predOpen .2s ease-out' }}>
-      <button onClick={doClose} aria-label="予測を閉じる" style={{ ...tabShape(false) }}>▶</button>
-      <button onClick={doClose} aria-label="予測を閉じる" style={tabShape(true)}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>予測</span></button>
+      <button onClick={doClose} aria-label={name + 'を閉じる'} style={{ ...tabShape(false) }}>▶</button>
+      <button onClick={doClose} aria-label={name + 'を閉じる'} style={tabShape(true)}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>{name}</span></button>
       <div style={{ position: 'absolute', left: 29, right: 29, top: 0, bottom: 0, background: 'rgba(0,0,0,.2)', padding: '0 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ flex: 1, minWidth: 0, height: 38, background: 'rgba(255,255,255,.94)', border: '1.5px solid ' + INK, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>{label}</div>

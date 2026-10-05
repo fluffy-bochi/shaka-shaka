@@ -1534,14 +1534,14 @@ export default class App extends React.Component {
     if (this.state.dayOffset <= min) return;
     const off = this.state.dayOffset - 1;
     if (this.state.sampleMode) this.ensureSample(shiftDate(todayStr(), off));
-    this.set({ dayOffset: off }); this.rebuildPhysics();
+    this.set({ dayOffset: off, ...this._predSwitchDay(off) }); this.rebuildPhysics();
   };
   nextDay = () => {
     const { max } = this.dayOffsetRange();
     if (this.state.dayOffset >= max) return;
     const off = this.state.dayOffset + 1;
     if (this.state.sampleMode) this.ensureSample(shiftDate(todayStr(), off));
-    this.set({ dayOffset: off }); this.rebuildPhysics();
+    this.set({ dayOffset: off, ...this._predSwitchDay(off) }); this.rebuildPhysics();
   };
 
   /* ================= navigation ================= */
@@ -2423,7 +2423,7 @@ export default class App extends React.Component {
   }
   componentDidUpdate(prevProps, prevState) {
     if (this.state.tutorial) this.checkTutorial(prevState);
-    if (this.state.predictOpen && (this.state.screen !== 'shaka' || this.state.dayOffset !== 0)) { this._pred = null; this.set({ predictOpen: false }); }
+    if (this.state.predictOpen && this.state.screen !== 'shaka') { this._pred = null; this.set({ predictOpen: false }); }
   }
   componentWillUnmount() {
     clearInterval(this._tick); clearInterval(this._planT); clearInterval(this._clockT); clearInterval(this._schedT);
@@ -2639,9 +2639,9 @@ export default class App extends React.Component {
       else this.freezeMotion();
     }
   };
-  /* 今日の、時刻つきの記録・予定（予測バーの印・時計の下の行動用）。entries が変わるまで使い回す（再生中の毎フレーム再計算を避ける） */
-  _timedToday() {
-    const t0 = todayStr();
+  /* その日の、時刻つきの記録・予定（予測バーの印・時計の下の行動用）。entries が変わるまで使い回す（再生中の毎フレーム再計算を避ける） */
+  _timedToday(day) {
+    const t0 = day || todayStr();
     if (this._ttRef === this.state.entries && this._ttDay === t0) return this._ttArr;
     this._ttRef = this.state.entries; this._ttDay = t0;
     this._ttArr = this.state.entries.filter(e => e.date === t0 && !e.exp && !e.wakeAdd && e.title && e.from && e.to)
@@ -2651,11 +2651,32 @@ export default class App extends React.Component {
   /* 上から降らせる絵文字の出現高さ。通常は画面の上（蓋は画面外）から。ジャイロは箱が上辺で閉じているので、箱の中の上端付近から */
   _spawnY(r, H) { return this.state.gyroMode ? r + Math.random() * r * 4 : -r - Math.random() * (H * 0.3); }
   /* ---- 予測バー: 時刻 T までに積もる予定ぶんを灰色で足す（保存しない）。消える回復ぶんは古い絵文字を薄くする ---- */
+  /* 予測バーの軸の範囲: 左端=その日の起床時刻（記入がなければ8時）、右端=23:00。
+     今日は「いま+30分」まで、他の日はその日の記録・予定が収まるように広げる */
+  _predRange(off) {
+    const d = shiftDate(todayStr(), off), now = Date.now();
+    const wk = (this.state.wakeLog || []).find(w => w.date === d);
+    let start = wk ? wk.ts : hmToTsOn(d, '08:00'), end = hmToTsOn(d, '23:00');
+    if (off === 0) end = Math.max(end, now + 30 * 60000);
+    else this._timedToday(d).forEach(x => { start = Math.min(start, x.a); end = Math.max(end, x.b); });
+    return { start, end: Math.max(end, start + 60 * 60000) };
+  }
+  /* 予測バーの元データをその日のぶんで作り、最初の時刻を返す（今日=いま、過去の日=1日の終わり、未来の日=1日の始まり） */
+  _initPredict(off) {
+    const d = shiftDate(todayStr(), off);
+    this._pred = predictUnits(this.state.entries, d);
+    this._predToday = this.state.entries.filter(e => e.date === d && !e.exp);
+    this._predRest = off === 0 ? consumedToday(this.state.collected, (ts) => dateToStr(new Date(ts)) === d) : [];
+    const { start, end } = this._predRange(off);
+    return off === 0 ? Date.now() : off < 0 ? end : start;
+  }
+  /* 予測バーを開いたまま日を移動したら、移動先の日のバーにする */
+  _predSwitchDay(off) {
+    if (!this.state.predictOpen) return {};
+    return { predictT: this._initPredict(off) };
+  }
   openPredict = () => {
-    const now = Date.now();
-    this._pred = predictUnits(this.state.entries, todayStr());
-    this._predToday = this.state.entries.filter(e => e.date === todayStr() && !e.exp);
-    this._predRest = consumedToday(this.state.collected, (ts) => dateToStr(new Date(ts)) === todayStr());
+    const now = this._initPredict(this.state.dayOffset);
     this.set({ predictOpen: true, predictT: now });
     // 既存の未来予定（灰色）は外して、予測の時刻に合わせて足し直す
     const { World } = Matter;
@@ -2677,8 +2698,7 @@ export default class App extends React.Component {
     this.set({ predictOpen: false }); this._pred = null; this._predToday = null; this._predRest = null; this.rebuildPhysics();
   };
   setPredictT = (t) => {
-    const t0 = todayStr(), wk = (this.state.wakeLog || []).find(w => w.date === t0);
-    const T = Math.max(wk ? wk.ts : hmToTsOn(t0, '08:00'), t);
+    const T = Math.max(this._predRange(this.state.dayOffset).start, t);
     this.set({ predictT: T }); this._applyPredict(T);
   };
   _applyPredict(T) {
@@ -3655,14 +3675,14 @@ export default class App extends React.Component {
         return homeLine(Math.min(100, this.pileCount()), next, d, st.lastRec, Date.now());
       })()) : '',
       tapCharacter: this.tapCharacter,
-      predict: (st.screen === 'shaka' && st.dayOffset === 0) ? (() => {
-        const now = Date.now(), t0 = todayStr();
-        const wk = (st.wakeLog || []).find(w => w.date === t0);
-        // 左端=今日の起床時刻（記入がなければ8時）、右端=寝る時刻（就寝の記録は未作成なので23:00）
-        const start = wk ? wk.ts : hmToTsOn(t0, '08:00');
-        // スライダー上に印をつける、今日の記録・予定の時間帯
-        const marks = st.predictOpen ? this._timedToday().map(x => ({ a: x.a, b: x.b })) : [];
-        return { open: !!st.predictOpen, marks, t: Math.max(st.predictT || now, start), now, start, end: Math.max(hmToTsOn(t0, '23:00'), now + 30 * 60000, start + 60 * 60000) };
+      predict: st.screen === 'shaka' ? (() => {
+        const now = Date.now(), off = st.dayOffset;
+        // 左端=その日の起床時刻（記入がなければ8時）、右端=寝る時刻（就寝の記録は未作成なので23:00）
+        const { start, end } = this._predRange(off);
+        // スライダー上に印をつける、その日の記録・予定の時間帯
+        const marks = st.predictOpen ? this._timedToday(viewDateStr).map(x => ({ a: x.a, b: x.b })) : [];
+        // 過去の日は「記録」、今日と未来の日は「予測」
+        return { open: !!st.predictOpen, marks, t: Math.min(end, Math.max(st.predictT || now, start)), now, start, end, past: off < 0 };
       })() : null,
       openPredict: this.openPredict, closePredict: this.closePredict, setPredictT: this.setPredictT,
       wakeDraft: st.wakeDraft, setWakeDraft: this.setWakeDraft, finishWake1: this.finishWake1,
@@ -3975,11 +3995,11 @@ export default class App extends React.Component {
       shakaDate: st.dayOffset === 0 ? formatDateShort(todayStr()) : formatDateShort(viewDateStr),
       clockHm: st.clockHm || this.tsToHm(Date.now()), // 大きい時計は常に現在時刻
       // 時計の下に、いまやっている行動を出す（予測バーを開いている間は、スライダーの時刻にやっていた/やっている/やる予定の行動）
-      predictActs: (st.screen === 'shaka' && st.dayOffset === 0) ? (() => {
+      predictActs: (st.screen === 'shaka' && (st.dayOffset === 0 || st.predictOpen)) ? (() => {
         const T = st.predictOpen ? (st.predictT || Date.now()) : Date.now(); // 予測を開いていなければ「いま」
         // 表示は「予定名 - 絵文字 行動名 開始–終了」。Googleカレンダーなどの予定（枠）に行動を入れたときは、
         // 予定名を頭に付けて1行にまとめ、行動が入った枠そのもの（行動待ちの空枠）は重複するので出さない。
-        const all = this._timedToday();
+        const all = this._timedToday(viewDateStr);
         const planHasActs = new Set(all.filter(x => x.e.plan && x.e.plan !== x.e.title && !x.e.needsSetup).map(x => x.e.plan));
         return all.filter(x => x.a <= T && T < x.b)
           .filter(x => !(x.e.needsSetup && !x.e.delta && planHasActs.has(x.e.plan)))
