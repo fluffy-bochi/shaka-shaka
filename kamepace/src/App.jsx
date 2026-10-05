@@ -228,7 +228,7 @@ export default class App extends React.Component {
       templates: s.templates, sortMode: s.sortMode, consumed: s.consumed, sampleDay: s.sampleDay,
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
-      prefs: s.prefs, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
+      prefs: s.prefs, actGoals: s.actGoals, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
       onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, wakeLog: s.wakeLog, bedLog: s.bedLog, mainScreen: s.mainScreen,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
@@ -728,6 +728,28 @@ export default class App extends React.Component {
     if (val === 'normal') delete prefs[k]; else prefs[k] = val;
     this.set({ prefs });
     this.save();
+  };
+  /* 行動のりれき（月ごと）: 日ごとの回数・合計回数・合計時間・平均時間。ym='YYYY-MM' */
+  actHistory(name, ym) {
+    const k = normTitle(name), days = {}, today = todayStr();
+    let count = 0, total = 0, timed = 0;
+    const toM = (hm) => { const [h, m] = (hm || '').split(':').map(Number); return h * 60 + (m || 0); };
+    (this.state.entries || []).forEach(e => {
+      if (e.exp || e.wakeAdd || !e.date || e.date.slice(0, 7) !== ym || e.date > today || normTitle(e.title) !== k) return; // 未来の日は数えない
+      if (e.planned && !(e.dropped > 0)) return; // まだ来ていない予定は数えない
+      const d = Number(e.date.slice(8, 10));
+      days[d] = (days[d] || 0) + 1; count++;
+      if (e.from && e.to) { let m = toM(e.to) - toM(e.from); if (m <= 0) m += 1440; total += m; timed++; }
+    });
+    return { days, count, totalMin: total, avgMin: timed ? Math.round(total / timed) : 0 };
+  }
+  /* 目標頻度（週あたり回数）。タップで 未設定→週1→…→週7→未設定 */
+  cycleActGoal = (name) => {
+    const k = normTitle(name); if (!k) return;
+    const g = { ...(this.state.actGoals || {}) };
+    const n = (g[k] || 0) + 1;
+    if (n > 7) delete g[k]; else g[k] = n;
+    this.set({ actGoals: g }); this.save();
   };
   intensitySummary(item) {
     const qs = this.intensityQuestions(item);
@@ -3373,7 +3395,7 @@ export default class App extends React.Component {
           ...c.items.filter(t => !hiddenActs0.has(normTitle(t.name))).map(t => {
             const pref = (st.prefs || {})[normTitle(t.name)] || 'normal';
             const mk = (pf) => this.actFatParts(t, pf === 'normal' ? null : pf);
-            return { key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t) };
+            return { key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), history: (ym) => this.actHistory(t.name, ym), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name) };
           }),
           { key: 'copy:' + c.id, kind: 'copy', name: 'にているものをコピーして作る', glyph: '➕', onStart: () => { this.set({ catId: c.id }); this.openActAdd(); } },
         ],
