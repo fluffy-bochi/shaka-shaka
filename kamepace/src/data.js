@@ -37,6 +37,9 @@ const act = (id, glyph, icon, name, body, mind, defMin, extra = {}) => {
   };
 };
 
+/* 名前を変えた行動（旧名 → 新名）。りれきで旧名の記録も新名として数える */
+export const RENAMED_ACTS = { '散歩・軽い運動': '散歩' };
+
 export const CATS = [
   { id: 'idou', icon: 'directions_subway', color: '#6f8fbf', glyph: '🚃', name: 'いどう', sub: '通勤通学・運転・送迎', items: [
     act('commute', '🚃', 'directions_subway', '通勤・通学（電車バス）', 5, 4, 30, { kw: ['移動', '電車', '満員電車', 'バス', '地下鉄', '通勤', '通学'] }),
@@ -123,8 +126,9 @@ export const CATS = [
   ] },
   { id: 'exercise', icon: 'fitness_center', color: '#3f9fb5', glyph: '🏃', name: '運動', sub: '散歩・ランニング・水泳', items: [
     // 散歩は回復のまま（設計書では体は微疲労・心は回復の混合（未決）。1軸のいまは小さめの回復として扱う）。
-    // 名前はりれき・すき/きらいの紐づけ（行動名で保存）を保つため変えない
-    act('stroll', '🚶', 'park', '散歩・軽い運動', 1, 2, 20, { recover: true, kw: ['運動', '休憩', '散歩', 'ウォーキング', '軽い運動'] }),
+    // 旧名「散歩・軽い運動」の記録も、りれきでは散歩として数える（RENAMED_ACTS）
+    act('stroll', '🚶', 'park', '散歩', 1, 2, 20, { recover: true, kw: ['運動', '休憩', '散歩', 'ウォーキング'] }),
+    act('lightex', '🤸', 'sports_gymnastics', '軽い運動', 3, 1, 20, { kw: ['運動', '軽い運動', '体操', 'エクササイズ'] }),
     act('running', '🏃', 'directions_run', 'ランニング', 10, 2, 30, { kw: ['運動', 'ランニング', 'ジョギング', '走る'] }),
     act('swimming', '🏊', 'pool', '水泳', 11, 2, 45, { kw: ['運動', '水泳', 'プール', '泳ぐ'] }),
   ] },

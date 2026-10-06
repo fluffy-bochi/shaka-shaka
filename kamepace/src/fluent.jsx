@@ -59,6 +59,7 @@ export const FLUENT_MAP = {
   '🎮': 'Video game/3D/video_game_3d.png',
   '📱': 'Mobile phone/3D/mobile_phone_3d.png',
   '🧘': 'Person in lotus position/Default/3D/person_in_lotus_position_3d_default.png',
+  '🤸': 'Person cartwheeling/Default/3D/person_cartwheeling_3d_default.png',
   '🌿': 'Herb/3D/herb_3d.png',
   '🌳': 'Deciduous tree/3D/deciduous_tree_3d.png',
   '🌙': 'Crescent moon/3D/crescent_moon_3d.png',
