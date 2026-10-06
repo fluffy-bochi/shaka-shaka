@@ -67,6 +67,13 @@ export function isDev() { return devMode; }
 export function setDev(on) { devMode = !!on; try { localStorage.setItem(DEV_KEY, on ? '1' : '0'); } catch (e) { /* ignore */ } changed(); }
 export function getDraft() { return draft; }
 export function setDraft(data) { draft = data || null; try { if (draft) localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); else localStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ } changed(); }
+/* みんなに反映されている版（初期値＋config/ikoi）の全セリフ・全表情。反映前の「変更点」を出すのに使う */
+export function publishedSnapshot() {
+  const lines = {};
+  Object.keys(DEFAULT_LINES).forEach(k => { lines[k] = DEFAULT_LINES[k].map(t => ({ t })); });
+  Object.entries((published && published.lines) || {}).forEach(([k, arr]) => { if (Array.isArray(arr)) lines[k] = arr.filter(x => x && typeof x.t === 'string'); });
+  return { lines, faces: { ...DEFAULT_FACES, ...((published && published.faces) || {}) } };
+}
 /* 編集のもとにする、いま表示中の全セリフ・全表情 */
 export function snapshot() { const c = cur(); return { lines: JSON.parse(JSON.stringify(c.lines)), faces: { ...c.faces } }; }
 

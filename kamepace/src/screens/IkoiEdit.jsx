@@ -95,6 +95,33 @@ function shrink(file) {
   });
 }
 
+/* 反映前の確認用: みんなに反映されている版との違いを、シチュエーションごとに並べる */
+const LABEL_OF = Object.fromEntries(GROUPS.flatMap(g => g.items.filter(i => !i.date).map(i => [i.key, g.label + '・' + i.label])));
+const labelOf = (k) => (k.startsWith('TAP_DATE:') ? 'タップ・日付の話題（' + Number(k.slice(9, 11)) + '/' + Number(k.slice(12)) + '）' : LABEL_OF[k] || k);
+function diffIkoi(base, next) {
+  const faceName = (f, faces) => (f ? (faces[f] || base.faces[f] || { label: '?' }).label : '自動');
+  const out = [];
+  const keys = [...new Set([...Object.keys(base.lines), ...Object.keys(next.lines)])];
+  keys.forEach(k => {
+    const a = base.lines[k] || [], b = next.lines[k] || [];
+    const at = a.map(x => x.t), bt = b.map(x => x.t), ch = [];
+    const removed = a.filter(x => !bt.includes(x.t)), added = b.filter(x => !at.includes(x.t));
+    // 同じ位置で消えた文と増えた文は「書き換え」として1つにまとめる
+    const used = new Set();
+    removed.forEach(r => {
+      const i = at.indexOf(r.t), m = added.find(x => !used.has(x) && bt.indexOf(x.t) === i);
+      if (m) { used.add(m); ch.push({ kind: 'edit', from: r.t, to: m.t }); } else ch.push({ kind: 'del', to: r.t });
+    });
+    added.filter(x => !used.has(x)).forEach(x => ch.push({ kind: 'add', to: x.t, face: x.f ? faceName(x.f, next.faces) : '' }));
+    b.forEach(x => { const o = a.find(y => y.t === x.t); if (o && (o.f || '') !== (x.f || '')) ch.push({ kind: 'face', to: x.t, from: faceName(o.f, base.faces), face: faceName(x.f, next.faces) }); });
+    if (!ch.length && at.join('\n') !== bt.join('\n')) ch.push({ kind: 'order' });
+    if (ch.length) out.push({ label: labelOf(k), ch });
+  });
+  const newFaces = Object.keys(next.faces).filter(k => !base.faces[k]).map(k => next.faces[k].label);
+  if (newFaces.length) out.push({ label: '表情', ch: newFaces.map(n => ({ kind: 'newface', to: n })) });
+  return out;
+}
+
 const customFaces = (faces) => Object.fromEntries(Object.entries(faces).filter(([k]) => !Ikoi.DEFAULT_FACES[k]));
 
 export default function IkoiEdit({ v }) {
@@ -238,14 +265,52 @@ export default function IkoiEdit({ v }) {
       {/* 反映 */}
       <div style={{ flex: '0 0 auto', display: 'flex', gap: 8, padding: '10px 16px calc(14px + env(safe-area-inset-bottom))', borderTop: '1px solid ' + LINE, background: '#f7f4ec' }}>
         {busy ? <div style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 800, padding: '13px 0' }}>{busy}</div> : confirm ? <>
-          <button onClick={() => setConfirm(false)} style={{ flex: 1, border: '2px solid ' + LINE, borderRadius: 14, background: '#fff', color: SUB, fontWeight: 800, fontSize: 14, padding: '12px 0', cursor: 'pointer' }}>やめる</button>
-          <button onClick={publish} style={{ flex: 1.6, border: 'none', borderRadius: 14, background: LIME, color: LIME_INK, fontWeight: 900, fontSize: 14, padding: '12px 0', cursor: 'pointer' }}>本当にみんなに反映</button>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 800, padding: '13px 0', color: '#8a8a82' }}>変更点を確認中</div>
         </> : <>
           {hasDraft && <button onClick={discard} style={{ flex: 1, border: '2px solid ' + LINE, borderRadius: 14, background: '#fff', color: SUB, fontWeight: 800, fontSize: 13, padding: '12px 0', cursor: 'pointer' }}>下書きを捨てる</button>}
           {!hasDraft && hasPrev && <button onClick={revert} style={{ flex: 1, border: '2px solid ' + LINE, borderRadius: 14, background: '#fff', color: SUB, fontWeight: 800, fontSize: 13, padding: '12px 0', cursor: 'pointer' }}>1つ前に戻す</button>}
           <button onClick={() => setConfirm(true)} disabled={!hasDraft || !v.user} style={{ flex: 1.6, border: 'none', borderRadius: 14, background: hasDraft && v.user ? LIME : '#e4e1d8', color: hasDraft && v.user ? LIME_INK : '#a5a39a', fontWeight: 900, fontSize: 14, padding: '12px 0', cursor: hasDraft && v.user ? 'pointer' : 'default' }}>みんなに反映</button>
         </>}
       </div>
+      {/* 反映前の確認: 変更点の一覧 → 本当に反映しますか？ */}
+      {confirm && (() => {
+        const diff = diffIkoi(Ikoi.publishedSnapshot(), data);
+        const tag = { edit: '変更', add: '追加', del: '削除', face: '表情', order: '並び順', newface: '新しい表情' };
+        const tagColor = { edit: '#5b8fd4', add: '#58a34d', del: '#b4645a', face: '#b07bc4', order: SUB, newface: '#b07bc4' };
+        return (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 12, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end' }}>
+            <div style={{ width: '100%', maxHeight: '85%', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '22px 22px 0 0' }}>
+              <div style={{ fontSize: 15, fontWeight: 900, textAlign: 'center', padding: '16px 16px 8px' }}>変更点（{diff.reduce((n, d) => n + d.ch.length, 0)}件）</div>
+              <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px' }}>
+                {diff.length === 0 && <div style={{ textAlign: 'center', fontSize: 13, color: '#8a8a82', padding: '20px 0' }}>変更はありません</div>}
+                {diff.map((d, i) => (
+                  <div key={i} style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: SUB, margin: '0 2px 6px' }}>{d.label}</div>
+                    {d.ch.map((c, j) => (
+                      <div key={j} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#f7f4ec', borderRadius: 10, padding: '8px 10px', marginBottom: 5, fontSize: 12.5, lineHeight: 1.6 }}>
+                        <span style={{ flex: '0 0 auto', fontSize: 10.5, fontWeight: 900, color: '#fff', background: tagColor[c.kind], borderRadius: 6, padding: '1px 6px', marginTop: 2 }}>{tag[c.kind]}</span>
+                        <div style={{ flex: 1, minWidth: 0, wordBreak: 'break-all' }}>
+                          {c.kind === 'edit' && <><div style={{ color: '#a5a39a', textDecoration: 'line-through' }}>{c.from}</div><div>{c.to}</div></>}
+                          {(c.kind === 'add' || c.kind === 'newface') && <div>{c.to}</div>}
+                          {c.kind === 'add' && c.face && <div style={{ color: SUB }}>表情：{c.face}</div>}
+                          {c.kind === 'del' && <div style={{ color: '#a5a39a', textDecoration: 'line-through' }}>{c.to}</div>}
+                          {c.kind === 'face' && <><div>{c.to}</div><div style={{ color: SUB }}>{c.from} → {c.face}</div></>}
+                          {c.kind === 'order' && <div>セリフの並び順</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 900, textAlign: 'center', padding: '10px 16px 0' }}>本当に反映しますか？</div>
+              <div style={{ display: 'flex', gap: 8, padding: '10px 16px calc(16px + env(safe-area-inset-bottom))' }}>
+                <button onClick={() => setConfirm(false)} style={{ flex: 1, border: '2px solid ' + LINE, borderRadius: 14, background: '#fff', color: SUB, fontWeight: 800, fontSize: 14, padding: '12px 0', cursor: 'pointer' }}>やめる</button>
+                <button onClick={publish} disabled={!diff.length} style={{ flex: 1.6, border: 'none', borderRadius: 14, background: diff.length ? LIME : '#e4e1d8', color: diff.length ? LIME_INK : '#a5a39a', fontWeight: 900, fontSize: 14, padding: '12px 0', cursor: diff.length ? 'pointer' : 'default' }}>反映する</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {/* 表情を選ぶ */}
       {picker != null && (
         <div onClick={() => { setPicker(null); setNewFace(null); }} style={{ position: 'absolute', inset: 0, zIndex: 12, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end' }}>
