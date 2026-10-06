@@ -2,7 +2,8 @@
    疲労度は 0〜100（山が100個で満杯）。0〜40=ゆったり / 41〜80=ほどほど / 81〜100=みちみち。
    1日の疲労の推移を滑らかな曲線にして、一番長く居たゾーンをその日のタイプにする。 */
 import { hmToTsOn, entryGlyph } from './model';
-import { REVIEW_BASE as BASE, REVIEW_CLOSER as CLOSER, PLAN_CLOSER, HOME_BY_ZONE, REST_FROM, REST_INTRO, REST_TIPS, AFTER_FATIGUE, AFTER_RECOVER, AFTER_RECORD_MIN, TAP_NO_REPEAT, TAP_TIME, TAP_DATE, TAP_OCTOBER, TAP_CHAT, TAP_ANNOY, NURSE_FACES, FACE_RULES } from './serifu';
+import { REST_FROM, AFTER_RECORD_MIN, TAP_NO_REPEAT } from './serifu';
+import { lines as L, fill, faceKeyFor, faceSrc } from './ikoi'; // セリフはいこいさん編集で変えられる（初期値は serifu.js）
 
 export const WAKE_TYPES = [
   { id: 'yuttari', name: 'ゆったりタイプ', glyph: '🌿' },
@@ -15,7 +16,7 @@ export const NO_TYPE = { id: 'none', name: 'まだ記録なし', glyph: '🌱' }
 export function zoneOf(f) { return f <= 40 ? 0 : f <= 80 ? 1 : 2; }
 
 function hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0); }
-function pick(seed, arr) { return arr[hash(seed) % arr.length]; }
+function pick(seed, arr) { return arr && arr.length ? arr[hash(seed) % arr.length] : ''; }
 
 /* その日の疲労の推移（10分刻み・移動平均で滑らかに）。朝の残り疲労 startFat から、
    各記録の from→to に疲労ぶんを等分に足し引きして 0〜100 に収める。 */
@@ -72,25 +73,25 @@ export function daySummary(entries, dateStr, startFat) {
 /* 画面3: 昨日のふりかえりのセリフ */
 export function reviewLine(sum, dateStr) {
   const id = sum.type.id;
-  const parts = [pick(dateStr + 'b', BASE[id])];
+  const parts = [pick(dateStr + 'b', L('REVIEW_BASE_' + id))];
   if (id === 'yuttari') {
     // ゆったりの日は「何もしていない」前提にせず、回復の記録（休憩・睡眠など）で山が減ったときだけ休憩できたかを聞く
-    if (sum.rec) parts.push(sum.rec + 'で休憩できましたか？');
+    if (sum.rec) parts.push(fill(pick(dateStr + 'r', L('TPL_REVIEW_YUTTARI_REC')), { 行動: sum.rec }));
   } else {
-    if (sum.up) parts.push(sum.up + 'に力を入れましたね。');
-    if (sum.rec) parts.push(sum.rec + 'で一番回復しましたね。');
+    if (sum.up) parts.push(fill(pick(dateStr + 'u', L('TPL_REVIEW_UP')), { 行動: sum.up }));
+    if (sum.rec) parts.push(fill(pick(dateStr + 'r', L('TPL_REVIEW_REC')), { 行動: sum.rec }));
   }
-  parts.push(pick(dateStr + 'c', CLOSER[id]));
+  parts.push(pick(dateStr + 'c', L('REVIEW_CLOSER_' + id)));
   return parts.join('');
 }
 
 /* 画面4: 今日の予定のセリフ */
 export function planLine(plans, tasks, sum, dateStr) {
   const parts = [];
-  if (plans.length) parts.push('今日の予定は' + plans.length + '件。' + plans[0].title + 'から始まります。');
-  else parts.push('今日は予定が入っていません。');
-  if (tasks.length) parts.push('タスクは' + tasks.length + '件あります。');
-  parts.push(pick(dateStr + 'p', PLAN_CLOSER));
+  if (plans.length) parts.push(fill(pick(dateStr + 'h', L('TPL_PLAN_HAS')), { 件数: plans.length, 最初の予定: plans[0].title }));
+  else parts.push(pick(dateStr + 'n', L('TPL_PLAN_NONE')));
+  if (tasks.length) parts.push(fill(pick(dateStr + 't', L('TPL_PLAN_TASKS')), { 件数: tasks.length }));
+  parts.push(pick(dateStr + 'p', L('PLAN_CLOSER')));
   return parts.join('');
 }
 
@@ -103,15 +104,16 @@ export function homeLine(count, next, dateStr, lastRec, now) {
   const seed = dateStr + 'h' + count;
   const tired = count >= REST_FROM;
   const hr = new Date(now).getHours();
-  const tips = (hr >= 18 || hr < 6) ? REST_TIPS.filter(t => !OUTDOOR.test(t)) : REST_TIPS; // 夜（18時〜6時）は外に出る休み方は勧めない
-  const restLine = () => pick(seed + 'i', REST_INTRO) + 'おすすめは' + pick(seed + 't', tips) + 'です。';
+  const allTips = L('REST_TIPS'), nightTips = allTips.filter(t => !OUTDOOR.test(t));
+  const tips = (hr >= 18 || hr < 6) && nightTips.length ? nightTips : allTips; // 夜（18時〜6時）は外に出る休み方は勧めない
+  const restLine = () => pick(seed + 'i', L('REST_INTRO')) + fill(pick(seed + 'f', L('TPL_REST_TIP')), { 休み方: pick(seed + 't', tips) });
   if (lastRec && now - lastRec.ts < AFTER_RECORD_MIN * 60000) {
-    const head = pick(seed + 'a' + lastRec.ts, lastRec.rec ? AFTER_RECOVER : AFTER_FATIGUE);
+    const head = pick(seed + 'a' + lastRec.ts, L(lastRec.rec ? 'AFTER_RECOVER' : 'AFTER_FATIGUE'));
     return head + (tired ? restLine() : '');
   }
   if (tired) return restLine();
-  const parts = [pick(seed, HOME_BY_ZONE[zoneOf(count) === 0 ? 0 : 1])];
-  if (next) parts.push('次は' + next.title + '（' + next.from + '〜）です。');
+  const parts = [pick(seed, L(zoneOf(count) === 0 ? 'HOME_ZONE0' : 'HOME_ZONE1'))];
+  if (next) parts.push(fill(pick(seed + 'n', L('TPL_HOME_NEXT')), { 予定: next.title, 時刻: next.from }));
   return parts.join('');
 }
 
@@ -120,10 +122,10 @@ export function tapLine(now, recent, annoyed) {
   const h = now.getHours();
   const slot = h >= 5 && h < 11 ? 'morning' : h < 14 && h >= 11 ? 'noon' : h >= 14 && h < 17 ? 'afternoon' : h >= 17 && h < 21 ? 'evening' : h >= 21 ? 'night' : 'late';
   const key = String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-  const dated = TAP_DATE[key] || [];
+  const dated = L('TAP_DATE:' + key).filter(Boolean);
   let pool;
-  if (annoyed) pool = TAP_ANNOY;
-  else pool = [...TAP_TIME[slot], ...TAP_TIME[slot], ...dated, ...dated, ...(now.getMonth() === 9 ? TAP_OCTOBER : []), ...TAP_CHAT];
+  if (annoyed) pool = L('TAP_ANNOY');
+  else pool = [...L('TAP_' + slot), ...L('TAP_' + slot), ...dated, ...dated, ...(now.getMonth() === 9 ? L('TAP_OCTOBER') : []), ...L('TAP_CHAT')];
   if (h >= 18 || h < 6) pool = pool.filter(x => !OUTDOOR.test(x)); // 夜（18時〜6時）は、外を歩く・出かけるなどの提案は言わない
   const avoid = new Set((recent || []).slice(-TAP_NO_REPEAT));
   let cand = pool.filter(x => !avoid.has(x));
@@ -133,8 +135,4 @@ export function tapLine(now, recent, annoyed) {
 }
 
 /* セリフに合ったおねえさんのイラスト（表情）のURL。合うものがなければふだんの顔 */
-export function nurseSrc(text) {
-  const rule = FACE_RULES.find(([re]) => re.test(text || ''));
-  const file = NURSE_FACES[rule ? rule[1] : 'normal'] || NURSE_FACES.normal;
-  return '/wake/' + encodeURIComponent(file);
-}
+export function nurseSrc(text) { return faceSrc(faceKeyFor(text)); }

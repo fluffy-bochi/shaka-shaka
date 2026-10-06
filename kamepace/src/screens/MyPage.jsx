@@ -27,7 +27,8 @@ export default function MyPage({ v }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#fff', borderRadius: 16, padding: '14px 15px', boxShadow: '0 1px 3px rgba(27,27,24,.05)' }}>
           <div style={{ width: 48, height: 48, flex: '0 0 auto', borderRadius: 13, background: '#c4f000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>🐢</div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 900 }}>{u ? (u.displayName || 'ほどほどふぉーと') : 'ゲスト'}</div>
+            {/* 名前を7回つづけてタップすると開発者モードの切り替え */}
+            <div onClick={v.tapDevSecret} style={{ fontSize: 15, fontWeight: 900, userSelect: 'none', WebkitUserSelect: 'none', WebkitTapHighlightColor: 'transparent' }}>{u ? (u.displayName || 'ほどほどふぉーと') : 'ゲスト'}</div>
             <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 2 }}>{u ? (u.email || '') : 'ログインするとクラウドに保存されます'}</div>
           </div>
           {u ? (
@@ -36,6 +37,16 @@ export default function MyPage({ v }) {
             <button onClick={v.openAuth} style={{ border: 'none', background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', flex: '0 0 auto' }}>ログイン</button>
           )}
         </div>
+        {v.devMode && <>
+          <div style={label}>開発者</div>
+          <div style={card}>
+            <button onClick={v.goIkoiEdit} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+              <span style={{ fontSize: 16 }}>💬</span>
+              <span style={{ flex: 1, fontSize: 14 }}>いこいさん編集</span>
+              <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+            </button>
+          </div>
+        </>}
         <div style={label}>きろく</div>
         <div style={card}>
           <button onClick={v.goSlotTimes} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
