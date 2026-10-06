@@ -291,3 +291,44 @@ export async function fetchGoogleData() {
   ]);
   return { cal, tasks };
 }
+
+/* ---- いこいさんのセリフ・表情（みんな共通）: config/ikoi ----
+   { lines: {key:[{t,f}]}, faces: {key:{label, img:true}}, prev: 1つ前の版, updatedAt }。
+   追加した表情の画像（dataURL）は1枚ずつ config/ikoiFace_<key> に置く（1ドキュメント1MBの上限を避ける）。
+   書き込みは Firestore のルールで開発者だけに許可する */
+const ikoiDoc = () => doc(db, 'config', 'ikoi');
+async function resolveFaces(faces) {
+  const out = {};
+  await Promise.all(Object.entries(faces || {}).map(async ([k, f]) => {
+    if (!f) return;
+    if (f.img) { const s = await getDoc(doc(db, 'config', 'ikoiFace_' + k)); if (s.exists()) out[k] = { label: f.label, src: s.data().src }; }
+    else if (f.src) out[k] = { label: f.label, src: f.src };
+  }));
+  return out;
+}
+export async function loadIkoi() {
+  const snap = await getDoc(ikoiDoc());
+  if (!snap.exists()) return null;
+  const d = snap.data();
+  return { lines: d.lines || {}, faces: await resolveFaces(d.faces), hasPrev: !!d.prev, updatedAt: d.updatedAt || 0 };
+}
+const cleanLines = (lines) => Object.fromEntries(Object.entries(lines || {}).map(([k, arr]) => [k, (arr || []).map(x => (x.f ? { t: x.t, f: x.f } : { t: x.t }))]));
+export async function publishIkoi(data) {
+  const faces = {};
+  for (const [k, f] of Object.entries(data.faces || {})) {
+    if (f.src && f.src.startsWith('data:')) { await setDoc(doc(db, 'config', 'ikoiFace_' + k), { src: f.src }); faces[k] = { label: f.label, img: true }; }
+    else if (f.src) faces[k] = { label: f.label, src: f.src };
+  }
+  const snap = await getDoc(ikoiDoc());
+  let prev = null;
+  if (snap.exists()) { const { prev: _p, ...cur } = snap.data(); prev = cur; } // eslint-disable-line no-unused-vars
+  await setDoc(ikoiDoc(), { lines: cleanLines(data.lines), faces, prev, updatedAt: Date.now(), by: auth.currentUser ? auth.currentUser.uid : '' });
+}
+/* 1つ前の版に戻す（いまの版は prev に入れるので、もう一度押すと元に戻る） */
+export async function revertIkoi() {
+  const snap = await getDoc(ikoiDoc());
+  if (!snap.exists() || !snap.data().prev) return false;
+  const { prev, ...cur } = snap.data();
+  await setDoc(ikoiDoc(), { ...prev, prev: cur, updatedAt: Date.now(), by: auth.currentUser ? auth.currentUser.uid : '' });
+  return true;
+}

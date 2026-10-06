@@ -17,7 +17,10 @@ import {
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout,
   cloudSave, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
+  loadIkoi,
 } from './firebase';
+import * as Ikoi from './ikoi';
+import IkoiEdit from './screens/IkoiEdit';
 import { initShakaSound, attachCollisionSound } from './sound';
 import { appendGlyph } from './fluent';
 import Home from './screens/Home';
@@ -1551,6 +1554,18 @@ export default class App extends React.Component {
   goRecordNow = () => this.openRecord(this.slotNow());
   setMainScreen = (v) => { this.set({ mainScreen: v }); this.save(); };
   goMypage = () => this.set({ screen: 'mypage' });
+  goIkoiEdit = () => this.set({ screen: 'ikoiEdit' });
+  /* マイページの名前を3秒以内に7回タップ → 開発者モードの切り替え（スマホの「ビルド番号を連打」と同じ） */
+  tapDevSecret = () => {
+    const now = Date.now();
+    this._devTaps = (this._devTaps || []).filter(t => now - t < 3000).concat(now);
+    if (this._devTaps.length < 7) return;
+    this._devTaps = [];
+    const on = !Ikoi.isDev();
+    Ikoi.setDev(on);
+    this.set({ toast: on ? '開発者モードになりました' : '開発者モードを終了しました' });
+    clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1800);
+  };
   goBookshelf = () => { this.set({ screen: 'bookshelf' }); this.ensureSample(todayStr()); };
   setBookFav = (key) => {
     const bookFav = { ...(this.state.bookFav || {}) };
@@ -2334,6 +2349,9 @@ export default class App extends React.Component {
     // 旧本番と同じ外部フック（デバッグ・検証用）
     window.__importEvents = (items) => this.importEvents(items);
     window.__kameApp = this; // 検証用（状態の読み取りのみに使う）
+    // いこいさんのセリフ・表情（みんなに反映された版）を読み、変わったら描き直す
+    this._unIkoi = Ikoi.subscribe(() => this.forceUpdate());
+    loadIkoi().then(d => { if (d) Ikoi.setPublished(d); }).catch(() => { /* 読めなければ serifu.js の初期値 */ });
     this._unwatch = watchAuth((user) => {
       this.set({ user, authOpen: false, authPass: '' });
       if (user) this.loadCloud(); else this.loadGuest();
@@ -2408,7 +2426,7 @@ export default class App extends React.Component {
       case 'wake3': this.set({ screen: 'wake2' }); return true;
       case 'collect': this.goShaka(); return true;
       case 'trash': case 'buffLog': case 'slotTimes': case 'catsManage':
-      case 'templates': case 'sensitivity': case 'help':
+      case 'templates': case 'sensitivity': case 'help': case 'ikoiEdit':
         this.goMypage(); return true;
       case 'cycle': this.cancelCycle(); return true;
       case 'onboard':
@@ -2429,6 +2447,7 @@ export default class App extends React.Component {
   componentWillUnmount() {
     clearInterval(this._tick); clearInterval(this._planT); clearInterval(this._clockT); clearInterval(this._schedT);
     if (this._unwatch) this._unwatch();
+    if (this._unIkoi) this._unIkoi();
     if (this._motionOn) window.removeEventListener('devicemotion', this._onDeviceMotion);
     if (this._onPop) window.removeEventListener('popstate', this._onPop);
     this.stopPhysics(); this.stopCollectPhysics();
@@ -3697,6 +3716,7 @@ export default class App extends React.Component {
         return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + '日月火水木金土'[d.getDay()] + '曜日 ' + Math.max(1, n) + '日目';
       })(),
       isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
+      isIkoiEdit: st.screen === 'ikoiEdit', devMode: Ikoi.isDev(), goIkoiEdit: this.goIkoiEdit, tapDevSecret: this.tapDevSecret,
       isTrash: st.screen === 'trash', isBuffLog: st.screen === 'buffLog',
       isBookshelf: st.screen === 'bookshelf',
       isSlotTimes: st.screen === 'slotTimes', isCatsManage: st.screen === 'catsManage',
@@ -4039,6 +4059,7 @@ export default class App extends React.Component {
         {v.isShaka && <Shaka v={v} />}
         {v.isCollect && <Collect v={v} />}
         {v.isMypage && <MyPage v={v} />}
+        {v.isIkoiEdit && <IkoiEdit v={v} />}
         {v.isTrash && <Trash v={v} />}
         {v.isBuffLog && <BuffLog v={v} />}
         {v.isSlotTimes && <SlotTimes v={v} />}
@@ -4063,7 +4084,7 @@ export default class App extends React.Component {
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}
-        {!v.isBookshelf && !v.isWake && !v.isBed && <Nav v={v} />}
+        {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && <Nav v={v} />}
         </>}
       </div>
     );

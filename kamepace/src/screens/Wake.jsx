@@ -108,8 +108,8 @@ export function BedCheck({ v }) {
 }
 
 /* キャラ＋吹き出し */
-export function Speaker({ text, size = 130, onTap }) {
-  const src = nurseSrc(text); // セリフに合った表情
+export function Speaker({ text, size = 130, onTap, src: srcIn }) {
+  const src = srcIn || nurseSrc(text); // セリフに合った表情（いこいさん編集のプレビューでは表情を指定できる）
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 20px' }}>
       <img key={src} src={src} alt="" onClick={onTap} style={{ cursor: onTap ? 'pointer' : undefined, WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none', flex: '0 0 auto', width: size, height: size, objectFit: 'contain', objectPosition: 'bottom', mixBlendMode: 'multiply' }} />
