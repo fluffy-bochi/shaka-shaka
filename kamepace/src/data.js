@@ -121,6 +121,13 @@ export const CATS = [
     act('cold', '🤧', 'sick', '風邪ぎみ', 5, 3, 120, { kw: ['体調', '風邪', 'かぜ', '鼻水', 'せき'], symptom: true, buffLv: [{ bodyFat: 1.15, mindFat: 1.1 }, { bodyFat: 1.25, mindFat: 1.15 }, { bodyFat: 1.4, mindFat: 1.2 }] }),
     act('hangover', '🥴', 'sick', '二日酔い', 5, 2, 120, { kw: ['体調', '二日酔い', 'ふつかよい'], symptom: true, buffLv: [{ bodyFat: 1.15 }, { bodyFat: 1.25, mindFat: 1.05 }, { bodyFat: 1.4, mindFat: 1.15 }] }),
   ] },
+  { id: 'exercise', icon: 'fitness_center', color: '#3f9fb5', glyph: '🏃', name: '運動', sub: '散歩・ランニング・水泳', items: [
+    // 散歩は回復のまま（設計書では体は微疲労・心は回復の混合（未決）。1軸のいまは小さめの回復として扱う）。
+    // 名前はりれき・すき/きらいの紐づけ（行動名で保存）を保つため変えない
+    act('stroll', '🚶', 'park', '散歩・軽い運動', 1, 2, 20, { recover: true, kw: ['運動', '休憩', '散歩', 'ウォーキング', '軽い運動'] }),
+    act('running', '🏃', 'directions_run', 'ランニング', 10, 2, 30, { kw: ['運動', 'ランニング', 'ジョギング', '走る'] }),
+    act('swimming', '🏊', 'pool', '水泳', 11, 2, 45, { kw: ['運動', '水泳', 'プール', '泳ぐ'] }),
+  ] },
   { id: 'rest', icon: 'self_improvement', color: '#7a9a00', glyph: '☕', name: '休憩・回復', sub: 'お茶・入浴・昼寝・趣味 ・ −回復', items: [
     act('rest', '☕', 'local_cafe', '休憩・コーヒー', 2, 5, 15, { recover: true, kw: ['休憩', 'お茶', 'カフェ', 'コーヒー', '休む'] }),
     act('meal', '🍙', 'restaurant', '食事', 3, 4, 30, { recover: true, kw: ['休憩', '食事', 'ランチ', 'ごはん'] }),
@@ -129,8 +136,6 @@ export const CATS = [
     act('hobby', '🎧', 'interests', '趣味・娯楽', 2, 8, 60, { recover: true, kw: ['休憩', '趣味', '娯楽', '音楽', '読書'] }),
     act('gaming', '🎮', 'sports_esports', 'ゲーム', 1, 6, 60, { recover: true, kw: ['休憩', 'ゲーム', 'プレイ'] }),
     act('sns', '📱', 'smartphone', 'SNS・動画', 1, 4, 30, { recover: true, kw: ['休憩', 'SNS', '動画', 'スマホ', 'YouTube'] }),
-    // 設計書では体は微疲労・心は回復の混合（未決）。1軸のいまは小さめの回復として扱う
-    act('stroll', '🚶', 'park', '散歩・軽い運動', 1, 2, 20, { recover: true, kw: ['休憩', '散歩', 'ウォーキング', '軽い運動'] }),
     act('stretch', '🧘', 'self_improvement', 'ストレッチ・ヨガ', 5, 5, 15, { recover: true, kw: ['休憩', 'ストレッチ', 'ヨガ'] }),
     act('breathe', '🌿', 'spa', '深呼吸・瞑想', 3, 5, 5, { recover: true, kw: ['休憩', '深呼吸', '瞑想', 'マインドフルネス'] }),
     act('nature', '🌳', 'park', 'ぼーっとする', 3, 5, 10, { recover: true, kw: ['休憩', 'ぼーっと', '外気浴'] }),
@@ -180,7 +185,6 @@ const SEARCH_VARIANTS = [
   { name: '集中作業', glyph: '⌨️', fh: 8, body: 3, mind: 5, defMin: 60, kw: ['集中', '作業', '仕事'] },
   { name: 'メール返信', glyph: '📧', fh: 4, body: 1, mind: 3, defMin: 15, kw: ['メール', '返信', '仕事'] },
   { name: '掃除機がけ', glyph: '🧹', fh: 7, body: 5, mind: 2, defMin: 20, kw: ['掃除', '家事', '掃除機'] },
-  { name: 'ランニング', glyph: '🏃', fh: 12, body: 10, mind: 2, defMin: 30, kw: ['ランニング', '運動', 'ジョギング', '走る'] },
   { name: '筋トレ', glyph: '🏋️', fh: 14, body: 12, mind: 2, defMin: 45, kw: ['筋トレ', '運動', 'ジム', 'トレーニング'] },
 ];
 export const SEARCH_DB = [
