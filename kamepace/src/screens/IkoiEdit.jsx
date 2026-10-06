@@ -14,12 +14,18 @@ const GROUPS = [
   { id: 'home', label: 'ホーム', size: 140, items: [
     { key: 'AFTER_FATIGUE', label: '記録直後（疲れる記録）' },
     { key: 'AFTER_RECOVER', label: '記録直後（回復の記録）' },
-    { key: 'HOME_ZONE0', label: '山が少ない（0〜40）' },
-    { key: 'HOME_ZONE1', label: '山がほどほど（41〜59）' },
-    { key: 'REST_INTRO', label: '山が多い（60〜）' },
+    { key: 'HOME_ZONE0', label: 'がんばりゲージ 0〜40' },
+    { key: 'HOME_ZONE1', label: 'がんばりゲージ 41〜59' },
+    { key: 'REST_INTRO', label: 'がんばりゲージ 60〜' },
     { key: 'REST_TIPS', label: 'おすすめの休み方' },
     { key: 'TPL_REST_TIP', label: 'おすすめの文', vars: ['休み方'] },
-    { key: 'TPL_HOME_NEXT', label: '次の予定', vars: ['予定', '時刻'] },
+    { key: 'TPL_NEXT_OVER', label: '次の予定・やるとゲージが80超え', vars: ['予定', '時刻'] },
+    { key: 'TPL_NEXT_MIND_HUGE', label: '次の予定・心の疲労がとても大きい（40〜）', vars: ['予定', '時刻'] },
+    { key: 'TPL_NEXT_BODY_HUGE', label: '次の予定・体の疲労がとても大きい（40〜）', vars: ['予定', '時刻'] },
+    { key: 'TPL_NEXT_MIND_BIG', label: '次の予定・心の疲労が大きい（20〜）', vars: ['予定', '時刻'] },
+    { key: 'TPL_NEXT_BODY_BIG', label: '次の予定・体の疲労が大きい（20〜）', vars: ['予定', '時刻'] },
+    { key: 'TPL_NEXT_REC', label: '次の予定・回復', vars: ['予定', '時刻'] },
+    { key: 'TPL_HOME_NEXT', label: '次の予定・どれにも当てはまらない', vars: ['予定', '時刻'] },
   ] },
   { id: 'tap', label: 'タップ', size: 140, items: [
     { key: 'TAP_morning', label: '朝（5〜10時）' },
@@ -63,7 +69,9 @@ function compose(key, line, L) {
   if ((m = key.match(/^REVIEW_CLOSER_(\w+)$/))) return (L('REVIEW_BASE_' + m[1])[0] || '') + mid(m[1]) + line;
   switch (key) {
     case 'HOME_ZONE0': case 'HOME_ZONE1': return line + f0('TPL_HOME_NEXT', { 予定: EX.予定, 時刻: EX.時刻 });
-    case 'TPL_HOME_NEXT': return (L('HOME_ZONE0')[0] || '') + fill(line, EX);
+    case 'TPL_HOME_NEXT': case 'TPL_NEXT_OVER': case 'TPL_NEXT_MIND_HUGE': case 'TPL_NEXT_BODY_HUGE':
+    case 'TPL_NEXT_MIND_BIG': case 'TPL_NEXT_BODY_BIG': case 'TPL_NEXT_REC':
+      return (L('HOME_ZONE' + (key === 'TPL_NEXT_OVER' ? 1 : 0))[0] || '') + fill(line, EX);
     case 'REST_INTRO': return line + tip(L('REST_TIPS')[0] || '');
     case 'REST_TIPS': return (L('REST_INTRO')[0] || '') + tip(line);
     case 'TPL_REST_TIP': return (L('REST_INTRO')[0] || '') + fill(line, { 休み方: L('REST_TIPS')[0] || '' });

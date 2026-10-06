@@ -95,6 +95,17 @@ export function planLine(plans, tasks, sum, dateStr) {
   return parts.join('');
 }
 
+/* 次の予定の中身で、どのセリフにするか（上から優先）。next.body / next.mind はその予定の体・心の疲労（がんばりゲージの単位） */
+export const NEXT_OVER = 80, NEXT_BIG = 20, NEXT_HUGE = 40;
+export function nextKind(count, next) {
+  const d = next.delta || 0, b = next.body || 0, m = next.mind || 0;
+  if (d > 0 && count + d > NEXT_OVER) return 'TPL_NEXT_OVER'; // やったらがんばりゲージが80を超えそう
+  if (m >= NEXT_HUGE || b >= NEXT_HUGE) return m >= b ? 'TPL_NEXT_MIND_HUGE' : 'TPL_NEXT_BODY_HUGE';
+  if (m >= NEXT_BIG || b >= NEXT_BIG) return m >= b ? 'TPL_NEXT_MIND_BIG' : 'TPL_NEXT_BODY_BIG';
+  if (d < 0) return 'TPL_NEXT_REC';
+  return 'TPL_HOME_NEXT';
+}
+
 /* ホーム上部のコメント。優先順:
    1) 記録した直後: おつかれさま／疲れは取れましたか？（この先の予定は言わない）。山が REST_FROM 以上なら休み方も添える
    2) 山が REST_FROM 以上: おすすめの休み方の提案
@@ -113,7 +124,7 @@ export function homeLine(count, next, dateStr, lastRec, now) {
   }
   if (tired) return restLine();
   const parts = [pick(seed, L(zoneOf(count) === 0 ? 'HOME_ZONE0' : 'HOME_ZONE1'))];
-  if (next) parts.push(fill(pick(seed + 'n', L('TPL_HOME_NEXT')), { 予定: next.title, 時刻: next.from }));
+  if (next) parts.push(fill(pick(seed + 'n', L(nextKind(count, next))), { 予定: next.title, 時刻: next.from }));
   return parts.join('');
 }
 
