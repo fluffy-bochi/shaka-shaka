@@ -1555,6 +1555,13 @@ export default class App extends React.Component {
   setMainScreen = (v) => { this.set({ mainScreen: v }); this.save(); };
   goMypage = () => this.set({ screen: 'mypage' });
   goIkoiEdit = () => this.set({ screen: 'ikoiEdit' });
+  /* 記録・予定の疲労を体と心に分ける（記録は合計しか持たないので、同じ名前の行動の体:心の比で分ける。わからなければ半々） */
+  entryBodyMind(e) {
+    const d = Math.abs(e.delta || 0);
+    const it = this.allItems().find(t => t.name === e.title) || SEARCH_DB.find(t => t.name === e.title);
+    const b = it && typeof it.body === 'number' ? it.body : 1, m = it && typeof it.mind === 'number' ? it.mind : 1;
+    return b + m > 0 ? { body: d * b / (b + m), mind: d * m / (b + m) } : { body: d / 2, mind: d / 2 };
+  }
   /* マイページの名前を3秒以内に7回タップ → 開発者モードの切り替え（スマホの「ビルド番号を連打」と同じ） */
   tapDevSecret = () => {
     const now = Date.now();
@@ -3692,7 +3699,7 @@ export default class App extends React.Component {
       homeComment: st.screen === 'home' ? (st.tapLine || (() => {
         const d = this.homeDateStr(), nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes());
         const next = sortEntries(st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.title && e.from && (d !== todayStr() || e.from > nowHm)))[0];
-        return homeLine(Math.min(100, this.pileCount()), next, d, st.lastRec, Date.now());
+        return homeLine(Math.min(100, this.pileCount()), next && { ...next, ...this.entryBodyMind(next) }, d, st.lastRec, Date.now());
       })()) : '',
       tapCharacter: this.tapCharacter,
       predict: st.screen === 'shaka' ? (() => {
