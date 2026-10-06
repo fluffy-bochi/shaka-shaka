@@ -5,7 +5,7 @@
 import React from 'react';
 import Matter from 'matter-js';
 import {
-  SLOTS, CATS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT, BUFFS, MOODS, MOOD_STRENGTHS,
+  SLOTS, CATS, RENAMED_ACTS, PLANS, SEARCH_DB, KW_PLACEHOLDERS, ACT_EMOJI, EMOJI_ACT, BUFFS, MOODS, MOOD_STRENGTHS,
   CAT_ICON_CHOICES, CAT_COLOR_CHOICES, COMPARE_STEPS,
   guessAct, slotOfEntry, slotForNow, IMPORT_DEFAULT_DELTA, DEFAULT_SLOT_HOURS,
 } from './data';
@@ -732,10 +732,11 @@ export default class App extends React.Component {
   /* 行動のりれき（月ごと）: 日ごとの回数・合計回数・合計時間・平均時間。ym='YYYY-MM' */
   actHistory(name, ym) {
     const k = normTitle(name), days = {}, today = todayStr();
+    const keyOf = (t) => normTitle(RENAMED_ACTS[(t || '').trim()] || t); // 旧名の記録も新名で数える
     let count = 0, total = 0, timed = 0;
     const toM = (hm) => { const [h, m] = (hm || '').split(':').map(Number); return h * 60 + (m || 0); };
     (this.state.entries || []).forEach(e => {
-      if (e.exp || e.wakeAdd || !e.date || e.date.slice(0, 7) !== ym || e.date > today || normTitle(e.title) !== k) return; // 未来の日は数えない
+      if (e.exp || e.wakeAdd || !e.date || e.date.slice(0, 7) !== ym || e.date > today || keyOf(e.title) !== k) return; // 未来の日は数えない
       if (e.planned && !(e.dropped > 0)) return; // まだ来ていない予定は数えない
       const d = Number(e.date.slice(8, 10));
       days[d] = (days[d] || 0) + 1; count++;
