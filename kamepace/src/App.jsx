@@ -1722,18 +1722,20 @@ export default class App extends React.Component {
   listItemFromAct(t) {
     return { uid: 'li' + Date.now() + Math.floor(Math.random() * 1000), itemId: t.id, name: t.name, glyph: t.glyph, min: this.initialMinOf(t) };
   }
+  // リストの更新は必ず最新の state から（続けて押しても取りこぼさない）
   addToList = (t) => {
-    const pl = this.state.pickList;
-    this.set({ pickList: { ...pl, items: [...pl.items, this.listItemFromAct(t)] }, pickListTick: this.state.pickListTick + 1 });
+    const li = this.listItemFromAct(t);
+    this.setState(s => ({ pickList: { ...s.pickList, items: [...s.pickList.items, li] }, pickListTick: s.pickListTick + 1 }));
   };
-  moveListItem = (i, d) => {
-    const items = [...this.state.pickList.items], j = i + d;
-    if (j < 0 || j >= items.length) return;
+  /* 並べ替えは行の uid で指定する（押した瞬間に並びが変わっていても、押した行そのものを動かす） */
+  moveListItem = (uid, d) => this.setState(s => {
+    const items = [...s.pickList.items], i = items.findIndex(x => x.uid === uid), j = i + d;
+    if (i < 0 || j < 0 || j >= items.length) return null;
     [items[i], items[j]] = [items[j], items[i]];
-    this.set({ pickList: { ...this.state.pickList, items } });
-  };
-  removeListItem = (i) => this.set({ pickList: { ...this.state.pickList, items: this.state.pickList.items.filter((_, k) => k !== i) } });
-  setListName = (e) => this.set({ pickList: { ...this.state.pickList, name: e.target.value } });
+    return { pickList: { ...s.pickList, items } };
+  });
+  removeListItem = (uid) => this.setState(s => ({ pickList: { ...s.pickList, items: s.pickList.items.filter(x => x.uid !== uid) } }));
+  setListName = (e) => { const name = e.target.value; this.setState(s => ({ pickList: { ...s.pickList, name } })); };
   loadPlanToList = (plan) => {
     const tpl = String(plan.id).startsWith('tpl:') ? plan.id.slice(4) : null;
     const items = plan.tasks.map((t, i) => ({ uid: 'lp' + Date.now() + i, itemId: null, name: t.name, glyph: t.glyph, min: t.min || 30, fat: t.fat }));
@@ -3979,7 +3981,7 @@ export default class App extends React.Component {
       showSub: false,
       pickList: st.screen === 'record' ? {
         name: st.pickList.name, tplKey: st.pickList.tplKey, tick: st.pickListTick,
-        rows: st.pickList.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.moveListItem(i, -1), onDown: () => this.moveListItem(i, 1), onRemove: () => this.removeListItem(i) })),
+        rows: st.pickList.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.moveListItem(li.uid, -1), onDown: () => this.moveListItem(li.uid, 1), onRemove: () => this.removeListItem(li.uid) })),
       } : null,
       setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate,
       pickCats, pickCatId: st.catId, pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
