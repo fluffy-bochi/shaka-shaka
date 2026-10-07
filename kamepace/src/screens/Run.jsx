@@ -14,13 +14,15 @@ const hm = (ts) => { const d = new Date(ts); return d.getHours() + ':' + String(
 // 実行区間から、いまの時点の経過ミリ秒（実行中の区間は b=null）
 const msOf = (segs, now) => (segs || []).reduce((a, s) => a + ((s.b == null ? now : s.b) - s.a), 0);
 /* シークバー: 実施中がアラーム（時刻）なら開始→その時刻を時計で、タイマーなら予定時間を実施時間で。endTs＝終わる時刻（タイマーは いま＋残り） */
+// 時間が過ぎたら延長: バー全体を経過時間に広げ、予定ぶん（plan）までを黒、そこから先（延長）をピンクにする
 function barOf(r, c, now) {
-  if (r.curAlarmTs && c.startAt) {
-    const total = Math.max(60000, r.curAlarmTs - c.startAt), el = now - c.startAt;
-    return { total, endTs: r.curAlarmTs, ratio: Math.max(0, Math.min(1, el / total)), over: now > r.curAlarmTs };
-  }
-  return { total: c.planMs, endTs: now + Math.max(0, c.planMs - c.ms), ratio: Math.min(1, c.ms / c.planMs), over: c.ms > c.planMs };
+  let total, el, endTs;
+  if (r.curAlarmTs && c.startAt) { total = Math.max(60000, r.curAlarmTs - c.startAt); el = Math.max(0, now - c.startAt); endTs = r.curAlarmTs; }
+  else { total = c.planMs; el = c.ms; endTs = now + (c.planMs - c.ms); } // 過ぎたら、予定の時間が終わった時刻（いま−延長ぶん）
+  const over = el > total;
+  return { total, endTs, over, ratio: over ? 1 : Math.min(1, el / total), plan: over ? total / el : 1, extra: over ? el - total : 0 };
 }
+const PINK = '#ff5fa2';
 const mmss = (t) => { const s = Math.max(0, Math.floor(t / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; };
 
 /* アラーム／タイマーの1行: [全体｜実施中] [アラーム|タイマー] ……… [時刻 or 分] */
@@ -96,11 +98,14 @@ export default function Run({ v }) {
           </div>
           <div style={{ position: 'relative', height: 14, display: 'flex', alignItems: 'center' }}>
             <div style={{ position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2, background: '#d8d5cb' }} />
-            <div style={{ position: 'absolute', left: 0, width: ratio * 100 + '%', height: 4, borderRadius: 2, background: over ? '#7a9a00' : INK }} />
-            <div style={{ position: 'absolute', left: `calc(${ratio * 100}% - 6px)`, width: 12, height: 12, borderRadius: '50%', background: over ? '#7a9a00' : INK }} />
+            <div style={{ position: 'absolute', left: 0, width: (over ? bar.plan : ratio) * 100 + '%', height: 4, borderRadius: 2, background: INK }} />
+            {/* 延長ぶん（予定の時間を過ぎたところから）はピンク */}
+            {over && <div style={{ position: 'absolute', left: bar.plan * 100 + '%', right: 0, height: 4, borderRadius: 2, background: PINK }} />}
+            {over && <div style={{ position: 'absolute', left: `calc(${bar.plan * 100}% - 1px)`, width: 2, height: 10, background: INK }} />}
+            <div style={{ position: 'absolute', left: `calc(${ratio * 100}% - 6px)`, width: 12, height: 12, borderRadius: '50%', background: over ? PINK : INK }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, fontWeight: 700, ...mono }}>
-            <span style={{ color: over ? '#7a9a00' : SUB }}>{mmss(c.ms)}</span><span style={{ color: SUB }}>{mmss(bar.total)}</span>
+            <span style={{ color: over ? PINK : SUB }}>{mmss(c.ms)}{over ? '（延長 +' + mmss(bar.extra) + '）' : ''}</span><span style={{ color: SUB }}>{mmss(bar.total)}</span>
           </div>
           {/* 必・♡ ｜ ▶ ｜ りれき */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', margin: '10px 0 36px' }}>{/* 下のアラームとの間はFigmaくらいあける */}
@@ -190,13 +195,14 @@ export function MiniRun({ v }) {
       <span style={{ position: 'relative', flex: '0 0 auto' }}><Emo e={c.glyph} size={36} /></span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 17, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: over ? '#7a9a00' : MUTED, ...mono }}>{mmss(c.ms)} / {mmss(bar.total)}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: over ? PINK : MUTED, ...mono }}>{mmss(c.ms)} / {mmss(bar.total)}{over ? '  延長 +' + mmss(bar.extra) : ''}</div>
       </div>
       <button onClick={(e) => { e.stopPropagation(); v.runToggle(); }} aria-label={r.running ? '一時停止' : '再開'} style={{ width: 44, height: 44, border: 'none', borderRadius: 12, background: r.running ? '#efece3' : LIME, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flex: '0 0 auto' }}>
         <span style={ms(30, r.running ? INK : LIME_INK, true)}>{r.running ? 'pause' : 'play_arrow'}</span>
       </button>
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, background: '#e4e1d8' }}>
-        <div style={{ height: '100%', width: ratio * 100 + '%', background: over ? '#7a9a00' : INK }} />
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, background: '#e4e1d8', display: 'flex' }}>
+        <div style={{ height: '100%', width: (over ? bar.plan : ratio) * 100 + '%', background: INK }} />
+        {over && <div style={{ height: '100%', flex: 1, background: PINK }} />}
       </div>
     </div>
   );
