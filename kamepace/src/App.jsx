@@ -2003,11 +2003,12 @@ export default class App extends React.Component {
     return {
       name: r.name, running: r.segs.some(s => s.b == null), now,
       alarm: { all: { mode: al.all.mode, at: al.all.at || '', min: al.all.min || 0 }, cur: { mode: al.cur.mode, at: al.cur.at || '', min: cur.min || 30 } },
-      cur: { name: cur.name, glyph: cur.glyph, cat: cat ? cat.name : (r.name || ''), color: cat ? cat.color : '#8a8a82',
+      // segs: その行動の実行区間（経過時間は画面側で「いま」から毎秒計算する）
+      cur: { name: cur.name, glyph: cur.glyph, cat: cat ? cat.name : (r.name || ''), color: cat ? cat.color : '#8a8a82', segs: r.segs.filter(s => s.uid === cur.uid),
         // 必・♡・りれき（行動カードと同じ）
         req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(cur.name, kind, val),
         history: (ym) => this.actHistory(cur.name, ym), goal: (st.actGoals || {})[normTitle(cur.name)] || 0, onGoal: () => this.cycleActGoal(cur.name), startAt: first ? first.a : null, ms: this.runMs(r, cur.uid, now), planMs: (cur.min || 30) * 60000 },
-      rows: r.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), on: i === r.cur, ms: this.runMs(r, li.uid, now),
+      rows: r.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), on: i === r.cur, ms: this.runMs(r, li.uid, now), segs: r.segs.filter(s => s.uid === li.uid),
         onTap: () => this.runSelect(i), onUp: () => this.runMove(li.uid, -1), onDown: () => this.runMove(li.uid, 1), onRemove: () => this.runRemove(li.uid) })),
     };
   }

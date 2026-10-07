@@ -125,7 +125,7 @@ export function FreqPop({ label, value, onSave, onDelete, onClose }) {
 
 /* りれき: 月カレンダー＋その月の 回数（目標に対して）・目標頻度・合計時間・平均時間 */
 const fmtMin = (m) => (m < 60 ? m + '分' : Math.floor(m / 60) + '時間' + (m % 60 ? (m % 60) + '分' : ''));
-export function History({ it, cat, onClose }) {
+export function History({ it, cat, onClose, closeX }) { // closeX: 右上を↩ではなく×に（実行画面で重ねて出すとき）
   const [off, setOff] = React.useState(0);
   const now = new Date();
   const base = new Date(now.getFullYear(), now.getMonth() + off, 1);
@@ -154,7 +154,7 @@ export function History({ it, cat, onClose }) {
         <button onClick={() => setOff(off - 1)} aria-label="前の月" style={navBtn}><span style={ms(20, '#8a8a82')}>chevron_left</span></button>
         <span style={{ fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap' }}><span style={{ fontSize: 10, color: '#8a8a82', marginRight: 3 }}>{y}</span>{mo + 1}月</span>
         <button onClick={() => setOff(off + 1)} aria-label="次の月" style={navBtn}><span style={ms(20, '#8a8a82')}>chevron_right</span></button>
-        <button onClick={onClose} aria-label="もどる" style={{ ...navBtn, marginLeft: 4 }}><span style={ms(20, INK)}>undo</span></button>
+        <button onClick={onClose} aria-label={closeX ? '閉じる' : 'もどる'} style={{ ...navBtn, marginLeft: 4 }}><span style={ms(closeX ? 22 : 20, INK)}>{closeX ? 'close' : 'undo'}</span></button>
       </div>
       <div style={{ display: 'flex', gap: 5, margin: '5px 0 6px' }}>
         <div style={{ ...stat, flex: 1.15 }}>
