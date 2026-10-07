@@ -294,6 +294,10 @@ function Card({ row, cat, v, hist, setHist }) {
 function ListCard({ v, onPick }) {
   const L = v.pickList;
   const empty = !L.rows.length, named = !!(L.name || '').trim();
+  // 名前は入力してから「決定」で変える
+  const [draft, setDraft] = React.useState(L.name || '');
+  React.useEffect(() => { setDraft(L.name || ''); }, [L.name]);
+  const dirty = draft !== (L.name || '');
   const gray = { border: 'none', borderRadius: 12, background: '#e4e1d8', color: '#55554e', fontSize: 14, fontWeight: 800, padding: '10px 14px', cursor: empty ? 'default' : 'pointer', opacity: empty ? 0.5 : 1 };
   const arrowBtn = (on) => ({ width: 26, height: 26, border: 'none', background: 'none', padding: 0, cursor: on ? 'pointer' : 'default', opacity: on ? 1 : 0.2, display: 'flex', alignItems: 'center', justifyContent: 'center' });
   const lab = { fontSize: 8.5, color: '#8a8a82', fontWeight: 700, marginRight: 1 };
@@ -303,7 +307,8 @@ function ListCard({ v, onPick }) {
     <div style={{ position: 'relative', width: '100%', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, WebkitTapHighlightColor: 'transparent', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
       {/* 名前（テンプレでなくてもつけられる） */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px 6px' }}>
-        <input value={L.name} onChange={v.setListName} placeholder="リストの名前" style={{ flex: 1, minWidth: 0, height: 32, border: 'none', borderRadius: 9, background: '#f3f0e8', padding: '0 10px', fontSize: 14, fontWeight: 800, color: INK, fontFamily: 'inherit', outline: 'none' }} />
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && dirty) v.setListName({ target: { value: draft } }); }} placeholder="リストの名前" style={{ flex: 1, minWidth: 0, height: 32, border: 'none', borderRadius: 9, background: '#f3f0e8', padding: '0 10px', fontSize: 14, fontWeight: 800, color: INK, fontFamily: 'inherit', outline: 'none' }} />
+        <button onClick={dirty ? () => v.setListName({ target: { value: draft } }) : undefined} style={{ height: 32, flex: '0 0 auto', border: 'none', borderRadius: 9, background: dirty ? INK : '#f3f0e8', color: dirty ? '#fff' : '#a5a39a', fontSize: 12.5, fontWeight: 800, padding: '0 11px', cursor: dirty ? 'pointer' : 'default', fontFamily: 'inherit' }}>決定</button>
         {!L.runMode && <button onClick={v.saveListTemplate} aria-label="テンプレに保存" disabled={empty} style={{ width: 32, height: 32, flex: '0 0 auto', border: 'none', borderRadius: 9, background: '#f3f0e8', cursor: empty ? 'default' : 'pointer', opacity: empty || !named ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(20, INK, !!L.tplKey)}>bookmark</span></button>}
       </div>
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px' }}>

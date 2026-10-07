@@ -53,6 +53,7 @@ export default function Run({ v }) {
   const [hist, setHist] = React.useState(false); // りれき
   const [listOpen, setListOpen] = React.useState(false); // 下のリストを開いているか
   const [delAsk, setDelAsk] = React.useState(false); // 削除の確認
+  const [nameDraft, setNameDraft] = React.useState(null); // リストの名前（入力中。null＝いまの名前）
   React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
   if (!r) return null;
   const now = Date.now();
@@ -153,6 +154,17 @@ export default function Run({ v }) {
             <span style={ms(24, SUB)}>{listOpen ? 'expand_more' : 'expand_less'}</span>
           </div>
         </div>
+        {listOpen && (() => {
+          const nm = nameDraft == null ? (r.name || '') : nameDraft, dirty = nm !== (r.name || '');
+          const ok = () => { v.runRename(nm); setNameDraft(null); };
+          return (
+            // リストの名前（入力して「決定」で変える）
+            <div style={{ display: 'flex', gap: 6, padding: '0 12px 8px' }}>
+              <input value={nm} onChange={(e) => setNameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && dirty) ok(); }} placeholder="リストの名前" style={{ flex: 1, minWidth: 0, height: 34, border: 'none', borderRadius: 9, background: '#f3f0e8', padding: '0 10px', fontSize: 14, fontWeight: 800, color: INK, fontFamily: 'inherit', outline: 'none' }} />
+              <button onClick={dirty ? ok : undefined} style={{ height: 34, border: 'none', borderRadius: 9, background: dirty ? INK : '#f3f0e8', color: dirty ? '#fff' : '#a5a39a', fontSize: 12.5, fontWeight: 800, padding: '0 12px', cursor: dirty ? 'pointer' : 'default', fontFamily: 'inherit' }}>決定</button>
+            </div>
+          );
+        })()}
         {listOpen && (
           <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 12px' }}>
             {r.rows.map((x0, i) => { const x = { ...x0, ms: msOf(x0.segs, now) }; return (
