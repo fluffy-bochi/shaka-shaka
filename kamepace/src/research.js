@@ -148,3 +148,78 @@ export function downloadText(name, text) {
   const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+
+/* ---------- デモデータ（研究データ画面の見た目確認用。保存はしない） ----------
+   5人×28日。人ごとに疲れやすさ・行動の続けやすさを変える（同じコードなら毎回同じ値） */
+const DEMO_ACTS = [
+  { key: 'washface', name: '洗顔・歯みがき', cat: 'grooming', min: 10, kind: 'req', f: { k: 1, unit: '日', n: 2 } },
+  { key: 'bath', name: '入浴', cat: 'rest', min: 20, kind: 'req', f: { k: 1, unit: '日', n: 1 } },
+  { key: 'cleanlaundry', name: '掃除・洗濯', cat: 'house', min: 30, kind: 'req', f: { k: 1, unit: '週', n: 2 } },
+  { key: 'stroll', name: '散歩', cat: 'exercise', min: 20, kind: 'fav', f: { k: 2, unit: '日', n: 1 } },
+  { key: 'running', name: 'ランニング', cat: 'exercise', min: 30, kind: 'fav', f: { k: 1, unit: '週', n: 2 } },
+];
+const DEMO_PEOPLE = [
+  { code: 'P01', base: 20, swing: 35, keep: 0.92 }, // ゆったり・よく続く
+  { code: 'P02', base: 35, swing: 45, keep: 0.75 },
+  { code: 'P03', base: 45, swing: 50, keep: 0.6 }, // 疲れやすい
+  { code: 'P04', base: 30, swing: 60, keep: 0.85 }, // 波が大きい
+  { code: 'P05', base: 50, swing: 40, keep: 0.45 }, // みちみち・続きにくい
+];
+function rng(seed) { let a = 0; for (let i = 0; i < seed.length; i++) a = Math.imul(a ^ seed.charCodeAt(i), 2654435761); return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+export function demoParticipants(nDays = 28) {
+  const today = new Date();
+  const dates = [];
+  for (let i = nDays; i >= 1; i--) { const d = new Date(today); d.setDate(d.getDate() - i); dates.push(d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate())); }
+  return DEMO_PEOPLE.map((p, pi) => {
+    const r = rng(p.code), days = {};
+    dates.forEach((d, di) => {
+      const wd = new Date(d + 'T00:00:00').getDay(), weekend = wd === 0 || wd === 6;
+      const wakeMin = 6 * 60 + 30 + Math.floor(r() * 90) + (weekend ? 60 : 0);
+      const wf = [0, 25, 50, 75][Math.min(3, Math.floor((p.base / 25) * r() + r()))];
+      const t = (m) => pad2(Math.floor(m / 60) % 24) + ':' + pad2(m % 60);
+      const fat = [{ t: t(wakeMin), v: wf }];
+      let lv = wf, m = wakeMin;
+      const n = 6 + Math.floor(r() * 5);
+      for (let i = 0; i < n; i++) {
+        m += 40 + Math.floor(r() * 110);
+        if (m > 23 * 60) break;
+        const up = r() < 0.72;
+        const dv = up ? Math.round((p.swing / 6) * (0.4 + r() * (weekend ? 0.8 : 1.4))) : -Math.round(4 + r() * 14);
+        lv = Math.max(0, Math.min(100, lv + dv));
+        fat.push({ t: t(m), v: lv });
+      }
+      const bedMin = Math.min(23 * 60 + 59, Math.max(m + 30, 22 * 60 + Math.floor(r() * 100)));
+      const bf = [25, 50, 75, 100][Math.min(3, Math.floor(lv / 26))];
+      fat.push({ t: t(bedMin), v: bf });
+      let mx = null, mn = null; fat.forEach(q => { if (!mx || q.v > mx.v) mx = q; if (!mn || q.v < mn.v) mn = q; });
+      // ゾーンの時間（点と点の間はその値が続いたとみなす）
+      const zone = { yuttari: 0, hodohodo: 0, michimichi: 0 }; let sum = 0, tot = 0;
+      for (let i = 0; i < fat.length - 1; i++) {
+        const a = fat[i], b = fat[i + 1], dm = (Number(b.t.slice(0, 2)) * 60 + Number(b.t.slice(3))) - (Number(a.t.slice(0, 2)) * 60 + Number(a.t.slice(3)));
+        if (dm <= 0) continue;
+        zone[['yuttari', 'hodohodo', 'michimichi'][zoneOf(a.v)]] += dm; sum += a.v * dm; tot += dm;
+      }
+      const type = Object.entries(zone).sort((x, y) => y[1] - x[1])[0][0];
+      // 行動（続けやすさ keep、後半ほど少し下がる・週末は家事が増える）
+      const acts = {}, cats = {}, freq = {};
+      DEMO_ACTS.forEach(a => {
+        freq[a.key] = { name: a.name, [a.kind]: a.f };
+        const per = perDay(a.f), drift = 1 - (di / nDays) * 0.15 * (1 - p.keep);
+        let cnt = 0;
+        const tries = Math.ceil(per * 2) + 1;
+        for (let k = 0; k < tries; k++) if (r() < Math.min(1, per / tries * 1.15) * p.keep * drift * (a.key === 'cleanlaundry' && weekend ? 2.2 : 1)) cnt++;
+        if (cnt) { acts[a.key] = { name: a.name, n: cnt, min: cnt * a.min }; cats[a.cat] = cats[a.cat] || { n: 0, min: 0 }; cats[a.cat].n += cnt; cats[a.cat].min += cnt * a.min; }
+      });
+      if (!weekend) { cats.school = { n: 2 + Math.floor(r() * 3), min: 180 + Math.floor(r() * 120) }; cats.study = { n: 1 + Math.floor(r() * 2), min: 60 + Math.floor(r() * 90) }; }
+      const plus = fat.slice(1, -1).reduce((s, q, i) => s + Math.max(0, q.v - fat[i].v), 0), minus = fat.slice(1, -1).reduce((s, q, i) => s + Math.max(0, fat[i].v - q.v), 0);
+      days[d] = {
+        v: 1, date: d,
+        wake: { t: t(wakeMin), cond: 2 + Math.floor(r() * 4), mood: 2 + Math.floor(r() * 4), fatigue: wf },
+        bed: { t: t(bedMin), cond: 1 + Math.floor(r() * 5), mood: 1 + Math.floor(r() * 5), fatigue: bf },
+        fat, fatMax: mx, fatMin: mn, fatAvg: tot ? Math.round(sum / tot) : null, zone, type,
+        rec: fat.length - 2 + Object.values(acts).reduce((s, x) => s + x.n, 0), plus, minus, cats, acts, freq, end: bf,
+      };
+    });
+    return { code: p.code, active: pi !== 4, demo: true, updatedAt: Date.now() - pi * 3600000, days };
+  });
+}
