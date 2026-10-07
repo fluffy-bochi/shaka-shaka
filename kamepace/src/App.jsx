@@ -2003,6 +2003,8 @@ export default class App extends React.Component {
     return {
       name: r.name, running: r.segs.some(s => s.b == null), now,
       alarm: { all: { mode: al.all.mode, at: al.all.at || '', min: al.all.min || 0 }, cur: { mode: al.cur.mode, at: al.cur.at || '', min: cur.min || 30 } },
+      // 実施中がアラーム（時刻）のとき、その時刻（シークバーの終わりに使う）
+      curAlarmTs: al.cur.mode === 'alarm' && al.cur.at ? this.runAtTs(r, al.cur.at) : null,
       // segs: その行動の実行区間（経過時間は画面側で「いま」から毎秒計算する）
       cur: { name: cur.name, glyph: cur.glyph, cat: cat ? cat.name : (r.name || ''), color: cat ? cat.color : '#8a8a82', segs: r.segs.filter(s => s.uid === cur.uid),
         // 必・♡・りれき（行動カードと同じ）

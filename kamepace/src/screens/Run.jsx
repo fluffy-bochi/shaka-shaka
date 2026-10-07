@@ -13,6 +13,14 @@ const hm = (ts) => { const d = new Date(ts); return d.getHours() + ':' + String(
 // 経過・予定の時間: 1時間未満は 分:秒、1時間以上は 時:分:秒
 // 実行区間から、いまの時点の経過ミリ秒（実行中の区間は b=null）
 const msOf = (segs, now) => (segs || []).reduce((a, s) => a + ((s.b == null ? now : s.b) - s.a), 0);
+/* シークバー: 実施中がアラーム（時刻）なら開始→その時刻を時計で、タイマーなら予定時間を実施時間で。endTs＝終わる時刻（タイマーは いま＋残り） */
+function barOf(r, c, now) {
+  if (r.curAlarmTs && c.startAt) {
+    const total = Math.max(60000, r.curAlarmTs - c.startAt), el = now - c.startAt;
+    return { total, endTs: r.curAlarmTs, ratio: Math.max(0, Math.min(1, el / total)), over: now > r.curAlarmTs };
+  }
+  return { total: c.planMs, endTs: now + Math.max(0, c.planMs - c.ms), ratio: Math.min(1, c.ms / c.planMs), over: c.ms > c.planMs };
+}
 const mmss = (t) => { const s = Math.max(0, Math.floor(t / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; };
 
 /* アラーム／タイマーの1行: [全体｜実施中] [アラーム|タイマー] ……… [時刻 or 分] */
@@ -46,7 +54,9 @@ export default function Run({ v }) {
   if (!r) return null;
   const now = Date.now();
   const c = { ...r.cur, ms: msOf(r.cur.segs, now) }; // 毎秒の再描画で「いま」から計算し直す
-  const over = c.ms > c.planMs, ratio = Math.min(1, c.ms / c.planMs);
+  // シークバーの終わりは実施中のアラームに合わせる: アラーム＝その時刻まで（時計で進む）、タイマー＝予定時間（実施時間で進む）
+  const bar = barOf(r, c, now);
+  const over = bar.over, ratio = bar.ratio;
   const chip = (on) => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 30, height: 28, borderRadius: 999, padding: '0 9px', background: on ? INK : '#efece3', color: on ? '#fff' : INK, fontSize: 13, fontWeight: 900, border: 'none', cursor: 'pointer', fontFamily: 'inherit' });
   const arrowBtn = (on) => ({ width: 26, height: 26, border: 'none', background: 'none', padding: 0, cursor: on ? 'pointer' : 'default', opacity: on ? 1 : 0.2, display: 'flex', alignItems: 'center', justifyContent: 'center' });
   const lab = { fontSize: 8.5, color: MUTED, fontWeight: 700, marginRight: 1 };
@@ -82,7 +92,7 @@ export default function Run({ v }) {
           <div style={{ fontSize: 12, fontWeight: 700, color: SUB, marginTop: 2 }}>{c.cat}</div>
           {/* 開始・いまの時刻／経過・予定の時間 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 10.5, fontWeight: 700, color: SUB, ...mono }}>
-            <span>{c.startAt ? hm(c.startAt) : '—'}</span><span>{hm(now)}</span>
+            <span>{c.startAt ? hm(c.startAt) : '—'}</span><span>{hm(bar.endTs)}</span>
           </div>
           <div style={{ position: 'relative', height: 14, display: 'flex', alignItems: 'center' }}>
             <div style={{ position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2, background: '#d8d5cb' }} />
@@ -90,7 +100,7 @@ export default function Run({ v }) {
             <div style={{ position: 'absolute', left: `calc(${ratio * 100}% - 6px)`, width: 12, height: 12, borderRadius: '50%', background: over ? '#7a9a00' : INK }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, fontWeight: 700, ...mono }}>
-            <span style={{ color: over ? '#7a9a00' : SUB }}>{mmss(c.ms)}</span><span style={{ color: SUB }}>{mmss(c.planMs)}</span>
+            <span style={{ color: over ? '#7a9a00' : SUB }}>{mmss(c.ms)}</span><span style={{ color: SUB }}>{mmss(bar.total)}</span>
           </div>
           {/* 必・♡ ｜ ▶ ｜ りれき */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', margin: '10px 0 36px' }}>{/* 下のアラームとの間はFigmaくらいあける */}
@@ -173,14 +183,14 @@ export function MiniRun({ v }) {
   const [, tick] = React.useState(0);
   React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
   if (!r) return null;
-  const c = { ...r.cur, ms: msOf(r.cur.segs, Date.now()) }, ratio = Math.min(1, c.ms / c.planMs), over = c.ms > c.planMs;
+  const now = Date.now(), c = { ...r.cur, ms: msOf(r.cur.segs, now) }, bar = barOf(r, c, now), ratio = bar.ratio, over = bar.over;
   return (
     <div onClick={v.goRun} style={{ position: 'relative', flex: '0 0 auto', height: 60, margin: '0 8px 6px', background: '#fff', borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 10px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(27,27,24,.14)', WebkitTapHighlightColor: 'transparent', zIndex: 3 }}>
       <span style={{ position: 'absolute', left: 0, top: 0, width: 47, height: 47, background: c.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
       <span style={{ position: 'relative', flex: '0 0 auto' }}><Emo e={c.glyph} size={36} /></span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 17, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: over ? '#7a9a00' : MUTED, ...mono }}>{mmss(c.ms)} / {mmss(c.planMs)}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: over ? '#7a9a00' : MUTED, ...mono }}>{mmss(c.ms)} / {mmss(bar.total)}</div>
       </div>
       <button onClick={(e) => { e.stopPropagation(); v.runToggle(); }} aria-label={r.running ? '一時停止' : '再開'} style={{ width: 44, height: 44, border: 'none', borderRadius: 12, background: r.running ? '#efece3' : LIME, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flex: '0 0 auto' }}>
         <span style={ms(30, r.running ? INK : LIME_INK, true)}>{r.running ? 'pause' : 'play_arrow'}</span>
