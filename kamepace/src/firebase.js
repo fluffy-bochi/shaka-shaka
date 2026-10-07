@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, doc, getDoc, setDoc,
-  collection, query, where, getDocs, Timestamp,
+  collection, query, where, getDocs, Timestamp, writeBatch, deleteDoc, updateDoc,
 } from 'firebase/firestore';
 import { serialize } from './model';
 
@@ -331,4 +331,43 @@ export async function revertIkoi() {
   const { prev, ...cur } = snap.data();
   await setDoc(ikoiDoc(), { ...prev, prev: cur, updatedAt: Date.now(), by: auth.currentUser ? auth.currentUser.uid : '' });
   return true;
+}
+
+/* ---- 研究への協力（参加者コード）: research/{code} と research/{code}/days/{日付} ----
+   本人（uid が一致）だけが書ける・研究者（開発者）だけが読める（Firestore のルール） */
+const rDoc = (code) => doc(db, 'research', code);
+/* 参加する。同じコードを別の人が使っていれば permission-denied になる */
+export async function researchJoin(code) {
+  const uid = auth.currentUser.uid;
+  await setDoc(rDoc(code), { code, uid, active: true, consentAt: Date.now(), updatedAt: Date.now() }, { merge: true });
+}
+export async function researchPutDays(code, days) {
+  const ds = Object.entries(days);
+  for (let i = 0; i < ds.length; i += 400) {
+    const b = writeBatch(db);
+    ds.slice(i, i + 400).forEach(([d, v]) => b.set(doc(db, 'research', code, 'days', d), v));
+    b.update(rDoc(code), { updatedAt: Date.now(), active: true });
+    await b.commit();
+  }
+}
+export async function researchStop(code) { await updateDoc(rDoc(code), { active: false, updatedAt: Date.now() }); }
+/* 送ったデータを全部消す（日ごとのドキュメント→本体） */
+export async function researchDelete(code) {
+  const snap = await getDocs(collection(db, 'research', code, 'days'));
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    const b = writeBatch(db);
+    snap.docs.slice(i, i + 400).forEach(d => b.delete(d.ref));
+    await b.commit();
+  }
+  await deleteDoc(rDoc(code));
+}
+/* 研究者用: 全参加者と日ごとの集計 */
+export async function researchLoadAll() {
+  const ps = await getDocs(collection(db, 'research'));
+  return Promise.all(ps.docs.map(async (p) => {
+    const ds = await getDocs(collection(db, 'research', p.id, 'days'));
+    const days = {}; ds.docs.forEach(d => { days[d.id] = d.data(); });
+    const { uid, ...meta } = p.data(); // eslint-disable-line no-unused-vars
+    return { code: p.id, ...meta, days };
+  }));
 }

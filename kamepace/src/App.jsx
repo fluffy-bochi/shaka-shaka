@@ -17,8 +17,10 @@ import {
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout,
   cloudSave, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
-  loadIkoi,
+  loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete,
 } from './firebase';
+import { summarizeDays, researchDates } from './research';
+import ResearchAdmin from './screens/ResearchAdmin';
 import * as Ikoi from './ikoi';
 import IkoiEdit from './screens/IkoiEdit';
 import { initShakaSound, attachCollisionSound } from './sound';
@@ -232,7 +234,7 @@ export default class App extends React.Component {
       templates: s.templates, sortMode: s.sortMode, consumed: s.consumed, sampleDay: s.sampleDay,
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
-      prefs: s.prefs, actGoals: s.actGoals, actFreq: s.actFreq, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
+      prefs: s.prefs, actGoals: s.actGoals, actFreq: s.actFreq, research: s.research, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
       onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, wakeLog: s.wakeLog, bedLog: s.bedLog, mainScreen: s.mainScreen,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
@@ -246,7 +248,7 @@ export default class App extends React.Component {
     // set() 直後に呼ばれるため、反映後の state で保存する
     setTimeout(() => {
       const data = this.dataState();
-      if (this.state.user) cloudSave(data);
+      if (this.state.user) { cloudSave(data); this.researchSync(); }
       else { try { localStorage.setItem('shaka_guest', JSON.stringify(serialize(data))); } catch (e) { /* ignore */ } }
     }, 0);
   }
@@ -1567,6 +1569,53 @@ export default class App extends React.Component {
   setMainScreen = (v) => { this.set({ mainScreen: v }); this.save(); };
   goMypage = () => this.set({ screen: 'mypage' });
   goIkoiEdit = () => this.set({ screen: 'ikoiEdit' });
+  goResearchAdmin = () => this.set({ screen: 'researchAdmin' });
+  /* ---- 研究への協力（参加者コード） ---- */
+  joinResearch = async (raw) => {
+    const code = (raw || '').trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{1,20}$/.test(code)) return '参加者コードは英数字で入力してください';
+    if (!this.state.user) return 'ログインが必要です';
+    try {
+      await researchJoin(code);
+      this.set({ research: { on: true, code, since: Date.now() } }); this.save();
+      // それまでの記録からも集計して送る
+      const days = summarizeDays(this.state, researchDates(this.state));
+      await researchPutDays(code, days);
+      this.set({ research: { on: true, code, since: Date.now(), lastSent: Date.now() } }); this.save();
+      this.toast('研究への協力を始めました');
+      return '';
+    } catch (e) {
+      return e && e.code === 'permission-denied' ? 'このコードは使えません（ほかの人が使っているか、まだ準備ができていません）' : '送信できませんでした';
+    }
+  };
+  /* 保存のたびに（少し待ってから）直近3日を集計して、最近2日ぶんを送る */
+  researchSync() {
+    const r = this.state.research;
+    if (!r || !r.on || !r.code || !this.state.user) return;
+    clearTimeout(this._resT);
+    this._resT = setTimeout(async () => {
+      const t = todayStr(), dates = [shiftDate(t, -2), shiftDate(t, -1), t];
+      const all = summarizeDays(this.state, dates);
+      try {
+        await researchPutDays(r.code, { [dates[1]]: all[dates[1]], [dates[2]]: all[dates[2]] });
+        this.setState(s => ({ research: s.research && s.research.on ? { ...s.research, lastSent: Date.now() } : s.research }));
+      } catch (e) { /* 通信できないときは次の保存で */ }
+    }, 5000);
+  }
+  stopResearch = async () => {
+    const r = this.state.research; if (!r) return;
+    try { await researchStop(r.code); } catch (e) { /* ignore */ }
+    clearTimeout(this._resT);
+    this.set({ research: { ...r, on: false } }); this.save();
+    this.toast('研究への協力をやめました');
+  };
+  deleteResearch = async () => {
+    const r = this.state.research; if (!r || !r.code) return;
+    try { await researchDelete(r.code); } catch (e) { this.toast('削除できませんでした'); return; }
+    clearTimeout(this._resT);
+    this.set({ research: null }); this.save();
+    this.toast('送ったデータを削除しました');
+  };
   /* 記録・予定の疲労を体と心に分ける（記録は合計しか持たないので、同じ名前の行動の体:心の比で分ける。わからなければ半々） */
   entryBodyMind(e) {
     const d = Math.abs(e.delta || 0);
@@ -2537,7 +2586,7 @@ export default class App extends React.Component {
       case 'wake3': this.set({ screen: 'wake2' }); return true;
       case 'collect': this.goShaka(); return true;
       case 'trash': case 'buffLog': case 'slotTimes': case 'catsManage':
-      case 'templates': case 'sensitivity': case 'help': case 'ikoiEdit':
+      case 'templates': case 'sensitivity': case 'help': case 'ikoiEdit': case 'researchAdmin':
         this.goMypage(); return true;
       case 'cycle': this.cancelCycle(); return true;
       case 'onboard':
@@ -3831,6 +3880,8 @@ export default class App extends React.Component {
       })(),
       isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
       isIkoiEdit: st.screen === 'ikoiEdit', devMode: Ikoi.isDev(), goIkoiEdit: this.goIkoiEdit, tapDevSecret: this.tapDevSecret,
+      isResearchAdmin: st.screen === 'researchAdmin', goResearchAdmin: this.goResearchAdmin,
+      research: st.research, joinResearch: this.joinResearch, stopResearch: this.stopResearch, deleteResearch: this.deleteResearch,
       isTrash: st.screen === 'trash', isBuffLog: st.screen === 'buffLog',
       isBookshelf: st.screen === 'bookshelf',
       isSlotTimes: st.screen === 'slotTimes', isCatsManage: st.screen === 'catsManage',
@@ -4179,6 +4230,7 @@ export default class App extends React.Component {
         {v.isCollect && <Collect v={v} />}
         {v.isMypage && <MyPage v={v} />}
         {v.isIkoiEdit && <IkoiEdit v={v} />}
+        {v.isResearchAdmin && <ResearchAdmin v={v} />}
         {v.isTrash && <Trash v={v} />}
         {v.isBuffLog && <BuffLog v={v} />}
         {v.isSlotTimes && <SlotTimes v={v} />}
@@ -4203,7 +4255,7 @@ export default class App extends React.Component {
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}
-        {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && <Nav v={v} />}
+        {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && !v.isResearchAdmin && <Nav v={v} />}
         </>}
       </div>
     );
