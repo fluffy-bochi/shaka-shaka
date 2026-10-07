@@ -5,7 +5,7 @@ import Emo from '../fluent';
 /* 行動選択（記録の入口）: 上に選択中のカード、下にカテゴリ＋行動のリスト。
    カテゴリは選択中にもう一度タップすると開く（開いていれば閉じる）。右の列は 検索 / 全部開閉 / 必須 / お気に入り（必須・お気に入りは見た目のみ）。
    START・予定・記録は「時間を選ぶ画面（確認）」へ進む。「リスト＋」は右のリストのカードに積む（カードとリストは横にスワイプ）。 */
-const INK = '#1b1b18';
+const INK = '#1b1b18', LIME_C = '#c4f000';
 const ms = (size, color, fill = false) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: fill ? "'FILL' 1" : "'FILL' 0", fontSize: size, color, lineHeight: 1 });
 const CARD_H = 252; // 上のカードの高さはカテゴリ・行動・予定で共通（切り替わってもリストの位置が動かないように）
 const sg = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0');
@@ -224,7 +224,7 @@ function Card({ row, cat, v, hist, setHist }) {
           <button onClick={it.onList} style={{ flex: 1, border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: INK, fontSize: 14, fontWeight: 800, padding: '9px 0', cursor: 'pointer' }}>リスト ＋</button>
         </>}
         {it.onTrash && <button onClick={it.onTrash} aria-label="ゴミ箱へ" style={{ ...gray, padding: '8px 10px' }}><span style={ms(18, '#b4645a')}>delete</span></button>}
-        <button onClick={it.onStart} style={{ flex: it.kind === 'act' ? 1.1 : 1, border: 'none', borderRadius: 12, background: '#c4f000', color: '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: 'pointer', letterSpacing: '.04em', boxShadow: '0 4px 12px rgba(122,154,0,.3)' }}>{it.kind === 'act' ? 'START' : 'ひらく'}</button>
+        <button onClick={it.onRun || it.onStart} style={{ flex: it.kind === 'act' ? 1.1 : 1, border: 'none', borderRadius: 12, background: '#c4f000', color: '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: 'pointer', letterSpacing: '.04em', boxShadow: '0 4px 12px rgba(122,154,0,.3)' }}>{it.kind === 'act' ? 'START' : 'ひらく'}</button>
       </div>
       {isAct && pop && (
         <FreqPop key={pop} label={pop === 'req' ? '生活必須行動' : 'やりたいこと'} value={it[pop]}
@@ -274,7 +274,7 @@ function ListCard({ v, onPick }) {
         <button onClick={empty ? undefined : v.listToConfirm} style={gray}>予定</button>
         <button onClick={empty ? undefined : v.listToConfirm} style={gray}>記録</button>
         <span style={{ flex: 1 }} />
-        <button onClick={empty ? undefined : v.listToConfirm} style={{ flex: '0 0 44%', border: 'none', borderRadius: 12, background: empty ? '#e4e1d8' : '#c4f000', color: empty ? '#a5a39a' : '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: empty ? 'default' : 'pointer', letterSpacing: '.04em', boxShadow: empty ? 'none' : '0 4px 12px rgba(122,154,0,.3)' }}>START</button>
+        <button onClick={empty ? undefined : v.startListRun} style={{ flex: '0 0 44%', border: 'none', borderRadius: 12, background: empty ? '#e4e1d8' : '#c4f000', color: empty ? '#a5a39a' : '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: empty ? 'default' : 'pointer', letterSpacing: '.04em', boxShadow: empty ? 'none' : '0 4px 12px rgba(122,154,0,.3)' }}>START</button>
       </div>
     </div>
   );
@@ -446,6 +446,8 @@ export default function Pick({ v }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 12px' }}>
         <button onClick={v.goHome} aria-label="もどる" style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: '#e4e1d8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(26, INK, true)}>arrow_back</span></button>
         <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{v.pickDateText}</div>
+        {/* 実行中のタスクがあれば、実行画面へ戻る */}
+        {v.run && <button onClick={v.goRun} style={{ display: 'flex', alignItems: 'center', gap: 4, border: 'none', borderRadius: 999, background: INK, color: '#fff', padding: '6px 10px 6px 8px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', maxWidth: 130 }}><span style={ms(16, LIME_C, true)}>{v.run.running ? 'play_arrow' : 'pause'}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.run.cur.name}</span></button>}
         <SlotPill v={v} small />
       </div>
       {/* 左に行動カード、右にリストのカード（横にスワイプ。となりのカードの端がのぞく）。
