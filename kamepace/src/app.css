@@ -146,3 +146,13 @@ body.kame-book-land .app-status-spacer { height: env(safe-area-inset-top); }
 
 /* おねえさんの吹き出しが変わるときの、ふわっと出る動き */
 @keyframes bubbleIn { from { opacity: .2; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* 研究データ（PCで見るダッシュボード）: スマホ枠・ロゴ・QRを外し、画面いっぱいに使う */
+body.kame-wide .app-screen { max-width: none; }
+@media (min-width: 768px) and (min-height: 600px) {
+  body.kame-wide .shell { padding: 0; }
+  body.kame-wide .shell-head, body.kame-wide .shell-side { display: none; }
+  body.kame-wide .phone { width: 100vw; padding: 0; border-radius: 0; background: none; box-shadow: none; }
+  body.kame-wide .phone .app-screen { width: 100vw; height: 100dvh; border-radius: 0; }
+}
+body.kame-wide .app-status-spacer { height: 0; }
