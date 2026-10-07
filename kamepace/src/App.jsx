@@ -893,6 +893,8 @@ export default class App extends React.Component {
   backFromConfirm = () => {
     // 編集フローだけは編集のキャンセル＝ホームへ
     if (this.state.confirmOrigin === 'edit') { this.set({ searchStep: null, searchCart: [], screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', framePlan: null }); return; }
+    // 実行画面の「記録」から来たときは、実行画面へ戻る（実行中のデータはそのまま）
+    if (this.state.confirmOrigin === 'run' && this.state.run) { this.set({ screen: 'run', searchStep: null, searchCart: [], catId: null, cart: {}, confirmOrigin: 'search', confirmMode: 'duration' }); return; }
     // リストから来たときは、行動はリストのカードに残っているので確認カートは空にして戻る
     if (this.state.confirmOrigin === 'list') { this.set({ searchStep: null, searchCart: [], catId: null, cart: {}, confirmOrigin: 'search' }); return; }
     // それ以外は「記録を開いたとき最初の画面」（検索/予定/大カテゴリの入口）へ。
@@ -1266,8 +1268,16 @@ export default class App extends React.Component {
     // ★ 物理の組み直しは setState のコールバック（state 反映後）で行う。
     // set は非同期のため、直後に startPhysics すると「新しい記録が入る前の古い山」で組んでしまい、
     // 記録した絵文字が降ってこない（何度かシャカに移動すると降る）不具合になっていた。
+    // 実行画面から記録したら、実行中のデータはここで終わり（確認画面から戻るまでは残している）
+    const fromRun = this.state.confirmOrigin === 'run';
+    if (fromRun) { try { localStorage.removeItem('kame_run'); } catch (e) { /* ignore */ } }
     this.setState({
-      pickList: this.state.confirmOrigin === 'list' ? { name: '', items: [], tplKey: null } : this.state.pickList, // リストで記録したらリストは空に
+      run: fromRun ? null : this.state.run,
+      // リストで記録したらリストは空に。実行画面から記録したときは、実行した行動だけリストのカードから外す（実行していない行動は残す）
+      pickList: this.state.confirmOrigin === 'list' ? { name: '', items: [], tplKey: null }
+        : (this.state.confirmOrigin === 'run' && this.state.run && this.state.run.fromList)
+          ? (() => { const done = new Set(this.state.run.doneUids || []), items = this.state.pickList.items.filter(x => !done.has(x.uid)); return { ...this.state.pickList, items, ...(items.length ? null : { name: '', tplKey: null }) }; })()
+          : this.state.pickList,
       entries, lastMins, tapLine: isEdit ? this.state.tapLine : null, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null,
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
@@ -1935,7 +1945,7 @@ export default class App extends React.Component {
     const r = this.state.run; if (!r) return;
     const now = Date.now(), segs = this.runClose(r, now);
     const done = r.items.filter(li => segs.some(s => s.uid === li.uid && s.b - s.a >= 1000));
-    if (!done.length) { this.setRun(null); this.set({ screen: 'record' }); return; }
+    if (!done.length) { this.toast('まだ実行した行動がありません'); return; } // 消さない（やめるときは「削除」）
     const hmOf = (ts) => this.tsToHm(ts);
     const cart = this.cartFromList(done, r.name).map((c, i) => {
       const ss = segs.filter(s => s.uid === done[i].uid && s.b - s.a >= 1000);
@@ -1946,8 +1956,9 @@ export default class App extends React.Component {
     const all = segs.filter(s => s.b - s.a >= 1000);
     const start = Math.min(...all.map(s => s.a)), end = Math.max(...all.map(s => s.b));
     const total = cart.reduce((a, c) => a + c.defMin, 0);
-    this.setRun(null);
-    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: total, searchFracs: cart.map(c => c.defMin / total), confirmMode: 'time', startTime: hmOf(start), endTime: hmOf(Math.max(end, start + 60000)), cart: {}, confirmOrigin: r.fromList ? 'list' : 'cat', framePlan: null });
+    // 実行中のデータは記録が終わるまで残す（確認画面から戻ったら実行画面へ。区間は閉じて一時停止の状態）
+    this.setRun({ ...r, segs, doneUids: done.map(li => li.uid) });
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: total, searchFracs: cart.map(c => c.defMin / total), confirmMode: 'time', startTime: hmOf(start), endTime: hmOf(Math.max(end, start + 60000)), cart: {}, confirmOrigin: 'run', framePlan: null });
   };
   goRun = () => { if (this.state.run) this.set({ screen: 'run', runAdd: false }); };
   /* 実行中のタスクを記録せずに捨てる */
