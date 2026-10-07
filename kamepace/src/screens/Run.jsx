@@ -40,6 +40,7 @@ export default function Run({ v }) {
   const [hist, setHist] = React.useState(false); // りれき
   const [listOpen, setListOpen] = React.useState(false); // 下のリストを開いているか
   React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
+  if (!r) return null;
   const c = r.cur, now = Date.now();
   const over = c.ms > c.planMs, ratio = Math.min(1, c.ms / c.planMs);
   const chip = (on) => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 30, height: 28, borderRadius: 999, padding: '0 9px', background: on ? INK : '#efece3', color: on ? '#fff' : INK, fontSize: 13, fontWeight: 900, border: 'none', cursor: 'pointer', fontFamily: 'inherit' });
