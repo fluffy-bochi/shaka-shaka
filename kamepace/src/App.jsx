@@ -1906,7 +1906,10 @@ export default class App extends React.Component {
     const first = r.segs.find(s => s.uid === cur.uid);
     return {
       name: r.name, running: r.segs.some(s => s.b == null), now,
-      cur: { name: cur.name, glyph: cur.glyph, cat: cat ? cat.name : (r.name || ''), color: cat ? cat.color : '#8a8a82', req: !!fq.req, fav: !!fq.fav, startAt: first ? first.a : null, ms: this.runMs(r, cur.uid, now), planMs: (cur.min || 30) * 60000 },
+      cur: { name: cur.name, glyph: cur.glyph, cat: cat ? cat.name : (r.name || ''), color: cat ? cat.color : '#8a8a82',
+        // 必・♡・りれき（行動カードと同じ）
+        req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(cur.name, kind, val),
+        history: (ym) => this.actHistory(cur.name, ym), goal: (st.actGoals || {})[normTitle(cur.name)] || 0, onGoal: () => this.cycleActGoal(cur.name), startAt: first ? first.a : null, ms: this.runMs(r, cur.uid, now), planMs: (cur.min || 30) * 60000 },
       rows: r.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), on: i === r.cur, ms: this.runMs(r, li.uid, now),
         onTap: () => this.runSelect(i), onUp: () => this.runMove(li.uid, -1), onDown: () => this.runMove(li.uid, 1), onRemove: () => this.runRemove(li.uid) })),
     };
