@@ -95,6 +95,7 @@ export default class App extends React.Component {
     searchTotalMin: 30,
     searchFracs: [],
     confirmOrigin: 'search',
+    pickList: { name: '', items: [], tplKey: null }, pickListTick: 0, // 行動選択のリスト（カードの右）。tick が増えるとリストのカードへ移る
     confirmMode: 'duration',
     startTime: '',
     endTime: '',
@@ -842,6 +843,8 @@ export default class App extends React.Component {
   backFromConfirm = () => {
     // 編集フローだけは編集のキャンセル＝ホームへ
     if (this.state.confirmOrigin === 'edit') { this.set({ searchStep: null, searchCart: [], screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', framePlan: null }); return; }
+    // リストから来たときは、行動はリストのカードに残っているので確認カートは空にして戻る
+    if (this.state.confirmOrigin === 'list') { this.set({ searchStep: null, searchCart: [], catId: null, cart: {}, confirmOrigin: 'search' }); return; }
     // それ以外は「記録を開いたとき最初の画面」（検索/予定/大カテゴリの入口）へ。
     // 確認カートの行動は消さない（入口下部のバーからいつでも確認へ戻れる）
     this.set({ searchStep: null, catId: null, cart: {}, keywords: [''], resolvedIdx: [] });
@@ -1214,6 +1217,7 @@ export default class App extends React.Component {
     // set は非同期のため、直後に startPhysics すると「新しい記録が入る前の古い山」で組んでしまい、
     // 記録した絵文字が降ってこない（何度かシャカに移動すると降る）不具合になっていた。
     this.setState({
+      pickList: this.state.confirmOrigin === 'list' ? { name: '', items: [], tplKey: null } : this.state.pickList, // リストで記録したらリストは空に
       entries, lastMins, tapLine: isEdit ? this.state.tapLine : null, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null,
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
@@ -1710,6 +1714,68 @@ export default class App extends React.Component {
     });
     this.save();
     this.toast('「' + name + '」をつくりました');
+  };
+
+  /* ================= 行動選択のリスト =================
+     行動カードの「リスト＋」で積み、リストのカードで並べ替え・名前つけ・テンプレ保存。予定・記録・STARTでまとめて確認画面へ。
+     予定（テンプレ含む）を開くと、そのタスクがリストに入り、名前の欄に予定名が入る。 */
+  listItemFromAct(t) {
+    return { uid: 'li' + Date.now() + Math.floor(Math.random() * 1000), itemId: t.id, name: t.name, glyph: t.glyph, min: this.initialMinOf(t) };
+  }
+  addToList = (t) => {
+    const pl = this.state.pickList;
+    this.set({ pickList: { ...pl, items: [...pl.items, this.listItemFromAct(t)] }, pickListTick: this.state.pickListTick + 1 });
+  };
+  moveListItem = (i, d) => {
+    const items = [...this.state.pickList.items], j = i + d;
+    if (j < 0 || j >= items.length) return;
+    [items[i], items[j]] = [items[j], items[i]];
+    this.set({ pickList: { ...this.state.pickList, items } });
+  };
+  removeListItem = (i) => this.set({ pickList: { ...this.state.pickList, items: this.state.pickList.items.filter((_, k) => k !== i) } });
+  setListName = (e) => this.set({ pickList: { ...this.state.pickList, name: e.target.value } });
+  loadPlanToList = (plan) => {
+    const tpl = String(plan.id).startsWith('tpl:') ? plan.id.slice(4) : null;
+    const items = plan.tasks.map((t, i) => ({ uid: 'lp' + Date.now() + i, itemId: null, name: t.name, glyph: t.glyph, min: t.min || 30, fat: t.fat }));
+    this.set({ pickList: { name: plan.name, items, tplKey: tpl }, pickListTick: this.state.pickListTick + 1 });
+  };
+  /* リストの1行の、表示と確認画面用の値（体・心・合計／分） */
+  listItemVals(li) {
+    const it = li.itemId ? this.itemById(li.itemId) : null;
+    if (it) {
+      const fh = this.effFh(it), k = li.min / 60, b0 = typeof it.body === 'number' ? it.body : 1, m0 = typeof it.mind === 'number' ? it.mind : 1;
+      const tot = fh * k;
+      return { it, total: Math.round(tot), body: Math.round(tot * b0 / (b0 + m0)), mind: Math.round(tot * m0 / (b0 + m0)) };
+    }
+    const f = li.fat || 0;
+    return { it: null, total: f, body: Math.round(f / 2), mind: f - Math.round(f / 2) };
+  }
+  listToConfirm = () => {
+    const pl = this.state.pickList;
+    if (!pl.items.length) return;
+    const name = (pl.name || '').trim();
+    const cart = pl.items.map((li, i) => {
+      const { it } = this.listItemVals(li);
+      const base = { id: 'scl' + Date.now() + i, name: li.name, glyph: li.glyph, defMin: li.min, ...(name ? { plan: name } : null) };
+      if (it) return { ...base, fh: it.fh, body: it.body, mind: it.mind, kw: [...(it.kw || []), it.name], picks: this.intensityQuestions(it).map(q => Math.floor(q.opts.length / 2)), after: it.after || 0, symId: it.id, symptom: it.symptom, buffLv: it.buffLv };
+      return { ...base, fh: li.min ? (li.fat * 60 / li.min) : li.fat, kw: [name, li.name].filter(Boolean), picks: [] };
+    });
+    const total = cart.reduce((a, c) => a + (c.defMin || 30), 0) || 30;
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: total, searchFracs: cart.map(c => (c.defMin || 30) / total), confirmMode: 'duration', cart: {}, confirmOrigin: 'list' });
+  };
+  /* リストをテンプレに保存（名前が必要）。同じ名前のテンプレは上書き */
+  saveListTemplate = () => {
+    const pl = this.state.pickList;
+    const name = (pl.name || '').trim();
+    if (!pl.items.length) return;
+    if (!name) { this.toast('リストに名前をつけてください'); return; }
+    const tasks = pl.items.map(li => ({ name: li.name, glyph: li.glyph, min: li.min, fat: this.listItemVals(li).total || 1 }));
+    const k = normTitle(name);
+    const templates = { ...(this.state.templates || {}) };
+    templates[k] = { ...(templates[k] || {}), act: guessAct(name) || '', delta: tasks.reduce((a, t) => a + t.fat, 0), tasks };
+    this.set({ templates, pickList: { ...pl, tplKey: k } });
+    this.save();
+    this.toast('「' + name + '」をテンプレに保存しました');
   };
 
   /* ================= 予定 ================= */
@@ -3433,7 +3499,7 @@ export default class App extends React.Component {
     const hiddenActs0 = this.hiddenActSet();
     const pickCats = [
       { id: '__plans', name: '予定', color: '#7a9a00', glyph: '📋', items: [
-        ...this.allPlans().map(p => ({ key: 'plan:' + p.id, kind: 'plan', name: p.name, glyph: '📋', meta: this.planMeta(p).metaText, onStart: () => this.openPlan(p.id), onTrash: () => this.trashPlan(p.id) })),
+        ...this.allPlans().map(p => ({ key: 'plan:' + p.id, kind: 'plan', name: p.name, glyph: '📋', meta: this.planMeta(p).metaText, onStart: () => this.loadPlanToList(p), onTrash: () => this.trashPlan(p.id) })),
         { key: 'newplan', kind: 'plan', name: '予定をつくる', glyph: '➕', meta: '', onStart: this.openPlanAdd },
       ] },
       ...this.allCats().filter(c => !(st.hiddenCats || []).includes(c.id)).map(c => ({
@@ -3442,7 +3508,7 @@ export default class App extends React.Component {
           ...c.items.filter(t => !hiddenActs0.has(normTitle(t.name))).map(t => {
             const pref = (st.prefs || {})[normTitle(t.name)] || 'normal';
             const mk = (pf) => this.actFatParts(t, pf === 'normal' ? null : pf);
-            return { key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), history: (ym) => this.actHistory(t.name, ym), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name) };
+            return { key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name) };
           }),
           { key: 'copy:' + c.id, kind: 'copy', name: 'にているものをコピーして作る', glyph: '➕', onStart: () => { this.set({ catId: c.id }); this.openActAdd(); } },
         ],
@@ -3911,6 +3977,11 @@ export default class App extends React.Component {
       prefOpts,
       cats, showCats: st.screen === 'record' && !st.searchStep,
       showSub: false,
+      pickList: st.screen === 'record' ? {
+        name: st.pickList.name, tplKey: st.pickList.tplKey, tick: st.pickListTick,
+        rows: st.pickList.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.moveListItem(i, -1), onDown: () => this.moveListItem(i, 1), onRemove: () => this.removeListItem(i) })),
+      } : null,
+      setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate,
       pickCats, pickCatId: st.catId, pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
       pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()), n = new Date(); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日　' + n.getHours() + ':' + pad2(n.getMinutes()); })(),
       subItems, subName: activeCat ? activeCat.name : '', subIcon: activeCat ? activeCat.icon : 'category', subColor: activeCat ? activeCat.color : '#8a8a82',

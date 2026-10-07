@@ -4,7 +4,7 @@ import Emo from '../fluent';
 
 /* 行動選択（記録の入口）: 上に選択中のカード、下にカテゴリ＋行動のリスト。
    カテゴリは選択中にもう一度タップすると開く（開いていれば閉じる）。右の列は 検索 / 全部開閉 / 必須 / お気に入り（必須・お気に入りは見た目のみ）。
-   START・予定・記録・リストは、いまは全部「時間を選ぶ画面（確認）」へ進む。 */
+   START・予定・記録は「時間を選ぶ画面（確認）」へ進む。「リスト＋」は右のリストのカードに積む（カードとリストは横にスワイプ）。 */
 const INK = '#1b1b18';
 const ms = (size, color, fill = false) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: fill ? "'FILL' 1" : "'FILL' 0", fontSize: size, color, lineHeight: 1 });
 const CARD_H = 252; // 上のカードの高さはカテゴリ・行動・予定で共通（切り替わってもリストの位置が動かないように）
@@ -106,7 +106,7 @@ function Card({ row, cat, v, hist, setHist }) {
       });
     };
   };
-  const wrap = { position: 'relative', margin: '0 16px', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, flex: '0 0 auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' };
+  const wrap = { position: 'relative', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, flex: '0 0 auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' };
   if (!row) return <div style={wrap} />;
   if (row.type === 'cat' || row.type === 'addcat') {
     const color = row.type === 'cat' ? cat.color : '#55554e';
@@ -164,10 +164,52 @@ function Card({ row, cat, v, hist, setHist }) {
         {it.kind === 'act' && <>
           <button onClick={it.onStart} style={gray}>予定</button>
           <button onClick={it.onStart} style={gray}>記録</button>
-          <button onClick={it.onStart} style={{ flex: 1, border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: INK, fontSize: 14, fontWeight: 800, padding: '9px 0', cursor: 'pointer' }}>リスト ＋</button>
+          <button onClick={it.onList} style={{ flex: 1, border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: INK, fontSize: 14, fontWeight: 800, padding: '9px 0', cursor: 'pointer' }}>リスト ＋</button>
         </>}
         {it.onTrash && <button onClick={it.onTrash} aria-label="ゴミ箱へ" style={{ ...gray, padding: '8px 10px' }}><span style={ms(18, '#b4645a')}>delete</span></button>}
         <button onClick={it.onStart} style={{ flex: it.kind === 'act' ? 1.1 : 1, border: 'none', borderRadius: 12, background: '#c4f000', color: '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: 'pointer', letterSpacing: '.04em', boxShadow: '0 4px 12px rgba(122,154,0,.3)' }}>{it.kind === 'act' ? 'START' : 'ひらく'}</button>
+      </div>
+    </div>
+  );
+}
+
+/* リストのカード（行動カードの右）: 名前（テンプレ名）・積んだ行動（並べ替え・削除）・予定／記録／START */
+function ListCard({ v }) {
+  const L = v.pickList;
+  const empty = !L.rows.length, named = !!(L.name || '').trim();
+  const gray = { border: 'none', borderRadius: 12, background: '#e4e1d8', color: '#55554e', fontSize: 14, fontWeight: 800, padding: '10px 14px', cursor: empty ? 'default' : 'pointer', opacity: empty ? 0.5 : 1 };
+  const arrowBtn = (on) => ({ width: 26, height: 26, border: 'none', background: 'none', padding: 0, cursor: on ? 'pointer' : 'default', opacity: on ? 1 : 0.2, display: 'flex', alignItems: 'center', justifyContent: 'center' });
+  const lab = { fontSize: 8.5, color: '#8a8a82', fontWeight: 700, marginRight: 1 };
+  const num = { fontSize: 12, fontWeight: 800, color: INK, fontFamily: "'Space Mono',monospace" };
+  return (
+    <div style={{ position: 'relative', borderRadius: 18, overflow: 'hidden', background: '#efece3', height: CARD_H, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
+      {/* 名前（テンプレでなくてもつけられる） */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px 6px' }}>
+        <input value={L.name} onChange={v.setListName} placeholder="リストの名前" style={{ flex: 1, minWidth: 0, height: 32, border: 'none', borderRadius: 9, background: '#fff', padding: '0 10px', fontSize: 14, fontWeight: 800, color: INK, fontFamily: 'inherit', outline: 'none' }} />
+        <button onClick={v.saveListTemplate} aria-label="テンプレに保存" disabled={empty} style={{ width: 32, height: 32, flex: '0 0 auto', border: 'none', borderRadius: 9, background: '#fff', cursor: empty ? 'default' : 'pointer', opacity: empty || !named ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(20, INK, !!L.tplKey)}>bookmark</span></button>
+      </div>
+      <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px' }}>
+        {empty && <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#a5a39a' }}>リストは空です</div>}
+        {L.rows.map((r, i) => (
+          <div key={r.uid} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 40, background: '#fff', borderRadius: 10, padding: '0 4px 0 6px', marginBottom: 6, boxShadow: '0 1px 2px rgba(27,27,24,.05)' }}>
+            <span style={{ flex: '0 0 auto' }}><Emo e={r.glyph} size={26} /></span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap', flex: '0 0 auto' }}>
+              <span><span style={lab}>体</span><span style={num}>{sg(r.body)}</span></span>
+              <span><span style={lab}>心</span><span style={num}>{sg(r.mind)}</span></span>
+              <span style={{ fontSize: 9, color: '#8a8a82', fontWeight: 700 }}>/{r.minText}</span>
+            </span>
+            <button onClick={r.onUp} aria-label="上へ" style={arrowBtn(i > 0)}><span style={ms(20, INK)}>arrow_upward</span></button>
+            <button onClick={r.onDown} aria-label="下へ" style={arrowBtn(i < L.rows.length - 1)}><span style={ms(20, INK)}>arrow_downward</span></button>
+            <button onClick={r.onRemove} aria-label="リストから外す" style={arrowBtn(true)}><span style={ms(18, '#a5a39a')}>close</span></button>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px 14px' }}>
+        <button onClick={empty ? undefined : v.listToConfirm} style={gray}>予定</button>
+        <button onClick={empty ? undefined : v.listToConfirm} style={gray}>記録</button>
+        <span style={{ flex: 1 }} />
+        <button onClick={empty ? undefined : v.listToConfirm} style={{ flex: '0 0 44%', border: 'none', borderRadius: 12, background: empty ? '#e4e1d8' : '#c4f000', color: empty ? '#a5a39a' : '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: empty ? 'default' : 'pointer', letterSpacing: '.04em', boxShadow: empty ? 'none' : '0 4px 12px rgba(122,154,0,.3)' }}>START</button>
       </div>
     </div>
   );
@@ -280,6 +322,16 @@ export default function Pick({ v }) {
   const side = (on) => ({ width: 36, height: 36, borderRadius: 10, border: 'none', boxShadow: '0 1px 3px rgba(27,27,24,.08)', background: on ? INK : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, marginBottom: 10 });
   const arrow = { position: 'absolute', left: 8, zIndex: 2, width: 26, height: 26, border: 'none', background: 'none', cursor: 'pointer', padding: 0 };
 
+  // リストに積んだ・予定を開いたら、リストのカードへ移る（開いた直後は動かさない）
+  const pagerRef = React.useRef(null);
+  const lastTick = React.useRef(v.pickList ? v.pickList.tick : 0);
+  React.useEffect(() => {
+    const t = v.pickList ? v.pickList.tick : 0;
+    if (t === lastTick.current) return;
+    lastTick.current = t;
+    const el = pagerRef.current; if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
+  }, [v.pickList && v.pickList.tick]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const all = [];
   for (let c = 0; c < COPIES; c++) rows.forEach((r, i) => all.push({ r, i: c * N + i }));
 
@@ -290,7 +342,15 @@ export default function Pick({ v }) {
         <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{v.pickDateText}</div>
         <SlotPill v={v} small />
       </div>
-      <Card key={selRow && selRow.key} row={selRow} cat={selRow && selRow.cat} v={v} hist={hist} setHist={setHist} />
+      {/* 行動カードと、その右のリストのカード（横にスワイプ。となりのカードが少しのぞく） */}
+      {/* 端の余白は padding だと右端が scrollWidth に入らないので、margin と末尾のすき間で作る */}
+      <div ref={pagerRef} className="nos" style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', flex: '0 0 auto', overscrollBehaviorX: 'contain' }}>
+        <div style={{ flex: '0 0 calc(100% - 32px)', marginLeft: 16, scrollSnapAlign: 'center' }}>
+          <Card key={selRow && selRow.key} row={selRow} cat={selRow && selRow.cat} v={v} hist={hist} setHist={setHist} />
+        </div>
+        {v.pickList && <div style={{ flex: '0 0 calc(100% - 32px)', marginLeft: 8, scrollSnapAlign: 'center' }}><ListCard v={v} /></div>}
+        <div style={{ flex: '0 0 16px' }} />
+      </div>
       <div style={{ position: 'relative', flex: 1, minHeight: 0, marginTop: 10, background: '#f7f4ec', overflow: 'hidden' }}>
         {/* まんなか＝選択中の印 */}
         <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 0, height: 0, borderTop: '8px solid transparent', borderBottom: '8px solid transparent', borderLeft: '12px solid ' + INK, pointerEvents: 'none' }} />
