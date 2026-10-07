@@ -40,7 +40,7 @@ function monthTarget(f, dim) {
   return Math.max(1, Math.round(f.n * per));
 }
 /* 頻度を決めるポップアップ（カードの上に出す）: [k] 日/週/月 に [n] 回。日/週/月 は きらい/ふつう/すき と同じ形の切り替え */
-function FreqPop({ label, value, onSave, onDelete, onClose }) {
+export function FreqPop({ label, value, onSave, onDelete, onClose }) {
   const [f, setF] = React.useState(() => (value ? { k: freqK(value), unit: value.unit, n: value.n } : { k: 1, unit: '週', n: 1 }));
   const numIn = (key) => (
     <input type="number" inputMode="numeric" min={1} max={99} value={f[key] || ''} onChange={(e) => setF({ ...f, [key]: Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0)) })}
@@ -73,7 +73,7 @@ function FreqPop({ label, value, onSave, onDelete, onClose }) {
 
 /* りれき: 月カレンダー＋その月の 回数（目標に対して）・目標頻度・合計時間・平均時間 */
 const fmtMin = (m) => (m < 60 ? m + '分' : Math.floor(m / 60) + '時間' + (m % 60 ? (m % 60) + '分' : ''));
-function History({ it, cat, onClose }) {
+export function History({ it, cat, onClose }) {
   const [off, setOff] = React.useState(0);
   const now = new Date();
   const base = new Date(now.getFullYear(), now.getMonth() + off, 1);

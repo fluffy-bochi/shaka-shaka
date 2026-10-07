@@ -1,5 +1,6 @@
 import React from 'react';
 import Emo from '../fluent';
+import { FreqPop, History } from './Pick';
 
 /* タスク実行（START）: いまの行動を大きく、開始時刻・いまの時刻と、経過／予定の時間のバー、▶／⏸。
    下のシートに実行するリスト（行をタップでその行動に切り替え・↑↓で並べ替え・編集で外す）。右上の「記録」で終えて確認画面へ。 */
@@ -14,6 +15,8 @@ export default function Run({ v }) {
   const r = v.run;
   const [, tick] = React.useState(0);
   const [edit, setEdit] = React.useState(false);
+  const [pop, setPop] = React.useState(null); // 頻度のポップアップ（'req' / 'fav'）
+  const [hist, setHist] = React.useState(false); // りれき
   React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
   const c = r.cur, now = Date.now();
   const over = c.ms > c.planMs, ratio = Math.min(1, c.ms / c.planMs);
@@ -30,15 +33,28 @@ export default function Run({ v }) {
       </div>
       {/* いまの行動 */}
       <div style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'center', padding: '8px 0 2px' }}><Emo e={c.glyph} size={170} /></div>
-      <div style={{ padding: '0 30px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+      <div style={{ position: 'relative', padding: '0 30px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 24, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
             <div style={{ fontSize: 12, fontWeight: 700, color: SUB, marginTop: 2 }}>{c.cat}</div>
           </div>
-          {c.req && <span style={chip(true)}>必</span>}
-          {c.fav && <span style={chip(true)}><span style={ms(15, '#fff', true)}>favorite</span></span>}
+          {/* 必・♡・りれき（行動カードと同じ） */}
+          <button onClick={() => setPop(pop === 'req' ? null : 'req')} aria-label="生活必須行動" style={{ ...chip(!!c.req), border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>必</button>
+          <button onClick={() => setPop(pop === 'fav' ? null : 'fav')} aria-label="やりたいこと" style={{ ...chip(!!c.fav), border: 'none', cursor: 'pointer' }}><span style={ms(15, c.fav ? '#fff' : INK, true)}>favorite</span></button>
+          <button onClick={() => { setPop(null); setHist(true); }} style={{ ...chip(false), border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, fontWeight: 800, gap: 2 }}>りれき<span style={ms(15, INK)}>calendar_month</span></button>
         </div>
+        {pop && (
+          <div style={{ position: 'absolute', left: 22, right: 22, top: 0, height: 0 }}>
+            {/* FreqPop は下から48pxの位置に出るので、名前・チップの行のすぐ下に来るよう高さで調整 */}
+            <div style={{ position: 'absolute', left: 0, right: 0, top: 52 }}>
+              <div style={{ position: 'relative', height: 120 }}>
+                <FreqPop key={pop} label={pop === 'req' ? '生活必須行動' : 'やりたいこと'} value={c[pop]}
+                  onSave={(f) => { c.onFreq(pop, f); setPop(null); }} onDelete={() => { c.onFreq(pop, null); setPop(null); }} onClose={() => setPop(null)} />
+              </div>
+            </div>
+          </div>
+        )}
         {/* 開始・いまの時刻／経過・予定の時間 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontSize: 10.5, fontWeight: 700, color: SUB, ...mono }}>
           <span>{c.startAt ? hm(c.startAt) : '—'}</span><span>{hm(now)}</span>
@@ -57,6 +73,14 @@ export default function Run({ v }) {
           </button>
         </div>
       </div>
+      {/* りれき（月カレンダー）: カードの形で上に重ねる */}
+      {hist && (
+        <div onClick={() => setHist(false)} style={{ position: 'absolute', inset: 0, zIndex: 12, background: 'rgba(27,27,24,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', height: 270, background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 12px 32px rgba(27,27,24,.25)' }}>
+            <History it={c} cat={{ color: c.color }} onClose={() => setHist(false)} />
+          </div>
+        </div>
+      )}
       {/* 実行するリスト */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '22px 22px 0 0', boxShadow: '0 -2px 14px rgba(27,27,24,.08)' }}>
         <div style={{ width: 120, height: 4, borderRadius: 2, background: '#e4e1d8', margin: '10px auto 6px' }} />
