@@ -21,6 +21,7 @@ import {
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
 import ResearchAdmin from './screens/ResearchAdmin';
+import Run from './screens/Run';
 import * as Ikoi from './ikoi';
 import IkoiEdit from './screens/IkoiEdit';
 import { initShakaSound, attachCollisionSound } from './sound';
@@ -97,6 +98,7 @@ export default class App extends React.Component {
     searchTotalMin: 30,
     searchFracs: [],
     confirmOrigin: 'search',
+    run: (() => { try { return JSON.parse(localStorage.getItem('kame_run') || 'null'); } catch (e) { return null; } })(), // 実行中のタスク（START）
     pickList: { name: '', items: [], tplKey: null }, pickListTick: 0, // 行動選択のリスト（カードの右）。tick が増えるとリストのカードへ移る
     confirmMode: 'duration',
     startTime: '',
@@ -1809,19 +1811,96 @@ export default class App extends React.Component {
     const f = li.fat || 0;
     return { it: null, total: f, body: Math.round(f / 2), mind: f - Math.round(f / 2) };
   }
-  listToConfirm = () => {
-    const pl = this.state.pickList;
-    if (!pl.items.length) return;
-    const name = (pl.name || '').trim();
-    const cart = pl.items.map((li, i) => {
+  /* リストの行 → 確認画面のカート（名前があれば予定名として記録） */
+  cartFromList(items, name) {
+    return items.map((li, i) => {
       const { it } = this.listItemVals(li);
       const base = { id: 'scl' + Date.now() + i, name: li.name, glyph: li.glyph, defMin: li.min, ...(name ? { plan: name } : null) };
       if (it) return { ...base, fh: it.fh, body: it.body, mind: it.mind, kw: [...(it.kw || []), it.name], picks: this.intensityQuestions(it).map(q => Math.floor(q.opts.length / 2)), after: it.after || 0, symId: it.id, symptom: it.symptom, buffLv: it.buffLv };
       return { ...base, fh: li.min ? (li.fat * 60 / li.min) : li.fat, kw: [name, li.name].filter(Boolean), picks: [] };
     });
+  }
+  listToConfirm = () => {
+    const pl = this.state.pickList;
+    if (!pl.items.length) return;
+    const name = (pl.name || '').trim();
+    const cart = this.cartFromList(pl.items, name);
     const total = cart.reduce((a, c) => a + (c.defMin || 30), 0) || 30;
     this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: total, searchFracs: cart.map(c => (c.defMin || 30) / total), confirmMode: 'duration', cart: {}, confirmOrigin: 'list' });
   };
+  /* ================= タスク実行（START） =================
+     run = { items: リストの行と同じ形, cur: いまの行, segs: [{ uid, a, b }]（行ごとの実行区間・b=null は実行中）, name, fromList }。
+     ⏸で区間を閉じ、▶で開く。行を選ぶと区間を切り替える。「記録」で各行の区間を時刻モードの確認画面へ。 */
+  setRun(run) { this.set({ run }); try { if (run) localStorage.setItem('kame_run', JSON.stringify(run)); else localStorage.removeItem('kame_run'); } catch (e) { /* ignore */ } }
+  startRun = (items, name, fromList) => {
+    if (!items.length) return;
+    const now = Date.now();
+    this.setRun({ items: items.map(x => ({ ...x })), cur: 0, segs: [{ uid: items[0].uid, a: now, b: null }], name: name || '', fromList: !!fromList });
+    this.set({ screen: 'run' });
+  };
+  runClose(run, now) { return run.segs.map(s => (s.b == null ? { ...s, b: now } : s)); }
+  runToggle = () => {
+    const r = this.state.run; if (!r) return;
+    const now = Date.now(), open = r.segs.some(s => s.b == null);
+    this.setRun(open ? { ...r, segs: this.runClose(r, now) } : { ...r, segs: [...r.segs, { uid: r.items[r.cur].uid, a: now, b: null }] });
+  };
+  runSelect = (i) => {
+    const r = this.state.run; if (!r || i === r.cur || !r.items[i]) return;
+    const now = Date.now(), open = r.segs.some(s => s.b == null);
+    const segs = this.runClose(r, now);
+    this.setRun({ ...r, cur: i, segs: open ? [...segs, { uid: r.items[i].uid, a: now, b: null }] : segs });
+  };
+  runMove = (uid, d) => {
+    const r = this.state.run; if (!r) return;
+    const items = [...r.items], i = items.findIndex(x => x.uid === uid), j = i + d;
+    if (i < 0 || j < 0 || j >= items.length) return;
+    const curUid = r.items[r.cur].uid;
+    [items[i], items[j]] = [items[j], items[i]];
+    this.setRun({ ...r, items, cur: items.findIndex(x => x.uid === curUid) });
+  };
+  runRemove = (uid) => {
+    const r = this.state.run; if (!r || r.items.length <= 1) return;
+    const curUid = r.items[r.cur].uid;
+    if (uid === curUid) return; // いま実行中の行は消さない
+    const items = r.items.filter(x => x.uid !== uid);
+    this.setRun({ ...r, items, segs: r.segs.filter(s => s.uid !== uid), cur: items.findIndex(x => x.uid === curUid) });
+  };
+  runMs(r, uid, now) { return r.segs.filter(s => s.uid === uid).reduce((a, s) => a + ((s.b == null ? now : s.b) - s.a), 0); }
+  /* 記録: やった行だけを、実際の時刻（区間）つきで確認画面へ */
+  runFinish = () => {
+    const r = this.state.run; if (!r) return;
+    const now = Date.now(), segs = this.runClose(r, now);
+    const done = r.items.filter(li => segs.some(s => s.uid === li.uid && s.b - s.a >= 1000));
+    if (!done.length) { this.setRun(null); this.set({ screen: 'record' }); return; }
+    const hmOf = (ts) => this.tsToHm(ts);
+    const cart = this.cartFromList(done, r.name).map((c, i) => {
+      const ss = segs.filter(s => s.uid === done[i].uid && s.b - s.a >= 1000);
+      const ranges = ss.map(s => ({ from: hmOf(s.a), to: hmOf(Math.max(s.b, s.a + 60000)) }));
+      const min = Math.max(1, Math.round(ss.reduce((a, s) => a + (s.b - s.a), 0) / 60000));
+      return { ...c, defMin: min, ranges };
+    });
+    const all = segs.filter(s => s.b - s.a >= 1000);
+    const start = Math.min(...all.map(s => s.a)), end = Math.max(...all.map(s => s.b));
+    const total = cart.reduce((a, c) => a + c.defMin, 0);
+    this.setRun(null);
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: total, searchFracs: cart.map(c => c.defMin / total), confirmMode: 'time', startTime: hmOf(start), endTime: hmOf(Math.max(end, start + 60000)), cart: {}, confirmOrigin: r.fromList ? 'list' : 'cat', framePlan: null });
+  };
+  goRun = () => { if (this.state.run) this.set({ screen: 'run' }); };
+  /* 実行画面に出す値 */
+  runVals() {
+    const st = this.state, r = st.run, now = Date.now();
+    const cur = r.items[r.cur] || r.items[0];
+    const it = cur.itemId ? this.itemById(cur.itemId) : null;
+    const cat = it ? this.allCats().find(c => c.id === it.catId) : null;
+    const fq = (st.actFreq || {})[normTitle(cur.name)] || {};
+    const first = r.segs.find(s => s.uid === cur.uid);
+    return {
+      name: r.name, running: r.segs.some(s => s.b == null), now,
+      cur: { name: cur.name, glyph: cur.glyph, cat: cat ? cat.name : (r.name || ''), color: cat ? cat.color : '#8a8a82', req: !!fq.req, fav: !!fq.fav, startAt: first ? first.a : null, ms: this.runMs(r, cur.uid, now), planMs: (cur.min || 30) * 60000 },
+      rows: r.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), on: i === r.cur, ms: this.runMs(r, li.uid, now),
+        onTap: () => this.runSelect(i), onUp: () => this.runMove(li.uid, -1), onDown: () => this.runMove(li.uid, 1), onRemove: () => this.runRemove(li.uid) })),
+    };
+  }
   /* リストをテンプレに保存（名前が必要）。同じ名前のテンプレは上書き */
   saveListTemplate = () => {
     const pl = this.state.pickList;
@@ -2586,6 +2665,7 @@ export default class App extends React.Component {
       case 'wake3': this.set({ screen: 'wake2' }); return true;
       case 'collect': this.goShaka(); return true;
       case 'trash': case 'buffLog': case 'slotTimes': case 'catsManage':
+      case 'run': this.set({ screen: 'record' }); return true;
       case 'templates': case 'sensitivity': case 'help': case 'ikoiEdit': case 'researchAdmin':
         this.goMypage(); return true;
       case 'cycle': this.cancelCycle(); return true;
@@ -3596,7 +3676,7 @@ export default class App extends React.Component {
             const pref = (st.prefs || {})[normTitle(t.name)] || 'normal';
             const fq = (st.actFreq || {})[normTitle(t.name)] || {};
             const mk = (pf) => this.actFatParts(t, pf === 'normal' ? null : pf);
-            return { key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
+            return { key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onRun: () => this.startRun([this.listItemFromAct(t)], ''), onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
               // 生活必須行動・やりたいこと（両方あるときの目標は生活必須行動の頻度）
               req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(t.name, kind, val) };
           }),
@@ -4074,6 +4154,9 @@ export default class App extends React.Component {
         rows: st.pickList.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.moveListItem(li.uid, -1), onDown: () => this.moveListItem(li.uid, 1), onRemove: () => this.removeListItem(li.uid) })),
       } : null,
       setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate,
+      startListRun: () => { const pl = st.pickList; if (pl.items.length) this.startRun(pl.items, (pl.name || '').trim(), true); },
+      run: st.run ? this.runVals() : null, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish,
+      exitRun: () => this.set({ screen: 'record' }),
       pickCats, pickCatId: st.catId, pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
       pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()), n = new Date(); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日　' + n.getHours() + ':' + pad2(n.getMinutes()); })(),
       subItems, subName: activeCat ? activeCat.name : '', subIcon: activeCat ? activeCat.icon : 'category', subColor: activeCat ? activeCat.color : '#8a8a82',
@@ -4231,6 +4314,7 @@ export default class App extends React.Component {
         {v.isMypage && <MyPage v={v} />}
         {v.isIkoiEdit && <IkoiEdit v={v} />}
         {v.isResearchAdmin && <ResearchAdmin v={v} />}
+        {v.isRun && <Run v={v} />}
         {v.isTrash && <Trash v={v} />}
         {v.isBuffLog && <BuffLog v={v} />}
         {v.isSlotTimes && <SlotTimes v={v} />}
