@@ -96,7 +96,7 @@ export default function Home({ v }) {
             <button onClick={v.goMypage} style={{ width: 38, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#55554e', cursor: 'pointer' }}>person</button>
           </div>
         </div>
-        <Speaker text={v.homeComment} size={140} onTap={v.tapCharacter} />
+        <Speaker text={v.homeComment} size={140} onTap={v.tapCharacter} onEdit={v.editIkoiLine} />
       </div>
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 0 12px' }}>
         {/* sleep card */}

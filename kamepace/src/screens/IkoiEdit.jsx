@@ -134,10 +134,13 @@ const customFaces = (faces) => Object.fromEntries(Object.entries(faces).filter((
 
 export default function IkoiEdit({ v }) {
   const [data, setData] = React.useState(() => Ikoi.snapshot()); // 編集中の全セリフ・全表情
-  const [gid, setGid] = React.useState('home');
-  const [key, setKey] = React.useState('AFTER_FATIGUE');
-  const [date, setDate] = React.useState(() => Ikoi.dateKeys().sort()[0] || '10-31');
-  const [sel, setSel] = React.useState(0);
+  // ホーム・記録画面の編集マークから来たときは、そのセリフを選んだ状態で開く
+  const t0 = v.ikoiTarget, isDate0 = t0 && t0.key.startsWith('TAP_DATE:');
+  const g0 = t0 ? GROUPS.find(g => g.items.some(i => (isDate0 ? i.date : i.key === t0.key))) : null;
+  const [gid, setGid] = React.useState(g0 ? g0.id : 'home');
+  const [key, setKey] = React.useState(g0 ? (isDate0 ? 'TAP_DATE' : t0.key) : 'AFTER_FATIGUE');
+  const [date, setDate] = React.useState(() => (isDate0 ? t0.key.slice(9) : (Ikoi.dateKeys().sort()[0] || '10-31')));
+  const [sel, setSel] = React.useState(g0 ? t0.idx : 0);
   const [picker, setPicker] = React.useState(null); // 表情を選ぶ行の番号
   const [newFace, setNewFace] = React.useState(null); // { src, label } 追加中の表情
   const [busy, setBusy] = React.useState('');
@@ -216,7 +219,7 @@ export default function IkoiEdit({ v }) {
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 20px 8px' }}>
-        <button onClick={v.goMypage} style={{ background: 'none', border: 'none', fontSize: 19, color: '#8a8a82', cursor: 'pointer' }}>‹</button>
+        <button onClick={v.closeIkoiEdit} style={{ background: 'none', border: 'none', fontSize: 19, color: '#8a8a82', cursor: 'pointer' }}>‹</button>
         <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>いこいさん編集</div>
         <span style={{ fontSize: 11, fontWeight: 700, color: hasDraft ? '#b4645a' : '#8a8a82' }}>{hasDraft ? '下書き' : '反映済み'}</span>
       </div>
