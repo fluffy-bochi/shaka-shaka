@@ -103,8 +103,9 @@ export default function Run({ v }) {
                   <span style={{ fontSize: 9, color: MUTED, fontWeight: 700 }}>/{x.minText}</span>
                 </span>
               </div>
-              <button onClick={x.onUp} aria-label="上へ" style={arrowBtn(i > 0)}><span style={ms(20, INK)}>arrow_upward</span></button>
-              <button onClick={x.onDown} aria-label="下へ" style={arrowBtn(i < r.rows.length - 1)}><span style={ms(20, INK)}>arrow_downward</span></button>
+              {/* 並べ替えの矢印と×は「編集」を押したときだけ */}
+              {edit && <button onClick={x.onUp} aria-label="上へ" style={arrowBtn(i > 0)}><span style={ms(20, INK)}>arrow_upward</span></button>}
+              {edit && <button onClick={x.onDown} aria-label="下へ" style={arrowBtn(i < r.rows.length - 1)}><span style={ms(20, INK)}>arrow_downward</span></button>}
               {edit && <button onClick={x.onRemove} aria-label="リストから外す" style={arrowBtn(!x.on && r.rows.length > 1)}><span style={ms(18, '#b4645a')}>close</span></button>}
             </div>
           ))}
