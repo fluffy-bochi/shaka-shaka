@@ -217,7 +217,7 @@ function ListCard({ v }) {
 
 /* リストの1行（高さは全行共通の ROW_H。選択中は横に広げて目立たせるだけで高さは変えない＝スクロール位置から選択行を計算できる） */
 const ROW_H = 60, COPIES = 5;
-const Row = React.memo(function Row({ r, i, on, open, onTap }) {
+const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd }) {
   const color = r.type === 'addcat' ? '#55554e' : r.cat.color;
   return (
     <div onClick={() => onTap(r, i)} style={{ height: ROW_H, display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
@@ -229,6 +229,10 @@ const Row = React.memo(function Row({ r, i, on, open, onTap }) {
             <div style={{ fontSize: on ? 16.5 : 14.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.item.name}</div>
             {on && <FatNums it={r.item} big />}
           </div>
+          {/* リストのカードを見ているときは、選択中の行動からそのままリストに足せる */}
+          {listAdd && r.item.onList && (
+            <button onClick={(e) => { e.stopPropagation(); r.item.onList(); }} style={{ flex: '0 0 auto', border: '1.5px solid ' + INK, borderRadius: 999, background: '#fff', color: INK, fontSize: 11, fontWeight: 800, padding: '3px 9px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>リスト ＋</button>
+          )}
           {!on && <FatNums it={r.item} />}
         </div>
       ) : (
@@ -324,6 +328,8 @@ export default function Pick({ v }) {
 
   // リストに積んだ・予定を開いたら、リストのカードへ移る（開いた直後は動かさない）
   const pagerRef = React.useRef(null);
+  const [onList, setOnList] = React.useState(false); // いまリストのカードを見ているか
+  const onPager = (e) => { const el = e.currentTarget, l = el.scrollLeft > (el.scrollWidth - el.clientWidth) / 2; if (l !== onList) setOnList(l); };
   const lastTick = React.useRef(v.pickList ? v.pickList.tick : 0);
   React.useEffect(() => {
     const t = v.pickList ? v.pickList.tick : 0;
@@ -344,7 +350,7 @@ export default function Pick({ v }) {
       </div>
       {/* 行動カードと、その右のリストのカード（横にスワイプ。となりのカードが少しのぞく） */}
       {/* 端の余白は padding だと右端が scrollWidth に入らないので、margin と末尾のすき間で作る */}
-      <div ref={pagerRef} className="nos" style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', flex: '0 0 auto', overscrollBehaviorX: 'contain' }}>
+      <div ref={pagerRef} onScroll={onPager} className="nos" style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', flex: '0 0 auto', overscrollBehaviorX: 'contain' }}>
         <div style={{ flex: '0 0 calc(100% - 32px)', marginLeft: 16, scrollSnapAlign: 'center' }}>
           <Card key={selRow && selRow.key} row={selRow} cat={selRow && selRow.cat} v={v} hist={hist} setHist={setHist} />
         </div>
@@ -364,7 +370,7 @@ export default function Pick({ v }) {
         </div>
         <div ref={listRef} onScroll={onScroll} className="nos" style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory', overscrollBehavior: 'contain' }}>
           {all.map(({ r, i }) => (
-            <Row key={i} r={r} i={i} on={i === idx} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} />
+            <Row key={i} r={r} i={i} on={i === idx} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={onList && i === idx} />
           ))}
         </div>
       </div>
