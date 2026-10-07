@@ -51,8 +51,9 @@ function FreqPop({ label, value, onSave, onDelete, onClose }) {
     <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: 8, right: 8, bottom: 48, zIndex: 5, background: '#fff', borderRadius: 18, padding: '8px 12px 10px', boxShadow: '0 8px 24px rgba(27,27,24,.22)', WebkitTapHighlightColor: 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
         <span style={{ fontSize: 12, fontWeight: 900 }}>{label}</span>
-        {value && <button onClick={onDelete} style={{ border: 'none', background: 'none', padding: 0, fontSize: 11.5, fontWeight: 700, color: '#b4645a', cursor: 'pointer', fontFamily: 'inherit' }}>削除</button>}
         <span style={{ flex: 1 }} />
+        {/* 削除＝登録を解除（✕は閉じるだけ）。未登録のときは押せない */}
+        <button onClick={value ? onDelete : undefined} disabled={!value} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, border: '1.5px solid ' + (value ? '#b4645a' : '#e4e1d8'), background: '#fff', borderRadius: 999, padding: '3px 9px 3px 6px', fontSize: 11.5, fontWeight: 800, color: value ? '#b4645a' : '#c9c7bf', cursor: value ? 'pointer' : 'default', fontFamily: 'inherit' }}><span style={ms(15, value ? '#b4645a' : '#c9c7bf')}>delete</span>削除</button>
         <button onClick={onClose} aria-label="閉じる" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(20, INK)}>close</span></button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
