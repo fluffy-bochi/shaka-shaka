@@ -39,6 +39,7 @@ export default function Run({ v }) {
   const [pop, setPop] = React.useState(null); // 頻度のポップアップ（'req' / 'fav'）
   const [hist, setHist] = React.useState(false); // りれき
   const [listOpen, setListOpen] = React.useState(false); // 下のリストを開いているか
+  const [delAsk, setDelAsk] = React.useState(false); // 削除の確認
   React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
   if (!r) return null;
   const c = r.cur, now = Date.now();
@@ -52,9 +53,23 @@ export default function Run({ v }) {
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec', WebkitTapHighlightColor: 'transparent', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 0' }}>
         <button onClick={v.exitRun} aria-label="もどる" style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: '#e4e1d8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(26, INK, true)}>arrow_back</span></button>
-        <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{(() => { const d = new Date(now); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日　' + hm(now); })()}</div>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(() => { const d = new Date(now); return (d.getMonth() + 1) + '月' + d.getDate() + '日　' + hm(now); })()}</div>
+        {/* 削除＝記録せずに実行をやめる（確認つき） */}
+        <button onClick={() => setDelAsk(true)} style={{ border: '2px solid #e8c9c4', borderRadius: 999, background: '#fff', color: '#b4645a', fontSize: 15, fontWeight: 900, padding: '8px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>削除</button>
         <button onClick={v.runFinish} style={{ border: '2px solid ' + INK, borderRadius: 999, background: '#fff', color: INK, fontSize: 17, fontWeight: 900, padding: '7px 20px', cursor: 'pointer', fontFamily: 'inherit' }}>記録</button>
       </div>
+      {delAsk && (
+        <div onClick={() => setDelAsk(false)} style={{ position: 'absolute', inset: 0, zIndex: 14, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: '#fff', borderRadius: 20, padding: '20px 18px 16px', textAlign: 'center', boxShadow: '0 20px 50px rgba(27,27,24,.3)' }}>
+            <div style={{ fontSize: 15.5, fontWeight: 900 }}>実行中のタスクを削除しますか？</div>
+            <div style={{ fontSize: 12.5, color: SUB, marginTop: 6 }}>記録はされません</div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button onClick={() => setDelAsk(false)} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: SUB, fontWeight: 800, fontSize: 14, padding: '12px 0', cursor: 'pointer' }}>やめる</button>
+              <button onClick={v.runDiscard} style={{ flex: 1.3, border: 'none', borderRadius: 13, background: '#b4645a', color: '#fff', fontWeight: 900, fontSize: 14, padding: '12px 0', cursor: 'pointer' }}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: SHEET_CLOSED + 10 }}>
         {/* いまの行動 */}
         <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 0' }}><Emo e={c.glyph} size={150} /></div>
