@@ -182,7 +182,8 @@ function ListCard({ v, onPick }) {
   const lab = { fontSize: 8.5, color: '#8a8a82', fontWeight: 700, marginRight: 1 };
   const num = { fontSize: 12, fontWeight: 800, color: INK, fontFamily: "'Space Mono',monospace" };
   return (
-    <div style={{ position: 'relative', width: '100%', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
+    // iOSのタップの青いハイライトは、並べ替えで行が動いたあとの場所に出て「別の行を押した」ように見えるので出さない（子要素にも継承される）
+    <div style={{ position: 'relative', width: '100%', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, WebkitTapHighlightColor: 'transparent', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
       {/* 名前（テンプレでなくてもつけられる） */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px 6px' }}>
         <input value={L.name} onChange={v.setListName} placeholder="リストの名前" style={{ flex: 1, minWidth: 0, height: 32, border: 'none', borderRadius: 9, background: '#f3f0e8', padding: '0 10px', fontSize: 14, fontWeight: 800, color: INK, fontFamily: 'inherit', outline: 'none' }} />
