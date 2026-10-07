@@ -371,3 +371,11 @@ export async function researchLoadAll() {
     return { code: p.id, ...meta, days };
   }));
 }
+
+/* 研究の期間（参加者コードの頭のアルファベットごと）: config/research = { periods: { A: { label, start, end }, ... } }。
+   誰でも読める・書けるのは開発者だけ（config のルール） */
+export async function loadResearchConfig() {
+  const s = await getDoc(doc(db, 'config', 'research'));
+  return s.exists() ? s.data() : { periods: {} };
+}
+export async function saveResearchConfig(cfg) { await setDoc(doc(db, 'config', 'research'), { ...cfg, updatedAt: Date.now() }); }

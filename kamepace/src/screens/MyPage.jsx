@@ -70,7 +70,7 @@ function ResearchJoin({ v, onClose }) {
         {!v.user ? (
           <button onClick={v.openAuth} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 14, background: '#1b1b18', color: '#fff', fontWeight: 800, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>ログインして参加する</button>
         ) : <>
-          <input value={code} onChange={(e) => { setCode(e.target.value); setErr(''); }} placeholder="参加者コード（例: P01）" autoCapitalize="characters"
+          <input value={code} onChange={(e) => { setCode(e.target.value); setErr(''); }} placeholder="参加者コード（例: A01）" autoCapitalize="characters"
             style={{ width: '100%', boxSizing: 'border-box', marginTop: 16, height: 46, borderRadius: 12, border: '1.5px solid #e4e1d8', fontSize: 16, fontWeight: 800, padding: '0 14px', fontFamily: "'Space Mono',monospace" }} />
           {err && <div style={{ fontSize: 12, color: '#b4645a', fontWeight: 700, marginTop: 6 }}>{err}</div>}
           <button onClick={busy || !code.trim() ? undefined : go} style={{ width: '100%', marginTop: 12, border: 'none', borderRadius: 14, background: code.trim() && !busy ? '#c4f000' : '#e4e1d8', color: code.trim() && !busy ? '#2f3a00' : '#a5a39a', fontWeight: 900, fontSize: 15, padding: '14px 0', cursor: 'pointer' }}>{busy ? '送信中…' : '同意して始める'}</button>

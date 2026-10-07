@@ -16,6 +16,7 @@ const msOf = (segs, now) => (segs || []).reduce((a, s) => a + ((s.b == null ? no
 /* シークバー: 実施中がアラーム（時刻）なら開始→その時刻を時計で、タイマーなら予定時間を実施時間で。endTs＝終わる時刻（タイマーは いま＋残り） */
 // 時間が過ぎたら延長: バー全体を経過時間に広げ、予定ぶん（plan）までを黒、そこから先（延長）をピンクにする
 function barOf(r, c, now) {
+  if (r.curNoTime) return { none: true, total: 0, endTs: null, over: false, ratio: 1, plan: 1, extra: 0 }; // 時間なし: いっぱい
   let total, el, endTs;
   if (r.curAlarmTs && c.startAt) { total = Math.max(60000, r.curAlarmTs - c.startAt); el = Math.max(0, now - c.startAt); endTs = r.curAlarmTs; }
   else { total = c.planMs; el = c.ms; endTs = now + (c.planMs - c.ms); } // 過ぎたら、予定の時間が終わった時刻（いま−延長ぶん）
@@ -94,7 +95,7 @@ export default function Run({ v }) {
           <div style={{ fontSize: 12, fontWeight: 700, color: SUB, marginTop: 2 }}>{c.cat}</div>
           {/* 開始・いまの時刻／経過・予定の時間 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 10.5, fontWeight: 700, color: SUB, ...mono }}>
-            <span>{c.startAt ? hm(c.startAt) : '—'}</span><span>{hm(bar.endTs)}</span>
+            <span>{c.startAt ? hm(c.startAt) : '—'}</span><span>{bar.none ? '' : hm(bar.endTs)}</span>
           </div>
           <div style={{ position: 'relative', height: 14, display: 'flex', alignItems: 'center' }}>
             <div style={{ position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2, background: '#d8d5cb' }} />
@@ -105,7 +106,7 @@ export default function Run({ v }) {
             <div style={{ position: 'absolute', left: `calc(${ratio * 100}% - 6px)`, width: 12, height: 12, borderRadius: '50%', background: over ? PINK : INK }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, fontWeight: 700, ...mono }}>
-            <span style={{ color: over ? PINK : SUB }}>{mmss(c.ms)}{over ? '（延長 +' + mmss(bar.extra) + '）' : ''}</span><span style={{ color: SUB }}>{mmss(bar.total)}</span>
+            <span style={{ color: over ? PINK : SUB }}>{mmss(c.ms)}{over ? '（延長 +' + mmss(bar.extra) + '）' : ''}</span><span style={{ color: SUB }}>{bar.none ? '' : mmss(bar.total)}</span>
           </div>
           {/* 必・♡ ｜ ▶ ｜ りれき */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', margin: '10px 0 36px' }}>{/* 下のアラームとの間はFigmaくらいあける */}
@@ -128,7 +129,7 @@ export default function Run({ v }) {
           )}
           {/* 全体／実施中 の アラーム・タイマー */}
           <AlarmRow label="全体" a={r.alarm.all} top onMode={(m) => v.setRunAlarm('all', { mode: m })} onAt={(t) => v.setRunAlarm('all', { at: t })} onMin={(n) => v.setRunAlarm('all', { min: n })} />
-          <AlarmRow label="実施中" a={r.alarm.cur} onMode={(m) => v.setRunAlarm('cur', { mode: m })} onAt={(t) => v.setRunAlarm('cur', { at: t })} onMin={(n) => v.setRunAlarm('cur', { min: n || 1 })} />
+          <AlarmRow label="実施中" a={r.alarm.cur} onMode={(m) => v.setRunAlarm('cur', { mode: m })} onAt={(t) => v.setRunAlarm('cur', { at: t })} onMin={(n) => v.setRunAlarm('cur', { min: n })} />
         </div>
       </div>
       {/* りれき（月カレンダー）: カードの形で上に重ねる */}
@@ -195,7 +196,7 @@ export function MiniRun({ v }) {
       <span style={{ position: 'relative', flex: '0 0 auto' }}><Emo e={c.glyph} size={36} /></span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 17, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: over ? PINK : MUTED, ...mono }}>{mmss(c.ms)} / {mmss(bar.total)}{over ? '  延長 +' + mmss(bar.extra) : ''}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: over ? PINK : MUTED, ...mono }}>{mmss(c.ms)}{bar.none ? '' : ' / ' + mmss(bar.total)}{over ? '  延長 +' + mmss(bar.extra) : ''}</div>
       </div>
       <button onClick={(e) => { e.stopPropagation(); v.runToggle(); }} aria-label={r.running ? '一時停止' : '再開'} style={{ width: 44, height: 44, border: 'none', borderRadius: 12, background: r.running ? '#efece3' : LIME, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flex: '0 0 auto' }}>
         <span style={ms(30, r.running ? INK : LIME_INK, true)}>{r.running ? 'pause' : 'play_arrow'}</span>
