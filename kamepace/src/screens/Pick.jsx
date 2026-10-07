@@ -106,7 +106,7 @@ function Card({ row, cat, v, hist, setHist }) {
       });
     };
   };
-  const wrap = { position: 'relative', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, flex: '0 0 auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' };
+  const wrap = { position: 'relative', width: '100%', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, flex: '0 0 auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' };
   if (!row) return <div style={wrap} />;
   if (row.type === 'cat' || row.type === 'addcat') {
     const color = row.type === 'cat' ? cat.color : '#55554e';
@@ -174,7 +174,7 @@ function Card({ row, cat, v, hist, setHist }) {
 }
 
 /* リストのカード（行動カードの右）: 名前（テンプレ名）・積んだ行動（並べ替え・削除）・予定／記録／START */
-function ListCard({ v }) {
+function ListCard({ v, onPick }) {
   const L = v.pickList;
   const empty = !L.rows.length, named = !!(L.name || '').trim();
   const gray = { border: 'none', borderRadius: 12, background: '#e4e1d8', color: '#55554e', fontSize: 14, fontWeight: 800, padding: '10px 14px', cursor: empty ? 'default' : 'pointer', opacity: empty ? 0.5 : 1 };
@@ -182,23 +182,26 @@ function ListCard({ v }) {
   const lab = { fontSize: 8.5, color: '#8a8a82', fontWeight: 700, marginRight: 1 };
   const num = { fontSize: 12, fontWeight: 800, color: INK, fontFamily: "'Space Mono',monospace" };
   return (
-    <div style={{ position: 'relative', borderRadius: 18, overflow: 'hidden', background: '#efece3', height: CARD_H, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
+    <div style={{ position: 'relative', width: '100%', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
       {/* 名前（テンプレでなくてもつけられる） */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px 6px' }}>
-        <input value={L.name} onChange={v.setListName} placeholder="リストの名前" style={{ flex: 1, minWidth: 0, height: 32, border: 'none', borderRadius: 9, background: '#fff', padding: '0 10px', fontSize: 14, fontWeight: 800, color: INK, fontFamily: 'inherit', outline: 'none' }} />
-        <button onClick={v.saveListTemplate} aria-label="テンプレに保存" disabled={empty} style={{ width: 32, height: 32, flex: '0 0 auto', border: 'none', borderRadius: 9, background: '#fff', cursor: empty ? 'default' : 'pointer', opacity: empty || !named ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(20, INK, !!L.tplKey)}>bookmark</span></button>
+        <input value={L.name} onChange={v.setListName} placeholder="リストの名前" style={{ flex: 1, minWidth: 0, height: 32, border: 'none', borderRadius: 9, background: '#f3f0e8', padding: '0 10px', fontSize: 14, fontWeight: 800, color: INK, fontFamily: 'inherit', outline: 'none' }} />
+        <button onClick={v.saveListTemplate} aria-label="テンプレに保存" disabled={empty} style={{ width: 32, height: 32, flex: '0 0 auto', border: 'none', borderRadius: 9, background: '#f3f0e8', cursor: empty ? 'default' : 'pointer', opacity: empty || !named ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(20, INK, !!L.tplKey)}>bookmark</span></button>
       </div>
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px' }}>
         {empty && <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#a5a39a' }}>リストは空です</div>}
         {L.rows.map((r, i) => (
-          <div key={r.uid} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 40, background: '#fff', borderRadius: 10, padding: '0 4px 0 6px', marginBottom: 6, boxShadow: '0 1px 2px rgba(27,27,24,.05)' }}>
-            <span style={{ flex: '0 0 auto' }}><Emo e={r.glyph} size={26} /></span>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-            <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap', flex: '0 0 auto' }}>
-              <span><span style={lab}>体</span><span style={num}>{sg(r.body)}</span></span>
-              <span><span style={lab}>心</span><span style={num}>{sg(r.mind)}</span></span>
-              <span style={{ fontSize: 9, color: '#8a8a82', fontWeight: 700 }}>/{r.minText}</span>
-            </span>
+          <div key={r.uid} style={{ display: 'flex', alignItems: 'center', gap: 2, height: 40, background: '#f3f0e8', borderRadius: 10, padding: '0 4px 0 6px', marginBottom: 6, minWidth: 0 }}>
+            {/* 左側（絵文字・名前・数値）をタップすると、その行動のカードを出す。右の矢印・×は押しても出さない */}
+            <div onClick={() => onPick && onPick(r)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: '100%', cursor: 'pointer' }}>
+              <span style={{ flex: '0 0 auto' }}><Emo e={r.glyph} size={26} /></span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap', flex: '0 0 auto' }}>
+                <span><span style={lab}>体</span><span style={num}>{sg(r.body)}</span></span>
+                <span><span style={lab}>心</span><span style={num}>{sg(r.mind)}</span></span>
+                <span style={{ fontSize: 9, color: '#8a8a82', fontWeight: 700 }}>/{r.minText}</span>
+              </span>
+            </div>
             <button onClick={r.onUp} aria-label="上へ" style={arrowBtn(i > 0)}><span style={ms(20, INK)}>arrow_upward</span></button>
             <button onClick={r.onDown} aria-label="下へ" style={arrowBtn(i < L.rows.length - 1)}><span style={ms(20, INK)}>arrow_downward</span></button>
             <button onClick={r.onRemove} aria-label="リストから外す" style={arrowBtn(true)}><span style={ms(18, '#a5a39a')}>close</span></button>
@@ -326,17 +329,48 @@ export default function Pick({ v }) {
   const side = (on) => ({ width: 36, height: 36, borderRadius: 10, border: 'none', boxShadow: '0 1px 3px rgba(27,27,24,.08)', background: on ? INK : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, marginBottom: 10 });
   const arrow = { position: 'absolute', left: 8, zIndex: 2, width: 26, height: 26, border: 'none', background: 'none', cursor: 'pointer', padding: 0 };
 
-  // リストに積んだ・予定を開いたら、リストのカードへ移る（開いた直後は動かさない）
+  /* 上のカード: [行動, リスト, 行動, リスト, 行動] を横に並べ、真ん中の3枚（リスト・行動・リスト）のどれかに止める。
+     端（0・4番）に止まったら真ん中の行動（2番）へ瞬間移動＝エンドレス。どのカードを見ていても左右にとなりのカードの端がのぞく。 */
+  const PAGES = ['A', 'L', 'A', 'L', 'A'];
   const pagerRef = React.useRef(null);
-  const [onList, setOnList] = React.useState(false); // いまリストのカードを見ているか
-  const onPager = (e) => { const el = e.currentTarget, l = el.scrollLeft > (el.scrollWidth - el.clientWidth) / 2; if (l !== onList) setOnList(l); };
+  const [page, setPage] = React.useState(() => mem.page || 2);
+  const onList = PAGES[page] === 'L'; // いまリストのカードを見ているか
+  const pageEls = () => (pagerRef.current ? [...pagerRef.current.querySelectorAll('[data-page]')] : []);
+  const leftFor = (i) => { const el = pagerRef.current, p = pageEls()[i]; return el && p ? p.offsetLeft - (el.clientWidth - p.offsetWidth) / 2 : 0; };
+  const goPage = (i, smooth) => { const el = pagerRef.current; if (!el) return; el.scrollTo({ left: leftFor(i), behavior: smooth ? 'smooth' : 'auto' }); setPage(i); mem.page = i; };
+  const nearest = () => {
+    const el = pagerRef.current; if (!el) return 2;
+    const c = el.scrollLeft + el.clientWidth / 2; let best = 2, bd = Infinity;
+    pageEls().forEach((p, i) => { const d = Math.abs(p.offsetLeft + p.offsetWidth / 2 - c); if (d < bd) { bd = d; best = i; } });
+    return best;
+  };
+  const pagerT = React.useRef(null);
+  const onPager = () => {
+    const i = nearest(); if (i !== page) { setPage(i); mem.page = i; }
+    clearTimeout(pagerT.current);
+    pagerT.current = setTimeout(() => { const j = nearest(); if (j === 0 || j === 4) goPage(2, false); }, 160);
+  };
+  React.useLayoutEffect(() => { goPage(mem.page || 2, false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // リストに積んだ・予定を開いたら、リストのカードへ（開いた直後は動かさない）
   const lastTick = React.useRef(v.pickList ? v.pickList.tick : 0);
   React.useEffect(() => {
     const t = v.pickList ? v.pickList.tick : 0;
     if (t === lastTick.current) return;
     lastTick.current = t;
-    const el = pagerRef.current; if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
+    if (PAGES[page] !== 'L') goPage(page >= 2 ? 3 : 1, true);
   }, [v.pickList && v.pickList.tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  // リストの行をタップ: その行動のカードを出し、下のリストでもその行動を選ぶ
+  const pickFromList = (r) => {
+    let key = r.itemId ? 'act:' + r.itemId : null;
+    if (!key) { const hit = cats.flatMap(c => c.items).find(it => it.kind === 'act' && it.name === r.name); if (hit) key = hit.key; }
+    goPage(2, true);
+    if (!key) return;
+    const c = cats.find(cc => cc.items.some(it => it.key === key)); if (!c) return;
+    mem.sel = key;
+    if (!open[c.id]) { want.current = key; setOpen(o => ({ ...o, [c.id]: true })); return; }
+    const i = rows.findIndex(x => x.key === key);
+    if (i >= 0) scrollToIdx(Math.floor(COPIES / 2) * N + i, true);
+  };
 
   const all = [];
   for (let c = 0; c < COPIES; c++) rows.forEach((r, i) => all.push({ r, i: c * N + i }));
@@ -348,14 +382,18 @@ export default function Pick({ v }) {
         <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{v.pickDateText}</div>
         <SlotPill v={v} small />
       </div>
-      {/* 行動カードと、その右のリストのカード（横にスワイプ。となりのカードが少しのぞく） */}
-      {/* 端の余白は padding だと右端が scrollWidth に入らないので、margin と末尾のすき間で作る */}
-      <div ref={pagerRef} onScroll={onPager} className="nos" style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', flex: '0 0 auto', overscrollBehaviorX: 'contain' }}>
-        <div style={{ flex: '0 0 calc(100% - 32px)', marginLeft: 16, scrollSnapAlign: 'center' }}>
-          <Card key={selRow && selRow.key} row={selRow} cat={selRow && selRow.cat} v={v} hist={hist} setHist={setHist} />
-        </div>
-        {v.pickList && <div style={{ flex: '0 0 calc(100% - 32px)', marginLeft: 8, scrollSnapAlign: 'center' }}><ListCard v={v} /></div>}
-        <div style={{ flex: '0 0 16px' }} />
+      {/* 行動カードとリストのカードを横にスワイプ（左右にとなりのカードの端がのぞく）。
+          端の余白は padding だと右端が scrollWidth に入らないので、前後のすき間の要素で作る */}
+      <div ref={pagerRef} onScroll={onPager} className="nos" style={{ position: 'relative', display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', flex: '0 0 auto', overscrollBehaviorX: 'contain' }}>
+        <div style={{ flex: '0 0 26px' }} />
+        {PAGES.map((t, i) => (
+          <div key={i} data-page={i} style={{ flex: '0 0 calc(100% - 52px)', minWidth: 0, marginLeft: i ? 10 : 0, scrollSnapAlign: 'center' }}>
+            {t === 'A'
+              ? <Card key={'a' + i + (selRow ? selRow.key : '')} row={selRow} cat={selRow && selRow.cat} v={v} hist={hist} setHist={setHist} />
+              : (v.pickList ? <ListCard v={v} onPick={pickFromList} /> : null)}
+          </div>
+        ))}
+        <div style={{ flex: '0 0 26px' }} />
       </div>
       <div style={{ position: 'relative', flex: 1, minHeight: 0, marginTop: 10, background: '#f7f4ec', overflow: 'hidden' }}>
         {/* まんなか＝選択中の印 */}
