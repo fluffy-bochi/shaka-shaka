@@ -23,23 +23,30 @@ function FatNums({ it, big }) {
   );
 }
 
-/* 生活必須行動・やりたいことの頻度 { every:'毎'|'隔', unit:'日'|'週'|'月', n } */
-const freqText = (f) => (f ? f.every + f.unit + f.n + '回' : '');
-// その月の目標回数（毎日n回=日数×n、隔日=半分の日数×n、毎週n回=日数/7×n、隔週=その半分、毎月n回=n、隔月=nの半分）
+/* 生活必須行動・やりたいことの頻度 { k, unit:'日'|'週'|'月', n } ＝「k日（週・か月）に n回」。
+   旧形式 { every:'毎'|'隔' } は 毎=1・隔=2 として読む */
+const freqK = (f) => (f ? (f.k || (f.every === '隔' ? 2 : 1)) : 1);
+const unitLabel = (unit, k) => (unit === '月' ? (k > 1 ? 'か月' : '月') : unit);
+const freqText = (f) => {
+  if (!f) return '';
+  const k = freqK(f);
+  return k === 1 ? '毎' + f.unit + f.n + '回' : k + unitLabel(f.unit, k) + 'に' + f.n + '回';
+};
+// その月の目標回数（k日にn回＝日数÷k×n、k週にn回＝日数÷7÷k×n、kか月にn回＝n÷k）
 function monthTarget(f, dim) {
   if (!f || !f.n) return 0;
-  const k = f.every === '隔' ? 0.5 : 1;
-  const per = f.unit === '日' ? dim : f.unit === '週' ? dim / 7 : 1;
-  return Math.max(1, Math.round(f.n * per * k));
+  const k = freqK(f);
+  const per = f.unit === '日' ? dim / k : f.unit === '週' ? dim / 7 / k : 1 / k;
+  return Math.max(1, Math.round(f.n * per));
 }
-/* 頻度を決めるポップアップ（カードの上に出す）。毎/隔・日/週/月 は きらい/ふつう/すき と同じ形の切り替え */
+/* 頻度を決めるポップアップ（カードの上に出す）: [k] 日/週/月 に [n] 回。日/週/月 は きらい/ふつう/すき と同じ形の切り替え */
 function FreqPop({ label, value, onSave, onDelete, onClose }) {
-  const [f, setF] = React.useState(() => value || { every: '毎', unit: '週', n: 1 });
-  const seg = (opts, key) => (
-    <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2, flex: '0 0 auto' }}>
-      {opts.map(o => <button key={o} onClick={() => setF({ ...f, [key]: o })} style={{ border: 'none', borderRadius: 999, padding: '4px 7px', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: f[key] === o ? INK : 'transparent', color: f[key] === o ? '#fff' : '#55554e', fontFamily: 'inherit' }}>{o}</button>)}
-    </div>
+  const [f, setF] = React.useState(() => (value ? { k: freqK(value), unit: value.unit, n: value.n } : { k: 1, unit: '週', n: 1 }));
+  const numIn = (key) => (
+    <input type="number" inputMode="numeric" min={1} max={99} value={f[key] || ''} onChange={(e) => setF({ ...f, [key]: Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0)) })}
+      style={{ width: 30, height: 28, border: 'none', borderRadius: 8, background: '#efece3', textAlign: 'center', fontSize: 15, fontWeight: 900, fontFamily: "'Space Mono',monospace", color: INK, padding: 0, flex: '0 0 auto' }} />
   );
+  const ok = f.k > 0 && f.n > 0;
   return (
     <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: 8, right: 8, bottom: 48, zIndex: 5, background: '#fff', borderRadius: 18, padding: '8px 12px 10px', boxShadow: '0 8px 24px rgba(27,27,24,.22)', WebkitTapHighlightColor: 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
@@ -49,13 +56,15 @@ function FreqPop({ label, value, onSave, onDelete, onClose }) {
         <button onClick={onClose} aria-label="閉じる" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(20, INK)}>close</span></button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        {seg(['毎', '隔'], 'every')}
-        {seg(['日', '週', '月'], 'unit')}
-        <input type="number" inputMode="numeric" min={1} max={99} value={f.n} onChange={(e) => setF({ ...f, n: Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0)) })}
-          style={{ width: 30, height: 28, border: 'none', borderRadius: 8, background: '#efece3', textAlign: 'center', fontSize: 15, fontWeight: 900, fontFamily: "'Space Mono',monospace", color: INK, padding: 0 }} />
+        {numIn('k')}
+        <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2, flex: '0 0 auto' }}>
+          {['日', '週', '月'].map(o => <button key={o} onClick={() => setF({ ...f, unit: o })} style={{ border: 'none', borderRadius: 999, padding: '4px 7px', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: f.unit === o ? INK : 'transparent', color: f.unit === o ? '#fff' : '#55554e', fontFamily: 'inherit' }}>{o}</button>)}
+        </div>
+        <span style={{ fontSize: 12, fontWeight: 800 }}>に</span>
+        {numIn('n')}
         <span style={{ fontSize: 12, fontWeight: 800 }}>回</span>
         <span style={{ flex: 1, minWidth: 0 }} />
-        <button onClick={() => f.n > 0 && onSave(f)} style={{ border: 'none', borderRadius: 999, background: f.n > 0 ? INK : '#d8d5cb', color: '#fff', fontSize: 12, fontWeight: 800, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flex: '0 0 auto' }}>登録</button>
+        <button onClick={() => ok && onSave({ k: f.k, unit: f.unit, n: f.n })} style={{ border: 'none', borderRadius: 999, background: ok ? INK : '#d8d5cb', color: '#fff', fontSize: 12, fontWeight: 800, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flex: '0 0 auto' }}>登録</button>
       </div>
     </div>
   );
