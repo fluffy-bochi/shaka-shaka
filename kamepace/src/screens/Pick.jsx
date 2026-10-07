@@ -39,6 +39,20 @@ function monthTarget(f, dim) {
   const per = f.unit === '日' ? dim / k : f.unit === '週' ? dim / 7 / k : 1 / k;
   return Math.max(1, Math.round(f.n * per));
 }
+/* 時間の入力 [時]:[分]（何時間でも）。value・onChange は合計の分 */
+export function HmInput({ value, onChange, size = 16 }) {
+  const v = Math.max(0, Math.round(Number(value) || 0)), h = Math.floor(v / 60), m = v % 60;
+  const box = { height: 36, boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 9, background: '#fff', textAlign: 'center', fontSize: size, fontWeight: 900, fontFamily: "'Space Mono',monospace", color: INK, padding: 0 };
+  const clean = (x) => Math.max(0, parseInt(x, 10) || 0);
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+      <input type="number" inputMode="numeric" min={0} max={99} value={v ? h : ''} placeholder="0" aria-label="時間" onChange={(e) => onChange(Math.min(99, clean(e.target.value)) * 60 + m)} style={{ ...box, width: 42 }} />
+      <span style={{ fontSize: size, fontWeight: 900 }}>:</span>
+      <input type="number" inputMode="numeric" min={0} max={59} value={v ? String(m).padStart(2, '0') : ''} placeholder="00" aria-label="分" onChange={(e) => onChange(h * 60 + Math.min(59, clean(e.target.value)))} style={{ ...box, width: 46 }} />
+    </span>
+  );
+}
+
 /* 行動の編集（カードの上に重ねる）: 名前・体・心（その分数ぶん、マイナス＝回復）・分 */
 function EditAct({ it, onClose }) {
   const [f, setF] = React.useState(() => ({ ...it.editVals }));
@@ -63,7 +77,7 @@ function EditAct({ it, onClose }) {
         <div><div style={lab}>体</div><div style={{ marginTop: 3 }}>{num('body')}</div></div>
         <div><div style={lab}>心</div><div style={{ marginTop: 3 }}>{num('mind')}</div></div>
         <span style={{ fontSize: 14, fontWeight: 800, paddingBottom: 8 }}>/</span>
-        <div><div style={lab}>分</div><div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 3 }}>{num('min', 70)}<span style={{ fontSize: 12, fontWeight: 800 }}>分</span></div></div>
+        <div><div style={lab}>時間（時:分）</div><div style={{ marginTop: 3 }}><HmInput value={f.min} onChange={(n) => setF({ ...f, min: n })} /></div></div>
       </div>
       <div style={{ fontSize: 10.5, color: '#8a8a82', fontWeight: 700 }}>マイナスで回復</div>
       <div style={{ flex: 1 }} />

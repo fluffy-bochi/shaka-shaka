@@ -1,6 +1,6 @@
 import React from 'react';
 import Emo from '../fluent';
-import { FreqPop, History } from './Pick';
+import { FreqPop, History, HmInput } from './Pick';
 
 /* タスク実行（START）: いまの行動を大きく、開始時刻・いまの時刻と、経過／予定の時間のバー。
    ▶／⏸の左に 必・♡、右に りれき。その下に 全体／実施中 の アラーム（時刻）・タイマー（時間）を切り替えて設定。
@@ -10,7 +10,8 @@ const mono = { fontFamily: "'Space Mono',monospace" };
 const ms = (size, color, fill = false) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: fill ? "'FILL' 1" : "'FILL' 0", fontSize: size, color, lineHeight: 1 });
 const sg = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0');
 const hm = (ts) => { const d = new Date(ts); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
-const mmss = (t) => { const s = Math.max(0, Math.floor(t / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+// 経過・予定の時間: 1時間未満は 分:秒、1時間以上は 時:分:秒
+const mmss = (t) => { const s = Math.max(0, Math.floor(t / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; };
 
 /* アラーム／タイマーの1行: [全体｜実施中] [アラーム|タイマー] ……… [時刻 or 分] */
 function AlarmRow({ label, a, onMode, onAt, onMin, top }) {
@@ -26,10 +27,7 @@ function AlarmRow({ label, a, onMode, onAt, onMin, top }) {
       <span style={{ flex: 1 }} />
       {a.mode === 'alarm'
         ? <input type="time" value={a.at} onChange={(e) => onAt(e.target.value)} style={box} />
-        : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <input type="number" inputMode="numeric" min={0} max={999} value={a.min || ''} placeholder="--" onChange={(e) => onMin(Math.max(0, Math.min(999, parseInt(e.target.value, 10) || 0)))} style={{ ...box, width: 76 }} />
-            <span style={{ fontSize: 13, fontWeight: 800 }}>分</span>
-          </span>}
+        : <HmInput value={a.min} onChange={onMin} size={17} />}
     </div>
   );
 }
