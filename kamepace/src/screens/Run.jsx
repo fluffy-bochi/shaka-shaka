@@ -107,7 +107,7 @@ export default function Run({ v }) {
         </div>
       )}
       {/* リスト（下から開く・閉じる） */}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6, height: listOpen ? '72%' : SHEET_CLOSED, transition: 'height .25s ease', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '22px 22px 0 0', boxShadow: '0 -2px 14px rgba(27,27,24,.1)' }}>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6, height: listOpen ? '40%' : SHEET_CLOSED /* 開いたとき: Figma「タスク実行/START」と同じくらい（画面の約4割） */, transition: 'height .25s ease', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '22px 22px 0 0', boxShadow: '0 -2px 14px rgba(27,27,24,.1)' }}>
         <div onClick={() => setListOpen(!listOpen)} style={{ flex: '0 0 auto', cursor: 'pointer', padding: '8px 14px 8px' }}>
           <div style={{ width: 120, height: 4, borderRadius: 2, background: '#e4e1d8', margin: '0 auto 8px' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
