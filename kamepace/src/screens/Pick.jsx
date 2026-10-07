@@ -308,7 +308,7 @@ function ListCard({ v, onPick }) {
             </div>
             <button onClick={r.onUp} aria-label="上へ" style={arrowBtn(i > 0)}><span style={ms(20, INK)}>arrow_upward</span></button>
             <button onClick={r.onDown} aria-label="下へ" style={arrowBtn(i < L.rows.length - 1)}><span style={ms(20, INK)}>arrow_downward</span></button>
-            <button onClick={r.onRemove} aria-label="リストから外す" style={arrowBtn(true)}><span style={ms(18, '#a5a39a')}>close</span></button>
+            <button onClick={r.onRemove} aria-label="リストから外す" style={arrowBtn(true)}><span style={ms(19, '#b4645a')}>delete</span></button>
           </div>
         ))}
       </div>
