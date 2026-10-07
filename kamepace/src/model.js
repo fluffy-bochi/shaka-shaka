@@ -79,7 +79,8 @@ export function serialize(st) {
     customActions: st.customActions || [],
     customItems: st.customItems || {},
     prefs: st.prefs || {},
-    actGoals: st.actGoals || {}, // 行動ごとの目標頻度 { normTitle: 週あたり回数 }
+    actGoals: st.actGoals || {}, // 行動ごとの目標頻度 { normTitle: 週あたり回数 }（旧・頻度が未設定のときだけ使う）
+    actFreq: st.actFreq || {}, // 生活必須行動(req)・やりたいこと(fav)と頻度 { normTitle: { req: {every:'毎'|'隔', unit:'日'|'週'|'月', n}, fav: {...} } }
     slotHours: st.slotHours || null,
     hiddenCats: st.hiddenCats || [],
     hiddenActs: st.hiddenActs || [],
@@ -139,6 +140,7 @@ export function deserialize(data) {
     customItems: (data.customItems && typeof data.customItems === 'object') ? data.customItems : {},
     prefs: (data.prefs && typeof data.prefs === 'object') ? data.prefs : {},
     actGoals: (data.actGoals && typeof data.actGoals === 'object') ? data.actGoals : {},
+    actFreq: (data.actFreq && typeof data.actFreq === 'object') ? data.actFreq : {},
     slotHours: (Array.isArray(data.slotHours) && data.slotHours.length === 4) ? data.slotHours : null,
     hiddenCats: Array.isArray(data.hiddenCats) ? data.hiddenCats : [],
     hiddenActs: Array.isArray(data.hiddenActs) ? data.hiddenActs : [],
@@ -169,7 +171,7 @@ export function freshState() {
   return {
     entries: [], tasks: [], sortMode: false,
     collected: [], collectedSeen: 0, templates: {}, consumed: 0, sampleDay: null,
-    customCats: [], customPlans: [], customActions: [], customItems: {}, prefs: {}, actGoals: {},
+    customCats: [], customPlans: [], customActions: [], customItems: {}, prefs: {}, actGoals: {}, actFreq: {},
     slotHours: null, hiddenCats: [], hiddenActs: [],
     onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null, wakeLog: [], bedLog: [], mainScreen: null,
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1,

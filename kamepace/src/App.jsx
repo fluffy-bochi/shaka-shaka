@@ -232,7 +232,7 @@ export default class App extends React.Component {
       templates: s.templates, sortMode: s.sortMode, consumed: s.consumed, sampleDay: s.sampleDay,
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
-      prefs: s.prefs, actGoals: s.actGoals, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
+      prefs: s.prefs, actGoals: s.actGoals, actFreq: s.actFreq, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
       onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, wakeLog: s.wakeLog, bedLog: s.bedLog, mainScreen: s.mainScreen,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
@@ -748,6 +748,14 @@ export default class App extends React.Component {
     });
     return { days, count, totalMin: total, avgMin: timed ? Math.round(total / timed) : 0 };
   }
+  /* 生活必須行動（req）・やりたいこと（fav）の頻度。val=null で解除 */
+  setActFreq = (name, kind, val) => {
+    const k = normTitle(name); if (!k) return;
+    const all = { ...(this.state.actFreq || {}) }, cur = { ...(all[k] || {}) };
+    if (val) cur[kind] = val; else delete cur[kind];
+    if (cur.req || cur.fav) all[k] = cur; else delete all[k];
+    this.set({ actFreq: all }); this.save();
+  };
   /* 目標頻度（週あたり回数）。タップで 未設定→週1→…→週7→未設定 */
   cycleActGoal = (name) => {
     const k = normTitle(name); if (!k) return;
@@ -3509,8 +3517,11 @@ export default class App extends React.Component {
         items: [
           ...c.items.filter(t => !hiddenActs0.has(normTitle(t.name))).map(t => {
             const pref = (st.prefs || {})[normTitle(t.name)] || 'normal';
+            const fq = (st.actFreq || {})[normTitle(t.name)] || {};
             const mk = (pf) => this.actFatParts(t, pf === 'normal' ? null : pf);
-            return { key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name) };
+            return { key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
+              // 生活必須行動・やりたいこと（両方あるときの目標は生活必須行動の頻度）
+              req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(t.name, kind, val) };
           }),
           { key: 'copy:' + c.id, kind: 'copy', name: 'にているものをコピーして作る', glyph: '➕', onStart: () => { this.set({ catId: c.id }); this.openActAdd(); } },
         ],

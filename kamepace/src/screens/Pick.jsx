@@ -23,6 +23,44 @@ function FatNums({ it, big }) {
   );
 }
 
+/* 生活必須行動・やりたいことの頻度 { every:'毎'|'隔', unit:'日'|'週'|'月', n } */
+const freqText = (f) => (f ? f.every + f.unit + f.n + '回' : '');
+// その月の目標回数（毎日n回=日数×n、隔日=半分の日数×n、毎週n回=日数/7×n、隔週=その半分、毎月n回=n、隔月=nの半分）
+function monthTarget(f, dim) {
+  if (!f || !f.n) return 0;
+  const k = f.every === '隔' ? 0.5 : 1;
+  const per = f.unit === '日' ? dim : f.unit === '週' ? dim / 7 : 1;
+  return Math.max(1, Math.round(f.n * per * k));
+}
+/* 頻度を決めるポップアップ（カードの上に出す）。毎/隔・日/週/月 は きらい/ふつう/すき と同じ形の切り替え */
+function FreqPop({ label, value, onSave, onDelete, onClose }) {
+  const [f, setF] = React.useState(() => value || { every: '毎', unit: '週', n: 1 });
+  const seg = (opts, key) => (
+    <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2, flex: '0 0 auto' }}>
+      {opts.map(o => <button key={o} onClick={() => setF({ ...f, [key]: o })} style={{ border: 'none', borderRadius: 999, padding: '4px 7px', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: f[key] === o ? INK : 'transparent', color: f[key] === o ? '#fff' : '#55554e', fontFamily: 'inherit' }}>{o}</button>)}
+    </div>
+  );
+  return (
+    <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: 8, right: 8, bottom: 48, zIndex: 5, background: '#fff', borderRadius: 18, padding: '8px 12px 10px', boxShadow: '0 8px 24px rgba(27,27,24,.22)', WebkitTapHighlightColor: 'transparent' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+        <span style={{ fontSize: 12, fontWeight: 900 }}>{label}</span>
+        {value && <button onClick={onDelete} style={{ border: 'none', background: 'none', padding: 0, fontSize: 11.5, fontWeight: 700, color: '#b4645a', cursor: 'pointer', fontFamily: 'inherit' }}>削除</button>}
+        <span style={{ flex: 1 }} />
+        <button onClick={onClose} aria-label="閉じる" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(20, INK)}>close</span></button>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        {seg(['毎', '隔'], 'every')}
+        {seg(['日', '週', '月'], 'unit')}
+        <input type="number" inputMode="numeric" min={1} max={99} value={f.n} onChange={(e) => setF({ ...f, n: Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0)) })}
+          style={{ width: 30, height: 28, border: 'none', borderRadius: 8, background: '#efece3', textAlign: 'center', fontSize: 15, fontWeight: 900, fontFamily: "'Space Mono',monospace", color: INK, padding: 0 }} />
+        <span style={{ fontSize: 12, fontWeight: 800 }}>回</span>
+        <span style={{ flex: 1, minWidth: 0 }} />
+        <button onClick={() => f.n > 0 && onSave(f)} style={{ border: 'none', borderRadius: 999, background: f.n > 0 ? INK : '#d8d5cb', color: '#fff', fontSize: 12, fontWeight: 800, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flex: '0 0 auto' }}>登録</button>
+      </div>
+    </div>
+  );
+}
+
 /* りれき: 月カレンダー＋その月の 回数（目標に対して）・目標頻度・合計時間・平均時間 */
 const fmtMin = (m) => (m < 60 ? m + '分' : Math.floor(m / 60) + '時間' + (m % 60 ? (m % 60) + '分' : ''));
 function History({ it, cat, onClose }) {
@@ -33,7 +71,8 @@ function History({ it, cat, onClose }) {
   const ym = y + '-' + String(mo + 1).padStart(2, '0');
   const h = it.history(ym);
   const dim = new Date(y, mo + 1, 0).getDate();
-  const target = it.goal ? Math.round(it.goal * dim / 7) : 0; // 週n回 → この月の目標回数
+  // 目標: 生活必須行動の頻度 → やりたいことの頻度 → （旧）週n回
+  const target = it.freq ? monthTarget(it.freq, dim) : it.goal ? Math.round(it.goal * dim / 7) : 0;
   const lead = (base.getDay() + 6) % 7; // 月曜はじまり
   const weeks = Math.ceil((lead + dim) / 7);
   const cells = [];
@@ -61,10 +100,17 @@ function History({ it, cat, onClose }) {
           <span style={val}>{h.count}{target ? <span style={{ fontSize: 10, color: '#8a8a82' }}> / {target}回</span> : '回'}</span>
           {target > 0 && <span style={{ height: 3, borderRadius: 2, background: '#e4e1d8', marginTop: 2, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: Math.min(100, Math.round(h.count / target * 100)) + '%', background: h.count >= target ? '#7a9a00' : '#c4f000' }} /></span>}
         </div>
-        <button onClick={it.onGoal} style={{ ...stat, border: '1.5px dashed ' + (it.goal ? 'transparent' : '#d8d5cb'), cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
-          <span style={lab}>目標</span>
-          <span style={{ ...val, color: it.goal ? INK : '#a5a39a', fontSize: it.goal ? 13 : 11.5 }}>{it.goal ? '週' + it.goal + '回' : '未設定'}</span>
-        </button>
+        {it.freq ? (
+          <div style={stat}>
+            <span style={lab}>{it.req ? '必須' : 'やりたい'}</span>
+            <span style={{ ...val, fontSize: 11.5 }}>{freqText(it.freq)}</span>
+          </div>
+        ) : (
+          <button onClick={it.onGoal} style={{ ...stat, border: '1.5px dashed ' + (it.goal ? 'transparent' : '#d8d5cb'), cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={lab}>目標</span>
+            <span style={{ ...val, color: it.goal ? INK : '#a5a39a', fontSize: it.goal ? 13 : 11.5 }}>{it.goal ? '週' + it.goal + '回' : '未設定'}</span>
+          </button>
+        )}
         <div style={stat}><span style={lab}>合計</span><span style={{ ...val, fontSize: h.totalMin >= 60 ? 11 : 13 }}>{fmtMin(h.totalMin)}</span></div>
         <div style={stat}><span style={lab}>平均</span><span style={{ ...val, fontSize: h.avgMin >= 60 ? 11 : 13 }}>{h.avgMin ? fmtMin(h.avgMin) : '—'}</span></div>
       </div>
@@ -91,6 +137,7 @@ function History({ it, cat, onClose }) {
 function Card({ row, cat, v, hist, setHist }) {
   // りれきを開く/閉じるときは、カードを裏返す（横に90度まわして中身を入れ替え、反対側から戻す）
   const ref = React.useRef(null);
+  const [pop, setPop] = React.useState(null); // 頻度のポップアップ（'req'＝生活必須行動 / 'fav'＝やりたいこと）
   const flip = (b) => {
     const el = ref.current;
     if (!el || !el.animate) { setHist(b); return; }
@@ -136,8 +183,8 @@ function Card({ row, cat, v, hist, setHist }) {
           <div style={{ fontSize: it.name.length > 9 ? 17 : 23, fontWeight: 900, lineHeight: 1.3, wordBreak: 'break-all', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.name}</div>
           {isAct && (
             <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
-              <span style={{ ...chip, fontSize: 13, fontWeight: 900 }}>必</span>
-              <span style={chip}><span style={ms(15, INK, true)}>favorite</span></span>
+              <button onClick={() => setPop(pop === 'req' ? null : 'req')} aria-label="生活必須行動" style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 900, background: it.req ? INK : chip.background, color: it.req ? '#fff' : INK }}>必</button>
+              <button onClick={() => setPop(pop === 'fav' ? null : 'fav')} aria-label="やりたいこと" style={{ ...chip, border: 'none', cursor: 'pointer', background: it.fav ? INK : chip.background }}><span style={ms(15, it.fav ? '#fff' : INK, true)}>favorite</span></button>
               <button onClick={() => flip(true)} style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>りれき<span style={ms(15, INK)}>list</span><span style={ms(15, INK)}>calendar_month</span></button>
             </div>
           )}
@@ -169,6 +216,10 @@ function Card({ row, cat, v, hist, setHist }) {
         {it.onTrash && <button onClick={it.onTrash} aria-label="ゴミ箱へ" style={{ ...gray, padding: '8px 10px' }}><span style={ms(18, '#b4645a')}>delete</span></button>}
         <button onClick={it.onStart} style={{ flex: it.kind === 'act' ? 1.1 : 1, border: 'none', borderRadius: 12, background: '#c4f000', color: '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: 'pointer', letterSpacing: '.04em', boxShadow: '0 4px 12px rgba(122,154,0,.3)' }}>{it.kind === 'act' ? 'START' : 'ひらく'}</button>
       </div>
+      {isAct && pop && (
+        <FreqPop key={pop} label={pop === 'req' ? '生活必須行動' : 'やりたいこと'} value={it[pop]}
+          onSave={(f) => { it.onFreq(pop, f); setPop(null); }} onDelete={() => { it.onFreq(pop, null); setPop(null); }} onClose={() => setPop(null)} />
+      )}
     </div>
   );
 }
@@ -264,13 +315,23 @@ export default function Pick({ v }) {
 
   const rows = React.useMemo(() => {
     const out = [];
+    // 右の「必」「♡」で絞り込み中は、生活必須行動・やりたいことの行動だけを（カテゴリを開かなくても）出す
+    const filtering = fil.req || fil.fav;
     cats.forEach(c => {
+      if (filtering) {
+        const hit = c.items.filter(it => it.kind === 'act' && ((fil.req && it.req) || (fil.fav && it.fav)));
+        if (!hit.length) return;
+        out.push({ key: 'cat:' + c.id, type: 'cat', cat: c });
+        hit.forEach(it => out.push({ key: it.key, type: 'item', cat: c, item: it }));
+        return;
+      }
       out.push({ key: 'cat:' + c.id, type: 'cat', cat: c });
       if (open[c.id]) c.items.forEach(it => out.push({ key: it.key, type: 'item', cat: c, item: it }));
     });
-    out.push({ key: 'addcat', type: 'addcat' });
+    if (!filtering) out.push({ key: 'addcat', type: 'addcat' });
+    if (!out.length) out.push({ key: 'addcat', type: 'addcat' });
     return out;
-  }, [cats, open]);
+  }, [cats, open, fil]);
   const N = rows.length;
   const selRow = rows[((idx % N) + N) % N];
 
