@@ -151,7 +151,7 @@ export function downloadText(name, text) {
 /* ---------- デモデータ（研究データ画面の見た目確認用。保存はしない） ----------
    5人×28日。人ごとに疲れやすさ・行動の続けやすさを変える（同じコードなら毎回同じ値） */
 const DEMO_ACTS = [
-  { key: 'washface', name: '洗顔・歯みがき', cat: 'grooming', min: 10, kind: 'req', f: { k: 1, unit: '日', n: 2 } },
+  { key: 'toothbrush', name: '歯みがき', cat: 'grooming', min: 5, kind: 'req', f: { k: 1, unit: '日', n: 2 } },
   { key: 'bath', name: '入浴', cat: 'rest', min: 20, kind: 'req', f: { k: 1, unit: '日', n: 1 } },
   { key: 'cleanlaundry', name: '掃除・洗濯', cat: 'house', min: 30, kind: 'req', f: { k: 1, unit: '週', n: 2 } },
   { key: 'stroll', name: '散歩', cat: 'exercise', min: 20, kind: 'fav', f: { k: 2, unit: '日', n: 1 } },

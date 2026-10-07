@@ -38,7 +38,7 @@ const act = (id, glyph, icon, name, body, mind, defMin, extra = {}) => {
 };
 
 /* 名前を変えた行動（旧名 → 新名）。りれきで旧名の記録も新名として数える */
-export const RENAMED_ACTS = { '散歩・軽い運動': '散歩' };
+export const RENAMED_ACTS = { '散歩・軽い運動': '散歩', '洗顔・歯みがき': '洗顔' }; // 洗顔・歯みがきは分けた（前の記録は洗顔として数える）
 
 export const CATS = [
   { id: 'idou', icon: 'directions_subway', color: '#6f8fbf', glyph: '🚃', name: 'いどう', sub: '通勤通学・運転・送迎', items: [
@@ -107,7 +107,8 @@ export const CATS = [
     act('family', '👪', 'diversity_3', '家族の対応', 3, 6, 30, { kw: ['対人', '家族', '親', '親戚'] }),
   ] },
   { id: 'grooming', icon: 'face', color: '#d98ba0', glyph: '🧼', name: '身じたく', sub: '洗顔・メイク・着替え', items: [
-    act('washface', '🧼', 'wash', '洗顔・歯みがき', 2, 1, 10, { kw: ['身じたく', '洗顔', '歯磨き', '歯みがき'] }),
+    act('washface', '🧼', 'wash', '洗顔', 2, 1, 5, { kw: ['身じたく', '洗顔', '顔を洗う'] }),
+    act('toothbrush', '🪥', 'dentistry', '歯みがき', 2, 1, 5, { kw: ['身じたく', '歯磨き', '歯みがき', 'はみがき'] }),
     act('makeup', '💄', 'face_retouching_natural', 'メイク', 2, 4, 20, { kw: ['身じたく', 'メイク', '化粧'] }),
     act('dressup', '👕', 'checkroom', '着替え', 2, 1, 10, { kw: ['身じたく', '着替え', '服'] }),
     act('skincare', '🧴', 'sanitizer', 'スキンケア', 1, 2, 10, { kw: ['身じたく', 'スキンケア', '保湿'] }),

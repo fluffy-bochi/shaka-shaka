@@ -103,7 +103,8 @@ export function buildAcademicYear(ay, opts = {}) {
     const isBreak = inSummer || inSpringBreak || inWinterGap;
 
     // ---- 朝の身じたく（毎日） ----
-    add(date, '07:20', '07:35', '洗顔・歯みがき', '🧼', D(3, 15));
+    add(date, '07:20', '07:28', '洗顔', '🧼', D(3, 8));
+    add(date, '07:28', '07:35', '歯みがき', '🪥', D(3, 7));
     const outing = inSpringClass || inFallClass || inSpringExam || (!isBreak && isWeekday) || rnd('out' + date) < 0.6;
     if (outing && (wd !== 0)) add(date, '07:35', '07:55', 'メイク', '💄', D(6, 20));
     add(date, '07:55', '08:05', '着替え', '👕', D(3, 10));

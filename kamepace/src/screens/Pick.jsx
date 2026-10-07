@@ -349,10 +349,18 @@ function ListCard({ v, onPick }) {
 
 /* リストの1行（高さは全行共通の ROW_H。選択中は横に広げて目立たせるだけで高さは変えない＝スクロール位置から選択行を計算できる） */
 const ROW_H = 60, COPIES = 5;
-const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd }) {
+const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd, vis }) {
   const color = r.type === 'addcat' ? '#55554e' : r.cat.color;
+  // 表示・非表示の切り替え中: 非表示のものは薄く、右に目のボタン
+  const target = r.type === 'item' ? (r.item.onToggleHide ? r.item : null) : r.type === 'cat' && r.cat.onToggleHide ? r.cat : null;
+  const isHidden = !!(target && target.hidden) || (r.type === 'item' && r.cat.hidden);
   return (
-    <div onClick={() => onTap(r, i)} style={{ height: ROW_H, display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
+    <div onClick={() => onTap(r, i)} style={{ position: 'relative', height: ROW_H, display: 'flex', alignItems: 'center', padding: vis ? (on ? '0 92px 0 30px' : '0 98px 0 42px') : (on ? '0 54px 0 30px' : '0 60px 0 42px'), cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box', opacity: vis && isHidden ? 0.4 : 1 }}>
+      {vis && target && (
+        <button onClick={(e) => { e.stopPropagation(); target.onToggleHide(); }} aria-label={target.hidden ? '表示する' : '非表示にする'} style={{ position: 'absolute', right: 56, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 30, height: 30, borderRadius: '50%', border: 'none', background: target.hidden ? '#e4e1d8' : '#fff', boxShadow: '0 1px 3px rgba(27,27,24,.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+          <span style={ms(18, target.hidden ? '#a5a39a' : INK)}>{target.hidden ? 'visibility_off' : 'visibility'}</span>
+        </button>
+      )}
       {r.type === 'item' ? (
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 10, height: on ? 58 : 48, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
           <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 48 : 40, height: on ? 48 : 40, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
@@ -538,10 +546,12 @@ export default function Pick({ v }) {
           <button onClick={toggleAll} aria-label={anyClosed ? 'カテゴリを全部開く' : 'カテゴリを全部閉じる'} style={side(false)}><span style={ms(22, INK)}>{anyClosed ? 'unfold_more' : 'unfold_less'}</span></button>
           <button onClick={() => setFil(f => ({ ...f, req: !f.req }))} aria-label="必須" style={side(fil.req)}><span style={{ fontSize: 17, fontWeight: 900, color: fil.req ? '#fff' : INK }}>必</span></button>
           <button onClick={() => setFil(f => ({ ...f, fav: !f.fav }))} aria-label="お気に入り" style={side(fil.fav)}><span style={ms(20, fil.fav ? '#fff' : INK, fil.fav)}>favorite</span></button>
+          {/* 表示・非表示の切り替え（押すと非表示のものも出て、目のボタンで切り替えられる） */}
+          <button onClick={v.togglePickHidden} aria-label="表示・非表示の切り替え" style={side(v.pickShowHidden)}><span style={ms(20, v.pickShowHidden ? '#fff' : INK)}>visibility</span></button>
         </div>
         <div ref={listRef} onScroll={onScroll} className="nos" style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory', overscrollBehavior: 'contain' }}>
           {all.map(({ r, i }) => (
-            <Row key={i} r={r} i={i} on={i === idx} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={(onList || v.runAdd) && i === idx} />
+            <Row key={i} r={r} i={i} on={i === idx} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={(onList || v.runAdd) && i === idx} vis={v.pickShowHidden} />
           ))}
         </div>
       </div>
