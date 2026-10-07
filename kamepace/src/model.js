@@ -80,7 +80,7 @@ export function serialize(st) {
     customItems: st.customItems || {},
     prefs: st.prefs || {},
     actGoals: st.actGoals || {}, // 行動ごとの目標頻度 { normTitle: 週あたり回数 }（旧・頻度が未設定のときだけ使う）
-    actFreq: st.actFreq || {}, // 生活必須行動(req)・やりたいこと(fav)と頻度 { normTitle: { req: {every:'毎'|'隔', unit:'日'|'週'|'月', n}, fav: {...} } }
+    actFreq: st.actFreq || {}, // 生活必須行動(req)・やりたいこと(fav)と頻度 { normTitle: { req: {k, unit:'日'|'週'|'月', n}＝k日にn回, fav: {...} } }
     slotHours: st.slotHours || null,
     hiddenCats: st.hiddenCats || [],
     hiddenActs: st.hiddenActs || [],
