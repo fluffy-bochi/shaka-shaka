@@ -140,49 +140,78 @@ const SERIES = [
   { key: 'fatigue', name: '疲労度', color: '#7a9a00', val: (r) => r.fatigue == null ? null : r.fatigue / 100 },
 ];
 
-function Chart({ recs }) {
+/* 推移グラフ。data = { recs: 朝・夜の記録, fat: 疲労度の増減 [{ts, v}] }。横軸は時刻。
+   体調・気分は記録の点に丸。疲労度は増減のたびに線を引き、いちばん高い・低いところだけ丸と時刻をつける */
+function Chart({ data }) {
   const [hide, setHide] = React.useState({});
-  const W = 320, H = 170, PX = 24, PT = 14, PB = 34;
-  const n = recs.length;
-  const X = (i) => (n === 1 ? W / 2 : PX + i * (W - 2 * PX) / (n - 1));
+  const W = 320, H = 170, PX = 24, PT = 18, PB = 34;
+  const recs = (data && data.recs) || [], fat = ((data && data.fat) || []).filter(p => p.v != null);
+  const all = [...recs.map(r => r.ts), ...fat.map(p => p.ts)];
+  const t0 = all.length ? Math.min(...all) : 0, t1 = all.length ? Math.max(...all) : 0;
+  const oneDay = t1 - t0 < 24 * 3600000;
+  const X = (ts) => (t1 === t0 ? W / 2 : PX + (ts - t0) / (t1 - t0) * (W - 2 * PX));
   const Y = (t) => PT + (1 - t) * (H - PT - PB);
-  const fmt = (ts) => { const d = new Date(ts); return [(d.getMonth() + 1) + '/' + d.getDate(), d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0')]; };
+  const hm = (ts) => { const d = new Date(ts); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  const md = (ts) => { const d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate(); };
+  // 疲労度の最高・最低（同じ値なら最初のもの）
+  let hi = null, lo = null;
+  fat.forEach(p => { if (!hi || p.v > hi.v) hi = p; if (!lo || p.v < lo.v) lo = p; });
+  const marks = hi && lo && hi !== lo ? [[hi, -9], [lo, 15]] : hi ? [[hi, -9]] : [];
+  const fs = SERIES.find(x => x.key === 'fatigue');
   return (
     <div style={{ margin: '0 20px' }}>
       <div style={{ background: '#fff', borderRadius: 18, padding: '6px 0 2px', boxShadow: '0 2px 10px rgba(27,27,24,.05)' }}>
-        {n === 0 ? (
+        {!all.length ? (
           <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#a5a39a' }}>まだ記録がありません</div>
         ) : (
           <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
             {[0, .5, 1].map((t, i) => <line key={i} x1={PX - 8} x2={W - PX + 8} y1={Y(t)} y2={Y(t)} stroke="#efece3" strokeWidth="1" />)}
-            {recs.map((r, i) => {
-              const [dt, tm] = fmt(r.ts);
+            {/* 朝・夜の記録の時刻（1日なら時刻だけ、複数日なら日付と時刻） */}
+            {recs.map((r, i) => (
+              <g key={i}>
+                <line x1={X(r.ts)} x2={X(r.ts)} y1={PT} y2={H - PB} stroke="#f3f1ea" strokeWidth="1" />
+                <text x={X(r.ts)} y={H - PB + 13} textAnchor="middle" fontSize="8.5" fill="#8a8a82" style={mono}>{oneDay ? hm(r.ts) : md(r.ts)}</text>
+                {!oneDay && <text x={X(r.ts)} y={H - PB + 24} textAnchor="middle" fontSize="8.5" fill="#8a8a82" style={mono}>{hm(r.ts)}</text>}
+              </g>
+            ))}
+            {SERIES.filter(x => x.key !== 'fatigue' && !hide[x.key]).map(x => {
+              const pts = recs.map(r => [X(r.ts), x.val(r)]).filter(p => p[1] != null).map(p => [p[0], Y(p[1])]);
               return (
-                <g key={i}>
-                  <line x1={X(i)} x2={X(i)} y1={PT} y2={H - PB} stroke="#f3f1ea" strokeWidth="1" />
-                  <text x={X(i)} y={H - PB + 13} textAnchor="middle" fontSize="8.5" fill="#8a8a82" style={mono}>{dt}</text>
-                  <text x={X(i)} y={H - PB + 24} textAnchor="middle" fontSize="8.5" fill="#8a8a82" style={mono}>{tm}</text>
+                <g key={x.key}>
+                  {pts.length > 1 && <path d={smoothPath(pts)} fill="none" stroke={x.color} strokeWidth="2.4" strokeLinecap="round" />}
+                  {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="4.2" fill="#fff" stroke={x.color} strokeWidth="2.4" />)}
                 </g>
               );
             })}
-            {SERIES.filter(s => !hide[s.key]).map(s => {
-              const pts = recs.map((r, i) => [X(i), s.val(r)]).filter(p => p[1] != null).map(p => [p[0], Y(p[1])]);
+            {!hide.fatigue && fat.length > 0 && (() => {
+              const pts = fat.map(p => [X(p.ts), Y(p.v / 100)]);
               return (
-                <g key={s.key}>
-                  {pts.length > 1 && <path d={smoothPath(pts)} fill="none" stroke={s.color} strokeWidth="2.4" strokeLinecap="round" />}
-                  {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="4.2" fill="#fff" stroke={s.color} strokeWidth="2.4" />)}
+                <g>
+                  {/* 増減の点は細かいので、なめらかにすると行きすぎる。折れ線で結ぶ */}
+                  {pts.length > 1 && <path d={'M' + pts.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L')} fill="none" stroke={fs.color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />}
+                  {marks.map(([p, dy0], i) => {
+                    const cx = X(p.ts), cy = Y(p.v / 100);
+                    const dy = dy0 > 0 && cy + dy0 > H - PB - 2 ? -9 : dy0 < 0 && cy + dy0 < 9 ? 15 : dy0; // 下の時刻・上の端と重ならないように
+                    const anchor = cx < PX + 20 ? 'start' : cx > W - PX - 20 ? 'end' : 'middle';
+                    return (
+                      <g key={i}>
+                        <circle cx={cx} cy={cy} r="4.2" fill="#fff" stroke={fs.color} strokeWidth="2.4" />
+                        <text x={cx} y={cy + dy} textAnchor={anchor} fontSize="8.5" fontWeight="700" fill={fs.color} stroke="#fff" strokeWidth="3" paintOrder="stroke" style={mono}>{(oneDay ? '' : md(p.ts) + ' ') + hm(p.ts)}</text>
+                      </g>
+                    );
+                  })}
                 </g>
               );
-            })}
+            })()}
           </svg>
         )}
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
-        {SERIES.map(s => {
-          const off = !!hide[s.key];
+        {SERIES.map(x => {
+          const off = !!hide[x.key];
           return (
-            <button key={s.key} onClick={() => setHide({ ...hide, [s.key]: !off })} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', borderRadius: 999, background: off ? '#e4e1d8' : INK, color: off ? '#a5a39a' : '#fff', fontWeight: 700, fontSize: 12.5, padding: '8px 14px', cursor: 'pointer' }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: off ? '#c9c5b8' : s.color, border: '1.5px solid #fff' }} />{s.name}
+            <button key={x.key} onClick={() => setHide({ ...hide, [x.key]: !off })} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', borderRadius: 999, background: off ? '#e4e1d8' : INK, color: off ? '#a5a39a' : '#fff', fontWeight: 700, fontSize: 12.5, padding: '8px 14px', cursor: 'pointer' }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: off ? '#c9c5b8' : x.color, border: '1.5px solid #fff' }} />{x.name}
             </button>
           );
         })}
@@ -215,7 +244,7 @@ export function BedReview({ v }) {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <TypeBlock sum={b.sum} label="今日のがんばりタイプ" />
         <Speaker text={b.reviewText} />
-        <Chart recs={v.wakeRecs} />
+        <Chart data={v.wakeRecs} />
         <div style={{ height: 8 }} />
       </div>
       <div style={foot}>
@@ -233,7 +262,7 @@ export function WakeReview({ v }) {
     <div style={wrap}>
       <Head v={v} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingTop: 10 }}>
-        <Chart recs={w.recs} />
+        <Chart data={w.chart} />
         <div style={{ height: 8 }} />
       </div>
       <div style={foot}>
