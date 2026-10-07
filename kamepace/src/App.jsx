@@ -17,7 +17,7 @@ import {
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout,
   cloudSave, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
-  loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete,
+  loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete, loadResearchConfig,
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
 import ResearchAdmin from './screens/ResearchAdmin';
@@ -1611,15 +1611,22 @@ export default class App extends React.Component {
   goIkoiEdit = () => this.set({ screen: 'ikoiEdit' });
   goResearchAdmin = () => this.set({ screen: 'researchAdmin' });
   /* ---- 研究への協力（参加者コード） ---- */
+  /* 参加者コードの頭のアルファベット＝実験の期間。その期間の収集期間（start〜end、空なら制限なし） */
+  researchPeriod(code) { const ps = (this._resCfg && this._resCfg.periods) || {}; return ps[(code || '')[0]] || null; }
+  inResearchPeriod(code, d) { const p = this.researchPeriod(code); if (!p) return true; return (!p.start || d >= p.start) && (!p.end || d <= p.end); }
   joinResearch = async (raw) => {
     const code = (raw || '').trim().toUpperCase();
-    if (!/^[A-Z0-9_-]{1,20}$/.test(code)) return '参加者コードは英数字で入力してください';
+    if (!/^[A-Z][0-9]{2}$/.test(code)) return '参加者コードはアルファベット1文字＋数字2桁です（例: A01）';
     if (!this.state.user) return 'ログインが必要です';
+    try { this._resCfg = await loadResearchConfig(); } catch (e) { /* そのまま */ }
+    const per = this.researchPeriod(code);
+    if (!per) return '「' + code[0] + '」の期間はまだ設定されていません';
+    if (per.end && todayStr() > per.end) return '「' + code[0] + '」の期間は終わっています';
     try {
       await researchJoin(code);
       this.set({ research: { on: true, code, since: Date.now() } }); this.save();
-      // それまでの記録からも集計して送る
-      const days = summarizeDays(this.state, researchDates(this.state));
+      // それまでの記録からも集計して送る（その期間の日だけ）
+      const days = summarizeDays(this.state, researchDates(this.state).filter(d => this.inResearchPeriod(code, d)));
       await researchPutDays(code, days);
       this.set({ research: { on: true, code, since: Date.now(), lastSent: Date.now() } }); this.save();
       this.toast('研究への協力を始めました');
@@ -1636,8 +1643,11 @@ export default class App extends React.Component {
     this._resT = setTimeout(async () => {
       const t = todayStr(), dates = [shiftDate(t, -2), shiftDate(t, -1), t];
       const all = summarizeDays(this.state, dates);
+      // 収集期間の日だけ送る
+      const send = {}; [dates[1], dates[2]].forEach(d => { if (this.inResearchPeriod(r.code, d)) send[d] = all[d]; });
+      if (!Object.keys(send).length) return;
       try {
-        await researchPutDays(r.code, { [dates[1]]: all[dates[1]], [dates[2]]: all[dates[2]] });
+        await researchPutDays(r.code, send);
         this.setState(s => ({ research: s.research && s.research.on ? { ...s.research, lastSent: Date.now() } : s.research }));
       } catch (e) { /* 通信できないときは次の保存で */ }
     }, 5000);
@@ -1888,7 +1898,7 @@ export default class App extends React.Component {
     this.unlockBeep();
     // alarm: 全体（all）と実施中（cur）。mode='alarm'＝時刻 at に鳴る／'timer'＝all は開始から min 分、cur はその行動の実施時間が予定（items[cur].min）に達したら
     this.setRun({ items: items.map(x => ({ ...x })), cur: 0, segs: [{ uid: items[0].uid, a: now, b: null }], name: name || '', fromList: !!fromList, startAt: now,
-      alarm: { all: { mode: 'timer', at: '', min: 0 }, cur: { mode: 'timer', at: '' } }, fired: {} });
+      alarm: { all: { mode: 'timer', at: '', min: 0 }, cur: { mode: 'timer', at: '', none: true } }, fired: {} }); // 実施中は最初は時間なし（none）
     this.set({ screen: 'run' });
   };
   runClose(run, now) { return run.segs.map(s => (s.b == null ? { ...s, b: now } : s)); }
@@ -1947,8 +1957,10 @@ export default class App extends React.Component {
   setRunAlarm = (which, patch) => {
     const r = this.state.run; if (!r) return;
     let items = r.items;
-    if (which === 'cur' && patch.min != null) { items = r.items.map((x, i) => (i === r.cur ? { ...x, min: Math.max(1, patch.min) } : x)); }
+    // 実施中タイマー: 0（空）＝時間なし。1分以上なら、いまの行動の予定時間にする
+    if (which === 'cur' && patch.min != null && patch.min > 0) { items = r.items.map((x, i) => (i === r.cur ? { ...x, min: patch.min } : x)); }
     const { min, ...rest } = patch;
+    if (which === 'cur' && min != null) rest.none = !(min > 0);
     const a0 = r.alarm || {};
     const al = { all: { mode: 'timer', at: '', min: 0, ...(a0.all || {}) }, cur: { mode: 'timer', at: '', ...(a0.cur || {}) } };
     al[which] = { ...al[which], ...(which === 'all' && min != null ? { min } : null), ...rest };
@@ -1963,7 +1975,7 @@ export default class App extends React.Component {
     if (a.all && a.all.mode === 'alarm' && a.all.at) { const k = 'allA:' + a.all.at; if (!fired[k] && now >= this.runAtTs(r, a.all.at)) hits.push([k, 'all', '全体アラーム', a.all.at + ' になりました']); }
     if (a.all && a.all.mode === 'timer' && a.all.min > 0) { const k = 'allT:' + a.all.min; if (!fired[k] && now >= (r.startAt || now) + a.all.min * 60000) hits.push([k, 'all', '全体タイマー', '始めてから' + this.fmtMin(a.all.min) + 'たちました']); }
     if (cur && a.cur && a.cur.mode === 'alarm' && a.cur.at) { const k = 'curA:' + cur.uid + ':' + a.cur.at; if (!fired[k] && now >= this.runAtTs(r, a.cur.at)) hits.push([k, 'cur', '実施中アラーム', cur.name + '・' + a.cur.at + ' になりました']); }
-    if (cur && a.cur && a.cur.mode === 'timer' && cur.min > 0) { const k = 'curT:' + cur.uid + ':' + cur.min; if (!fired[k] && this.runMs(r, cur.uid, now) >= cur.min * 60000) hits.push([k, 'cur', '実施中タイマー', cur.name + 'の' + this.fmtMin(cur.min) + 'がたちました']); }
+    if (cur && a.cur && a.cur.mode === 'timer' && !a.cur.none && cur.min > 0) { const k = 'curT:' + cur.uid + ':' + cur.min; if (!fired[k] && this.runMs(r, cur.uid, now) >= cur.min * 60000) hits.push([k, 'cur', '実施中タイマー', cur.name + 'の' + this.fmtMin(cur.min) + 'がたちました']); }
     if (!hits.length) return;
     const f = { ...fired }; hits.forEach(([k]) => { f[k] = true; });
     this.setRun({ ...r, fired: f });
@@ -2002,7 +2014,9 @@ export default class App extends React.Component {
     const al = { all: { mode: 'timer', at: '', min: 0, ...(al0.all || {}) }, cur: { mode: 'timer', at: '', ...(al0.cur || {}) } };
     return {
       name: r.name, running: r.segs.some(s => s.b == null), now,
-      alarm: { all: { mode: al.all.mode, at: al.all.at || '', min: al.all.min || 0 }, cur: { mode: al.cur.mode, at: al.cur.at || '', min: cur.min || 30 } },
+      alarm: { all: { mode: al.all.mode, at: al.all.at || '', min: al.all.min || 0 }, cur: { mode: al.cur.mode, at: al.cur.at || '', min: al.cur.none ? 0 : (cur.min || 30) } },
+      // 実施中に時間を設定していない（タイマー空・アラーム時刻なし）とき、シークバーは常にいっぱい
+      curNoTime: al.cur.mode === 'timer' ? !!al.cur.none : !al.cur.at,
       // 実施中がアラーム（時刻）のとき、その時刻（シークバーの終わりに使う）
       curAlarmTs: al.cur.mode === 'alarm' && al.cur.at ? this.runAtTs(r, al.cur.at) : null,
       // segs: その行動の実行区間（経過時間は画面側で「いま」から毎秒計算する）
@@ -2704,6 +2718,8 @@ export default class App extends React.Component {
     // いこいさんのセリフ・表情（みんなに反映された版）を読み、変わったら描き直す
     this._unIkoi = Ikoi.subscribe(() => this.forceUpdate());
     loadIkoi().then(d => { if (d) Ikoi.setPublished(d); }).catch(() => { /* 読めなければ serifu.js の初期値 */ });
+    // 研究の期間（参加者コードのアルファベットごとの収集期間）
+    loadResearchConfig().then(c => { this._resCfg = c; }).catch(() => { /* 読めなければ期間の制限なし */ });
     this._unwatch = watchAuth((user) => {
       this.set({ user, authOpen: false, authPass: '' });
       if (user) this.loadCloud(); else this.loadGuest();
