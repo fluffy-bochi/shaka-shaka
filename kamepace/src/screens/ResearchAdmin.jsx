@@ -19,9 +19,11 @@ function overallRate(days) {
   const r = adherence(days).map(x => x.rate).filter(x => x != null);
   return r.length ? r.reduce((a, b) => a + Math.min(1, b), 0) / r.length : null;
 }
-function meanFatigue(days) {
-  const v = Object.values(days).map(s => s.fatAvg).filter(x => x != null);
-  return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+/* 体調・気分（朝と夜の記録、1〜5）の平均 */
+function meanOf(days, key) {
+  const v = [];
+  Object.values(days).forEach(s => ['wake', 'bed'].forEach(w => { if (s[w] && s[w][key] != null) v.push(s[w][key]); }));
+  return v.length ? (v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : null;
 }
 function useWide() {
   const q = () => window.innerWidth >= 900;
@@ -30,29 +32,62 @@ function useWide() {
   return w;
 }
 
-/* 日ごとの疲労度（最高〜最低の帯＋平均の線） */
+/* 日ごとの疲労度（最高の線・最低の線と、その間の帯） */
 function FatigueChart({ days, W = 320, H = 150 }) {
-  const ds = Object.keys(days).sort().filter(d => days[d].fatMax || days[d].fatAvg != null);
+  const ds = Object.keys(days).sort().filter(d => days[d].fatMax);
   if (!ds.length) return <div style={{ fontSize: 12, color: MUTED, padding: '20px 0', textAlign: 'center' }}>疲労度の記録がありません</div>;
   const PX = 26, PT = 10, PB = 24;
   const X = (i) => (ds.length === 1 ? W / 2 : PX + i * (W - 2 * PX) / (ds.length - 1));
   const Y = (v) => PT + (1 - v / 100) * (H - PT - PB);
-  const hi = (d) => (days[d].fatMax ? days[d].fatMax.v : days[d].fatAvg), lo = (d) => (days[d].fatMin ? days[d].fatMin.v : days[d].fatAvg);
-  const band = ds.map((d, i) => [X(i), Y(hi(d))]).concat(ds.map((d, i) => [X(i), Y(lo(d))]).reverse());
-  const avg = ds.map((d, i) => [X(i), days[d].fatAvg]).filter(p => p[1] != null).map(p => [p[0], Y(p[1])]);
+  const hi = (d) => days[d].fatMax.v, lo = (d) => (days[d].fatMin ? days[d].fatMin.v : hi(d));
+  const top = ds.map((d, i) => [X(i), Y(hi(d))]), bot = ds.map((d, i) => [X(i), Y(lo(d))]);
+  const band = top.concat([...bot].reverse());
   const step = Math.max(1, Math.ceil(ds.length / (W > 400 ? 10 : 6)));
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
       {[0, 40, 80, 100].map(v => <g key={v}><line x1={PX} x2={W - PX} y1={Y(v)} y2={Y(v)} stroke={LINE} /><text x={PX - 5} y={Y(v) + 3} textAnchor="end" fontSize="8" fill={MUTED} style={mono}>{v}</text></g>)}
       <path d={'M' + band.map(p => p.join(',')).join(' L') + ' Z'} fill={LIME} opacity=".35" />
-      {avg.length > 1 && <path d={'M' + avg.map(p => p.join(',')).join(' L')} fill="none" stroke={GREEN} strokeWidth="2" strokeLinejoin="round" />}
-      {avg.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="2.4" fill={GREEN}><title>{md(ds[i])} 平均{days[ds[i]].fatAvg}・最高{hi(ds[i])}・最低{lo(ds[i])}</title></circle>)}
+      {top.length > 1 && <path d={'M' + top.map(p => p.join(',')).join(' L')} fill="none" stroke={GREEN} strokeWidth="2" strokeLinejoin="round" />}
+      {bot.length > 1 && <path d={'M' + bot.map(p => p.join(',')).join(' L')} fill="none" stroke={GREEN} strokeWidth="1.2" strokeDasharray="3 3" strokeLinejoin="round" />}
+      {top.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="2.4" fill={GREEN}><title>{md(ds[i])} 最高{hi(ds[i])}（{days[ds[i]].fatMax.t}）・最低{lo(ds[i])}</title></circle>)}
       {ds.map((d, i) => ((i % step === 0 && i <= ds.length - 1 - step) || i === ds.length - 1) && <text key={d} x={X(i)} y={H - 8} textAnchor="middle" fontSize="8.5" fill={MUTED} style={mono}>{md(d)}</text>)}
     </svg>
   );
 }
 
-/* 参加者の比較: 1日の平均疲労度の推移（人ごとの線） */
+/* 体調・気分（1〜5）の推移: 体調＝黒・気分＝ピンク、朝＝実線・夜＝点線 */
+function CondMoodChart({ days, W = 320, H = 140 }) {
+  const ds = Object.keys(days).sort();
+  const has = ds.some(d => ['wake', 'bed'].some(w => days[d][w] && (days[d][w].cond != null || days[d][w].mood != null)));
+  if (!has) return <div style={{ fontSize: 12, color: MUTED, padding: '16px 0', textAlign: 'center' }}>体調・気分の記録がありません</div>;
+  const PX = 26, PT = 10, PB = 24;
+  const X = (i) => (ds.length === 1 ? W / 2 : PX + i * (W - 2 * PX) / (ds.length - 1));
+  const Y = (v) => PT + (1 - (v - 1) / 4) * (H - PT - PB);
+  const step = Math.max(1, Math.ceil(ds.length / (W > 400 ? 10 : 6)));
+  const lines = [['cond', 'wake', INK, ''], ['cond', 'bed', INK, '3 3'], ['mood', 'wake', '#ff5fa2', ''], ['mood', 'bed', '#ff5fa2', '3 3']];
+  return (
+    <>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+        {[1, 3, 5].map(v => <g key={v}><line x1={PX} x2={W - PX} y1={Y(v)} y2={Y(v)} stroke={LINE} /><text x={PX - 5} y={Y(v) + 3} textAnchor="end" fontSize="8" fill={MUTED} style={mono}>{v}</text></g>)}
+        {lines.map(([k, w, col, dash]) => {
+          const pts = ds.map((d, i) => [X(i), days[d][w] ? days[d][w][k] : null]).filter(p => p[1] != null).map(p => [p[0], Y(p[1])]);
+          return pts.length > 0 && <g key={k + w}>
+            {pts.length > 1 && <path d={'M' + pts.map(q => q.join(',')).join(' L')} fill="none" stroke={col} strokeWidth={dash ? 1.4 : 2} strokeDasharray={dash || undefined} strokeLinejoin="round" />}
+            {!dash && pts.map((q, i) => <circle key={i} cx={q[0]} cy={q[1]} r="2" fill={col} />)}
+          </g>;
+        })}
+        {ds.map((d, i) => ((i % step === 0 && i <= ds.length - 1 - step) || i === ds.length - 1) && <text key={d} x={X(i)} y={H - 8} textAnchor="middle" fontSize="8.5" fill={MUTED} style={mono}>{md(d)}</text>)}
+      </svg>
+      <div style={{ display: 'flex', gap: 14, justifyContent: 'center', fontSize: 10.5, color: SUB, fontWeight: 700, marginTop: 2 }}>
+        <span><span style={{ display: 'inline-block', width: 14, height: 2, background: INK, verticalAlign: 'middle', marginRight: 4 }} />体調</span>
+        <span><span style={{ display: 'inline-block', width: 14, height: 2, background: '#ff5fa2', verticalAlign: 'middle', marginRight: 4 }} />気分</span>
+        <span>実線＝朝・点線＝夜</span>
+      </div>
+    </>
+  );
+}
+
+/* 参加者の比較: 1日の最高疲労度の推移（人ごとの線） */
 function CompareFatigue({ parts, sel, onSel }) {
   const all = [...new Set(parts.flatMap(p => Object.keys(p.days)))].sort();
   if (!all.length) return null;
@@ -64,7 +99,7 @@ function CompareFatigue({ parts, sel, onSel }) {
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
       {[0, 40, 80, 100].map(v => <g key={v}><line x1={PX} x2={W - PX} y1={Y(v)} y2={Y(v)} stroke={LINE} /><text x={PX - 5} y={Y(v) + 3} textAnchor="end" fontSize="8" fill={MUTED} style={mono}>{v}</text></g>)}
       {parts.map((p, i) => {
-        const pts = Object.keys(p.days).sort().filter(d => p.days[d].fatAvg != null).map(d => [X(d), Y(p.days[d].fatAvg)]);
+        const pts = Object.keys(p.days).sort().filter(d => p.days[d].fatMax).map(d => [X(d), Y(p.days[d].fatMax.v)]);
         const on = !sel || sel === p.code;
         return pts.length > 1 && <path key={p.code} onClick={() => onSel(p.code)} d={'M' + pts.map(q => q.join(',')).join(' L')} fill="none" stroke={PCOL[i % PCOL.length]} strokeWidth={sel === p.code ? 3 : 1.8} opacity={on ? 1 : 0.25} strokeLinejoin="round" style={{ cursor: 'pointer' }}><title>{p.code}</title></path>;
       })}
@@ -142,18 +177,19 @@ function TypeDays({ days }) {
 
 /* 参加者の一覧（表） */
 function PeopleTable({ parts, sel, onSel }) {
-  const cols = '1.1fr .7fr .9fr .9fr 1.3fr';
+  const cols = '1.1fr .6fr .7fr .7fr .8fr 1.3fr';
   const last = (ts) => { if (!ts) return '—'; const d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: cols, gap: '0 6px', fontSize: 10.5, color: MUTED, fontWeight: 700, padding: '4px 6px', borderBottom: '1px solid ' + LINE }}>
-        <span>コード</span><span>日数</span><span>平均疲労</span><span>実行率</span><span>最終送信</span>
+        <span>コード</span><span>日数</span><span>体調</span><span>気分</span><span>実行率</span><span>最終送信</span>
       </div>
       {parts.map((x, i) => (
         <button key={x.code} onClick={() => onSel(x.code)} style={{ display: 'grid', gridTemplateColumns: cols, gap: '0 6px', width: '100%', alignItems: 'center', border: 'none', borderBottom: '1px solid ' + LINE, background: sel === x.code ? '#f7f4ec' : 'none', padding: '9px 6px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
           <span style={{ ...mono, fontSize: 13, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: PCOL[i % PCOL.length] }} />{x.code}{!x.active && <span style={{ fontSize: 9, color: '#b4645a' }}>停止</span>}</span>
           <span style={{ ...mono, fontSize: 12 }}>{Object.keys(x.days).length}</span>
-          <span style={{ ...mono, fontSize: 12 }}>{meanFatigue(x.days) ?? '—'}</span>
+          <span style={{ ...mono, fontSize: 12 }}>{meanOf(x.days, 'cond') ?? '—'}</span>
+          <span style={{ ...mono, fontSize: 12 }}>{meanOf(x.days, 'mood') ?? '—'}</span>
           <span style={{ ...mono, fontSize: 12, fontWeight: 800 }}>{pct(overallRate(x.days))}</span>
           <span style={{ ...mono, fontSize: 10.5, color: SUB }}>{last(x.updatedAt)}</span>
         </button>
@@ -221,7 +257,7 @@ export default function ResearchAdmin({ v }) {
             {parts && parts.length > 0 && <>
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(380px, 1fr) minmax(0, 1.6fr) minmax(260px, .9fr)', gap: 16, marginBottom: 16 }}>
                 <div style={card}><div style={h3}>参加者（{parts.length}人）</div><PeopleTable parts={parts} sel={p && p.code} onSel={pick} /></div>
-                <div style={card}><div style={h3}>1日の平均疲労度の比較</div><CompareFatigue parts={parts} sel={p && p.code} onSel={pick} /></div>
+                <div style={card}><div style={h3}>1日の最高疲労度の比較</div><CompareFatigue parts={parts} sel={p && p.code} onSel={pick} /></div>
                 <div style={card}><div style={h3}>全体の実行率</div><CompareRate parts={parts} sel={p && p.code} onSel={pick} /><div style={{ fontSize: 10.5, color: MUTED, marginTop: 8, lineHeight: 1.6 }}>行動ごとの実行率（100%で頭打ち）の平均</div></div>
               </div>
               {p && (
@@ -229,9 +265,11 @@ export default function ResearchAdmin({ v }) {
                   {detailHead(p)}
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 1fr)', gap: 24 }}>
                     <div>
-                      <div style={h3}>疲労度の推移 <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>線＝1日の平均・帯＝最高〜最低</span></div>
+                      <div style={h3}>疲労度の推移 <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>実線＝1日の最高・点線＝最低</span></div>
                       <FatigueChart days={p.days} W={640} H={240} />
                       <TypeDays days={p.days} />
+                      <div style={{ ...h3, marginTop: 18 }}>体調・気分の推移 <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>朝・夜の記録（1〜5）</span></div>
+                      <CondMoodChart days={p.days} W={640} H={190} />
                     </div>
                     <div>
                       <div style={h3}>実行率（実施／目標）</div>
@@ -257,10 +295,11 @@ export default function ResearchAdmin({ v }) {
           {detailHead(p)}
           <div style={{ ...card, marginBottom: 12 }}>
             <div style={h3}>疲労度の推移</div>
-            <div style={{ fontSize: 10.5, color: MUTED, marginBottom: 6 }}>線＝1日の平均・帯＝最高〜最低</div>
+            <div style={{ fontSize: 10.5, color: MUTED, marginBottom: 6 }}>実線＝1日の最高・点線＝最低</div>
             <FatigueChart days={p.days} />
             <TypeDays days={p.days} />
           </div>
+          <div style={{ ...card, marginBottom: 12 }}><div style={h3}>体調・気分の推移</div><CondMoodChart days={p.days} /></div>
           <div style={card}><div style={h3}>実行率（実施／目標）</div><Adherence days={p.days} /></div>
         </> : (
           <div style={card}><div style={h3}>参加者（{parts.length}人）</div><PeopleTable parts={parts} sel={null} onSel={pick} /></div>

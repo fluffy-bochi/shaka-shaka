@@ -1784,11 +1784,11 @@ export default class App extends React.Component {
   // リストの更新は必ず最新の state から（続けて押しても取りこぼさない）
   addToList = (t) => {
     const li = this.listItemFromAct(t);
-    // 実行画面の「＋」から来たときは、実行中のリストに足して実行画面へ戻る
+    // 実行画面の「＋」から来たときは、実行中のリスト（リストのカードに出ている）に足す。続けて足せるよう画面はそのまま
     if (this.state.runAdd && this.state.run) {
       const r = this.state.run;
       this.setRun({ ...r, items: [...r.items, li] });
-      this.set({ runAdd: false, screen: 'run' });
+      this.setState(s => ({ pickListTick: s.pickListTick + 1 }));
       this.toast('「' + t.name + '」を追加しました');
       return;
     }
@@ -1802,7 +1802,11 @@ export default class App extends React.Component {
     return { pickList: { ...s.pickList, items } };
   });
   removeListItem = (uid) => this.setState(s => ({ pickList: { ...s.pickList, items: s.pickList.items.filter(x => x.uid !== uid) } }));
-  setListName = (e) => { const name = e.target.value; this.setState(s => ({ pickList: { ...s.pickList, name } })); };
+  setListName = (e) => {
+    const name = e.target.value;
+    if (this.state.runAdd && this.state.run) { this.setRun({ ...this.state.run, name }); return; }
+    this.setState(s => ({ pickList: { ...s.pickList, name } }));
+  };
   loadPlanToList = (plan) => {
     const tpl = String(plan.id).startsWith('tpl:') ? plan.id.slice(4) : null;
     const items = plan.tasks.map((t, i) => ({ uid: 'lp' + Date.now() + i, itemId: null, name: t.name, glyph: t.glyph, min: t.min || 30, fat: t.fat }));
@@ -1843,12 +1847,16 @@ export default class App extends React.Component {
   startRun = (items, name, fromList) => {
     if (!items.length) return;
     const now = Date.now();
-    this.setRun({ items: items.map(x => ({ ...x })), cur: 0, segs: [{ uid: items[0].uid, a: now, b: null }], name: name || '', fromList: !!fromList });
+    this.unlockBeep();
+    // alarm: 全体（all）と実施中（cur）。mode='alarm'＝時刻 at に鳴る／'timer'＝all は開始から min 分、cur はその行動の実施時間が予定（items[cur].min）に達したら
+    this.setRun({ items: items.map(x => ({ ...x })), cur: 0, segs: [{ uid: items[0].uid, a: now, b: null }], name: name || '', fromList: !!fromList, startAt: now,
+      alarm: { all: { mode: 'timer', at: '', min: 0 }, cur: { mode: 'timer', at: '' } }, fired: {} });
     this.set({ screen: 'run' });
   };
   runClose(run, now) { return run.segs.map(s => (s.b == null ? { ...s, b: now } : s)); }
   runToggle = () => {
     const r = this.state.run; if (!r) return;
+    this.unlockBeep();
     const now = Date.now(), open = r.segs.some(s => s.b == null);
     this.setRun(open ? { ...r, segs: this.runClose(r, now) } : { ...r, segs: [...r.segs, { uid: r.items[r.cur].uid, a: now, b: null }] });
   };
@@ -1894,8 +1902,52 @@ export default class App extends React.Component {
     this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: total, searchFracs: cart.map(c => c.defMin / total), confirmMode: 'time', startTime: hmOf(start), endTime: hmOf(Math.max(end, start + 60000)), cart: {}, confirmOrigin: r.fromList ? 'list' : 'cat', framePlan: null });
   };
   goRun = () => { if (this.state.run) this.set({ screen: 'run', runAdd: false }); };
+  /* ---- アラーム・タイマー ---- */
+  // which='all'|'cur'。cur のタイマーの分は、いまの行動の予定時間（items[cur].min）として持つ
+  setRunAlarm = (which, patch) => {
+    const r = this.state.run; if (!r) return;
+    let items = r.items;
+    if (which === 'cur' && patch.min != null) { items = r.items.map((x, i) => (i === r.cur ? { ...x, min: Math.max(1, patch.min) } : x)); }
+    const { min, ...rest } = patch;
+    const al = { ...(r.alarm || {}) };
+    al[which] = { ...(al[which] || {}), ...(which === 'all' && min != null ? { min } : null), ...rest };
+    this.setRun({ ...r, items, alarm: al });
+  };
+  // 時刻（HH:MM）→ 実行開始より後のその時刻
+  runAtTs(r, at) { let t = this.hmToTs(at); if (t < (r.startAt || 0) - 60000) t += 86400000; return t; }
+  checkRunAlarms() {
+    const r = this.state.run; if (!r || !r.alarm) return;
+    const now = Date.now(), a = r.alarm, fired = r.fired || {}, cur = r.items[r.cur];
+    const hits = [];
+    if (a.all && a.all.mode === 'alarm' && a.all.at) { const k = 'allA:' + a.all.at; if (!fired[k] && now >= this.runAtTs(r, a.all.at)) hits.push([k, 'all', '全体アラーム', a.all.at + ' になりました']); }
+    if (a.all && a.all.mode === 'timer' && a.all.min > 0) { const k = 'allT:' + a.all.min; if (!fired[k] && now >= (r.startAt || now) + a.all.min * 60000) hits.push([k, 'all', '全体タイマー', '始めてから' + this.fmtMin(a.all.min) + 'たちました']); }
+    if (cur && a.cur && a.cur.mode === 'alarm' && a.cur.at) { const k = 'curA:' + cur.uid + ':' + a.cur.at; if (!fired[k] && now >= this.runAtTs(r, a.cur.at)) hits.push([k, 'cur', '実施中アラーム', cur.name + '・' + a.cur.at + ' になりました']); }
+    if (cur && a.cur && a.cur.mode === 'timer' && cur.min > 0) { const k = 'curT:' + cur.uid + ':' + cur.min; if (!fired[k] && this.runMs(r, cur.uid, now) >= cur.min * 60000) hits.push([k, 'cur', '実施中タイマー', cur.name + 'の' + this.fmtMin(cur.min) + 'がたちました']); }
+    if (!hits.length) return;
+    const f = { ...fired }; hits.forEach(([k]) => { f[k] = true; });
+    this.setRun({ ...r, fired: f });
+    const h = hits[0];
+    this.set({ runAlarm: { kind: h[1], title: h[2], msg: h[3], next: h[1] === 'cur' && r.cur < r.items.length - 1 } });
+    try { if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]); } catch (e) { /* ignore */ }
+    this.beep();
+  }
+  closeRunAlarm = () => this.set({ runAlarm: null });
+  runAlarmNext = () => { const r = this.state.run; this.set({ runAlarm: null }); if (r) this.runSelect(r.cur + 1); };
+  // 音: ユーザー操作（START・▶）のときに AudioContext を作っておき、鳴らすときに使う（iOSは操作中にしか音を出せない）
+  unlockBeep() { try { if (!this._beepCtx) { const C = window.AudioContext || window.webkitAudioContext; if (C) this._beepCtx = new C(); } if (this._beepCtx && this._beepCtx.state === 'suspended') this._beepCtx.resume(); } catch (e) { /* ignore */ } }
+  beep() {
+    const c = this._beepCtx; if (!c) return;
+    try {
+      [0, 0.35, 0.7].forEach(t0 => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'sine'; o.frequency.value = 880; o.connect(g); g.connect(c.destination);
+        const t = c.currentTime + t0; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+        o.start(t); o.stop(t + 0.27);
+      });
+    } catch (e) { /* ignore */ }
+  }
   /* 実行画面のリストの「＋」: 行動選択画面へ（「リスト＋」で実行中のリストに足す） */
-  goRunAdd = () => this.set({ screen: 'record', runAdd: true, searchStep: null, catId: null });
+  goRunAdd = () => { this._pickMem = { ...(this._pickMem || {}), page: 1 }; this.set({ screen: 'record', runAdd: true, searchStep: null, catId: null }); }; // リストのカードを開いた状態で
   /* 実行画面に出す値 */
   runVals() {
     const st = this.state, r = st.run, now = Date.now();
@@ -1904,8 +1956,10 @@ export default class App extends React.Component {
     const cat = it ? this.allCats().find(c => c.id === it.catId) : null;
     const fq = (st.actFreq || {})[normTitle(cur.name)] || {};
     const first = r.segs.find(s => s.uid === cur.uid);
+    const al = r.alarm || { all: { mode: 'timer', at: '', min: 0 }, cur: { mode: 'timer', at: '' } };
     return {
       name: r.name, running: r.segs.some(s => s.b == null), now,
+      alarm: { all: { mode: al.all.mode, at: al.all.at || '', min: al.all.min || 0 }, cur: { mode: al.cur.mode, at: al.cur.at || '', min: cur.min || 30 } },
       cur: { name: cur.name, glyph: cur.glyph, cat: cat ? cat.name : (r.name || ''), color: cat ? cat.color : '#8a8a82',
         // 必・♡・りれき（行動カードと同じ）
         req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(cur.name, kind, val),
@@ -2627,7 +2681,7 @@ export default class App extends React.Component {
         if (this.collectEngine) this.stopCollectPhysics();
       }
     }, 160);
-    this._planT = setInterval(() => this.advancePlans(), 1000);
+    this._planT = setInterval(() => { this.advancePlans(); this.checkRunAlarms(); }, 1000);
     // シャカ画面のロック画面風時計（旧本番 tickClock 相当）
     this._clockT = setInterval(() => {
       const hm = this.tsToHm(Date.now());
@@ -4162,13 +4216,18 @@ export default class App extends React.Component {
       prefOpts,
       cats, showCats: st.screen === 'record' && !st.searchStep,
       showSub: false,
-      pickList: st.screen === 'record' ? {
+      pickList: st.screen === 'record' ? (st.runAdd && st.run ? {
+        // 実行画面の「＋」から来たとき: リストのカードには実行中のリストを出す（並べ替え・外すも実行中のリストに）
+        runMode: true, name: st.run.name, tplKey: null, tick: st.pickListTick,
+        rows: st.run.items.map((li) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.runMove(li.uid, -1), onDown: () => this.runMove(li.uid, 1), onRemove: () => this.runRemove(li.uid) })),
+      } : {
         name: st.pickList.name, tplKey: st.pickList.tplKey, tick: st.pickListTick,
         rows: st.pickList.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.moveListItem(li.uid, -1), onDown: () => this.moveListItem(li.uid, 1), onRemove: () => this.removeListItem(li.uid) })),
-      } : null,
+      }) : null,
       setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate,
       startListRun: () => { const pl = st.pickList; if (pl.items.length) this.startRun(pl.items, (pl.name || '').trim(), true); },
-      run: st.run ? this.runVals() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish,
+      run: st.run ? this.runVals() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish, setRunAlarm: this.setRunAlarm,
+      runAlarm: st.runAlarm, closeRunAlarm: this.closeRunAlarm, runAlarmNext: this.runAlarmNext,
       exitRun: () => this.set({ screen: 'record', runAdd: false }), goRunAdd: this.goRunAdd, runAdd: !!st.runAdd && !!st.run,
       pickCats, pickCatId: st.catId, pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
       pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()), n = new Date(); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日　' + n.getHours() + ':' + pad2(n.getMinutes()); })(),
@@ -4351,6 +4410,20 @@ export default class App extends React.Component {
         )}
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
+        )}
+        {/* アラーム・タイマーが鳴ったとき（どの画面でも） */}
+        {v.runAlarm && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(27,27,24,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }}>
+            <div style={{ width: '100%', background: '#fff', borderRadius: 22, padding: '20px 20px 18px', textAlign: 'center', boxShadow: '0 24px 60px rgba(27,27,24,.35)' }}>
+              <div style={{ fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 40, color: '#1b1b18', lineHeight: 1 }}>alarm</div>
+              <div style={{ fontSize: 16, fontWeight: 900, marginTop: 8 }}>{v.runAlarm.title}</div>
+              <div style={{ fontSize: 13, color: '#55554e', marginTop: 6, lineHeight: 1.6 }}>{v.runAlarm.msg}</div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <button onClick={v.closeRunAlarm} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 800, fontSize: 14, padding: '12px 0', cursor: 'pointer' }}>OK</button>
+                {v.runAlarm.next && <button onClick={v.runAlarmNext} style={{ flex: 1.4, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 900, fontSize: 14, padding: '12px 0', cursor: 'pointer' }}>次へ</button>}
+              </div>
+            </div>
+          </div>
         )}
         {/* 実施中のバー（ホーム・行動選択画面の下） */}
         {v.run && !v.isRun && (v.isHome || v.isPickScreen) && <MiniRun v={v} />}

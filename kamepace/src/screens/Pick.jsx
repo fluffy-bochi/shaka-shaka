@@ -5,7 +5,7 @@ import Emo from '../fluent';
 /* 行動選択（記録の入口）: 上に選択中のカード、下にカテゴリ＋行動のリスト。
    カテゴリは選択中にもう一度タップすると開く（開いていれば閉じる）。右の列は 検索 / 全部開閉 / 必須 / お気に入り（必須・お気に入りは見た目のみ）。
    START・予定・記録は「時間を選ぶ画面（確認）」へ進む。「リスト＋」は右のリストのカードに積む（カードとリストは横にスワイプ）。 */
-const INK = '#1b1b18', LIME_C = '#c4f000';
+const INK = '#1b1b18';
 const ms = (size, color, fill = false) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: fill ? "'FILL' 1" : "'FILL' 0", fontSize: size, color, lineHeight: 1 });
 const CARD_H = 252; // 上のカードの高さはカテゴリ・行動・予定で共通（切り替わってもリストの位置が動かないように）
 const sg = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0');
@@ -248,7 +248,7 @@ function ListCard({ v, onPick }) {
       {/* 名前（テンプレでなくてもつけられる） */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px 6px' }}>
         <input value={L.name} onChange={v.setListName} placeholder="リストの名前" style={{ flex: 1, minWidth: 0, height: 32, border: 'none', borderRadius: 9, background: '#f3f0e8', padding: '0 10px', fontSize: 14, fontWeight: 800, color: INK, fontFamily: 'inherit', outline: 'none' }} />
-        <button onClick={v.saveListTemplate} aria-label="テンプレに保存" disabled={empty} style={{ width: 32, height: 32, flex: '0 0 auto', border: 'none', borderRadius: 9, background: '#f3f0e8', cursor: empty ? 'default' : 'pointer', opacity: empty || !named ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(20, INK, !!L.tplKey)}>bookmark</span></button>
+        {!L.runMode && <button onClick={v.saveListTemplate} aria-label="テンプレに保存" disabled={empty} style={{ width: 32, height: 32, flex: '0 0 auto', border: 'none', borderRadius: 9, background: '#f3f0e8', cursor: empty ? 'default' : 'pointer', opacity: empty || !named ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(20, INK, !!L.tplKey)}>bookmark</span></button>}
       </div>
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px' }}>
         {empty && <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#a5a39a' }}>リストは空です</div>}
@@ -270,12 +270,18 @@ function ListCard({ v, onPick }) {
           </div>
         ))}
       </div>
+      {L.runMode ? (
+        // 実行中のリストを出しているとき: 実行画面へ戻るだけ
+        <div style={{ padding: '8px 14px 14px' }}>
+          <button onClick={v.goRun} style={{ width: '100%', border: 'none', borderRadius: 12, background: '#c4f000', color: '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: 'pointer', boxShadow: '0 4px 12px rgba(122,154,0,.3)' }}>実行に戻る</button>
+        </div>
+      ) :
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px 14px' }}>
         <button onClick={empty ? undefined : v.listToConfirm} style={gray}>予定</button>
         <button onClick={empty ? undefined : v.listToConfirm} style={gray}>記録</button>
         <span style={{ flex: 1 }} />
         <button onClick={empty ? undefined : v.startListRun} style={{ flex: '0 0 44%', border: 'none', borderRadius: 12, background: empty ? '#e4e1d8' : '#c4f000', color: empty ? '#a5a39a' : '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: empty ? 'default' : 'pointer', letterSpacing: '.04em', boxShadow: empty ? 'none' : '0 4px 12px rgba(122,154,0,.3)' }}>START</button>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -446,8 +452,6 @@ export default function Pick({ v }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 12px' }}>
         <button onClick={v.goHome} aria-label="もどる" style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: '#e4e1d8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(26, INK, true)}>arrow_back</span></button>
         <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{v.pickDateText}</div>
-        {/* 実行画面の「＋」から来たときだけ、実行画面へ戻るボタン（ふだんは下の「実施中」のバーから戻る） */}
-        {v.run && v.runAdd && <button onClick={v.goRun} style={{ display: 'flex', alignItems: 'center', gap: 4, border: 'none', borderRadius: 999, background: INK, color: '#fff', padding: '6px 10px 6px 8px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', maxWidth: 130 }}><span style={ms(16, LIME_C, true)}>{v.run.running ? 'play_arrow' : 'pause'}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.runAdd ? '実行に戻る' : v.run.cur.name}</span></button>}
         <SlotPill v={v} small />
       </div>
       {/* 左に行動カード、右にリストのカード（横にスワイプ。となりのカードの端がのぞく）。
