@@ -52,7 +52,8 @@ export default function Run({ v }) {
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec', WebkitTapHighlightColor: 'transparent', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 0' }}>
-        <button onClick={v.exitRun} aria-label="もどる" style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: '#e4e1d8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(26, INK, true)}>arrow_back</span></button>
+        {/* 下三角＝小さくする（ホームへ。下に「実施中」のバーが出る） */}
+        <button onClick={v.minimizeRun} aria-label="小さくする" style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: '#e4e1d8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(32, INK, true)}>keyboard_arrow_down</span></button>
         <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(() => { const d = new Date(now); return (d.getMonth() + 1) + '月' + d.getDate() + '日　' + hm(now); })()}</div>
         {/* 削除＝記録せずに実行をやめる（確認つき） */}
         <button onClick={() => setDelAsk(true)} style={{ border: '2px solid #e8c9c4', borderRadius: 999, background: '#fff', color: '#b4645a', fontSize: 15, fontWeight: 900, padding: '8px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>削除</button>
