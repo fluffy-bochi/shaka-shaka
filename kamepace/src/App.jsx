@@ -1947,8 +1947,9 @@ export default class App extends React.Component {
     let items = r.items;
     if (which === 'cur' && patch.min != null) { items = r.items.map((x, i) => (i === r.cur ? { ...x, min: Math.max(1, patch.min) } : x)); }
     const { min, ...rest } = patch;
-    const al = { ...(r.alarm || {}) };
-    al[which] = { ...(al[which] || {}), ...(which === 'all' && min != null ? { min } : null), ...rest };
+    const a0 = r.alarm || {};
+    const al = { all: { mode: 'timer', at: '', min: 0, ...(a0.all || {}) }, cur: { mode: 'timer', at: '', ...(a0.cur || {}) } };
+    al[which] = { ...al[which], ...(which === 'all' && min != null ? { min } : null), ...rest };
     this.setRun({ ...r, items, alarm: al });
   };
   // 時刻（HH:MM）→ 実行開始より後のその時刻
@@ -1994,7 +1995,9 @@ export default class App extends React.Component {
     const cat = it ? this.allCats().find(c => c.id === it.catId) : null;
     const fq = (st.actFreq || {})[normTitle(cur.name)] || {};
     const first = r.segs.find(s => s.uid === cur.uid);
-    const al = r.alarm || { all: { mode: 'timer', at: '', min: 0 }, cur: { mode: 'timer', at: '' } };
+    // アラーム設定は、古い実行中データや片方だけ保存されたものでも読めるように初期値で埋める（欠けていると画面全体が描けなくなる）
+    const al0 = r.alarm || {};
+    const al = { all: { mode: 'timer', at: '', min: 0, ...(al0.all || {}) }, cur: { mode: 'timer', at: '', ...(al0.cur || {}) } };
     return {
       name: r.name, running: r.segs.some(s => s.b == null), now,
       alarm: { all: { mode: al.all.mode, at: al.all.at || '', min: al.all.min || 0 }, cur: { mode: al.cur.mode, at: al.cur.at || '', min: cur.min || 30 } },
@@ -4264,7 +4267,7 @@ export default class App extends React.Component {
       }) : null,
       setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate,
       startListRun: () => { const pl = st.pickList; if (pl.items.length) this.startRun(pl.items, (pl.name || '').trim(), true); },
-      run: st.run ? this.runVals() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish, setRunAlarm: this.setRunAlarm,
+      run: st.run ? (() => { try { return this.runVals(); } catch (e) { console.warn('[kamepace] run', e); return null; } })() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish, setRunAlarm: this.setRunAlarm,
       runAlarm: st.runAlarm, closeRunAlarm: this.closeRunAlarm, runAlarmNext: this.runAlarmNext,
       exitRun: () => this.set({ screen: 'record', runAdd: false }), goRunAdd: this.goRunAdd, runAdd: !!st.runAdd && !!st.run,
       pickCats, pickCatId: st.catId, pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
