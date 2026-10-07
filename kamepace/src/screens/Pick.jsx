@@ -39,6 +39,44 @@ function monthTarget(f, dim) {
   const per = f.unit === '日' ? dim / k : f.unit === '週' ? dim / 7 / k : 1 / k;
   return Math.max(1, Math.round(f.n * per));
 }
+/* 行動の編集（カードの上に重ねる）: 名前・体・心（その分数ぶん、マイナス＝回復）・分 */
+function EditAct({ it, onClose }) {
+  const [f, setF] = React.useState(() => ({ ...it.editVals }));
+  const num = (key, w = 64) => (
+    <input type="number" inputMode="numeric" value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value === '' || e.target.value === '-' ? e.target.value : parseInt(e.target.value, 10) || 0 })}
+      style={{ width: w, height: 36, boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 9, textAlign: 'center', fontSize: 16, fontWeight: 900, fontFamily: "'Space Mono',monospace", color: INK, padding: 0 }} />
+  );
+  const lab = { fontSize: 11, fontWeight: 800, color: '#55554e' };
+  const ok = (f.name || '').trim() && Number(f.min) > 0;
+  const save = () => { if (!ok) return; it.onEdit({ name: f.name, body: Number(f.body) || 0, mind: Number(f.mind) || 0, min: Number(f.min) }); onClose(); };
+  return (
+    <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: '#fff', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, WebkitTapHighlightColor: 'transparent' }}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: 14, fontWeight: 900, flex: 1 }}>行動を編集</span>
+        <button onClick={onClose} aria-label="閉じる" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(22, INK)}>close</span></button>
+      </div>
+      <div>
+        <div style={lab}>名前</div>
+        <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} style={{ width: '100%', boxSizing: 'border-box', height: 38, border: '1.5px solid #e4e1d8', borderRadius: 9, fontSize: 15, fontWeight: 800, padding: '0 10px', fontFamily: 'inherit', marginTop: 3 }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+        <div><div style={lab}>体</div><div style={{ marginTop: 3 }}>{num('body')}</div></div>
+        <div><div style={lab}>心</div><div style={{ marginTop: 3 }}>{num('mind')}</div></div>
+        <span style={{ fontSize: 14, fontWeight: 800, paddingBottom: 8 }}>/</span>
+        <div><div style={lab}>分</div><div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 3 }}>{num('min', 70)}<span style={{ fontSize: 12, fontWeight: 800 }}>分</span></div></div>
+      </div>
+      <div style={{ fontSize: 10.5, color: '#8a8a82', fontWeight: 700 }}>マイナスで回復</div>
+      <div style={{ flex: 1 }} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        {it.onReset && <button onClick={() => { it.onReset(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '10px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>元に戻す</button>}
+        <span style={{ flex: 1 }} />
+        <button onClick={onClose} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '10px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>キャンセル</button>
+        <button onClick={save} style={{ border: 'none', borderRadius: 12, background: ok ? '#c4f000' : '#e4e1d8', color: ok ? '#2f3a00' : '#a5a39a', fontSize: 14, fontWeight: 900, padding: '10px 20px', cursor: ok ? 'pointer' : 'default', fontFamily: 'inherit' }}>保存</button>
+      </div>
+    </div>
+  );
+}
+
 /* 頻度を決めるポップアップ（カードの上に出す）: [k] 日/週/月 に [n] 回。日/週/月 は きらい/ふつう/すき と同じ形の切り替え */
 export function FreqPop({ label, value, onSave, onDelete, onClose }) {
   const [f, setF] = React.useState(() => (value ? { k: freqK(value), unit: value.unit, n: value.n } : { k: 1, unit: '週', n: 1 }));
@@ -148,6 +186,7 @@ function Card({ row, cat, v, hist, setHist }) {
   // りれきを開く/閉じるときは、カードを裏返す（横に90度まわして中身を入れ替え、反対側から戻す）
   const ref = React.useRef(null);
   const [pop, setPop] = React.useState(null); // 頻度のポップアップ（'req'＝生活必須行動 / 'fav'＝やりたいこと）
+  const [editing, setEditing] = React.useState(false); // 行動の編集
   const flip = (b) => {
     const el = ref.current;
     if (!el || !el.animate) { setHist(b); return; }
@@ -226,6 +265,9 @@ function Card({ row, cat, v, hist, setHist }) {
         {it.onTrash && <button onClick={it.onTrash} aria-label="ゴミ箱へ" style={{ ...gray, padding: '8px 10px' }}><span style={ms(18, '#b4645a')}>delete</span></button>}
         <button onClick={it.onRun || it.onStart} style={{ flex: it.kind === 'act' ? 1.1 : 1, border: 'none', borderRadius: 12, background: '#c4f000', color: '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: 'pointer', letterSpacing: '.04em', boxShadow: '0 4px 12px rgba(122,154,0,.3)' }}>{it.kind === 'act' ? 'START' : 'ひらく'}</button>
       </div>
+      {/* 右上の「編集」 */}
+      {isAct && it.onEdit && <button onClick={() => { setPop(null); setEditing(true); }} style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', color: INK, fontSize: 11.5, fontWeight: 800, padding: '3px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
+      {isAct && editing && <EditAct it={it} onClose={() => setEditing(false)} />}
       {isAct && pop && (
         <FreqPop key={pop} label={pop === 'req' ? '生活必須行動' : 'やりたいこと'} value={it[pop]}
           onSave={(f) => { it.onFreq(pop, f); setPop(null); }} onDelete={() => { it.onFreq(pop, null); setPop(null); }} onClose={() => setPop(null)} />
