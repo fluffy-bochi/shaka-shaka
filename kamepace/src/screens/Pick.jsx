@@ -329,41 +329,35 @@ export default function Pick({ v }) {
   const side = (on) => ({ width: 36, height: 36, borderRadius: 10, border: 'none', boxShadow: '0 1px 3px rgba(27,27,24,.08)', background: on ? INK : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, marginBottom: 10 });
   const arrow = { position: 'absolute', left: 8, zIndex: 2, width: 26, height: 26, border: 'none', background: 'none', cursor: 'pointer', padding: 0 };
 
-  /* 上のカード: [行動, リスト, 行動, リスト, 行動] を横に並べ、真ん中の3枚（リスト・行動・リスト）のどれかに止める。
-     端（0・4番）に止まったら真ん中の行動（2番）へ瞬間移動＝エンドレス。どのカードを見ていても左右にとなりのカードの端がのぞく。 */
-  const PAGES = ['A', 'L', 'A', 'L', 'A'];
+  /* 上のカード: 左に行動カード、右にリストのカードの2枚（ループしない）。となりのカードの端が少しのぞく */
+  const PAGES = ['A', 'L'];
   const pagerRef = React.useRef(null);
-  const [page, setPage] = React.useState(() => mem.page || 2);
+  const [page, setPage] = React.useState(() => (mem.page === 1 ? 1 : 0));
   const onList = PAGES[page] === 'L'; // いまリストのカードを見ているか
   const pageEls = () => (pagerRef.current ? [...pagerRef.current.querySelectorAll('[data-page]')] : []);
   const leftFor = (i) => { const el = pagerRef.current, p = pageEls()[i]; return el && p ? p.offsetLeft - (el.clientWidth - p.offsetWidth) / 2 : 0; };
   const goPage = (i, smooth) => { const el = pagerRef.current; if (!el) return; el.scrollTo({ left: leftFor(i), behavior: smooth ? 'smooth' : 'auto' }); setPage(i); mem.page = i; };
   const nearest = () => {
-    const el = pagerRef.current; if (!el) return 2;
-    const c = el.scrollLeft + el.clientWidth / 2; let best = 2, bd = Infinity;
+    const el = pagerRef.current; if (!el) return 0;
+    const c = el.scrollLeft + el.clientWidth / 2; let best = 0, bd = Infinity;
     pageEls().forEach((p, i) => { const d = Math.abs(p.offsetLeft + p.offsetWidth / 2 - c); if (d < bd) { bd = d; best = i; } });
     return best;
   };
-  const pagerT = React.useRef(null);
-  const onPager = () => {
-    const i = nearest(); if (i !== page) { setPage(i); mem.page = i; }
-    clearTimeout(pagerT.current);
-    pagerT.current = setTimeout(() => { const j = nearest(); if (j === 0 || j === 4) goPage(2, false); }, 160);
-  };
-  React.useLayoutEffect(() => { goPage(mem.page || 2, false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const onPager = () => { const i = nearest(); if (i !== page) { setPage(i); mem.page = i; } };
+  React.useLayoutEffect(() => { goPage(page, false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // リストに積んだ・予定を開いたら、リストのカードへ（開いた直後は動かさない）
   const lastTick = React.useRef(v.pickList ? v.pickList.tick : 0);
   React.useEffect(() => {
     const t = v.pickList ? v.pickList.tick : 0;
     if (t === lastTick.current) return;
     lastTick.current = t;
-    if (PAGES[page] !== 'L') goPage(page >= 2 ? 3 : 1, true);
+    if (page !== 1) goPage(1, true);
   }, [v.pickList && v.pickList.tick]); // eslint-disable-line react-hooks/exhaustive-deps
   // リストの行をタップ: その行動のカードを出し、下のリストでもその行動を選ぶ
   const pickFromList = (r) => {
     let key = r.itemId ? 'act:' + r.itemId : null;
     if (!key) { const hit = cats.flatMap(c => c.items).find(it => it.kind === 'act' && it.name === r.name); if (hit) key = hit.key; }
-    goPage(2, true);
+    goPage(0, true);
     if (!key) return;
     const c = cats.find(cc => cc.items.some(it => it.key === key)); if (!c) return;
     mem.sel = key;
@@ -382,12 +376,12 @@ export default function Pick({ v }) {
         <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{v.pickDateText}</div>
         <SlotPill v={v} small />
       </div>
-      {/* 行動カードとリストのカードを横にスワイプ（左右にとなりのカードの端がのぞく）。
+      {/* 左に行動カード、右にリストのカード（横にスワイプ。となりのカードの端がのぞく）。
           端の余白は padding だと右端が scrollWidth に入らないので、前後のすき間の要素で作る */}
       <div ref={pagerRef} onScroll={onPager} className="nos" style={{ position: 'relative', display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', flex: '0 0 auto', overscrollBehaviorX: 'contain' }}>
         <div style={{ flex: '0 0 26px' }} />
         {PAGES.map((t, i) => (
-          <div key={i} data-page={i} style={{ flex: '0 0 calc(100% - 52px)', minWidth: 0, marginLeft: i ? 10 : 0, scrollSnapAlign: 'center' }}>
+          <div key={i} data-page={i} style={{ flex: '0 0 calc(100% - 52px)', minWidth: 0, marginLeft: i ? 10 : 0, scrollSnapAlign: 'center', scrollSnapStop: 'always' }}>
             {t === 'A'
               ? <Card key={'a' + i + (selRow ? selRow.key : '')} row={selRow} cat={selRow && selRow.cat} v={v} hist={hist} setHist={setHist} />
               : (v.pickList ? <ListCard v={v} onPick={pickFromList} /> : null)}
