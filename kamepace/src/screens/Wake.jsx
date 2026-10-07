@@ -1,5 +1,6 @@
 import React from 'react';
 import { nurseSrc } from '../wake';
+import * as Ikoi from '../ikoi';
 
 /* 起床後記録（ホームの睡眠カードから）: 1 入力 → シャカで🌙 → 2 昨日のふりかえり → 3 今日の予定。
    体調・気分は今は数字の1〜5（あとでイラストに差し替える予定）。背景はホームと同じ #f7f4ec。 */
@@ -108,10 +109,16 @@ export function BedCheck({ v }) {
 }
 
 /* キャラ＋吹き出し */
-export function Speaker({ text, size = 130, onTap, src: srcIn }) {
+export function Speaker({ text, size = 130, onTap, src: srcIn, onEdit }) {
   const src = srcIn || nurseSrc(text); // セリフに合った表情（いこいさん編集のプレビューでは表情を指定できる）
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 20px' }}>
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 20px' }}>
+      {/* 開発者モードのとき: いこいさんの左上に編集マーク（いま出ているセリフを編集） */}
+      {onEdit && Ikoi.isDev() && (
+        <button onClick={(e) => { e.stopPropagation(); onEdit(text); }} aria-label="このセリフを編集" style={{ position: 'absolute', left: 14, top: 0, zIndex: 3, width: 30, height: 30, borderRadius: '50%', border: 'none', background: '#1b1b18', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, boxShadow: '0 2px 6px rgba(27,27,24,.25)' }}>
+          <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 17, lineHeight: 1 }}>edit</span>
+        </button>
+      )}
       <img key={src} src={src} alt="" onClick={onTap} style={{ cursor: onTap ? 'pointer' : undefined, WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none', flex: '0 0 auto', width: size, height: size, objectFit: 'contain', objectPosition: 'bottom', mixBlendMode: 'multiply' }} />
       <div key={text} onClick={onTap} style={{ position: 'relative', flex: 1, background: '#fff', borderRadius: 18, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.75, boxShadow: '0 2px 10px rgba(27,27,24,.06)', marginBottom: 14, animation: 'bubbleIn .18s ease-out', cursor: onTap ? 'pointer' : undefined, WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none' }}>
         {text}
@@ -243,7 +250,7 @@ export function BedReview({ v }) {
       <Head v={v} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <TypeBlock sum={b.sum} label="今日のがんばりタイプ" />
-        <Speaker text={b.reviewText} />
+        <Speaker text={b.reviewText} onEdit={v.editIkoiLine} />
         <Chart data={v.wakeRecs} />
         <div style={{ height: 8 }} />
       </div>
@@ -280,7 +287,7 @@ export function WakePlan({ v }) {
     <div style={wrap}>
       <Head v={v} />
       <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, margin: '4px 0 10px' }}>今日の予定</div>
-      <Speaker text={w.planText} />
+      <Speaker text={w.planText} onEdit={v.editIkoiLine} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: '#efece3', borderRadius: '22px 22px 0 0', padding: '16px 20px 8px' }}>
         {w.plans.length === 0 && w.tasks.length === 0 && <div style={{ textAlign: 'center', fontSize: 12.5, color: '#a5a39a', padding: '30px 0' }}>予定もタスクもありません</div>}
         {w.plans.map((p, i) => (

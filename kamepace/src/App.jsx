@@ -1618,7 +1618,15 @@ export default class App extends React.Component {
   goRecordNow = () => this.openRecord(this.slotNow());
   setMainScreen = (v) => { this.set({ mainScreen: v }); this.save(); };
   goMypage = () => this.set({ screen: 'mypage' });
-  goIkoiEdit = () => this.set({ screen: 'ikoiEdit' });
+  goIkoiEdit = () => { this._ikoiBack = 'mypage'; this.set({ screen: 'ikoiEdit', ikoiTarget: null }); };
+  /* いこいさんの編集マーク: いま出ているセリフの元のセリフを探して編集画面へ（つないだ文で複数あるときは選ぶ）。戻ると元の画面へ */
+  editIkoiLine = (text) => {
+    const ms = Ikoi.findLines(text);
+    if (ms.length > 1) { this.set({ ikoiPick: ms }); return; }
+    this.openIkoiAt(ms[0] || null);
+  };
+  openIkoiAt = (m) => { this._ikoiBack = this.state.screen; this.set({ ikoiPick: null, screen: 'ikoiEdit', ikoiTarget: m ? { key: m.key, idx: m.idx } : null }); };
+  closeIkoiEdit = () => this.set({ screen: this._ikoiBack || 'mypage', ikoiTarget: null });
   goResearchAdmin = () => this.set({ screen: 'researchAdmin' });
   /* ---- 研究への協力（参加者コード） ---- */
   /* 参加者コードの頭のアルファベット＝実験の期間。その期間の収集期間（start〜end、空なら制限なし） */
@@ -2807,7 +2815,8 @@ export default class App extends React.Component {
       case 'collect': this.goShaka(); return true;
       case 'trash': case 'buffLog': case 'slotTimes': case 'catsManage':
       case 'run': this.set({ screen: 'home', runAdd: false }); return true; // 実行画面は小さくしてホームへ（下に実施中のバー）
-      case 'templates': case 'sensitivity': case 'help': case 'ikoiEdit': case 'researchAdmin':
+      case 'ikoiEdit': this.closeIkoiEdit(); return true; // 開いた元の画面へ
+      case 'templates': case 'sensitivity': case 'help': case 'researchAdmin':
         this.goMypage(); return true;
       case 'cycle': this.cancelCycle(); return true;
       case 'onboard':
@@ -4100,6 +4109,7 @@ export default class App extends React.Component {
         return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + '日月火水木金土'[d.getDay()] + '曜日 ' + Math.max(1, n) + '日目';
       })(),
       isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
+      editIkoiLine: this.editIkoiLine, ikoiTarget: st.ikoiTarget, closeIkoiEdit: this.closeIkoiEdit,
       isIkoiEdit: st.screen === 'ikoiEdit', devMode: Ikoi.isDev(), goIkoiEdit: this.goIkoiEdit, tapDevSecret: this.tapDevSecret,
       isResearchAdmin: st.screen === 'researchAdmin', goResearchAdmin: this.goResearchAdmin,
       research: st.research, joinResearch: this.joinResearch, stopResearch: this.stopResearch, deleteResearch: this.deleteResearch,
@@ -4440,7 +4450,7 @@ export default class App extends React.Component {
   }
 
   render() {
-    const v = this.renderVals();
+    const v = this.renderVals(), st0 = this.state;
     return (
       <div className="app-screen" ref={this._screenRef} style={{ background: v.screenBg, ...(v.isBookshelf ? { maxWidth: 'none' } : null) }}>
         {/* status bar spacer（本棚の横向きでは詰める＝下の kame-book-land ルール） */}
@@ -4484,6 +4494,17 @@ export default class App extends React.Component {
         )}
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
+        )}
+        {/* いこいさんの編集マーク: つないだ文のとき、どの部分を編集するか選ぶ */}
+        {st0.ikoiPick && (
+          <div onClick={() => this.set({ ikoiPick: null })} style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: '#fff', borderRadius: '22px 22px 0 0', padding: '16px 16px calc(18px + env(safe-area-inset-bottom))' }}>
+              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10 }}>どのセリフを編集しますか？</div>
+              {st0.ikoiPick.map((m, i) => (
+                <button key={i} onClick={() => this.openIkoiAt(m)} style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', borderRadius: 12, background: '#f7f4ec', padding: '11px 12px', marginBottom: 8, fontSize: 13.5, lineHeight: 1.6, color: '#1b1b18', cursor: 'pointer', fontFamily: 'inherit' }}>{m.t}</button>
+              ))}
+            </div>
+          </div>
         )}
         {/* アラーム・タイマーが鳴ったとき（どの画面でも） */}
         {v.runAlarm && (

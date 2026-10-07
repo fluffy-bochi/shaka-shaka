@@ -101,3 +101,24 @@ export function faceKeyFor(text) {
   const rule = S.FACE_RULES.find(([re]) => re.test(t));
   return rule && fs[rule[1]] ? rule[1] : 'normal';
 }
+
+/* 表示しているセリフ（いくつかをつないだ文もある）から、元になったセリフを探す。
+   差し込みつきの文（{行動} など）は、差し込みの部分を何にでも合うようにして探す。文の前から順に返す */
+export function findLines(text) {
+  const t = text || '', out = [];
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  Object.entries(cur().lines).forEach(([key, arr]) => arr.forEach((x, idx) => {
+    if (!x.t) return;
+    let at = -1, len = x.t.length;
+    if (x.t.includes('{')) {
+      // 差し込みつき: 文全体が合うか確かめ、位置は「差し込みでない部分」で数える（差し込み部分がほかのセリフを飲み込まないように）
+      const parts = x.t.split(/\{[^}]+\}/), lit = parts.filter(Boolean).sort((p, q) => q.length - p.length)[0] || '';
+      const re = new RegExp(parts.map(esc).join('.+?'));
+      if (lit && re.test(t)) { at = t.indexOf(lit); len = lit.length; }
+    } else at = t.indexOf(x.t);
+    if (at >= 0) out.push({ key, idx, t: x.t, at, len });
+  }));
+  // 同じ場所に重なるもの（短い方）は外す
+  out.sort((a, b) => a.at - b.at || b.len - a.len);
+  return out.filter((m, i) => !out.some((o, j) => j !== i && o.at <= m.at && o.at + o.len >= m.at + m.len && o.len > m.len));
+}
