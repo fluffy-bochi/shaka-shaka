@@ -75,7 +75,7 @@ export default function Run({ v }) {
             <span style={{ color: over ? '#7a9a00' : SUB }}>{mmss(c.ms)}</span><span style={{ color: SUB }}>{mmss(c.planMs)}</span>
           </div>
           {/* 必・♡ ｜ ▶ ｜ りれき */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', margin: '10px 0 12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', margin: '10px 0 36px' }}>{/* 下のアラームとの間はFigmaくらいあける */}
             <div style={{ display: 'flex', gap: 6 }}>
               <button onClick={() => setPop(pop === 'req' ? null : 'req')} aria-label="生活必須行動" style={chip(!!c.req)}>必</button>
               <button onClick={() => setPop(pop === 'fav' ? null : 'fav')} aria-label="やりたいこと" style={chip(!!c.fav)}><span style={ms(15, c.fav ? '#fff' : INK, true)}>favorite</span></button>
