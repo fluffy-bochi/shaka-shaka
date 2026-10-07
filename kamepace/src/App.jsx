@@ -21,7 +21,7 @@ import {
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
 import ResearchAdmin from './screens/ResearchAdmin';
-import Run from './screens/Run';
+import Run, { MiniRun } from './screens/Run';
 import * as Ikoi from './ikoi';
 import IkoiEdit from './screens/IkoiEdit';
 import { initShakaSound, attachCollisionSound } from './sound';
@@ -4168,7 +4168,7 @@ export default class App extends React.Component {
       } : null,
       setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate,
       startListRun: () => { const pl = st.pickList; if (pl.items.length) this.startRun(pl.items, (pl.name || '').trim(), true); },
-      run: st.run ? this.runVals() : null, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish,
+      run: st.run ? this.runVals() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish,
       exitRun: () => this.set({ screen: 'record', runAdd: false }), goRunAdd: this.goRunAdd, runAdd: !!st.runAdd && !!st.run,
       pickCats, pickCatId: st.catId, pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
       pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()), n = new Date(); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日　' + n.getHours() + ':' + pad2(n.getMinutes()); })(),
@@ -4352,6 +4352,8 @@ export default class App extends React.Component {
         {v.showToast && (
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 88, zIndex: 9, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '11px 20px', fontSize: 12.5, fontWeight: 700, boxShadow: '0 10px 24px rgba(27,27,24,.3)', whiteSpace: 'nowrap', animation: 'pop .25s ease' }}>{v.toastText}</div>
         )}
+        {/* 実施中のバー（ホーム・行動選択画面の下） */}
+        {v.run && !v.isRun && (v.isHome || v.isPickScreen) && <MiniRun v={v} />}
         {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && !v.isResearchAdmin && <Nav v={v} />}
         </>}
       </div>

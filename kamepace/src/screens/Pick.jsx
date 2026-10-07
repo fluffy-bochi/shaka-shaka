@@ -446,8 +446,8 @@ export default function Pick({ v }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 12px' }}>
         <button onClick={v.goHome} aria-label="もどる" style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: '#e4e1d8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(26, INK, true)}>arrow_back</span></button>
         <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{v.pickDateText}</div>
-        {/* 実行中のタスクがあれば、実行画面へ戻る */}
-        {v.run && <button onClick={v.goRun} style={{ display: 'flex', alignItems: 'center', gap: 4, border: 'none', borderRadius: 999, background: INK, color: '#fff', padding: '6px 10px 6px 8px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', maxWidth: 130 }}><span style={ms(16, LIME_C, true)}>{v.run.running ? 'play_arrow' : 'pause'}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.runAdd ? '実行に戻る' : v.run.cur.name}</span></button>}
+        {/* 実行画面の「＋」から来たときだけ、実行画面へ戻るボタン（ふだんは下の「実施中」のバーから戻る） */}
+        {v.run && v.runAdd && <button onClick={v.goRun} style={{ display: 'flex', alignItems: 'center', gap: 4, border: 'none', borderRadius: 999, background: INK, color: '#fff', padding: '6px 10px 6px 8px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', maxWidth: 130 }}><span style={ms(16, LIME_C, true)}>{v.run.running ? 'play_arrow' : 'pause'}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.runAdd ? '実行に戻る' : v.run.cur.name}</span></button>}
         <SlotPill v={v} small />
       </div>
       {/* 左に行動カード、右にリストのカード（横にスワイプ。となりのカードの端がのぞく）。

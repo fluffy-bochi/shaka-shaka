@@ -114,3 +114,28 @@ export default function Run({ v }) {
     </div>
   );
 }
+
+/* ホーム・行動選択画面の下に出す「実施中」のバー（実行画面のリストの行と同じ形）。押すと実行画面へ、右の⏸/▶で止める・再開 */
+export function MiniRun({ v }) {
+  const r = v.run;
+  const [, tick] = React.useState(0);
+  React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
+  if (!r) return null;
+  const c = r.cur, ratio = Math.min(1, c.ms / c.planMs), over = c.ms > c.planMs;
+  return (
+    <div onClick={v.goRun} style={{ position: 'relative', flex: '0 0 auto', height: 60, margin: '0 8px 6px', background: '#fff', borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 10px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(27,27,24,.14)', WebkitTapHighlightColor: 'transparent', zIndex: 3 }}>
+      <span style={{ position: 'absolute', left: 0, top: 0, width: 47, height: 47, background: c.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+      <span style={{ position: 'relative', flex: '0 0 auto' }}><Emo e={c.glyph} size={36} /></span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 17, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: over ? '#7a9a00' : MUTED, ...mono }}>{mmss(c.ms)} / {mmss(c.planMs)}</div>
+      </div>
+      <button onClick={(e) => { e.stopPropagation(); v.runToggle(); }} aria-label={r.running ? '一時停止' : '再開'} style={{ width: 44, height: 44, border: 'none', borderRadius: 12, background: r.running ? '#efece3' : LIME, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flex: '0 0 auto' }}>
+        <span style={ms(30, r.running ? INK : LIME_INK, true)}>{r.running ? 'pause' : 'play_arrow'}</span>
+      </button>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, background: '#e4e1d8' }}>
+        <div style={{ height: '100%', width: ratio * 100 + '%', background: over ? '#7a9a00' : INK }} />
+      </div>
+    </div>
+  );
+}
