@@ -14,8 +14,75 @@ function Toggle({ on, onClick }) {
   );
 }
 
+/* 研究への協力: 参加中・停止中・未参加の表示と操作 */
+function ResearchCard({ v, onJoin }) {
+  const r = v.research;
+  const [del, setDel] = React.useState(false); // 削除の確認
+  const hm = (ts) => { const d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  const btn = (main) => ({ border: main ? 'none' : '1.5px solid #e4e1d8', borderRadius: 10, background: main ? '#1b1b18' : '#fff', color: main ? '#fff' : '#55554e', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' });
+  if (!r || !r.code) {
+    return (
+      <div style={card}>
+        <button onClick={onJoin} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+          <span style={{ fontSize: 16 }}>🔬</span>
+          <span style={{ flex: 1, fontSize: 14 }}>参加する</span>
+          <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ ...card, padding: '12px 15px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 16 }}>🔬</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14 }}>{r.on ? '参加中' : '停止中'}<span style={{ ...mono, fontSize: 12, fontWeight: 700, marginLeft: 8 }}>{r.code}</span></div>
+          {r.on && r.lastSent && <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 2 }}>送信 {hm(r.lastSent)}</div>}
+        </div>
+        {r.on ? <button onClick={v.stopResearch} style={btn(false)}>やめる</button> : <button onClick={onJoin} style={btn(true)}>再開する</button>}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+        {del ? <>
+          <button onClick={() => setDel(false)} style={btn(false)}>やめる</button>
+          <button onClick={() => { setDel(false); v.deleteResearch(); }} style={{ ...btn(false), borderColor: '#b4645a', color: '#b4645a' }}>本当に削除する</button>
+        </> : <button onClick={() => setDel(true)} style={{ ...btn(false), borderColor: '#e8c9c4', color: '#b4645a' }}>送ったデータを削除</button>}
+      </div>
+    </div>
+  );
+}
+
+/* 参加の同意（参加者コードを入れて始める） */
+function ResearchJoin({ v, onClose }) {
+  const [code, setCode] = React.useState((v.research && v.research.code) || '');
+  const [err, setErr] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const go = async () => { setBusy(true); const e = await v.joinResearch(code); setBusy(false); if (e) setErr(e); else onClose(); };
+  const li = { fontSize: 12.5, lineHeight: 1.7, color: '#1b1b18' };
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 12, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: '#fff', borderRadius: '22px 22px 0 0', padding: '18px 20px calc(20px + env(safe-area-inset-bottom))' }}>
+        <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>研究への協力</div>
+        <div style={{ ...li, fontWeight: 800, color: '#55554e', fontSize: 11.5 }}>送るもの（数値だけ）</div>
+        <div style={li}>疲労度の推移・朝夜の記録（体調・気分・疲労度）・生活必須行動とやりたいことの実施回数・カテゴリ別の回数と時間</div>
+        <div style={{ ...li, fontWeight: 800, color: '#55554e', fontSize: 11.5, marginTop: 8 }}>送らないもの</div>
+        <div style={li}>予定の名前・自分で作った行動の名前・メモなどの文章</div>
+        <div style={{ ...li, marginTop: 8 }}>いつでもやめられ、送ったデータは削除できます。</div>
+        {!v.user ? (
+          <button onClick={v.openAuth} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 14, background: '#1b1b18', color: '#fff', fontWeight: 800, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>ログインして参加する</button>
+        ) : <>
+          <input value={code} onChange={(e) => { setCode(e.target.value); setErr(''); }} placeholder="参加者コード（例: P01）" autoCapitalize="characters"
+            style={{ width: '100%', boxSizing: 'border-box', marginTop: 16, height: 46, borderRadius: 12, border: '1.5px solid #e4e1d8', fontSize: 16, fontWeight: 800, padding: '0 14px', fontFamily: "'Space Mono',monospace" }} />
+          {err && <div style={{ fontSize: 12, color: '#b4645a', fontWeight: 700, marginTop: 6 }}>{err}</div>}
+          <button onClick={busy || !code.trim() ? undefined : go} style={{ width: '100%', marginTop: 12, border: 'none', borderRadius: 14, background: code.trim() && !busy ? '#c4f000' : '#e4e1d8', color: code.trim() && !busy ? '#2f3a00' : '#a5a39a', fontWeight: 900, fontSize: 15, padding: '14px 0', cursor: 'pointer' }}>{busy ? '送信中…' : '同意して始める'}</button>
+        </>}
+      </div>
+    </div>
+  );
+}
+
 export default function MyPage({ v }) {
   const u = v.user;
+  const [join, setJoin] = React.useState(false);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 20px 12px' }}>
@@ -40,9 +107,14 @@ export default function MyPage({ v }) {
         {v.devMode && <>
           <div style={label}>開発者</div>
           <div style={card}>
-            <button onClick={v.goIkoiEdit} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <button onClick={v.goIkoiEdit} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
               <span style={{ fontSize: 16 }}>💬</span>
               <span style={{ flex: 1, fontSize: 14 }}>いこいさん編集</span>
+              <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+            </button>
+            <button onClick={v.goResearchAdmin} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+              <span style={{ fontSize: 16 }}>📊</span>
+              <span style={{ flex: 1, fontSize: 14 }}>研究データ</span>
               <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
             </button>
           </div>
@@ -111,6 +183,8 @@ export default function MyPage({ v }) {
               : <span style={{ display: 'inline-flex', background: '#f1efe8', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#8a8a82', flex: '0 0 auto' }}>ログインで連携</span>}
           </button>
         </div>
+        <div style={label}>研究への協力</div>
+        <ResearchCard v={v} onJoin={() => setJoin(true)} />
         <div style={label}>ヘルプ</div>
         <div style={card}>
           <button onClick={v.startTutorial} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
@@ -198,6 +272,7 @@ export default function MyPage({ v }) {
         )}
       </div>
       {v.authOpen && <AuthGate v={v} />}
+      {join && <ResearchJoin v={v} onClose={() => setJoin(false)} />}
     </div>
   );
 }
