@@ -1940,6 +1940,8 @@ export default class App extends React.Component {
     this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: total, searchFracs: cart.map(c => c.defMin / total), confirmMode: 'time', startTime: hmOf(start), endTime: hmOf(Math.max(end, start + 60000)), cart: {}, confirmOrigin: r.fromList ? 'list' : 'cat', framePlan: null });
   };
   goRun = () => { if (this.state.run) this.set({ screen: 'run', runAdd: false }); };
+  /* 実行中のタスクを記録せずに捨てる */
+  runDiscard = () => { this.setRun(null); this.set({ screen: 'record', runAdd: false, runAlarm: null }); this.toast('実行中のタスクを削除しました'); };
   /* ---- アラーム・タイマー ---- */
   // which='all'|'cur'。cur のタイマーの分は、いまの行動の予定時間（items[cur].min）として持つ
   setRunAlarm = (which, patch) => {
@@ -4267,7 +4269,7 @@ export default class App extends React.Component {
       }) : null,
       setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate,
       startListRun: () => { const pl = st.pickList; if (pl.items.length) this.startRun(pl.items, (pl.name || '').trim(), true); },
-      run: st.run ? (() => { try { return this.runVals(); } catch (e) { console.warn('[kamepace] run', e); return null; } })() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish, setRunAlarm: this.setRunAlarm,
+      run: st.run ? (() => { try { return this.runVals(); } catch (e) { console.warn('[kamepace] run', e); return null; } })() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish, runDiscard: this.runDiscard, setRunAlarm: this.setRunAlarm,
       runAlarm: st.runAlarm, closeRunAlarm: this.closeRunAlarm, runAlarmNext: this.runAlarmNext,
       exitRun: () => this.set({ screen: 'record', runAdd: false }), goRunAdd: this.goRunAdd, runAdd: !!st.runAdd && !!st.run,
       pickCats, pickCatId: st.catId, pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
