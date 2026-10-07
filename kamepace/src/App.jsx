@@ -3819,14 +3819,17 @@ export default class App extends React.Component {
         ...this.allPlans().map(p => ({ key: 'plan:' + p.id, kind: 'plan', name: p.name, glyph: '📋', meta: this.planMeta(p).metaText, onStart: () => this.loadPlanToList(p), onTrash: () => this.trashPlan(p.id) })),
         { key: 'newplan', kind: 'plan', name: '予定をつくる', glyph: '➕', meta: '', onStart: this.openPlanAdd },
       ] },
-      ...this.allCats().filter(c => !(st.hiddenCats || []).includes(c.id)).map(c => ({
+      // 「表示・非表示の切り替え」中（pickShowHidden）は、非表示のカテゴリ・行動も出して目のボタンで切り替える
+      ...this.allCats().filter(c => st.pickShowHidden || !(st.hiddenCats || []).includes(c.id)).map(c => ({
         id: c.id, name: c.name, color: c.color, glyph: c.glyph || '⭐',
+        hidden: (st.hiddenCats || []).includes(c.id), onToggleHide: () => this.toggleCatHidden(c.id),
         items: [
-          ...c.items.filter(t => !hiddenActs0.has(normTitle(t.name))).map(t => {
+          ...c.items.filter(t => st.pickShowHidden || !hiddenActs0.has(normTitle(t.name))).map(t => {
             const pref = (st.prefs || {})[normTitle(t.name)] || 'normal';
             const fq = (st.actFreq || {})[normTitle(t.name)] || {};
             const mk = (pf) => this.actFatParts(t, pf === 'normal' ? null : pf);
-            return { key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onRun: () => this.startRun([this.listItemFromAct(t)], ''), editVals: this.actEditVals(t), onEdit: (vals) => this.editAct(t.id, vals), onReset: t.edited ? () => this.resetAct(t.id) : null, onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym, t.prevNames), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
+            return { hidden: hiddenActs0.has(normTitle(t.name)), onToggleHide: () => this.toggleActHidden(t.name),
+              key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onRun: () => this.startRun([this.listItemFromAct(t)], ''), editVals: this.actEditVals(t), onEdit: (vals) => this.editAct(t.id, vals), onReset: t.edited ? () => this.resetAct(t.id) : null, onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym, t.prevNames), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
               // 生活必須行動・やりたいこと（両方あるときの目標は生活必須行動の頻度）
               req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(t.name, kind, val) };
           }),
@@ -4313,7 +4316,7 @@ export default class App extends React.Component {
       run: st.run ? (() => { try { return this.runVals(); } catch (e) { console.warn('[kamepace] run', e); return null; } })() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish, runDiscard: this.runDiscard, runRename: this.runRename, setRunAlarm: this.setRunAlarm,
       runAlarm: st.runAlarm, closeRunAlarm: this.closeRunAlarm, runAlarmNext: this.runAlarmNext,
       exitRun: () => this.set({ screen: 'record', runAdd: false }), minimizeRun: () => this.set({ screen: 'home', runAdd: false }), goRunAdd: this.goRunAdd, runAdd: !!st.runAdd && !!st.run,
-      pickCats, pickCatId: st.catId, pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
+      pickCats, pickCatId: st.catId, pickShowHidden: !!st.pickShowHidden, togglePickHidden: () => this.set({ pickShowHidden: !st.pickShowHidden }), pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
       pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()), n = new Date(); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日　' + n.getHours() + ':' + pad2(n.getMinutes()); })(),
       subItems, subName: activeCat ? activeCat.name : '', subIcon: activeCat ? activeCat.icon : 'category', subColor: activeCat ? activeCat.color : '#8a8a82',
       degreeOpen: !!st.degreeItem,
