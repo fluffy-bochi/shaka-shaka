@@ -2353,6 +2353,33 @@ export default class App extends React.Component {
     (st.wakeLog || []).forEach(w => { by[w.date] = w; });
     return Object.keys(by).sort().map(d => by[d]).slice(-7);
   }
+  /* 推移グラフのデータ: 朝・夜の記録（体調・気分・疲労度）と、疲労度が増減したところ（記録の終わりの時刻）。
+     疲労度はその日の朝の記録を起点に、記録の増減を足していく（朝の記録がない日は前の日の続き）。0〜100に収める */
+  chartData(days) {
+    const st = this.state, now = Date.now(), recs = [], fat = [];
+    const sw = st.sampleMode ? (this._sampleWake || {}) : {};
+    let carry = null;
+    days.forEach(d => {
+      const w0 = (st.wakeLog || []).find(w => w.date === d);
+      const w = w0 || (sw[d] ? { date: d, ts: hmToTsOn(d, '00:00') + sw[d].min * 60000, cond: sw[d].cond, mood: sw[d].mood, fatigue: sw[d].fatigue } : null);
+      const b = (st.bedLog || []).find(x => x.date === d);
+      let lv = w ? w.fatigue : carry;
+      const start = w ? w.ts : hmToTsOn(d, '00:00');
+      if (w) { recs.push(w); fat.push({ ts: w.ts, v: w.fatigue }); }
+      st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.delta && e.from && e.to)
+        .map(e => ({ e, t: entryEndTs(e) })).filter(x => x.t >= start && x.t <= now && (!b || x.t <= b.ts))
+        .sort((x, y) => x.t - y.t)
+        .forEach(({ e, t }) => {
+          if (lv == null) lv = 0;
+          const nv = Math.max(0, Math.min(100, lv + e.delta));
+          if (nv !== lv) fat.push({ ts: t, v: nv });
+          lv = nv;
+        });
+      if (b) { recs.push(b); fat.push({ ts: b.ts, v: b.fatigue }); lv = b.fatigue; }
+      carry = lv;
+    });
+    return { recs, fat };
+  }
   /* 就寝記録の最後: 今日のがんばりタイプ（朝の疲労を起点に今日の記録から判定） */
   bedVals() {
     const st = this.state, today = this.state.bedDay || this.bedDay();
@@ -2368,7 +2395,8 @@ export default class App extends React.Component {
     const sum = daySummary(st.entries, y, yRec ? yRec.fatigue : 0);
     const plans = sortEntries(st.entries.filter(e => e.date === today && !e.exp && !e.wakeAdd && e.title)).map(e => ({ title: e.title, from: e.from, to: e.to, glyph: entryGlyph(e), delta: e.delta }));
     const tasks = (st.tasks || []).filter(t => t.date === today && t.title);
-    return { recs, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks };
+    const chart = this.chartData([...new Set(recs.map(r => r.date))].sort()); // 朝は直近7回ぶんの日
+    return { recs, chart, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks };
   }
 
   /* ================= 予定の時間進行（旧本番と統一） ================= */
@@ -3774,7 +3802,7 @@ export default class App extends React.Component {
       isWake: ['wake1', 'wake2', 'wake3'].includes(st.screen), isWake1: st.screen === 'wake1', isWake2: st.screen === 'wake2', isWake3: st.screen === 'wake3',
       isBed1: st.screen === 'bed1', isBed2: st.screen === 'bed2', isBed: ['bed1', 'bed2'].includes(st.screen),
       bedDraft: st.bedDraft, setBedDraft: this.setBedDraft, finishBed1: this.finishBed1, goBed: this.goBed, goBed2: this.goBed2,
-      bedFlow: st.bedFlow && st.screen === 'shaka', backBed: () => this.set({ screen: 'shaka' }), wakeRecs: st.screen === 'bed2' ? this.wakeRecords() : [], bed: st.screen === 'bed2' ? this.bedVals() : null,
+      bedFlow: st.bedFlow && st.screen === 'shaka', backBed: () => this.set({ screen: 'shaka' }), wakeRecs: st.screen === 'bed2' ? this.chartData([st.bedDay || this.bedDay()]) : null /* 夜はその日のぶんだけ */, bed: st.screen === 'bed2' ? this.bedVals() : null,
       homeComment: st.screen === 'home' ? (st.tapLine || (() => {
         const d = this.homeDateStr(), nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes());
         const next = sortEntries(st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.title && e.from && (d !== todayStr() || e.from > nowHm)))[0];
