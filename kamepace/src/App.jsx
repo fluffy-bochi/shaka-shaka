@@ -1698,7 +1698,7 @@ export default class App extends React.Component {
     this.toast('「' + sa.name + '」のデバフも調整しました');
   };
   dismissSymAdjust = () => this.set({ symAdjust: null });
-  openRecord(id) { this._pickMem = {}; this.set({ slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
+  openRecord(id) { this._pickMem = {}; this.set({ runAdd: false, slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
   toggleSlotMenu = () => this.set({ slotMenuOpen: !this.state.slotMenuOpen });
   pickSlot = (id) => this.set({ slotId: id, slotMenuOpen: false });
   selectCat = (id) => this.set({ catId: id });
@@ -1784,6 +1784,14 @@ export default class App extends React.Component {
   // リストの更新は必ず最新の state から（続けて押しても取りこぼさない）
   addToList = (t) => {
     const li = this.listItemFromAct(t);
+    // 実行画面の「＋」から来たときは、実行中のリストに足して実行画面へ戻る
+    if (this.state.runAdd && this.state.run) {
+      const r = this.state.run;
+      this.setRun({ ...r, items: [...r.items, li] });
+      this.set({ runAdd: false, screen: 'run' });
+      this.toast('「' + t.name + '」を追加しました');
+      return;
+    }
     this.setState(s => ({ pickList: { ...s.pickList, items: [...s.pickList.items, li] }, pickListTick: s.pickListTick + 1 }));
   };
   /* 並べ替えは行の uid で指定する（押した瞬間に並びが変わっていても、押した行そのものを動かす） */
@@ -1885,7 +1893,9 @@ export default class App extends React.Component {
     this.setRun(null);
     this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: total, searchFracs: cart.map(c => c.defMin / total), confirmMode: 'time', startTime: hmOf(start), endTime: hmOf(Math.max(end, start + 60000)), cart: {}, confirmOrigin: r.fromList ? 'list' : 'cat', framePlan: null });
   };
-  goRun = () => { if (this.state.run) this.set({ screen: 'run' }); };
+  goRun = () => { if (this.state.run) this.set({ screen: 'run', runAdd: false }); };
+  /* 実行画面のリストの「＋」: 行動選択画面へ（「リスト＋」で実行中のリストに足す） */
+  goRunAdd = () => this.set({ screen: 'record', runAdd: true, searchStep: null, catId: null });
   /* 実行画面に出す値 */
   runVals() {
     const st = this.state, r = st.run, now = Date.now();
@@ -4156,7 +4166,7 @@ export default class App extends React.Component {
       setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate,
       startListRun: () => { const pl = st.pickList; if (pl.items.length) this.startRun(pl.items, (pl.name || '').trim(), true); },
       run: st.run ? this.runVals() : null, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish,
-      exitRun: () => this.set({ screen: 'record' }),
+      exitRun: () => this.set({ screen: 'record', runAdd: false }), goRunAdd: this.goRunAdd, runAdd: !!st.runAdd && !!st.run,
       pickCats, pickCatId: st.catId, pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
       pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()), n = new Date(); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日　' + n.getHours() + ':' + pad2(n.getMinutes()); })(),
       subItems, subName: activeCat ? activeCat.name : '', subIcon: activeCat ? activeCat.icon : 'category', subColor: activeCat ? activeCat.color : '#8a8a82',

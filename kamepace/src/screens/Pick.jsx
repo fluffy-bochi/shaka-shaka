@@ -447,7 +447,7 @@ export default function Pick({ v }) {
         <button onClick={v.goHome} aria-label="もどる" style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: '#e4e1d8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(26, INK, true)}>arrow_back</span></button>
         <div style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{v.pickDateText}</div>
         {/* 実行中のタスクがあれば、実行画面へ戻る */}
-        {v.run && <button onClick={v.goRun} style={{ display: 'flex', alignItems: 'center', gap: 4, border: 'none', borderRadius: 999, background: INK, color: '#fff', padding: '6px 10px 6px 8px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', maxWidth: 130 }}><span style={ms(16, LIME_C, true)}>{v.run.running ? 'play_arrow' : 'pause'}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.run.cur.name}</span></button>}
+        {v.run && <button onClick={v.goRun} style={{ display: 'flex', alignItems: 'center', gap: 4, border: 'none', borderRadius: 999, background: INK, color: '#fff', padding: '6px 10px 6px 8px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', maxWidth: 130 }}><span style={ms(16, LIME_C, true)}>{v.run.running ? 'play_arrow' : 'pause'}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.runAdd ? '実行に戻る' : v.run.cur.name}</span></button>}
         <SlotPill v={v} small />
       </div>
       {/* 左に行動カード、右にリストのカード（横にスワイプ。となりのカードの端がのぞく）。
@@ -476,7 +476,7 @@ export default function Pick({ v }) {
         </div>
         <div ref={listRef} onScroll={onScroll} className="nos" style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory', overscrollBehavior: 'contain' }}>
           {all.map(({ r, i }) => (
-            <Row key={i} r={r} i={i} on={i === idx} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={onList && i === idx} />
+            <Row key={i} r={r} i={i} on={i === idx} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={(onList || v.runAdd) && i === idx} />
           ))}
         </div>
       </div>
