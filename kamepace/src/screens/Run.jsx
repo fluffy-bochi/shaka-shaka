@@ -11,6 +11,8 @@ const ms = (size, color, fill = false) => ({ fontFamily: 'Material Symbols Round
 const sg = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0');
 const hm = (ts) => { const d = new Date(ts); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
 // 経過・予定の時間: 1時間未満は 分:秒、1時間以上は 時:分:秒
+// 実行区間から、いまの時点の経過ミリ秒（実行中の区間は b=null）
+const msOf = (segs, now) => (segs || []).reduce((a, s) => a + ((s.b == null ? now : s.b) - s.a), 0);
 const mmss = (t) => { const s = Math.max(0, Math.floor(t / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; };
 
 /* アラーム／タイマーの1行: [全体｜実施中] [アラーム|タイマー] ……… [時刻 or 分] */
@@ -42,7 +44,8 @@ export default function Run({ v }) {
   const [delAsk, setDelAsk] = React.useState(false); // 削除の確認
   React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
   if (!r) return null;
-  const c = r.cur, now = Date.now();
+  const now = Date.now();
+  const c = { ...r.cur, ms: msOf(r.cur.segs, now) }; // 毎秒の再描画で「いま」から計算し直す
   const over = c.ms > c.planMs, ratio = Math.min(1, c.ms / c.planMs);
   const chip = (on) => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 30, height: 28, borderRadius: 999, padding: '0 9px', background: on ? INK : '#efece3', color: on ? '#fff' : INK, fontSize: 13, fontWeight: 900, border: 'none', cursor: 'pointer', fontFamily: 'inherit' });
   const arrowBtn = (on) => ({ width: 26, height: 26, border: 'none', background: 'none', padding: 0, cursor: on ? 'pointer' : 'default', opacity: on ? 1 : 0.2, display: 'flex', alignItems: 'center', justifyContent: 'center' });
@@ -117,7 +120,7 @@ export default function Run({ v }) {
       {hist && (
         <div onClick={() => setHist(false)} style={{ position: 'absolute', inset: 0, zIndex: 12, background: 'rgba(27,27,24,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', height: 270, background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 12px 32px rgba(27,27,24,.25)' }}>
-            <History it={c} cat={{ color: c.color }} onClose={() => setHist(false)} />
+            <History it={c} cat={{ color: c.color }} onClose={() => setHist(false)} closeX />
           </div>
         </div>
       )}
@@ -136,7 +139,7 @@ export default function Run({ v }) {
         </div>
         {listOpen && (
           <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 12px' }}>
-            {r.rows.map((x, i) => (
+            {r.rows.map((x0, i) => { const x = { ...x0, ms: msOf(x0.segs, now) }; return (
               <div key={x.uid} style={{ display: 'flex', alignItems: 'center', gap: 2, height: 44, background: x.on ? '#fff' : '#f3f0e8', borderRadius: 10, padding: '0 4px 0 6px', marginBottom: 6, boxShadow: x.on ? 'inset 0 0 0 2px ' + INK : 'none' }}>
                 <div onClick={x.onTap} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: '100%', cursor: 'pointer' }}>
                   <span style={{ flex: '0 0 auto' }}><Emo e={x.glyph} size={28} /></span>
@@ -155,7 +158,7 @@ export default function Run({ v }) {
                 {edit && <button onClick={x.onDown} aria-label="下へ" style={arrowBtn(i < r.rows.length - 1)}><span style={ms(20, INK)}>arrow_downward</span></button>}
                 {edit && <button onClick={x.onRemove} aria-label="リストから外す" style={arrowBtn(!x.on && r.rows.length > 1)}><span style={ms(19, '#b4645a')}>delete</span></button>}
               </div>
-            ))}
+            ); })}
             <button onClick={v.goRunAdd} aria-label="行動を追加" style={{ width: '100%', height: 40, border: '1.5px dashed #c9c7bf', borderRadius: 10, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(24, SUB)}>add</span></button>
           </div>
         )}
@@ -170,7 +173,7 @@ export function MiniRun({ v }) {
   const [, tick] = React.useState(0);
   React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
   if (!r) return null;
-  const c = r.cur, ratio = Math.min(1, c.ms / c.planMs), over = c.ms > c.planMs;
+  const c = { ...r.cur, ms: msOf(r.cur.segs, Date.now()) }, ratio = Math.min(1, c.ms / c.planMs), over = c.ms > c.planMs;
   return (
     <div onClick={v.goRun} style={{ position: 'relative', flex: '0 0 auto', height: 60, margin: '0 8px 6px', background: '#fff', borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 10px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(27,27,24,.14)', WebkitTapHighlightColor: 'transparent', zIndex: 3 }}>
       <span style={{ position: 'absolute', left: 0, top: 0, width: 47, height: 47, background: c.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
