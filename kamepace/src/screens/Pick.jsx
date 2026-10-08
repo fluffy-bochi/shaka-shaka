@@ -418,7 +418,7 @@ export default function Pick({ v }) {
   const want = React.useRef(mem.sel || null); // 次の描画で真ん中に置きたい行の key
   const endT = React.useRef(null);
 
-  const dark = v.catStyle === 'dark';
+  const dark = true; // カテゴリ行は常に「白地＋色の枠と左の四角」（色はマイページのやさしい／カラフル）
   hOf = hOfFor(dark);
   const rows = React.useMemo(() => {
     const out = [];

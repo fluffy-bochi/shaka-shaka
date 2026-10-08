@@ -237,16 +237,6 @@ export default function MyPage({ v }) {
             </div>
           </div>
           <div style={row(true)}>
-            <span style={{ fontSize: 16 }}>🗂</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14 }}>カテゴリの並び</div>
-            </div>
-            <div style={{ display: 'flex', gap: 0, background: '#efece3', borderRadius: 10, padding: 3, flex: '0 0 auto' }}>
-              <button onClick={v.setCatDark} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.catStyle === 'dark' ? '#1b1b18' : 'transparent', color: v.catStyle === 'dark' ? '#fff' : '#8a8a82' }}>枠</button>
-              <button onClick={v.setCatColorful} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.catStyle === 'color' ? '#1b1b18' : 'transparent', color: v.catStyle === 'color' ? '#fff' : '#8a8a82' }}>カラー</button>
-            </div>
-          </div>
-          <div style={row(true)}>
             <span style={{ fontSize: 16 }}>🎨</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14 }}>カテゴリの色</div>
