@@ -201,7 +201,6 @@ function PeopleTable({ parts, sel, onSel }) {
 /* 参加者のアカウントを作る（実験番号＋パスワード）。参加者はログイン画面の「実験番号」でログインする */
 function AccountMaker({ onClose }) {
   const [code, setCode] = React.useState('');
-  const [pass, setPass] = React.useState('');
   const [msg, setMsg] = React.useState('');
   const [made, setMade] = React.useState([]);
   const [busy, setBusy] = React.useState(false);
@@ -209,9 +208,8 @@ function AccountMaker({ onClose }) {
   const go = async () => {
     const c = code.trim().toUpperCase();
     if (!/^[A-Z][0-9]{2}$/.test(c)) { setMsg('実験番号はアルファベット1文字＋数字2桁です（例: A01）'); return; }
-    if (pass.length < 6) { setMsg('パスワードは6文字以上にしてください'); return; }
     setBusy(true); setMsg('');
-    try { await createParticipantAccount(c, pass); setMade(m => [...m, { c, pass }]); setCode(''); setPass(''); setMsg(c + ' を作りました'); }
+    try { await createParticipantAccount(c); setMade(m => [...m, { c }]); setCode(''); setMsg(c + ' を作りました'); }
     catch (e) { setMsg(e && e.code === 'auth/email-already-in-use' ? c + ' はもう作られています' : '作れませんでした（' + ((e && e.code) || '') + '）'); }
     setBusy(false);
   };
@@ -220,14 +218,14 @@ function AccountMaker({ onClose }) {
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: '#fff', borderRadius: 18, padding: '18px 18px 16px', boxShadow: '0 20px 50px rgba(27,27,24,.3)' }}>
         <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 12 }}>参加者アカウントを作る</div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="A01" autoCapitalize="characters" style={{ ...inp, width: 86 }} />
-          <input value={pass} onChange={(e) => setPass(e.target.value)} placeholder="パスワード（6文字以上）" style={{ ...inp, flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14 }} />
+          <input value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !busy) go(); }} placeholder="A01" autoCapitalize="characters" style={{ ...inp, width: 110 }} />
+          <span style={{ flex: 1 }} />
           <button onClick={busy ? undefined : go} style={btn(true)}>{busy ? '作成中…' : '作る'}</button>
         </div>
         {msg && <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 8, color: msg.endsWith('作りました') ? GREEN : '#b4645a' }}>{msg}</div>}
         {made.length > 0 && (
           <div style={{ marginTop: 12, background: '#f7f4ec', borderRadius: 10, padding: '8px 10px' }}>
-            {made.map(m => <div key={m.c} style={{ ...mono, fontSize: 13, fontWeight: 800, padding: '2px 0' }}>{m.c}　{m.pass}</div>)}
+            {made.map(m => <div key={m.c} style={{ ...mono, fontSize: 13, fontWeight: 800, padding: '2px 0' }}>{m.c}</div>)}
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}><button onClick={onClose} style={btn(false)}>閉じる</button></div>

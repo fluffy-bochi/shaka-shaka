@@ -3552,8 +3552,8 @@ export default class App extends React.Component {
     const code = (this.state.authCode || '').trim().toUpperCase();
     if (!/^[A-Z][0-9]{2}$/.test(code)) { this.set({ authErr: '実験番号はアルファベット1文字＋数字2桁です（例: A01）' }); return; }
     this.set({ authErr: '', authBusy: true });
-    try { await loginCode(code, this.state.authPass); }
-    catch (e) { const c = e && e.code; this.set({ authErr: (c === 'auth/invalid-credential' || c === 'auth/user-not-found' || c === 'auth/wrong-password' || c === 'auth/invalid-email') ? '実験番号かパスワードが違います' : jpError(c) }); }
+    try { await loginCode(code); }
+    catch (e) { const c = e && e.code; this.set({ authErr: (c === 'auth/invalid-credential' || c === 'auth/user-not-found' || c === 'auth/wrong-password' || c === 'auth/invalid-email') ? 'この実験番号は登録されていません' : jpError(c) }); }
     this.set({ authBusy: false });
   };
   doSignupEmail = async () => {

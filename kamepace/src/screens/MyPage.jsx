@@ -301,8 +301,7 @@ function AuthGate({ v }) {
           {[['email', 'メール'], ['code', '実験番号']].map(([k, n]) => <button key={k} onClick={() => v.setAuthMode(k)} style={{ flex: 1, border: 'none', borderRadius: 999, padding: '7px 0', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', background: v.authMode === k ? '#1b1b18' : 'transparent', color: v.authMode === k ? '#fff' : '#55554e', fontFamily: 'inherit' }}>{n}</button>)}
         </div>
         {v.authMode === 'code' ? <>
-          <input value={v.authCode} onChange={v.onAuthCode} placeholder="実験番号（例: A01）" autoCapitalize="characters" style={{ ...input, ...mono, fontWeight: 800 }} />
-          <input type="password" value={v.authPass} onChange={v.onAuthPass} placeholder="パスワード" style={input} />
+          <input value={v.authCode} onChange={v.onAuthCode} onKeyDown={(e) => { if (e.key === 'Enter') v.doLoginCode(); }} placeholder="実験番号（例: A01）" autoCapitalize="characters" style={{ ...input, ...mono, fontWeight: 800 }} />
           {v.authErr && <div style={{ fontSize: 12, color: '#d9534f', marginTop: 10, lineHeight: 1.5 }}>{v.authErr}</div>}
           <button onClick={v.doLoginCode} disabled={v.authBusy} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '13px 0', cursor: 'pointer' }}>ログイン</button>
         </> : <>

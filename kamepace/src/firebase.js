@@ -386,10 +386,12 @@ export async function saveResearchConfig(cfg) { await setDoc(doc(db, 'config', '
 const CODE_DOMAIN = 'exp.hodohodo.app';
 export const codeEmail = (code) => (code || '').trim().toLowerCase() + '@' + CODE_DOMAIN;
 export const codeOfEmail = (email) => { const m = /^([a-z][0-9]{2})@exp\.hodohodo\.app$/.exec(email || ''); return m ? m[1].toUpperCase() : null; };
-export async function loginCode(code, pass) { await signInWithEmailAndPassword(auth, codeEmail(code), pass); }
-export async function createParticipantAccount(code, pass) {
+// 実験番号の人はパスワードを入れない: 実験番号から決まったパスワードを作る（作るときも同じ）
+const codePass = (code) => 'hodohodo-' + (code || '').trim().toLowerCase() + '-exp';
+export async function loginCode(code) { await signInWithEmailAndPassword(auth, codeEmail(code), codePass(code)); }
+export async function createParticipantAccount(code) {
   const sec = getApps().find(a => a.name === 'kame-admin') || initializeApp(firebaseConfig, 'kame-admin');
   const secAuth = getAuth(sec);
-  await createUserWithEmailAndPassword(secAuth, codeEmail(code), pass);
+  await createUserWithEmailAndPassword(secAuth, codeEmail(code), codePass(code));
   await fbSignOut(secAuth);
 }
