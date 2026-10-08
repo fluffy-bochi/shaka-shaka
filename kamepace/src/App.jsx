@@ -128,6 +128,7 @@ export default class App extends React.Component {
     tplName: '',
     /* きもち・できごと（時間なしの心イベント） */
     moodOpen: false,
+    recNote: '', editGid: null, // 記録に書く文章・編集中のまとまり
     moodId: null,
     moodStrength: 'b',
     moodNote: '',
@@ -719,11 +720,13 @@ export default class App extends React.Component {
     const slot = this.slotDef(slotId);
     const off = this.slotUsedMin(slotId);
     const note = (this.state.moodNote || '').trim();
+    const at = recDate === todayStr() ? this.tsToHm(Date.now()) : this.slotHm(slot, off); // 今日はいまの時刻
     const e = {
       ...baseEntry(note || mood.name, delta, recDate),
-      glyph: mood.glyph, min: 0, mood: 'event', event: true, _new: true,
-      slot: slotId, from: this.slotHm(slot, off), to: this.slotHm(slot, off),
+      glyph: mood.glyph, min: 0, mood: 'event', event: true, _new: true, moodLabel: mood.name, gid: 'g' + Date.now().toString(36),
+      slot: slotId, from: at, to: at,
     };
+    if (note) e.note = note;
     const entries = sortEntries([...this.state.entries, e]);
     const immediate = delta > 0;
     this.set({
@@ -1273,6 +1276,10 @@ export default class App extends React.Component {
         }
       });
     }
+    // ホームの投稿: 1回の記録＝1つのまとまり（gid）。書いた文章(note)は最初の記録に持たせる。編集ではまとまりを引き継ぐ
+    const gid = (isEdit && this.state.editGid) || ('g' + Date.now().toString(36));
+    const recNote = (this.state.recNote || '').trim();
+    newEntries.forEach((e, k) => { e.gid = gid; if (k === 0 && recNote) e.note = recNote; else delete e.note; });
     // 体調・症状を記録したら、自動デバフをオン＋その日の後続時間帯にも同じ症状を入れる
     const sym = this.applySymptomEffects(newEntries, recDate, slotId);
     if (sym.extraEntries.length) newEntries.push(...sym.extraEntries);
@@ -1297,7 +1304,7 @@ export default class App extends React.Component {
         : (this.state.confirmOrigin === 'run' && this.state.run && this.state.run.fromList)
           ? (() => { const done = new Set(this.state.run.doneUids || []), items = this.state.pickList.items.filter(x => !done.has(x.uid)); return { ...this.state.pickList, items, ...(items.length ? null : { name: '', tplKey: null }) }; })()
           : this.state.pickList,
-      entries, lastMins, tapLine: isEdit ? this.state.tapLine : null, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null, anchorEnd: null,
+      entries, lastMins, tapLine: isEdit ? this.state.tapLine : null, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null, anchorEnd: null, recNote: '', editGid: null,
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
       // 編集で山が縮んだ場合に consumed が超過しないように
@@ -1432,6 +1439,86 @@ export default class App extends React.Component {
       }
     });
     return out;
+  }
+
+  /* ホームのタイムライン（Figma「home」）: 1回の記録＝1つの投稿。起床・就寝は記録がなくても枠を出す。
+     投稿の見出し＝テンプレ/予定名 → なければいちばん多かった行動（同数なら上のもの）。アイコンもその行動。
+     終わった投稿は薄く。時間帯の区切り（朝・午前・午後・夜）ごとに並べる */
+  homePosts() {
+    const st = this.state, d = this.homeDateStr(), now = Date.now(), today = todayStr();
+    const freq = st.actFreq || {};
+    const colorOf = {}; this.allItems().forEach(it => { colorOf[it.name] = it.color; });
+    const rows = st.entries.map((e, i) => ({ e, i })).filter(({ e }) => e.date === d && !e.exp && !e.wakeAdd);
+    const groups = {}, order = [];
+    rows.forEach(({ e, i }) => {
+      const k = e.gid || (e.plan ? 'plan:' + e.plan : 'one:' + i);
+      if (!groups[k]) { groups[k] = []; order.push(k); }
+      groups[k].push({ e, i });
+    });
+    const sg = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0');
+    const hmText = (hm) => (hm || '').replace(/^0(\d)/, '$1');
+    const posts = order.map(k => {
+      const list = groups[k].sort((a, b) => (a.e.from || '').localeCompare(b.e.from || ''));
+      const es = list.map(x => x.e);
+      const first = es[0];
+      // いちばん多かった行動（同数なら上）
+      const cnt = {}; es.forEach(e => { cnt[e.title] = (cnt[e.title] || 0) + 1; });
+      let top = es[0]; es.forEach(e => { if (cnt[e.title] > cnt[top.title]) top = e; });
+      const label = first.moodLabel || first.plan || top.title;
+      const note = (es.find(e => e.note) || {}).note || '';
+      const from = first.from || '';
+      const endTs = Math.max(...es.map(e => (e.to ? entryEndTs(e) : 0)));
+      const sum = es.reduce((a, e) => a + (e.delta || 0), 0);
+      const frame = es.length === 1 && first.needsSetup;
+      const g = { idxs: list.map(x => x.i), title: label, glyph: entryGlyph(top), isPlan: !!first.plan && !first.gid, planName: first.plan || null, isFrame: frame, plan: first.plan };
+      return {
+        key: k, sortHm: from, slot: this.slotOf(first),
+        glyph: entryGlyph(top), head: note ? label : '', time: hmText(from), main: note || label,
+        sumText: frame ? '' : sg(sum), past: !!endTs && endTs < now, planned: es.some(e => e.planned),
+        frameHint: frame ? 'タップして行動を入れる' : '',
+        items: es.length > 1 ? es.map(e => {
+          const f = freq[normTitle(e.title)] || {};
+          return { glyph: entryGlyph(e), name: e.title, sumText: sg(e.delta || 0), color: colorOf[e.title] || '#d8d5cb', req: !!f.req, fav: !!f.fav };
+        }) : [],
+        onTap: () => (frame ? this.openFrameFill({ ...g, isPlan: true }) : this.openEditFlow(g)),
+        onMenu: () => this.openRecMenu(g),
+      };
+    });
+    // 起床・就寝（記録がなくても出す。タップで記録画面へ）。調子は前回の記録との差を矢印で
+    const logs = [...(st.wakeLog || []).map(w => ({ ...w, kind: 'wake' })), ...(st.bedLog || []).map(b => ({ ...b, kind: 'bed' }))].filter(x => x.ts).sort((a, b) => a.ts - b.ts);
+    const arrow = (cur, prev) => (cur == null || prev == null ? '' : cur > prev ? '↑' : cur < prev ? '↓' : '→');
+    const cond = (rec) => {
+      if (!rec) return null;
+      const prev = [...logs].reverse().find(x => x.ts < rec.ts);
+      return { body: rec.cond, mind: rec.mood, bodyArrow: arrow(rec.cond, prev && prev.cond), mindArrow: arrow(rec.mood, prev && prev.mood) };
+    };
+    const wk = (st.wakeLog || []).find(w => w.date === d);
+    const bd = (st.bedLog || []).find(b => b.date === d);
+    const moon = (st.collected || []).reduce((a, c) => (c.glyph === '🌙' && c.ts && dateToStr(new Date(c.ts)) === d) ? a + (c.amount || 1) : a, 0);
+    const wakeHm = wk ? (wk.up || tsToHmOn(d, wk.ts)) : '';
+    const bedHm = bd ? tsToHmOn(d, bd.ts) : '';
+    posts.push({
+      key: 'wake', kind: 'wake', sortHm: wakeHm || '00:00', slot: 'asa', glyph: '🌅',
+      head: '起床後の記録', time: hmText(wakeHm), main: wk ? (wk.note || '') : '', empty: !wk,
+      sumText: moon ? '−' + moon : '', past: !!wk, cond: cond(wk && { ...wk, ts: wk.ts }),
+      onTap: this.goSleep, onMenu: this.goSleep,
+    });
+    posts.push({
+      key: 'bed', kind: 'bed', sortHm: bedHm || '99:99', slot: 'yoru', glyph: '🌙',
+      head: '就寝前の記録', time: hmText(bedHm), main: bd ? (bd.note || '') : '', empty: !bd,
+      sumText: '', past: !!bd, cond: cond(bd),
+      onTap: this.goBed, onMenu: this.goBed,
+    });
+    posts.sort((a, b) => (a.sortHm || '').localeCompare(b.sortHm || ''));
+    // 時間帯の区切り
+    const names = Object.fromEntries(SLOTS.map(x => [x.id, x.name]));
+    const out = []; let last = null;
+    posts.forEach(p => {
+      const sid = p.kind === 'wake' ? (out.length ? last : 'asa') : p.slot;
+      if (sid !== last) { out.push({ divider: true, key: 'div:' + sid + out.length, slot: sid, name: names[sid] || '' }); last = sid; }
+      out.push(p);
+    });
+    return { rows: out, isToday: d === today };
   }
 
   /* 画面サイズ: 実際のアプリ画面要素を実測（PC表示のスマホ枠にも追従） */
@@ -1751,7 +1838,7 @@ export default class App extends React.Component {
     const last = lastBed ? { bed: lastBed.hm } : [...(this.state.wakeLog || [])].reverse().find(x => x.bed);
     const nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes()); // 起床時刻の入力欄は実際の時計
     const draft = w
-      ? { cond: w.cond, mood: w.mood, fat: w.fatigue, bed: w.bed || (last && last.bed) || '23:00', up: w.up || this.tsToHm(w.ts) }
+      ? { note: w.note || '', cond: w.cond, mood: w.mood, fat: w.fatigue, bed: w.bed || (last && last.bed) || '23:00', up: w.up || this.tsToHm(w.ts) }
       : { cond: null, mood: null, fat: null, bed: (last && last.bed) || '23:00', up: nowHm };
     this.set({ screen: 'wake1', wakeDraft: draft, wakeFlow: false, buffCheckOpen: false });
   }
@@ -1786,7 +1873,7 @@ export default class App extends React.Component {
     this.toast('「' + sa.name + '」のデバフも調整しました');
   };
   dismissSymAdjust = () => this.set({ symAdjust: null });
-  openRecord(id) { this._pickMem = {}; this.set({ runAdd: false, anchorEnd: null, slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
+  openRecord(id) { this._pickMem = {}; this.set({ recNote: '', editGid: null, runAdd: false, anchorEnd: null, slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
   toggleSlotMenu = () => this.set({ slotMenuOpen: !this.state.slotMenuOpen });
   pickSlot = (id) => this.set({ slotId: id, slotMenuOpen: false });
   selectCat = (id) => this.set({ catId: id });
@@ -2164,7 +2251,7 @@ export default class App extends React.Component {
      記録フローと同じ「登録を確認」画面に、元の記録をカートとして積んで入り直す。
      確定時に元の entries を置き換えるので、選び直した絵文字が山にもそのまま反映される。 */
   openEditFlow = (g) => {
-    const idxs = g.isPlan ? (g.idxs || []) : (g.idx != null ? [g.idx] : []);
+    const idxs = g.idxs ? g.idxs : (g.idx != null ? [g.idx] : []);
     if (!idxs.length) return;
     const entries = this.state.entries;
     const mins = idxs.map(i => entryMin(entries[i]) || 30);
@@ -2189,10 +2276,12 @@ export default class App extends React.Component {
     });
     const first = entries[idxs[0]], last = entries[idxs[idxs.length - 1]];
     // 予定グループを編集するときは framePlan をセット。あとで追加した行動も同じ予定の中に入る
-    const planName = g.isPlan ? (g.title || (first && first.plan) || '') : '';
+    const planName = g.isPlan ? (g.planName || (first && first.plan) || g.title || '') : '';
+    const noteE = idxs.map(i => entries[i]).find(e => e && e.note);
     this.set({
       screen: 'record', slotId: this.slotOf(first),
       searchStep: 'confirm', confirmOrigin: 'edit', editIdxs: idxs, framePlan: planName || null,
+      editGid: (first && first.gid) || null, recNote: noteE ? noteE.note : '',
       searchCart: items, searchTotalMin: total, searchFracs: mins.map(m => m / total),
       confirmMode: anyPlanned ? 'time' : 'duration',
       startTime: anyPlanned ? (first.from || '') : '',
@@ -2232,7 +2321,7 @@ export default class App extends React.Component {
     const g = this.state.recMenu;
     this.set({ recMenu: null });
     if (!g) return;
-    const idxs = g.isPlan ? (g.idxs || []) : (g.idx != null ? [g.idx] : []);
+    const idxs = g.idxs ? g.idxs : (g.idx != null ? [g.idx] : []);
     if (!idxs.length) return;
     const set = new Set(idxs);
     // 完全削除せず exp:true でゴミ箱へ（きろくの編集画面の「ゴミ箱へ」と同じ）
@@ -2575,7 +2664,7 @@ export default class App extends React.Component {
     const today = this.wakeDay();
     const up = d.up || (pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes()));
     // ts=起床時刻（予測バーの左端になる）。bed=就寝時刻(HH:MM)。就寝〜起床の時間は bed/up から出せる
-    const wakeLog = [...(this.state.wakeLog || []).filter(w => w.date !== today), { date: today, ts: hmToTsOn(today, up), bed: d.bed || null, up, cond: d.cond, mood: d.mood, fatigue: d.fat }];
+    const wakeLog = [...(this.state.wakeLog || []).filter(w => w.date !== today), { date: today, ts: hmToTsOn(today, up), bed: d.bed || null, up, cond: d.cond, mood: d.mood, fatigue: d.fat, note: (d.note || '').trim() }];
     this.applyFatigue(d.fat, '起床時の疲労', { wakeLog, wakeFlow: true });
   };
   /* 申告した疲労度に山を合わせる: 多ければ使った行動の絵文字から足し、少なければ差ぶんの🌙を降らせる */
@@ -2614,13 +2703,13 @@ export default class App extends React.Component {
   /* 就寝記録が属する日。0時を過ぎて（〜朝5時前に）記録したときは、まだ前の日の夜として扱う（日またぎ対策） */
   bedDay() { return nightDayStr(); }
   /* 就寝記録: 1) 体調・気分・疲労度 → 2) シャカで山を合わせる → 3) 今日のがんばりタイプ。記録した時刻は翌朝の起床記録の就寝時刻になる */
-  goBed = () => this.set({ screen: 'bed1', bedDraft: { cond: null, mood: null, fat: null }, bedFlow: false });
+  goBed = () => { const b = (this.state.bedLog || []).find(x => x.date === this.bedDay()); this.set({ screen: 'bed1', bedDraft: b ? { cond: b.cond, mood: b.mood, fat: b.fatigue, note: b.note || '' } : { cond: null, mood: null, fat: null, note: '' }, bedFlow: false }); };
   setBedDraft = (k, val) => this.setState(prev => ({ bedDraft: { ...prev.bedDraft, [k]: val } }));
   finishBed1 = () => {
     const d = this.state.bedDraft;
     if (d.fat == null) return;
     const today = this.bedDay(), now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
-    const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts: now.getTime(), hm, cond: d.cond, mood: d.mood, fatigue: d.fat }];
+    const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts: now.getTime(), hm, cond: d.cond, mood: d.mood, fatigue: d.fat, note: (d.note || '').trim() }];
     this.applyFatigue(d.fat, '就寝時の疲労', { bedLog, bedFlow: true, bedDay: today }, today);
   };
   /* 🌙が落ち切る前に「つぎへ」を押しても、選んだ疲労度の数まで山を減らす */
@@ -4241,6 +4330,7 @@ export default class App extends React.Component {
       homeDate: this.homeDateStr(),
       homeIsToday: this.homeDateStr() === todayStr(),
       homeNowSlot: this.homeDateStr() === todayStr() ? this.slotNow() : null,
+      homeFeed: st.screen === 'home' ? this.homePosts().rows : [], openRecordNow: () => this.openRecord(this.slotNow()),
       homeDateY: strToDate(this.homeDateStr()).getFullYear(),
       homeDateM: strToDate(this.homeDateStr()).getMonth() + 1,
       homeDateD: strToDate(this.homeDateStr()).getDate(),
@@ -4425,6 +4515,7 @@ export default class App extends React.Component {
         : (searchTotalFat >= 0 ? '+' + searchTotalFat : '' + searchTotalFat),
       goHome: this.goHome, goShaka: this.goShaka, goMypage: this.goMypage, goSleep: this.goSleep,
       moodOpen: !!st.moodOpen, openMood: this.openMood, closeMood: this.closeMood, commitMood: this.commitMood,
+      recNote: st.recNote || '', setRecNote: (t) => this.set({ recNote: t }),
       moodNote: st.moodNote || '', onMoodNote: this.onMoodNote,
       moodChoices: MOODS.map(m => ({ id: m.id, glyph: m.glyph, name: m.name, kind: m.kind, axis: m.axis || 'mind', on: st.moodId === m.id, onPick: () => this.pickMood(m.id) })),
       moodStrengths: MOOD_STRENGTHS.map(x => ({ key: x.key, label: x.label, on: st.moodStrength === x.key, onPick: () => this.pickMoodStrength(x.key) })),
