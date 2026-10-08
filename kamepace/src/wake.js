@@ -20,26 +20,27 @@ function pick(seed, arr) { return arr && arr.length ? arr[hash(seed) % arr.lengt
 
 /* その日の疲労の推移（10分刻み・移動平均で滑らかに）。朝の残り疲労 startFat から、
    各記録の from→to に疲労ぶんを等分に足し引きして 0〜100 に収める。 */
-export function fatigueCurve(entries, dateStr, startFat) {
+export function fatigueCurve(entries, dateStr, startFat, range) {
   const list = (entries || []).filter(e => e.date === dateStr && !e.exp && !e.wakeAdd && e.delta && e.from && e.to);
   const t0 = hmToTsOn(dateStr, '00:00');
   const STEP = 10 * 60000;
+  // range: { from: 起床の時刻, to: 就寝の時刻 }。起床の疲労 startFat はその時点の値なので、
+  // 起床より前に進んだ分（睡眠など）は足さない
+  const from = range && range.from ? range.from : null;
+  const prog = (e, t) => { const a = hmToTsOn(dateStr, e.from), b = hmToTsOn(dateStr, e.to); return b <= a ? (t >= b ? 1 : 0) : Math.max(0, Math.min(1, (t - a) / (b - a))); };
   const raw = [];
   for (let i = 0; i <= 144; i++) {
     const t = t0 + i * STEP;
     let lv = startFat || 0;
-    list.forEach(e => {
-      const a = hmToTsOn(dateStr, e.from), b = hmToTsOn(dateStr, e.to);
-      const k = b <= a ? (t >= b ? 1 : 0) : Math.max(0, Math.min(1, (t - a) / (b - a)));
-      lv += e.delta * k;
-    });
+    list.forEach(e => { lv += e.delta * (prog(e, t) - (from ? prog(e, from) : 0)); });
     raw.push(Math.max(0, Math.min(100, lv)));
   }
-  // 記録のある時間帯(最初の開始〜最後の終了)だけを対象にする
-  if (!list.length) return [];
-  const first = Math.min(...list.map(e => hmToTsOn(dateStr, e.from)));
-  const last = Math.max(...list.map(e => hmToTsOn(dateStr, e.to)));
+  if (!list.length && !from) return [];
+  // 対象の時間帯: 起床〜就寝（わからないときは記録のある時間帯＝最初の開始〜最後の終了）
+  const first = from || (list.length ? Math.min(...list.map(e => hmToTsOn(dateStr, e.from))) : t0);
+  const last = range && range.to ? range.to : (list.length ? Math.max(...list.map(e => hmToTsOn(dateStr, e.to))) : first);
   const i0 = Math.max(0, Math.floor((first - t0) / STEP)), i1 = Math.min(144, Math.ceil((last - t0) / STEP));
+  if (i1 < i0) return [];
   const seg = raw.slice(i0, i1 + 1);
   return seg.map((_, i) => {
     let s = 0, n = 0;
@@ -59,8 +60,8 @@ export function typeOfCurve(curve) {
 }
 
 /* 昨日のまとめ: タイプ・一番力を入れた行動・一番回復した行動 */
-export function daySummary(entries, dateStr, startFat) {
-  const curve = fatigueCurve(entries, dateStr, startFat);
+export function daySummary(entries, dateStr, startFat, range) {
+  const curve = fatigueCurve(entries, dateStr, startFat, range); // 起床〜就寝で一番長く居たゾーン
   const list = (entries || []).filter(e => e.date === dateStr && !e.exp && !e.wakeAdd && e.delta && e.title);
   let up = null, rec = null;
   list.forEach(e => {
