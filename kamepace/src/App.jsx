@@ -111,7 +111,7 @@ export default class App extends React.Component {
     // カテゴリの色: soft＝彩度を下げて明るく・黒字（標準）／vivid＝元のカラフル
     catPalette: (() => { try { return localStorage.getItem('kame_cat_palette') === 'vivid' ? 'vivid' : 'soft'; } catch (e) { return 'soft'; } })(),
     // シャカの動かし方: false=加速度センサー（振る）／true=ジャイロ（傾き＝逆さで上辺に集まる）
-    gyroMode: (() => { try { return localStorage.getItem('shaka_gyro_mode') === '1'; } catch (e) { return false; } })(),
+    gyroMode: true, // シャカの動かし方は「傾き」のみ（振るモードはマイページから外した）
     slotMenuOpen: false,
     /* ---- auth ---- */
     /* ---- 記録の編集（確認画面フローで置き換える対象の entries インデックス） ---- */
