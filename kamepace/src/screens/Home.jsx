@@ -51,6 +51,14 @@ export default function Home({ v }) {
   // 時間帯カードのアコーディオン開閉（デフォルトは開）
   const [closedSlots, setClosedSlots] = React.useState({});
   const toggleSlot = (id) => setClosedSlots((s) => ({ ...s, [id]: !s[id] }));
+  // 今日を開いたときは、いまの時間帯のカードを真ん中に（大きくて入りきらないときは上をそろえる）
+  const listRef = React.useRef(null);
+  React.useLayoutEffect(() => {
+    const box = listRef.current; if (!box || !v.homeNowSlot) return;
+    const el = box.querySelector('[data-slot="' + v.homeNowSlot + '"]'); if (!el) return;
+    const off = el.offsetHeight > box.clientHeight ? 0 : (box.clientHeight - el.offsetHeight) / 2;
+    box.scrollTop = Math.max(0, el.offsetTop - off);
+  }, [v.homeDate, v.homeNowSlot]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
       {/* 背景の積もった絵文字（ボカシ） */}
@@ -98,7 +106,7 @@ export default function Home({ v }) {
         </div>
         <Speaker text={v.homeComment} size={140} onTap={v.tapCharacter} onEdit={v.editIkoiLine} />
       </div>
-      <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 0 12px' }}>
+      <div ref={listRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 0 12px' }}>
         {/* sleep card */}
         <button onClick={v.goSleep} style={{ display: 'block', textAlign: 'left', background: '#fff', border: 'none', borderRadius: 16, padding: '13px 14px', margin: '0 16px 10px', boxShadow: '0 1px 3px rgba(27,27,24,.05)', cursor: 'pointer', width: 'calc(100% - 32px)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -110,7 +118,7 @@ export default function Home({ v }) {
         </button>
         {/* slots */}
         {v.slots.map(s => (
-          <div key={s.id} style={{ background: '#fff', borderRadius: 18, margin: '0 16px 12px', boxShadow: '0 1px 3px rgba(27,27,24,.06)', overflow: 'hidden' }}>
+          <div key={s.id} data-slot={s.id} style={{ background: '#fff', borderRadius: 18, margin: '0 16px 12px', boxShadow: '0 1px 3px rgba(27,27,24,.06)', overflow: 'hidden' }}>
             {/* ヘッダーをタップでアコーディオン開閉 */}
             <div onClick={() => toggleSlot(s.id)} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px 12px', cursor: 'pointer', userSelect: 'none' }}>
               <div style={{ position: 'relative', width: 42, height: 42, flex: '0 0 auto', borderRadius: '50%', background: s.circleBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
