@@ -485,7 +485,9 @@ export default class App extends React.Component {
     return { min, fat, minText: this.fmtMin(min), fatText: (fat >= 0 ? '+' + fat : '' + fat), metaText: p.tasks.length + '件 · ' + this.fmtMin(min) };
   }
   /* 非表示にした行動（名前で管理＝カテゴリ側の item と検索側の entry の両方に効く） */
-  hiddenActSet() { return new Set((this.state.hiddenActs || []).map(n => normTitle(n))); }
+  // オンボーディングの回答で出さない行動（男性には生理痛を出さない）
+  profileExcl() { return new Set(((this.state.profile || {}).gender === '男性' ? ['生理痛'] : []).map(n => normTitle(n))); }
+  hiddenActSet() { return new Set([...(this.state.hiddenActs || []).map(n => normTitle(n)), ...this.profileExcl()]); }
   searchPool() {
     const hidden = this.hiddenActSet();
     return SEARCH_DB.concat(this.state.customActions || []).filter(e => !hidden.has(normTitle(e.name)));
@@ -3833,6 +3835,7 @@ export default class App extends React.Component {
       this.setState({ cart: { [t.id]: { degIdx: null } } }, () => this.goConfirm());
     };
     const hiddenActs0 = this.hiddenActSet();
+    const excl0 = this.profileExcl();
     const pickCats = [
       { id: '__plans', name: 'まとめて入力', color: '#7a9a00', glyph: '📋', items: [
         ...this.allPlans().map(p => ({ key: 'plan:' + p.id, kind: 'plan', name: p.name, glyph: '📋', meta: this.planMeta(p).metaText, onStart: () => this.loadPlanToList(p), onTrash: () => this.trashPlan(p.id) })),
@@ -3843,12 +3846,12 @@ export default class App extends React.Component {
       ...this.allCats().filter(c => {
         const ch = (st.hiddenCats || []).includes(c.id);
         if (!st.pickShowHidden) return !ch;
-        return ch || c.items.some(t => hiddenActs0.has(normTitle(t.name)));
+        return ch || c.items.some(t => hiddenActs0.has(normTitle(t.name)) && !excl0.has(normTitle(t.name)));
       }).map(c => ({
         id: c.id, name: c.name, color: c.color, glyph: c.glyph || '⭐',
         hidden: (st.hiddenCats || []).includes(c.id), onToggleHide: () => this.toggleCatHidden(c.id),
         items: [
-          ...c.items.filter(t => {
+          ...c.items.filter(t => !excl0.has(normTitle(t.name))).filter(t => {
             const h = hiddenActs0.has(normTitle(t.name));
             if (!st.pickShowHidden) return !h;
             return h || (st.hiddenCats || []).includes(c.id);
@@ -4043,7 +4046,8 @@ export default class App extends React.Component {
       const isCustom = (st.customCats || []).some(x => x.id === c.id);
       const customIds = new Set((customItemsById[c.id] || []).map(it => it.id));
       // このカテゴリの行動一覧（非表示トグル＋自作は削除）
-      const acts = c.items.map(it => ({
+      const excl = this.profileExcl();
+      const acts = c.items.filter(it => !excl.has(normTitle(it.name))).map(it => ({
         id: it.id, name: it.name, glyph: it.glyph,
         hidden: hiddenActSet.has(normTitle(it.name)),
         isCustom: customIds.has(it.id),
