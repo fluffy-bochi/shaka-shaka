@@ -4240,6 +4240,7 @@ export default class App extends React.Component {
       navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? 1 : 0,
       homeDate: this.homeDateStr(),
       homeIsToday: this.homeDateStr() === todayStr(),
+      homeNowSlot: this.homeDateStr() === todayStr() ? this.slotNow() : null,
       homeDateY: strToDate(this.homeDateStr()).getFullYear(),
       homeDateM: strToDate(this.homeDateStr()).getMonth() + 1,
       homeDateD: strToDate(this.homeDateStr()).getDate(),
