@@ -237,6 +237,16 @@ export default function MyPage({ v }) {
             </div>
           </div>
           <div style={row(true)}>
+            <span style={{ fontSize: 16 }}>🎨</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14 }}>カテゴリの色</div>
+            </div>
+            <div style={{ display: 'flex', gap: 0, background: '#efece3', borderRadius: 10, padding: 3, flex: '0 0 auto' }}>
+              <button onClick={v.setCatSoft} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.catPalette === 'soft' ? '#1b1b18' : 'transparent', color: v.catPalette === 'soft' ? '#fff' : '#8a8a82' }}>やさしい</button>
+              <button onClick={v.setCatVivid} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.catPalette === 'vivid' ? '#1b1b18' : 'transparent', color: v.catPalette === 'vivid' ? '#fff' : '#8a8a82' }}>カラフル</button>
+            </div>
+          </div>
+          <div style={row(true)}>
             <span style={{ fontSize: 16 }}>📱</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14 }}>動かし方</div>
