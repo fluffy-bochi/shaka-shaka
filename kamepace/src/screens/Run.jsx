@@ -71,9 +71,9 @@ export default function Run({ v }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 0' }}>
         {/* 下三角＝小さくする（ホームへ。下に「実施中」のバーが出る） */}
         <button onClick={v.minimizeRun} aria-label="小さくする" style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: '#e4e1d8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(32, INK, true)}>keyboard_arrow_down</span></button>
-        <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(() => { const d = new Date(now); return (d.getMonth() + 1) + '月' + d.getDate() + '日　' + hm(now); })()}</div>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(() => { const d = new Date(now); return (d.getMonth() + 1) + '月' + d.getDate() + '日'; })()}</div>
         {/* 削除＝記録せずに実行をやめる（確認つき） */}
-        <button onClick={() => setDelAsk(true)} style={{ border: '2px solid #e8c9c4', borderRadius: 999, background: '#fff', color: '#b4645a', fontSize: 15, fontWeight: 900, padding: '8px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>削除</button>
+        <button onClick={() => setDelAsk(true)} style={{ border: 'none', background: 'none', color: '#d9534f', fontSize: 15, fontWeight: 900, padding: '8px 4px', cursor: 'pointer', fontFamily: 'inherit' }}>削除</button>
         <button onClick={v.runFinish} style={{ border: '2px solid ' + INK, borderRadius: 999, background: '#fff', color: INK, fontSize: 17, fontWeight: 900, padding: '7px 20px', cursor: 'pointer', fontFamily: 'inherit' }}>記録</button>
       </div>
       {delAsk && (
@@ -106,8 +106,11 @@ export default function Run({ v }) {
             {over && <div style={{ position: 'absolute', left: `calc(${bar.plan * 100}% - 1px)`, width: 2, height: 10, background: INK }} />}
             <div style={{ position: 'absolute', left: `calc(${ratio * 100}% - 6px)`, width: 12, height: 12, borderRadius: '50%', background: over ? PINK : INK }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, fontWeight: 700, ...mono }}>
-            <span style={{ color: over ? PINK : SUB }}>{mmss(c.ms)}{over ? '（延長 +' + mmss(bar.extra) + '）' : ''}</span><span style={{ color: SUB }}>{bar.none ? '' : mmss(bar.total)}</span>
+          {/* 下: 左＝0:00、点の下＝経過時間、右端＝終わりの時間（近いときは重ならないよう端の表示を隠す） */}
+          <div style={{ position: 'relative', height: 16, fontSize: 10.5, fontWeight: 700, color: SUB, ...mono }}>
+            {ratio > 0.14 && <span style={{ position: 'absolute', left: 0 }}>0:00</span>}
+            <span style={{ position: 'absolute', left: ratio * 100 + '%', transform: `translateX(-${ratio * 100}%)`, color: over ? PINK : INK, whiteSpace: 'nowrap' }}>{mmss(c.ms)}{over ? '（+' + mmss(bar.extra) + '）' : ''}</span>
+            {!bar.none && !over && ratio < 0.8 && <span style={{ position: 'absolute', right: 0 }}>{mmss(bar.total)}</span>}
           </div>
           {/* 必・♡ ｜ ▶ ｜ りれき */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', margin: '10px 0 36px' }}>{/* 下のアラームとの間はFigmaくらいあける */}
