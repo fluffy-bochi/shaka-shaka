@@ -368,11 +368,11 @@ function ListCard({ v, onPick }) {
 
 /* リストの1行（高さは行動 ROW_H・カテゴリ CAT_H で固定。選択中は横に広げて目立たせるだけで高さは変えない＝スクロール位置から選択行を計算できる）
    カテゴリは細くして、閉じた状態でスクロールせずに一覧できるようにする */
-const ROW_H = 60, CAT_H = 32, CAT_H_DARK = 40, COPIES = 5;
-// dark: カテゴリは濃いグレーの帯。選択中は白地＋左に色の四角、となりの行だけカテゴリの色（Figma「カテゴリを閉じる」）
+const ROW_H = 60, CAT_H = 32, CAT_H_DARK = 32, COPIES = 5;
+// dark(枠): カテゴリは白地＋黒字＋カテゴリ色の枠、左にカテゴリ色の四角（▶）
 const hOfFor = (dark) => (r) => (r.type === 'item' ? ROW_H : dark ? CAT_H_DARK : CAT_H);
 let hOf = hOfFor(false);
-const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd, dark, near }) {
+const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd, dark }) {
   const color = r.type === 'addcat' ? '#55554e' : r.cat.color;
   return (
     <div onClick={() => onTap(r, i)} style={{ position: 'relative', height: hOf(r), display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
@@ -391,17 +391,10 @@ const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd, dark, near
           {!on && <FatNums it={r.item} />}
         </div>
       ) : dark ? (
-        on ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', height: 50, margin: '0 -10px', borderRadius: 6, background: '#fff', border: '3px solid ' + color, overflow: 'hidden', boxSizing: 'border-box', position: 'relative', zIndex: 1, boxShadow: '0 4px 14px rgba(27,27,24,.18)' }}>
-            <span style={{ flex: '0 0 52px', alignSelf: 'stretch', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: INK }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
-            <span style={{ flex: 1, textAlign: 'center', fontSize: 19, fontWeight: 900, color: INK, paddingRight: 52, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
-          </div>
-        ) : (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: 32, borderRadius: 5, padding: '0 12px', background: near && r.type === 'cat' ? color : '#3f3f3f', color: near && r.type === 'cat' ? (r.cat.ink || '#fff') : '#fff' }}>
-            <span style={{ fontSize: 10 }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
-            <span style={{ flex: 1, textAlign: 'center', fontSize: 14.5, fontWeight: 800, paddingRight: 20, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
-          </div>
-        )
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', height: on ? 30 : 26, borderRadius: 7, background: '#fff', border: '2px solid ' + color, overflow: 'hidden', boxSizing: 'border-box', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
+          <span style={{ flex: on ? '0 0 34px' : '0 0 30px', alignSelf: 'stretch', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: on ? 11 : 9.5, color: r.type === 'addcat' ? '#fff' : (r.cat.ink || INK) }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
+          <span style={{ flex: 1, textAlign: 'center', fontSize: on ? 14.5 : 13, fontWeight: 800, color: INK, paddingRight: on ? 34 : 30, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
+        </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 30 : 26, borderRadius: 8, padding: '0 12px', background: color, color: r.type === 'cat' ? (r.cat.ink || '#fff') : '#fff', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
           <span style={{ fontSize: on ? 11 : 9.5 }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
@@ -589,7 +582,7 @@ export default function Pick({ v }) {
         </div>
         <div ref={listRef} onScroll={onScroll} className="nos" style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory', overscrollBehavior: 'contain' }}>
           {all.map(({ r, i }) => (
-            <Row key={i} r={r} i={i} on={i === idx} near={Math.abs(i - idx) === 1} dark={dark} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={(onList || v.runAdd) && i === idx} />
+            <Row key={i} r={r} i={i} on={i === idx} dark={dark} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={(onList || v.runAdd) && i === idx} />
           ))}
         </div>
       </div>
