@@ -106,8 +106,6 @@ export default class App extends React.Component {
     recordDate: null, // 記録する日付（確認画面で指定・null=ホーム表示日）。前日の記録などに使う
     homeMotion: (() => { try { return localStorage.getItem('shaka_home_motion') === '1'; } catch (e) { return false; } })(),
     // カテゴリの色: soft＝彩度を下げて明るく・黒字（標準）／vivid＝元のカラフル
-    // カテゴリ行の見た目: dark＝白地＋色の枠と左の四角／color＝全部カテゴリの色
-    catStyle: (() => { try { return localStorage.getItem('kame_cat_style') === 'color' ? 'color' : 'dark'; } catch (e) { return 'dark'; } })(),
     catPalette: (() => { try { return localStorage.getItem('kame_cat_palette') === 'vivid' ? 'vivid' : 'soft'; } catch (e) { return 'soft'; } })(),
     // シャカの動かし方: false=加速度センサー（振る）／true=ジャイロ（傾き＝逆さで上辺に集まる）
     gyroMode: (() => { try { return localStorage.getItem('shaka_gyro_mode') === '1'; } catch (e) { return false; } })(),
@@ -3062,10 +3060,6 @@ export default class App extends React.Component {
     this._savePileLayout();
   }
   resumeMotion() { if (!this.engine || this._running) return; this._running = true; Matter.Runner.run(this.runner, this.engine); if (!this._phys) this._startLoop(); }
-  setCatStyle = (p) => {
-    this.set({ catStyle: p });
-    try { localStorage.setItem('kame_cat_style', p); } catch (e) { /* ignore */ }
-  };
   setCatPalette = (p) => {
     this.set({ catPalette: p });
     try { localStorage.setItem('kame_cat_palette', p); } catch (e) { /* ignore */ }
@@ -4323,7 +4317,6 @@ export default class App extends React.Component {
       sensSub: '体×' + (st.bodyFatCoef || 1).toFixed(1) + ' ・ 心×' + (st.mindFatCoef || 1).toFixed(1),
       goSlotTimes: this.goSlotTimes, goCatsManage: this.goCatsManage,
       goTemplates: this.goTemplates, goSensitivity: this.goSensitivity,
-      catStyle: st.catStyle, setCatDark: () => this.setCatStyle('dark'), setCatColorful: () => this.setCatStyle('color'),
       catPalette: st.catPalette, setCatSoft: () => this.setCatPalette('soft'), setCatVivid: () => this.setCatPalette('vivid'),
       homeMotion: st.homeMotion, setMotionFixed: () => this.setMotion(false), setMotionMove: () => this.setMotion(true),
       mainScreen: st.mainScreen || 'shaka', setMainShaka: () => this.setMainScreen('shaka'), setMainHome: () => this.setMainScreen('home'),
