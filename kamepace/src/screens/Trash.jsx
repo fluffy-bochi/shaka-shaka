@@ -14,11 +14,11 @@ export default function Trash({ v }) {
       <div className="nos" style={{ flex: 1, overflowY: 'auto', padding: '0 16px 24px' }}>
         {v.trashRows.length === 0 && v.trashPlanRows.length === 0 && (
           <div style={{ textAlign: 'center', fontSize: 12.5, color: '#b4b2a8', lineHeight: 1.8, padding: '48px 24px' }}>
-            ゴミ箱は空です。<br />きろくの編集画面や予定リストから「ゴミ箱へ」で移動できます。
+            ゴミ箱は空です。<br />きろくの編集画面やまとめて入力から「ゴミ箱へ」で移動できます。
           </div>
         )}
         {v.trashPlanRows.length > 0 && (
-          <div style={{ ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#b4b2a8', margin: '4px 6px 8px' }}>予定</div>
+          <div style={{ ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#b4b2a8', margin: '4px 6px 8px' }}>まとめて入力</div>
         )}
         {v.trashPlanRows.map(r => (
           <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 11, background: '#fff', borderRadius: 14, padding: '12px 13px', marginBottom: 8, boxShadow: '0 1px 3px rgba(27,27,24,.05)' }}>

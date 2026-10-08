@@ -677,7 +677,7 @@ function PlanDetailPopup({ v }) {
           </div>
           <button onClick={v.closePlan} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
         </div>
-        <div style={{ ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a8a82', margin: '16px 2px 6px' }}>この予定にふくまれる行動</div>
+        <div style={{ ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a8a82', margin: '16px 2px 6px' }}>ふくまれる行動</div>
         <div style={{ border: '1px solid #f1efe8', borderRadius: 14, overflow: 'hidden' }}>
           {v.planTasks.map((t, ti) => (
             <div key={ti} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 13px', borderBottom: '1px solid #f1efe8' }}>
@@ -692,13 +692,13 @@ function PlanDetailPopup({ v }) {
           <span style={msIcon(20, '#6f8fbf', false)}>event_available</span>
           <div style={{ flex: 1, fontSize: 12.5, fontWeight: 700, lineHeight: 1.4 }}>
             Googleカレンダーにも同期
-            <div style={{ fontSize: 10.5, fontWeight: 400, color: '#9d9b91' }}>予定＋ふくまれる行動をそのまま反映</div>
+            <div style={{ fontSize: 10.5, fontWeight: 400, color: '#9d9b91' }}>ふくまれる行動をそのまま反映</div>
           </div>
           <button onClick={v.togglePlanSync} style={{ width: 44, height: 26, borderRadius: 999, border: 'none', background: v.planSyncBg, position: 'relative', cursor: 'pointer', flex: '0 0 auto' }}>
             <span style={{ position: 'absolute', top: 3, left: v.planSyncDot, width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)' }} />
           </button>
         </div>
-        <button onClick={v.recordThisPlan} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 15, padding: '15px 0', cursor: 'pointer' }}>この予定を記録 · <span style={mono}>{v.planDetailFat}</span></button>
+        <button onClick={v.recordThisPlan} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 15, padding: '15px 0', cursor: 'pointer' }}>記録 · <span style={mono}>{v.planDetailFat}</span></button>
       </div>
     </div>
   );
@@ -710,10 +710,10 @@ function PlanAddPopup({ v }) {
     <div style={{ position: 'absolute', inset: 0, zIndex: 7, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div className="nos" style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: '#fff', borderRadius: '22px 22px 0 0', padding: '16px 18px 20px', boxShadow: '0 -12px 40px rgba(27,27,24,.3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>予定をつくる</div>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>まとめて入力をつくる</div>
           <button onClick={v.closePlanAdd} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
         </div>
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>予定の名前</div>
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>名前</div>
         <input value={v.newPlanName} onChange={v.onPlanName} placeholder="例：通勤・ジム・買い出し" style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 15, fontWeight: 700, color: '#1b1b18', boxSizing: 'border-box', outline: 'none' }} />
         <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>ふくめる行動をえらぶ</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
