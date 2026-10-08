@@ -2477,7 +2477,7 @@ export default class App extends React.Component {
     const src = id.startsWith('tpl:') ? 'tpl' : ((this.state.customPlans || []).some(c => c.id === id) ? 'custom' : 'builtin');
     this.set({ trashedPlans: [...(this.state.trashedPlans || []), { plan: { id: p.id, name: p.name, tasks: p.tasks }, src, trashedAt: Date.now() }] });
     this.save();
-    this.toast('予定をゴミ箱に移動しました');
+    this.toast('まとめて入力をゴミ箱に移動しました');
   };
   restorePlanTrash = (id) => {
     const st = this.state;
@@ -3834,9 +3834,9 @@ export default class App extends React.Component {
     };
     const hiddenActs0 = this.hiddenActSet();
     const pickCats = [
-      { id: '__plans', name: '予定', color: '#7a9a00', glyph: '📋', items: [
+      { id: '__plans', name: 'まとめて入力', color: '#7a9a00', glyph: '📋', items: [
         ...this.allPlans().map(p => ({ key: 'plan:' + p.id, kind: 'plan', name: p.name, glyph: '📋', meta: this.planMeta(p).metaText, onStart: () => this.loadPlanToList(p), onTrash: () => this.trashPlan(p.id) })),
-        { key: 'newplan', kind: 'plan', name: '予定をつくる', glyph: '➕', meta: '', onStart: this.openPlanAdd },
+        { key: 'newplan', kind: 'plan', name: 'まとめて入力をつくる', glyph: '➕', meta: '', onStart: this.openPlanAdd },
       ] },
       // 右の目のボタン（pickShowHidden）で「表示中の行動」⇄「非表示の行動」を切り替える。
       // 非表示の行動を見ているときは、非表示のカテゴリ（中身ごと）と、非表示にした行動だけを出す
