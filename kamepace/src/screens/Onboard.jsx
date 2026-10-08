@@ -1,13 +1,13 @@
 import React from 'react';
 
-/* オンボーディング（記録フロー設計.dc.html の9問ウィザードを移植）
+/* オンボーディング（記録フロー設計.dc.html のオンボーディングを移植）
    1問1画面・上部プログレスバー・大きな選択カード。約1分・あとでマイページから変更可 */
 
 const mono = { fontFamily: "'Space Mono',monospace" };
 
 export default function Onboard({ v }) {
   const step = v.obStep;
-  const total = 9;
+  const total = 12;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec' }}>
       {/* progress */}
@@ -20,14 +20,17 @@ export default function Onboard({ v }) {
       </div>
       <div className="nos" style={{ flex: 1, overflowY: 'auto', padding: '14px 24px 24px', display: 'flex', flexDirection: 'column' }}>
         {step === 1 && <Welcome v={v} />}
-        {step === 2 && <Choice v={v} k="age" icon="🎂" q="年代を教えてください" sub="周りとくらべる基準に使います" opts={['10代', '20代', '30代', '40代', '50代', '60代〜']} cols={2} />}
-        {step === 3 && <Choice v={v} k="gender" icon="🧍" q="からだの性別は？" sub="疲労の目安の参考にします" opts={['女性', '男性', 'その他', '答えない']} cols={2} />}
-        {step === 4 && <Choice v={v} k="occupation" icon="💼" q="おもな職業・活動は？" sub="記録するカテゴリのおすすめ表示に使います" opts={['会社員（デスクワーク）', '学生', '立ち仕事・接客', '医療・介護', '主婦・主夫', 'その他']} emojis={['💻', '🎒', '🙋', '🩺', '🏠', '✨']} cols={1} />}
-        {step === 5 && <Choice v={v} k="bodyFat" icon="💪" q="からだは疲れやすい方？" sub="計算の係数になります（あとで変更できます）" opts={['とても疲れやすい', '疲れやすい', 'ふつう', '疲れにくい', 'とても疲れにくい']} cols={1} />}
-        {step === 6 && <Choice v={v} k="bodyRec" icon="💪" q="からだは回復しやすい方？" sub="ねむったり休んだりしたときの戻りやすさ" opts={['とても回復しやすい', '回復しやすい', 'ふつう', '回復しにくい', 'とても回復しにくい']} cols={1} />}
-        {step === 7 && <Choice v={v} k="mindFat" icon="🧠" q="心は疲れやすい方？" sub="人づきあい・プレッシャーなどの効きかた" opts={['とても疲れやすい', '疲れやすい', 'ふつう', '疲れにくい', 'とても疲れにくい']} cols={1} />}
-        {step === 8 && <Choice v={v} k="mindRec" icon="🧠" q="心は回復しやすい方？" sub="気晴らしで気持ちが戻りやすいか" opts={['とても回復しやすい', '回復しやすい', 'ふつう', '回復しにくい', 'とても回復しにくい']} cols={1} />}
-        {step === 9 && <Done v={v} />}
+        {step === 2 && <ActPick v={v} k="req" icon="📌" q="欠かさずやりたいことは？" sub="生活に必須なこと（1日1回で登録・あとで変更できます）" />}
+        {step === 3 && <ActPick v={v} k="fav" icon="💗" q="やりたいことは？" sub="楽しみにしたいこと（1日1回で登録・あとで変更できます）" />}
+        {step === 4 && <Choice v={v} k="age" icon="🎂" q="年代を教えてください" sub="周りとくらべる基準に使います" opts={['10代', '20代', '30代', '40代', '50代', '60代〜']} cols={2} />}
+        {step === 5 && <Choice v={v} k="gender" icon="🧍" q="からだの性別は？" sub="疲労の目安の参考にします" opts={['女性', '男性', 'その他', '答えない']} cols={2} />}
+        {step === 6 && <Choice v={v} k="occupation" icon="💼" q="おもな職業・活動は？" sub="記録するカテゴリのおすすめ表示に使います" opts={['会社員（デスクワーク）', '学生', '立ち仕事・接客', '医療・介護', '主婦・主夫', 'その他']} emojis={['💻', '🎒', '🙋', '🩺', '🏠', '✨']} cols={1} />}
+        {step === 7 && <HideCats v={v} />}
+        {step === 8 && <Choice v={v} k="bodyFat" icon="💪" q="からだは疲れやすい方？" sub="計算の係数になります（あとで変更できます）" opts={['とても疲れやすい', '疲れやすい', 'ふつう', '疲れにくい', 'とても疲れにくい']} cols={1} />}
+        {step === 9 && <Choice v={v} k="bodyRec" icon="💪" q="からだは回復しやすい方？" sub="ねむったり休んだりしたときの戻りやすさ" opts={['とても回復しやすい', '回復しやすい', 'ふつう', '回復しにくい', 'とても回復しにくい']} cols={1} />}
+        {step === 10 && <Choice v={v} k="mindFat" icon="🧠" q="心は疲れやすい方？" sub="人づきあい・プレッシャーなどの効きかた" opts={['とても疲れやすい', '疲れやすい', 'ふつう', '疲れにくい', 'とても疲れにくい']} cols={1} />}
+        {step === 11 && <Choice v={v} k="mindRec" icon="🧠" q="心は回復しやすい方？" sub="気晴らしで気持ちが戻りやすいか" opts={['とても回復しやすい', '回復しやすい', 'ふつう', '回復しにくい', 'とても回復しにくい']} cols={1} />}
+        {step === 12 && <Done v={v} />}
       </div>
     </div>
   );
@@ -39,10 +42,72 @@ function Welcome({ v }) {
       <div style={{ width: 96, height: 96, borderRadius: 28, background: '#c4f000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 52, boxShadow: '0 16px 40px rgba(122,154,0,.3)' }}>🐢</div>
       <div style={{ ...mono, fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: '#8a8a82', marginTop: 22 }}>HodoHodo Effort</div>
       <div style={{ fontSize: 22, fontWeight: 900, marginTop: 6, lineHeight: 1.5 }}>ほどほどふぉーとへ<br />ようこそ</div>
-      <div style={{ fontSize: 13.5, color: '#55554e', lineHeight: 1.9, marginTop: 14 }}>あなたに合わせて疲労を記録します。<br />まずは <b>7つの質問</b> に答えてね。</div>
+      <div style={{ fontSize: 13.5, color: '#55554e', lineHeight: 1.9, marginTop: 14 }}>あなたに合わせて疲労を記録します。<br />まずは <b>10の質問</b> に答えてね。</div>
       <div style={{ ...mono, fontSize: 10.5, color: '#b4b2a8', marginTop: 10 }}>約1分 · あとで変更できます</div>
       <button onClick={v.obNext} style={{ width: '100%', marginTop: 26, border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 16, padding: 16, cursor: 'pointer' }}>はじめる</button>
       <button onClick={v.skipOnboard} style={{ marginTop: 14, border: 'none', background: 'none', fontSize: 12, fontWeight: 700, color: '#b4b2a8', cursor: 'pointer' }}>あとで（ふつうの設定ではじめる）</button>
+    </div>
+  );
+}
+
+const nextBtn = { width: '100%', marginTop: 16, border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 15, padding: 15, cursor: 'pointer', flex: '0 0 auto' };
+const chip = (on) => ({ display: 'inline-flex', alignItems: 'center', gap: 5, border: on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: on ? '#fbfdf0' : '#fff', borderRadius: 999, padding: on ? '7px 11px' : '7.5px 11.5px', fontSize: 13, fontWeight: on ? 900 : 700, color: '#1b1b18', cursor: 'pointer' });
+
+function Head({ icon, q, sub }) {
+  return (
+    <>
+      <div style={{ textAlign: 'center', fontSize: 44, marginTop: 6 }}>{icon}</div>
+      <div style={{ textAlign: 'center', fontSize: 20, fontWeight: 900, marginTop: 10, lineHeight: 1.5 }}>{q}</div>
+      <div style={{ textAlign: 'center', fontSize: 11.5, color: '#8a8a82', marginTop: 6, lineHeight: 1.6 }}>{sub}</div>
+    </>
+  );
+}
+
+// 行動を複数選ぶ（欠かさずやること・やりたいこと）
+function ActPick({ v, k, icon, q, sub }) {
+  const sel = v.obSel[k] || [];
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <Head icon={icon} q={q} sub={sub} />
+      <div style={{ marginTop: 14 }}>
+        {v.obCats.map(c => (
+          <div key={c.id} style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#8a8a82', marginBottom: 6 }}>{c.glyph} {c.name}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {c.items.map(t => {
+                const on = sel.includes(t.name);
+                return <button key={t.name} onClick={() => v.obToggle(k, t.name)} style={chip(on)}><span>{t.glyph}</span>{t.name}</button>;
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ flex: 1 }} />
+      <button onClick={v.obNext} style={{ ...nextBtn, position: 'sticky', bottom: 0, boxShadow: '0 -8px 16px #f7f4ec' }}>{sel.length ? '次へ →' : 'とばす →'}</button>
+    </div>
+  );
+}
+
+// 非表示にするカテゴリを選ぶ（職業のおすすめが初期値）
+function HideCats({ v }) {
+  const sel = v.obSel.hide || [];
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <Head icon="🙈" q="使わないカテゴリは？" sub="選んだカテゴリは非表示になります（あとで変更できます）" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginTop: 18 }}>
+        {v.obCats.map(c => {
+          const on = sel.includes(c.id);
+          return (
+            <button key={c.id} onClick={() => v.obToggle('hide', c.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, border: on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: on ? '#eeece4' : '#fff', borderRadius: 14, padding: '13px 12px', fontSize: 13.5, fontWeight: on ? 900 : 700, color: on ? '#8a8a82' : '#1b1b18', cursor: 'pointer', textAlign: 'left' }}>
+              <span style={{ fontSize: 18 }}>{c.glyph}</span>
+              <span style={{ flex: 1, textDecoration: on ? 'line-through' : 'none' }}>{c.name}</span>
+              {on && <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 18 }}>visibility_off</span>}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ flex: 1 }} />
+      <button onClick={v.obNext} style={nextBtn}>次へ →</button>
     </div>
   );
 }
