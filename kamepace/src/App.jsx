@@ -2689,7 +2689,9 @@ export default class App extends React.Component {
   bedVals() {
     const st = this.state, today = this.state.bedDay || this.bedDay();
     const wk = (st.wakeLog || []).find(w => w.date === today);
-    const sum = daySummary(st.entries, today, wk ? wk.fatigue : 0);
+    const bd = (st.bedLog || []).find(b => b.date === today);
+    // 日中（起床〜就寝）の推移で判定
+    const sum = daySummary(st.entries, today, wk ? wk.fatigue : 0, { from: wk ? wk.ts : null, to: bd ? bd.ts : Date.now() });
     return { sum, reviewText: reviewLine(sum, today) };
   }
   /* 画面3・4に出す値 */
@@ -2697,7 +2699,8 @@ export default class App extends React.Component {
     const st = this.state, today = todayStr(), y = shiftDate(today, -1);
     const recs = this.wakeRecords();
     const yRec = recs.find(w => w.date === y);
-    const sum = daySummary(st.entries, y, yRec ? yRec.fatigue : 0);
+    const yBed = (st.bedLog || []).find(b => b.date === y);
+    const sum = daySummary(st.entries, y, yRec ? yRec.fatigue : 0, { from: yRec ? yRec.ts : null, to: yBed ? yBed.ts : null });
     const plans = sortEntries(st.entries.filter(e => e.date === today && !e.exp && !e.wakeAdd && e.title)).map(e => ({ title: e.title, from: e.from, to: e.to, glyph: entryGlyph(e), delta: e.delta }));
     const tasks = (st.tasks || []).filter(t => t.date === today && t.title);
     const chart = this.chartData([...new Set(recs.map(r => r.date))].sort()); // 朝は直近7回ぶんの日

@@ -39,7 +39,7 @@ export function summarizeDay(st, d, carry = null, now = Date.now()) {
   let mx = null, mn = null;
   fat.forEach(p => { if (!mx || p.v > mx.v) mx = p; if (!mn || p.v < mn.v) mn = p; });
   // ゆったり(0〜40)・ほどほど(41〜80)・みちみち(81〜)にいた時間（10分刻みの曲線から）
-  const curve = fatigueCurve(list, d, wk && wk.fatigue != null ? wk.fatigue : (carry || 0));
+  const curve = fatigueCurve(list, d, wk && wk.fatigue != null ? wk.fatigue : (carry || 0), { from: wk ? wk.ts : null, to: bd ? bd.ts : null }); // 起床〜就寝
   const zone = { yuttari: 0, hodohodo: 0, michimichi: 0 };
   curve.forEach(v => { zone[['yuttari', 'hodohodo', 'michimichi'][zoneOf(v)]] += 10; });
   // カテゴリ別・行動別
