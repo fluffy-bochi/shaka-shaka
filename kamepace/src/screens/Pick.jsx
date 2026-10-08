@@ -6,6 +6,8 @@ import Emo from '../fluent';
    カテゴリは選択中にもう一度タップすると開く（開いていれば閉じる）。右の列は 検索 / 全部開閉 / 必須 / お気に入り（必須・お気に入りは見た目のみ）。
    START・予定・記録は「時間を選ぶ画面（確認）」へ進む。「リスト＋」は右のリストのカードに積む（カードとリストは横にスワイプ）。 */
 const INK = '#1b1b18';
+const CREAM = '#fcfaf3'; // カード・リストの地色（白は使わず、背景 #f7f4ec に近い黄みの白）
+const HEAD_H = 28; // カードの上の色帯（カテゴリ名）
 const ms = (size, color, fill = false) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: fill ? "'FILL' 1" : "'FILL' 0", fontSize: size, color, lineHeight: 1 });
 const CARD_H = 212; // 上のカードの高さはカテゴリ・行動・予定で共通（切り替わってもリストの位置が動かないように）
 const sg = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0');
@@ -42,7 +44,7 @@ function monthTarget(f, dim) {
 /* 時間の入力 [時]:[分]（何時間でも）。value・onChange は合計の分 */
 export function HmInput({ value, onChange, size = 16 }) {
   const v = Math.max(0, Math.round(Number(value) || 0)), h = Math.floor(v / 60), m = v % 60;
-  const box = { height: 36, boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 9, background: '#fff', textAlign: 'center', fontSize: size, fontWeight: 900, fontFamily: "'Space Mono',monospace", color: INK, padding: 0 };
+  const box = { height: 36, boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 9, background: CREAM, textAlign: 'center', fontSize: size, fontWeight: 900, fontFamily: "'Space Mono',monospace", color: INK, padding: 0 };
   const clean = (x) => Math.max(0, parseInt(x, 10) || 0);
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
@@ -64,11 +66,11 @@ function EditAct({ it, onClose }) {
   const ok = (f.name || '').trim() && Number(f.min) > 0;
   const save = () => { if (!ok) return; it.onEdit({ name: f.name, body: Number(f.body) || 0, mind: Number(f.mind) || 0, min: Number(f.min) }); onClose(); };
   return (
-    <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: '#fff', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 7, overflowY: 'auto', WebkitTapHighlightColor: 'transparent' }}>
+    <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: CREAM, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 7, overflowY: 'auto', WebkitTapHighlightColor: 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <span style={{ fontSize: 14, fontWeight: 900, flex: 1 }}>行動を編集</span>
         {/* 表示・非表示（非表示にした行動は、右の目のボタンで「非表示の行動」を見ると出てくる） */}
-        {it.onToggleHide && <button onClick={() => { it.onToggleHide(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', color: '#55554e', fontSize: 11.5, fontWeight: 800, padding: '4px 10px 4px 7px', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', marginRight: 8 }}><span style={ms(16, '#55554e')}>{it.hidden ? 'visibility' : 'visibility_off'}</span>{it.hidden ? '表示する' : '非表示にする'}</button>}
+        {it.onToggleHide && <button onClick={() => { it.onToggleHide(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: CREAM, color: '#55554e', fontSize: 11.5, fontWeight: 800, padding: '4px 10px 4px 7px', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', marginRight: 8 }}><span style={ms(16, '#55554e')}>{it.hidden ? 'visibility' : 'visibility_off'}</span>{it.hidden ? '表示する' : '非表示にする'}</button>}
         <button onClick={onClose} aria-label="閉じる" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(22, INK)}>close</span></button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -83,9 +85,9 @@ function EditAct({ it, onClose }) {
       </div>
       <div style={{ flex: 1 }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {it.onReset && <button onClick={() => { it.onReset(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>元に戻す</button>}
+        {it.onReset && <button onClick={() => { it.onReset(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: CREAM, color: '#55554e', fontSize: 13, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>元に戻す</button>}
         <span style={{ flex: 1, fontSize: 10.5, color: '#8a8a82', fontWeight: 700 }}>マイナスで回復</span>
-        <button onClick={onClose} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>キャンセル</button>
+        <button onClick={onClose} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: CREAM, color: '#55554e', fontSize: 13, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>キャンセル</button>
         <button onClick={save} style={{ border: 'none', borderRadius: 12, background: ok ? '#c4f000' : '#e4e1d8', color: ok ? '#2f3a00' : '#a5a39a', fontSize: 14, fontWeight: 900, padding: '7px 20px', cursor: ok ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>保存</button>
       </div>
     </div>
@@ -101,12 +103,12 @@ export function FreqPop({ label, value, onSave, onDelete, onClose }) {
   );
   const ok = f.k > 0 && f.n > 0;
   return (
-    <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: 8, right: 8, bottom: 48, zIndex: 5, background: '#fff', borderRadius: 18, padding: '8px 12px 10px', boxShadow: '0 8px 24px rgba(27,27,24,.22)', WebkitTapHighlightColor: 'transparent' }}>
+    <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: 8, right: 8, bottom: 48, zIndex: 5, background: CREAM, borderRadius: 18, padding: '8px 12px 10px', boxShadow: '0 8px 24px rgba(27,27,24,.22)', WebkitTapHighlightColor: 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
         <span style={{ fontSize: 12, fontWeight: 900 }}>{label}</span>
         <span style={{ flex: 1 }} />
         {/* 削除＝登録を解除（✕は閉じるだけ）。未登録のときは押せない */}
-        <button onClick={value ? onDelete : undefined} disabled={!value} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, border: '1.5px solid ' + (value ? '#b4645a' : '#e4e1d8'), background: '#fff', borderRadius: 999, padding: '3px 9px 3px 6px', fontSize: 11.5, fontWeight: 800, color: value ? '#b4645a' : '#c9c7bf', cursor: value ? 'pointer' : 'default', fontFamily: 'inherit' }}><span style={ms(15, value ? '#b4645a' : '#c9c7bf')}>delete</span>削除</button>
+        <button onClick={value ? onDelete : undefined} disabled={!value} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, border: '1.5px solid ' + (value ? '#b4645a' : '#e4e1d8'), background: CREAM, borderRadius: 999, padding: '3px 9px 3px 6px', fontSize: 11.5, fontWeight: 800, color: value ? '#b4645a' : '#c9c7bf', cursor: value ? 'pointer' : 'default', fontFamily: 'inherit' }}><span style={ms(15, value ? '#b4645a' : '#c9c7bf')}>delete</span>削除</button>
         <button onClick={onClose} aria-label="閉じる" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(20, INK)}>close</span></button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -217,23 +219,23 @@ function Card({ row, cat, v, hist, setHist }) {
       });
     };
   };
-  const wrap = { position: 'relative', width: '100%', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, flex: '0 0 auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' };
+  const wrap = { position: 'relative', width: '100%', borderRadius: 18, overflow: 'hidden', background: CREAM, height: CARD_H, flex: '0 0 auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' };
   if (!row) return <div style={wrap} />;
   if (row.type === 'cat' || row.type === 'addcat') {
     const color = row.type === 'cat' ? cat.color : '#55554e';
     const ink = row.type === 'cat' ? (cat.ink || '#fff') : '#fff';
     return (
-      <div style={{ ...wrap, background: color, justifyContent: 'center' }}>
-        <span style={{ position: 'absolute', left: 16, top: 12, fontSize: 13, fontWeight: 800, color: ink }}>{row.type === 'cat' ? 'カテゴリ' : '追加'}</span>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 22 }}>
-          {row.type === 'cat' ? <Emo e={cat.glyph} size={64} /> : <span style={ms(56, '#fff')}>add</span>}
-          <span style={{ fontSize: 24, fontWeight: 900, color: ink }}>{row.type === 'cat' ? cat.name : '大カテゴリを追加'}</span>
+      <div style={{ ...wrap, border: '3px solid ' + color }}>
+        <div style={{ flex: '0 0 auto', height: HEAD_H, background: color, display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 13, fontWeight: 800, color: ink }}>{row.type === 'cat' ? 'カテゴリ' : '追加'}</div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 22 }}>
+          {row.type === 'cat' ? <Emo e={cat.glyph} size={64} /> : <span style={ms(56, INK)}>add</span>}
+          <span style={{ fontSize: 24, fontWeight: 900, color: INK }}>{row.type === 'cat' ? cat.name : '大カテゴリを追加'}</span>
         </div>
-        {row.type === 'cat' && cat.hidden && <span style={{ position: 'absolute', left: 16, bottom: 12, fontSize: 12, fontWeight: 800, color: ink, opacity: 0.85 }}>非表示中</span>}
+        {row.type === 'cat' && cat.hidden && <span style={{ position: 'absolute', left: 16, bottom: 12, fontSize: 12, fontWeight: 800, color: '#8a8a82' }}>非表示中</span>}
         {/* 右上の「編集」: カテゴリの表示・非表示 */}
-        {row.type === 'cat' && cat.onToggleHide && <button onClick={() => setEditing(true)} style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, border: 'none', borderRadius: 999, background: 'rgba(255,255,255,.92)', color: INK, fontSize: 11.5, fontWeight: 800, padding: '3px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
+        {row.type === 'cat' && cat.onToggleHide && <button onClick={() => setEditing(true)} style={{ position: 'absolute', top: 3, right: 8, zIndex: 2, border: 'none', borderRadius: 999, background: CREAM, color: INK, fontSize: 11, fontWeight: 800, padding: '2px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
         {row.type === 'cat' && editing && (
-          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: '#fff', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: CREAM, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 900, flex: 1, color: INK }}>カテゴリを編集</span>
               <button onClick={() => setEditing(false)} aria-label="閉じる" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(22, INK)}>close</span></button>
@@ -241,7 +243,7 @@ function Card({ row, cat, v, hist, setHist }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Emo e={cat.glyph} size={44} /><span style={{ fontSize: 20, fontWeight: 900, color: INK }}>{cat.name}</span></div>
             <div style={{ flex: 1 }} />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setEditing(false)} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '10px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>キャンセル</button>
+              <button onClick={() => setEditing(false)} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: CREAM, color: '#55554e', fontSize: 13, fontWeight: 800, padding: '10px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>キャンセル</button>
               <button onClick={() => { cat.onToggleHide(); setEditing(false); }} style={{ border: 'none', borderRadius: 12, background: INK, color: '#fff', fontSize: 13.5, fontWeight: 900, padding: '10px 16px', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={ms(17, '#fff')}>{cat.hidden ? 'visibility' : 'visibility_off'}</span>{cat.hidden ? '表示する' : '非表示にする'}</button>
             </div>
           </div>
@@ -256,10 +258,9 @@ function Card({ row, cat, v, hist, setHist }) {
   const chip = { display: 'inline-flex', alignItems: 'center', gap: 3, height: 26, background: '#efece3', borderRadius: 999, padding: '0 8px', fontSize: 11, fontWeight: 700, color: INK };
   const gray = { border: 'none', borderRadius: 10, background: '#efece3', color: '#55554e', fontSize: 13.5, fontWeight: 800, padding: '6px 14px', cursor: 'pointer' };
   return (
-    <div ref={ref} style={wrap}>
-      <div style={{ position: 'absolute', left: 0, top: 0, width: '46%', height: 150, background: cat.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
-      <span style={{ position: 'absolute', left: 14, top: 10, fontSize: 13, fontWeight: 800, color: cat.ink || '#fff' }}>{cat.name}</span>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: '26px 16px 4px 20px', flex: 1, minHeight: 0 }}>
+    <div ref={ref} style={{ ...wrap, border: '3px solid ' + cat.color }}>
+      <div style={{ flex: '0 0 auto', height: HEAD_H, background: cat.color, display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 13, fontWeight: 800, color: cat.ink || '#fff' }}>{cat.name}</div>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 2px 20px', flex: 1, minHeight: 0 }}>
         <span style={{ flex: '0 0 auto' }}><Emo e={it.glyph} size={72} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: it.name.length > 9 ? 17 : 23, fontWeight: 900, lineHeight: 1.3, wordBreak: 'break-all', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.name}</div>
@@ -293,13 +294,13 @@ function Card({ row, cat, v, hist, setHist }) {
         {it.kind === 'act' && <>
           <button onClick={it.onStart} style={gray}>予定</button>
           <button onClick={it.onStart} style={gray}>記録</button>
-          <button onClick={it.onList} style={{ flex: 1, border: '1.5px solid #e4e1d8', borderRadius: 10, background: '#fff', color: INK, fontSize: 13.5, fontWeight: 800, padding: '5px 0', cursor: 'pointer' }}>リスト ＋</button>
+          <button onClick={it.onList} style={{ flex: 1, border: '1.5px solid #e4e1d8', borderRadius: 10, background: CREAM, color: INK, fontSize: 13.5, fontWeight: 800, padding: '5px 0', cursor: 'pointer' }}>リスト ＋</button>
         </>}
         {it.onTrash && <button onClick={it.onTrash} aria-label="ゴミ箱へ" style={{ ...gray, padding: '4px 10px' }}><span style={ms(18, '#b4645a')}>delete</span></button>}
         <button onClick={it.onRun || it.onStart} style={{ flex: it.kind === 'act' ? 1.1 : 1, border: 'none', borderRadius: 10, background: '#c4f000', color: '#2f3a00', fontSize: 14.5, fontWeight: 900, padding: '6px 0', cursor: 'pointer', letterSpacing: '.04em', boxShadow: '0 3px 10px rgba(122,154,0,.3)' }}>{it.kind === 'act' ? 'START' : 'ひらく'}</button>
       </div>
       {/* 右上の「編集」 */}
-      {isAct && it.onEdit && <button onClick={() => { setPop(null); setEditing(true); }} style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', color: INK, fontSize: 11.5, fontWeight: 800, padding: '3px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
+      {isAct && it.onEdit && <button onClick={() => { setPop(null); setEditing(true); }} style={{ position: 'absolute', top: 3, right: 8, zIndex: 2, border: 'none', borderRadius: 999, background: CREAM, color: INK, fontSize: 11, fontWeight: 800, padding: '2px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
       {isAct && editing && <EditAct it={it} onClose={() => setEditing(false)} />}
       {isAct && pop && (
         <FreqPop key={pop} label={pop === 'req' ? '生活必須行動' : 'やりたいこと'} value={it[pop]}
@@ -323,7 +324,7 @@ function ListCard({ v, onPick }) {
   const num = { fontSize: 12, fontWeight: 800, color: INK, fontFamily: "'Space Mono',monospace" };
   return (
     // iOSのタップの青いハイライトは、並べ替えで行が動いたあとの場所に出て「別の行を押した」ように見えるので出さない（子要素にも継承される）
-    <div style={{ position: 'relative', width: '100%', borderRadius: 18, overflow: 'hidden', background: '#fff', height: CARD_H, WebkitTapHighlightColor: 'transparent', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
+    <div style={{ position: 'relative', width: '100%', borderRadius: 18, overflow: 'hidden', background: CREAM, height: CARD_H, WebkitTapHighlightColor: 'transparent', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
       {/* 名前（テンプレでなくてもつけられる） */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px 6px' }}>
         <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && dirty) v.setListName({ target: { value: draft } }); }} placeholder="リストの名前" style={{ flex: 1, minWidth: 0, height: 32, border: 'none', borderRadius: 9, background: '#f3f0e8', padding: '0 10px', fontSize: 14, fontWeight: 800, color: INK, fontFamily: 'inherit', outline: 'none' }} />
@@ -377,7 +378,7 @@ const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd, dark }) {
   return (
     <div onClick={() => onTap(r, i)} style={{ position: 'relative', height: hOf(r), display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
       {r.type === 'item' ? (
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 10, height: on ? 58 : 48, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: CREAM, borderRadius: 10, height: on ? 58 : 48, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
           <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 48 : 40, height: on ? 48 : 40, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
           <span style={{ position: 'relative', flex: '0 0 auto', marginLeft: 6 }}><Emo e={r.item.glyph} size={on ? 32 : 26} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -386,12 +387,12 @@ const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd, dark }) {
           </div>
           {/* リストのカードを見ているときは、選択中の行動からそのままリストに足せる */}
           {listAdd && r.item.onList && (
-            <button onClick={(e) => { e.stopPropagation(); r.item.onList(); }} style={{ flex: '0 0 auto', border: '1.5px solid ' + INK, borderRadius: 999, background: '#fff', color: INK, fontSize: 11, fontWeight: 800, padding: '3px 9px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>リスト ＋</button>
+            <button onClick={(e) => { e.stopPropagation(); r.item.onList(); }} style={{ flex: '0 0 auto', border: '1.5px solid ' + INK, borderRadius: 999, background: CREAM, color: INK, fontSize: 11, fontWeight: 800, padding: '3px 9px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>リスト ＋</button>
           )}
           {!on && <FatNums it={r.item} />}
         </div>
       ) : dark ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', height: on ? 30 : 26, borderRadius: 7, background: '#fff', border: '2px solid ' + color, overflow: 'hidden', boxSizing: 'border-box', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', height: on ? 30 : 26, borderRadius: 7, background: CREAM, border: '2px solid ' + color, overflow: 'hidden', boxSizing: 'border-box', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
           <span style={{ flex: on ? '0 0 34px' : '0 0 30px', alignSelf: 'stretch', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: on ? 11 : 9.5, color: r.type === 'addcat' ? '#fff' : (r.cat.ink || INK) }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
           <span style={{ flex: 1, textAlign: 'center', fontSize: on ? 14.5 : 13, fontWeight: 800, color: INK, paddingRight: on ? 34 : 30, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
         </div>
