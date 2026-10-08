@@ -42,6 +42,13 @@ export const FLUENT_MAP = {
   '⚽': 'Soccer ball/3D/soccer_ball_3d.png',
   '🏆': 'Trophy/3D/trophy_3d.png',
   '📋': 'Clipboard/3D/clipboard_3d.png',
+  '🏪': 'Convenience store/3D/convenience_store_3d.png',
+  '🏫': 'School/3D/school_3d.png',
+  '💭': 'Thought balloon/3D/thought_balloon_3d.png',
+  '🥵': 'Hot face/3D/hot_face_3d.png',
+  '🥶': 'Cold face/3D/cold_face_3d.png',
+  '😖': 'Confounded face/3D/confounded_face_3d.png',
+  '➕': 'Plus/3D/plus_3d.png',
   '🧺': 'Basket/3D/basket_3d.png',
   '🛒': 'Shopping cart/3D/shopping_cart_3d.png',
   '🍼': 'Baby bottle/3D/baby_bottle_3d.png',
@@ -265,6 +272,7 @@ export function appendGlyph(el, glyph, sizePx) {
 export default function Emo({ e, size }) {
   const [err, setErr] = React.useState(false);
   const src = err ? null : fluentSrc(e);
-  if (!src) return e;
+  // 3D画像が無い絵文字も、画像と同じ大きさの枠で出す（大きさがそろうように）
+  if (!src) return <span style={{ width: size, height: size, fontSize: Math.round(size * 0.82), lineHeight: size + 'px', textAlign: 'center', display: 'block', pointerEvents: 'none' }}>{e}</span>;
   return <img src={src} alt={e} draggable={false} decoding="async" loading="lazy" onError={() => setErr(true)} style={{ width: size, height: size, objectFit: 'contain', pointerEvents: 'none', display: 'block' }} />;
 }
