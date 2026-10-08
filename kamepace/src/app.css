@@ -156,3 +156,6 @@ body.kame-wide .app-screen { max-width: none; }
   body.kame-wide .phone .app-screen { width: 100vw; height: 100dvh; border-radius: 0; }
 }
 body.kame-wide .app-status-spacer { height: 0; }
+
+/* 時刻入力の時計アイコンは出さない（狭い欄で数字が切れるため） */
+input[type="time"]::-webkit-calendar-picker-indicator { display: none; }

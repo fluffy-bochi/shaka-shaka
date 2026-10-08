@@ -128,7 +128,7 @@ export default class App extends React.Component {
     tplName: '',
     /* きもち・できごと（時間なしの心イベント） */
     moodOpen: false,
-    recNote: '', editGid: null, // 記録に書く文章・編集中のまとまり
+    recNote: '', recTitle: '', editGid: null, // 記録に書く文章・タイトル・編集中のまとまり
     moodId: null,
     moodStrength: 'b',
     moodNote: '',
@@ -1279,7 +1279,8 @@ export default class App extends React.Component {
     // ホームの投稿: 1回の記録＝1つのまとまり（gid）。書いた文章(note)は最初の記録に持たせる。編集ではまとまりを引き継ぐ
     const gid = (isEdit && this.state.editGid) || ('g' + Date.now().toString(36));
     const recNote = (this.state.recNote || '').trim();
-    newEntries.forEach((e, k) => { e.gid = gid; if (k === 0 && recNote) e.note = recNote; else delete e.note; });
+    const recTitle = (this.state.recTitle || '').trim();
+    newEntries.forEach((e, k) => { e.gid = gid; if (k === 0 && recNote) e.note = recNote; else delete e.note; if (k === 0 && recTitle) e.postTitle = recTitle; else delete e.postTitle; });
     // 体調・症状を記録したら、自動デバフをオン＋その日の後続時間帯にも同じ症状を入れる
     const sym = this.applySymptomEffects(newEntries, recDate, slotId);
     if (sym.extraEntries.length) newEntries.push(...sym.extraEntries);
@@ -1304,7 +1305,7 @@ export default class App extends React.Component {
         : (this.state.confirmOrigin === 'run' && this.state.run && this.state.run.fromList)
           ? (() => { const done = new Set(this.state.run.doneUids || []), items = this.state.pickList.items.filter(x => !done.has(x.uid)); return { ...this.state.pickList, items, ...(items.length ? null : { name: '', tplKey: null }) }; })()
           : this.state.pickList,
-      entries, lastMins, tapLine: isEdit ? this.state.tapLine : null, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null, anchorEnd: null, recNote: '', editGid: null,
+      entries, lastMins, tapLine: isEdit ? this.state.tapLine : null, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null, anchorEnd: null, recNote: '', recTitle: '', editGid: null,
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
       // 編集で山が縮んだ場合に consumed が超過しないように
@@ -1464,7 +1465,7 @@ export default class App extends React.Component {
       // いちばん多かった行動（同数なら上）
       const cnt = {}; es.forEach(e => { cnt[e.title] = (cnt[e.title] || 0) + 1; });
       let top = es[0]; es.forEach(e => { if (cnt[e.title] > cnt[top.title]) top = e; });
-      const label = first.moodLabel || first.plan || top.title;
+      const label = (es.find(e => e.postTitle) || {}).postTitle || first.moodLabel || first.plan || top.title;
       const note = (es.find(e => e.note) || {}).note || '';
       const from = first.from || '';
       const endTs = Math.max(...es.map(e => (e.to ? entryEndTs(e) : 0)));
@@ -1875,7 +1876,7 @@ export default class App extends React.Component {
     this.toast('「' + sa.name + '」のデバフも調整しました');
   };
   dismissSymAdjust = () => this.set({ symAdjust: null });
-  openRecord(id) { this._pickMem = {}; this.set({ recNote: '', editGid: null, runAdd: false, anchorEnd: null, slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
+  openRecord(id) { this._pickMem = {}; this.set({ recNote: '', recTitle: '', editGid: null, runAdd: false, anchorEnd: null, slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
   toggleSlotMenu = () => this.set({ slotMenuOpen: !this.state.slotMenuOpen });
   pickSlot = (id) => this.set({ slotId: id, slotMenuOpen: false });
   selectCat = (id) => this.set({ catId: id });
@@ -2283,7 +2284,7 @@ export default class App extends React.Component {
     this.set({
       screen: 'record', slotId: this.slotOf(first),
       searchStep: 'confirm', confirmOrigin: 'edit', editIdxs: idxs, framePlan: planName || null,
-      editGid: (first && first.gid) || null, recNote: noteE ? noteE.note : '',
+      editGid: (first && first.gid) || null, recNote: noteE ? noteE.note : '', recTitle: (idxs.map(i => entries[i]).find(e => e && e.postTitle) || {}).postTitle || '',
       searchCart: items, searchTotalMin: total, searchFracs: mins.map(m => m / total),
       confirmMode: anyPlanned ? 'time' : 'duration',
       startTime: anyPlanned ? (first.from || '') : '',
@@ -4053,8 +4054,14 @@ export default class App extends React.Component {
         fatText: (fat >= 0 ? '+' + fat : '' + fat),
         onRemove: () => this.removeSearchItem(it.id),
         onIntensity: () => this.openIntensity(it.id),
+        hasIntensity: this.intensityQuestions(it).length > 0,
+        pref: (st.prefs || {})[normTitle(it.name)] || 'normal', onPref: (val) => this.setPref(it.name, val),
+        req: !!((st.actFreq || {})[normTitle(it.name)] || {}).req, fav: !!((st.actFreq || {})[normTitle(it.name)] || {}).fav,
       };
     });
+    // 投稿のタイトルの初期値: 予定/テンプレ名 → いちばん多かった行動（ほかにもあれば「など」）
+    const scTop = (() => { const cnt = {}; let top = null; scItems.forEach(it => { cnt[it.name] = (cnt[it.name] || 0) + 1; if (!top || cnt[it.name] > cnt[top.name]) top = it; }); return top; })();
+    const recTitleAuto = st.framePlan || (scItems[0] && scItems[0].plan) || (scTop ? scTop.name + (scItems.length > 1 ? 'など' : '') : '');
     let segCursor = 0;
     const allocSegs = scItems.map((it, idx) => {
       const min = itemMinAt(it, idx);
@@ -4415,6 +4422,7 @@ export default class App extends React.Component {
       onOverallStepFromH: (dir) => this.set({ startTime: this.addHm(st.startTime || '9:00', dir * 60) }),
       onOverallStepToH: (dir) => this.set({ endTime: this.addHm(st.endTime || '10:00', dir * 60) }),
       overallSpanText: overallActive ? this.fmtMin(this.timeSpanMin()) : '',
+      commitShort: isEditFlow ? '保存' : '記録',
       commitLabel: (timeMode && hmToTsOn(st.recordDate || this.homeDateStr(), st.endTime) > Date.now())
         ? (isEditFlow ? '予定にへんこう' : '予定を追加')
         : (isEditFlow ? 'へんこうする' : 'きろくする'),
@@ -4518,6 +4526,7 @@ export default class App extends React.Component {
       goHome: this.goHome, goShaka: this.goShaka, goMypage: this.goMypage, goSleep: this.goSleep,
       moodOpen: !!st.moodOpen, openMood: this.openMood, closeMood: this.closeMood, commitMood: this.commitMood,
       recNote: st.recNote || '', setRecNote: (t) => this.set({ recNote: t }),
+      recTitle: st.recTitle || '', setRecTitle: (t) => this.set({ recTitle: t }), recTitleAuto, recGlyph: scTop ? scTop.glyph : '📝',
       moodNote: st.moodNote || '', onMoodNote: this.onMoodNote,
       moodChoices: MOODS.map(m => ({ id: m.id, glyph: m.glyph, name: m.name, kind: m.kind, axis: m.axis || 'mind', on: st.moodId === m.id, onPick: () => this.pickMood(m.id) })),
       moodStrengths: MOOD_STRENGTHS.map(x => ({ key: x.key, label: x.label, on: st.moodStrength === x.key, onPick: () => this.pickMoodStrength(x.key) })),

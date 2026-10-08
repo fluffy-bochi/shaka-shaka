@@ -194,121 +194,135 @@ function SearchMore({ v }) {
 
 /* ---- 登録を確認（統一確認UI）＋時間の割り振り ---- */
 function Confirm({ v }) {
+  // Figma「記録」: タイトル（アイコン＋名前）・コメント・合計と配分バー・行動ごとの行（すき嫌い・時刻/時間・時間）
+  const seg = (opts, cur, onPick) => (
+    <div style={{ display: 'inline-flex', border: '1px solid #1b1b18', borderRadius: 14, background: '#fcfaf3', padding: 1, flex: '0 0 auto' }}>
+      {opts.map(([k, t]) => (
+        <button key={k} onClick={() => onPick(k)} style={{ border: 'none', borderRadius: 12, padding: '3px 9px', fontSize: 11, fontWeight: cur === k ? 800 : 600, cursor: 'pointer', background: cur === k ? '#55554e' : 'transparent', color: cur === k ? '#fff' : '#1b1b18', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{t}</button>
+      ))}
+    </div>
+  );
+  const line = { border: 'none', borderBottom: '1px solid #5a5a5a', background: 'transparent', outline: 'none', fontFamily: 'inherit', color: '#1b1b18', padding: '6px 4px', boxSizing: 'border-box' };
+  const timeIn = { ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fcfaf3' };
+  const sm = { width: 28, height: 26, borderRadius: 8, border: '1.5px solid #e4e1d8', background: '#fcfaf3', ...mono, fontSize: 11, fontWeight: 700, color: '#55554e', cursor: 'pointer', padding: 0 };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 20px 10px' }}>
-        <button onClick={v.backFromConfirm} style={{ background: 'none', border: 'none', fontSize: 19, color: '#8a8a82', cursor: 'pointer' }}>‹</button>
-        <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>{v.confirmTitle}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 16px 4px' }}>
+        <button onClick={v.backFromConfirm} aria-label="もどる" style={{ background: 'none', border: 'none', fontSize: 26, lineHeight: 1, color: '#1b1b18', cursor: 'pointer', padding: '0 2px' }}>‹</button>
+        <div style={{ fontSize: 15.5, fontWeight: 700, flex: 1 }}>{v.confirmTitle}</div>
         <SlotPill v={v} />
       </div>
-      <div className="nos" style={{ flex: 1, overflowY: 'auto', padding: '2px 16px 8px' }}>
-        {/* ホームの投稿に出す文章 */}
-        <textarea value={v.recNote} onChange={(e) => v.setRecNote(e.target.value)} placeholder="ひとこと" rows={2}
-          style={{ display: 'block', width: '100%', boxSizing: 'border-box', resize: 'none', border: 'none', borderRadius: 14, background: '#fff', padding: '12px 13px', marginBottom: 10, fontSize: 14, fontWeight: 600, lineHeight: 1.5, color: '#1b1b18', fontFamily: 'inherit', boxShadow: '0 1px 3px rgba(27,27,24,.05)', outline: 'none' }} />
-        {v.searchCartRows.map(r => (
-          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', borderRadius: 14, padding: '11px 12px', marginBottom: 8, boxShadow: '0 1px 3px rgba(27,27,24,.05)' }}>
-            <button onClick={r.onRemove} style={{ width: 26, height: 26, border: 'none', background: 'none', fontSize: 17, color: '#c9c7bf', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
-            <span style={{ fontSize: 17, flex: '0 0 auto' }}>{r.glyph}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, lineHeight: 1.4 }}>{r.name}</div>
-              <div style={{ ...mono, fontSize: 10.5, color: '#f5994e', marginTop: 1 }}>{r.fatText}</div>
-            </div>
-            <button onClick={r.onIntensity} style={{ border: '1.5px solid #c4de52', background: '#fbfdf0', borderRadius: 10, padding: '7px 11px', fontSize: 11.5, fontWeight: 700, color: '#4a5a00', cursor: 'pointer', flex: '0 0 auto', maxWidth: 118, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.intensityText}</button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '6px 20px 0' }}>
+        <button onClick={v.commitSearch} style={{ border: 'none', borderRadius: 8, background: '#1b1b18', color: '#fff', fontSize: 15, fontWeight: 700, padding: '7px 16px', cursor: 'pointer', fontFamily: 'inherit' }}>{v.commitShort}</button>
+      </div>
+      <div className="nos" style={{ flex: 1, overflowY: 'auto', padding: '6px 40px 24px 44px' }}>
+        {/* タイトル: いちばん多かった行動のアイコン＋名前（タップで変更） */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span style={{ flex: '0 0 auto' }}><Emo e={v.recGlyph} size={44} /></span>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', borderBottom: '1px solid #5a5a5a' }}>
+            <input value={v.recTitle} onChange={(e) => v.setRecTitle(e.target.value)} placeholder={v.recTitleAuto} style={{ ...line, borderBottom: 'none', flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700 }} />
+            <span style={{ ...msIcon(20, '#1b1b18', true), flex: '0 0 auto' }}>edit</span>
           </div>
-        ))}
-        <button onClick={v.addMoreMenu} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#fff', border: 'none', borderRadius: 14, padding: '14px 0', fontSize: 14, fontWeight: 700, color: '#7a9a00', cursor: 'pointer', boxShadow: '0 1px 3px rgba(27,27,24,.05)' }}>
-          <span style={msIcon(20, '#7a9a00', false)}>add_circle</span>メニューを追加
-        </button>
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
-          <button onClick={v.openTplSave} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', padding: '4px 2px', fontSize: 12.5, fontWeight: 700, color: '#55554e', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+        </div>
+        <textarea value={v.recNote} onChange={(e) => v.setRecNote(e.target.value)} placeholder="コメント……" rows={2}
+          style={{ ...line, display: 'block', width: '100%', marginTop: 14, borderBottom: '1px solid #1b1b18', resize: 'none', fontSize: 13.5, lineHeight: 1.5 }} />
+        {/* 合計（時間・疲労）と配分バー */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 26, fontSize: 13, color: '#3d3d3d' }}>
+          <span>合計</span>
+          {v.isDurationMode && !v.hasOverallTime ? (
+            <>
+              <button onClick={v.addTotalM10} style={sm}>-10</button>
+              <MinEdit text={v.searchTotalText} raw={v.searchTotalMinRaw} onSet={v.setTotalMin} style={{ ...mono, fontSize: 13, fontWeight: 700, minWidth: 52, textAlign: 'center' }} />
+              <button onClick={v.addTotalP10} style={sm}>+10</button>
+            </>
+          ) : <span style={{ ...mono, fontWeight: 700, marginLeft: 4 }}>{v.searchTotalText}</span>}
+          <span style={{ flex: 1 }} />
+          <span style={{ ...mono, fontWeight: 700, color: '#1b1b18' }}>{v.searchTotalFatText}</span>
+        </div>
+        {v.isDurationMode ? (
+          <div style={{ position: 'relative', height: 14, marginTop: 8, touchAction: 'none' }}>
+            <div style={{ position: 'absolute', left: 0, right: 0, top: 4, height: 6, display: 'flex', borderRadius: 5, overflow: 'hidden', background: '#d9d9d9' }}>
+              {v.allocSegs.map((s, si) => <div key={si} style={{ width: s.widthPct, background: s.color }} />)}
+            </div>
+            {v.allocHandles.map((h, hi) => (
+              <div key={hi} onPointerDown={h.onDrag} onPointerMove={h.onDrag} style={{ position: 'absolute', top: -8, bottom: -8, left: h.leftPct, width: 26, marginLeft: -13, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'ew-resize' }}>
+                <span style={{ width: 6, height: 18, borderRadius: 4, background: '#fcfaf3', border: '2px solid #1b1b18' }} />
+              </div>
+            ))}
+          </div>
+        ) : <div style={{ height: 6, marginTop: 8, borderRadius: 5, background: '#d9d9d9' }} />}
+        {/* 時刻モード: 日付・予定の全体の時間 */}
+        {v.isTimeMode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12, color: '#55554e' }}>
+            <span>日付</span>
+            <input type="date" value={v.recordDate} onChange={(e) => e.target.value && v.onRecordDate(e.target.value)} style={{ ...timeIn, width: 'auto', padding: '4px 8px' }} />
+          </div>
+        )}
+        {v.hasOverallTime && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap', marginTop: 10 }}>
+            <span style={{ fontSize: 12, color: '#55554e', marginRight: 4 }}>全体</span>
+            <HourStep dir={-1} onClick={() => v.onOverallStepFromH(-1)} />
+            <input type="time" value={hmIn(v.overallFromHm)} onChange={(e) => e.target.value && v.onOverallFrom(hmOut(e.target.value, v.overallFromHm))} style={timeIn} />
+            <HourStep dir={1} onClick={() => v.onOverallStepFromH(1)} />
+            <span style={{ color: '#8a8a82', fontSize: 12 }}>→</span>
+            <HourStep dir={-1} onClick={() => v.onOverallStepToH(-1)} />
+            <input type="time" value={hmIn(v.overallToHm)} onChange={(e) => e.target.value && v.onOverallTo(hmOut(e.target.value, v.overallToHm))} style={timeIn} />
+            <HourStep dir={1} onClick={() => v.onOverallStepToH(1)} />
+          </div>
+        )}
+        {/* 行動ごと */}
+        <div style={{ marginTop: 18, borderTop: '1px solid #1b1b18' }}>
+          {v.searchCartRows.map((r, idx) => {
+            const a = v.allocSegs[idx] || {};
+            return (
+              <div key={r.id} style={{ position: 'relative', borderBottom: '1px solid #1b1b18', padding: '6px 0 10px' }}>
+                <span style={{ position: 'absolute', left: -18, top: -1, width: 33, height: 33, background: a.color || '#d8d5cb', clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ display: 'inline-flex', marginLeft: 3 }}><Emo e={r.glyph} size={20} /></span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
+                  {r.req && <span style={{ fontSize: 11, fontWeight: 900 }}>必</span>}
+                  {r.fav && <span style={msIcon(13, '#1b1b18', true)}>favorite</span>}
+                  <span style={{ ...mono, fontSize: 11.5, fontWeight: 700, minWidth: 28, textAlign: 'right' }}>{r.fatText}</span>
+                  <button onClick={r.onRemove} aria-label="外す" style={{ width: 22, height: 22, border: 'none', background: 'none', fontSize: 14, color: '#b4b2a8', cursor: 'pointer', padding: 0, flex: '0 0 auto' }}>✕</button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8, paddingLeft: 26 }}>
+                  {seg([['dislike', 'きらい'], ['normal', 'ふつう'], ['like', 'すき']], r.pref, r.onPref)}
+                  {seg([['time', '時刻'], ['dur', '時間']], v.isTimeMode ? 'time' : 'dur', (k) => (k === 'time' ? v.setTimeMode() : v.setDurationMode()))}
+                  {r.hasIntensity && <button onClick={r.onIntensity} style={{ border: '1px solid #1b1b18', background: '#fcfaf3', borderRadius: 14, padding: '3px 9px', fontSize: 11, fontWeight: 700, color: '#1b1b18', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{r.intensityText}</button>}
+                  {!a.timeMode && a.minText && <MinEdit text={a.minText} raw={a.rawMin} onSet={a.onSetMin} style={{ ...mono, fontSize: 12, fontWeight: 700, background: '#efece3', borderRadius: 8, padding: '3px 9px', marginLeft: 'auto' }} />}
+                </div>
+                {a.timeMode && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, paddingLeft: 26 }}>
+                    {a.ranges.map((rg, ri) => (
+                      <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
+                        <HourStep dir={-1} onClick={() => rg.onStepFromH(-1)} />
+                        <input type="time" value={hmIn(rg.fromHm)} onChange={(e) => e.target.value && rg.onSetFrom(hmOut(e.target.value, rg.fromHm))} style={timeIn} />
+                        <HourStep dir={1} onClick={() => rg.onStepFromH(1)} />
+                        <span style={{ color: '#8a8a82', fontSize: 12 }}>→</span>
+                        <HourStep dir={-1} onClick={() => rg.onStepToH(-1)} />
+                        <input type="time" value={hmIn(rg.toHm)} onChange={(e) => e.target.value && rg.onSetTo(hmOut(e.target.value, rg.toHm))} style={timeIn} />
+                        <HourStep dir={1} onClick={() => rg.onStepToH(1)} />
+                        {a.canRemoveRange && <button onClick={rg.onRemove} style={{ width: 22, height: 24, border: 'none', background: 'none', fontSize: 14, color: '#c9c7bf', cursor: 'pointer' }}>✕</button>}
+                      </div>
+                    ))}
+                    <button onClick={a.onAddRange} style={{ alignSelf: 'flex-start', border: '1px dashed #8a8a82', background: 'transparent', borderRadius: 999, padding: '3px 10px', fontSize: 11, fontWeight: 700, color: '#55554e', cursor: 'pointer', fontFamily: 'inherit' }}>＋ 時間をたす</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
+          <button onClick={v.addMoreMenu} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, border: 'none', background: 'none', padding: '4px 0', fontSize: 13, fontWeight: 700, color: '#1b1b18', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <span style={msIcon(18, '#1b1b18', false)}>add</span>行動を追加
+          </button>
+          <button onClick={v.openTplSave} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, border: 'none', background: 'none', padding: '4px 0', fontSize: 12.5, fontWeight: 700, color: '#55554e', cursor: 'pointer', fontFamily: 'inherit' }}>
             <span style={msIcon(17, '#55554e', false)}>bookmark_add</span>テンプレートへ
           </button>
         </div>
-        <div style={{ marginTop: 12, background: '#fff', borderRadius: 16, padding: 15, boxShadow: '0 1px 3px rgba(27,27,24,.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>時間の割り振り</span>
-            <div style={{ display: 'flex', gap: 0, background: '#efece3', borderRadius: 10, padding: 3 }}>
-              <button onClick={v.setDurationMode} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.durTabBg, color: v.durTabColor }}>所要時間</button>
-              <button onClick={v.setTimeMode} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.timeTabBg, color: v.timeTabColor }}>時刻</button>
-            </div>
-          </div>
-          {/* 記録する日付（時刻モード。前日ぶんを後から記録するとき用） */}
-          {v.isTimeMode && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#55554e' }}>日付</span>
-              <input type="date" value={v.recordDate} onChange={(e) => e.target.value && v.onRecordDate(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 8px', color: '#1b1b18', background: '#fff' }} />
-            </div>
-          )}
-          {/* 全体の時間（取り込み予定＝枠。手動で変更可） */}
-          {v.hasOverallTime && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#55554e' }}>予定の全体の時間</span>
-                <span style={{ ...mono, fontSize: 11, color: '#8a8a82' }}>{v.overallSpanText}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
-                <HourStep dir={-1} onClick={() => v.onOverallStepFromH(-1)} />
-                <input type="time" value={hmIn(v.overallFromHm)} onChange={(e) => e.target.value && v.onOverallFrom(hmOut(e.target.value, v.overallFromHm))} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
-                <HourStep dir={1} onClick={() => v.onOverallStepFromH(1)} />
-                <span style={{ color: '#8a8a82', fontSize: 12, margin: '0 1px' }}>→</span>
-                <HourStep dir={-1} onClick={() => v.onOverallStepToH(-1)} />
-                <input type="time" value={hmIn(v.overallToHm)} onChange={(e) => e.target.value && v.onOverallTo(hmOut(e.target.value, v.overallToHm))} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
-                <HourStep dir={1} onClick={() => v.onOverallStepToH(1)} />
-              </div>
-            </div>
-          )}
-          {v.isDurationMode && !v.hasOverallTime && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12 }}>
-              <button onClick={v.addTotalM10} style={{ width: 32, height: 32, borderRadius: 9, border: '1.5px solid #e4e1d8', background: '#fff', ...mono, fontSize: 11, fontWeight: 700, color: '#55554e', cursor: 'pointer' }}>-10</button>
-              <button onClick={v.addTotalM1} style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid #1b1b18', background: '#fff', fontSize: 17, color: '#1b1b18', cursor: 'pointer' }}>−</button>
-              <MinEdit text={v.searchTotalText} raw={v.searchTotalMinRaw} onSet={v.setTotalMin} style={{ ...mono, fontSize: 15, fontWeight: 700, minWidth: 60, textAlign: 'center' }} />
-              <button onClick={v.addTotalP1} style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid #1b1b18', background: '#fff', fontSize: 17, color: '#1b1b18', cursor: 'pointer' }}>＋</button>
-              <button onClick={v.addTotalP10} style={{ width: 32, height: 32, borderRadius: 9, border: '1.5px solid #e4e1d8', background: '#fff', ...mono, fontSize: 11, fontWeight: 700, color: '#55554e', cursor: 'pointer' }}>+10</button>
-            </div>
-          )}
-          {/* 所要時間モードのみ: 配分バー（つまみドラッグ） */}
-          {v.isDurationMode && (
-            <div style={{ position: 'relative', height: 38, marginTop: 14, touchAction: 'none' }}>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', borderRadius: 11, overflow: 'hidden' }}>
-                {v.allocSegs.map((s, si) => <div key={si} style={{ width: s.widthPct, background: s.color }} />)}
-              </div>
-              {v.allocHandles.map((h, hi) => (
-                <div key={hi} onPointerDown={h.onDrag} onPointerMove={h.onDrag} style={{ position: 'absolute', top: -4, bottom: -4, left: h.leftPct, width: 28, marginLeft: -14, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'ew-resize', touchAction: 'none' }}>
-                  <span style={{ width: 8, height: 34, borderRadius: 5, background: '#fff', border: '2px solid #1b1b18', boxShadow: '0 2px 6px rgba(27,27,24,.3)' }} />
-                </div>
-              ))}
-            </div>
-          )}
-          {v.allocSegs.map((s, si) => (
-            <div key={si} style={{ padding: '10px 2px 9px', borderBottom: '1px solid #f1efe8' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 11, height: 11, borderRadius: 3, background: s.color, flex: '0 0 auto' }} />
-                <span style={{ fontSize: 13.5, flex: 1, minWidth: 0 }}>{s.name}</span>
-                {!s.timeMode && <MinEdit text={s.minText} raw={s.rawMin} onSet={s.onSetMin} style={{ ...mono, fontSize: 12, fontWeight: 700, background: '#efece3', borderRadius: 8, padding: '4px 9px' }} />}
-                <span style={{ ...mono, fontSize: 12, fontWeight: 700, color: '#f5994e', width: 30, textAlign: 'right', flex: '0 0 auto' }}>{s.fatText}</span>
-              </div>
-              {s.timeMode && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 7, paddingLeft: 19 }}>
-                  {s.ranges.map((r, ri) => (
-                    <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
-                      <HourStep dir={-1} onClick={() => r.onStepFromH(-1)} />
-                      <input type="time" value={hmIn(r.fromHm)} onChange={(e) => e.target.value && r.onSetFrom(hmOut(e.target.value, r.fromHm))} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
-                      <HourStep dir={1} onClick={() => r.onStepFromH(1)} />
-                      <span style={{ color: '#8a8a82', fontSize: 12, margin: '0 1px' }}>→</span>
-                      <HourStep dir={-1} onClick={() => r.onStepToH(-1)} />
-                      <input type="time" value={hmIn(r.toHm)} onChange={(e) => e.target.value && r.onSetTo(hmOut(e.target.value, r.toHm))} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
-                      <HourStep dir={1} onClick={() => r.onStepToH(1)} />
-                      {s.canRemoveRange && <button onClick={r.onRemove} style={{ width: 24, height: 26, border: 'none', background: 'none', fontSize: 15, color: '#c9c7bf', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>}
-                    </div>
-                  ))}
-                  <div style={{ fontSize: 10, color: '#b4b2a8', marginTop: -2 }}>−/＋ ボタンで1時間ずつ、数字を押すと分をキーボード入力</div>
-                  <button onClick={s.onAddRange} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, border: '1.5px dashed #cfe08a', background: '#fbfdf0', borderRadius: 999, padding: '4px 11px', fontSize: 11, fontWeight: 700, color: '#5a7500', cursor: 'pointer' }}>＋ 時間を追加</button>
-                </div>
-              )}
-            </div>
-          ))}
-          <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 8 }}>{v.isTimeMode ? '強度チップで体感を調整できます' : 'つまみを左右にドラッグで配分を変更（1分単位）。強度チップで体感を調整'}</div>
-        </div>
+        {v.isEditFlow && (
+          <button onClick={v.trashOriginal} style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '22px auto 0', border: 'none', background: 'none', color: '#d9534f', fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }}>削除</button>
+        )}
       </div>
       {v.tplOpen && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 9, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
@@ -327,16 +341,6 @@ function Confirm({ v }) {
           </div>
         </div>
       )}
-      <div style={{ flex: '0 0 auto', padding: '10px 16px 22px' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '0 4px 9px' }}>
-          <span style={{ fontSize: 12, color: '#8a8a82' }}>合計 {v.searchTotalText}</span>
-          <span style={{ ...mono, fontSize: 15, fontWeight: 700 }}>{v.searchTotalFatText}</span>
-        </div>
-        <button onClick={v.commitSearch} style={{ width: '100%', border: 'none', borderRadius: 14, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 16, padding: 16, cursor: 'pointer' }}>{v.commitLabel}</button>
-        {v.isEditFlow && (
-          <button onClick={v.trashOriginal} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#b4645a', fontWeight: 700, fontSize: 13, padding: '11px 0', cursor: 'pointer' }}>🗑 この記録をゴミ箱へ</button>
-        )}
-      </div>
     </div>
   );
 }
