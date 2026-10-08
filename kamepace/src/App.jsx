@@ -1509,6 +1509,8 @@ export default class App extends React.Component {
       sumText: '', past: !!bd, cond: cond(bd),
       onTap: this.goBed, onMenu: this.goBed,
     });
+    // 就寝前の記録は薄くしない。就寝の記録をしたら、その日の記録はぜんぶ濃く
+    posts.forEach(p => { if (p.kind === 'bed' || bd) p.past = false; });
     posts.sort((a, b) => (a.sortHm || '').localeCompare(b.sortHm || ''));
     // 時間帯の区切り
     const names = Object.fromEntries(SLOTS.map(x => [x.id, x.name]));
@@ -4379,7 +4381,7 @@ export default class App extends React.Component {
         const n = (st.collected || []).reduce((a, c) => (c.glyph === '🌙' && c.ts && dateToStr(new Date(c.ts)) === dd) ? a + (c.amount || 1) : a, 0);
         return n > 0 ? '−' + n : '';
       })(),
-      pile: st.screen === 'home' ? this.makePile(7) : [],
+      pile: [], // ホームの背景に絵文字は出さない
       // 山が高く積み上がって上部UI（時計・日付ナビ）に重なる量になったら白文字にする
       pileHigh: this.pileCount() >= 90,
       slots,

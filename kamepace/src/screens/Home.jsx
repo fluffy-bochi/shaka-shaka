@@ -111,12 +111,8 @@ export default function Home({ v }) {
   }, [v.homeDate, v.homeNowSlot]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
-      {/* 背景の積もった絵文字（ボカシ） */}
-      <div style={{ position: 'absolute', inset: 0, top: 0, bottom: 64, zIndex: 0, filter: 'blur(1.5px)', pointerEvents: 'none' }}>
-        {v.pile.map((p, i) => (
-          <span key={i} style={{ position: 'absolute', left: p.x, bottom: p.y, fontSize: p.s, transform: `rotate(${p.r2}deg)` }}><Emo e={p.e} size={p.s * 1.2} /></span>
-        ))}
-      </div>
+      {/* 背景はいこいさんの背景と同じ地色（シャカの絵文字は出さない） */}
+      <div style={{ position: 'absolute', inset: 0, background: '#f7f4ec', zIndex: 0, pointerEvents: 'none' }} />
       <div style={{ position: 'relative', zIndex: 1, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       {/* 上部1/3: 人＋コメント（固定）。行動は下でスクロール */}
       <div style={{ flex: '0 0 auto', background: '#f7f4ec', paddingTop: 2 }}>
