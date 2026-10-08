@@ -894,7 +894,7 @@ export default class App extends React.Component {
     // 編集フローだけは編集のキャンセル＝ホームへ
     if (this.state.confirmOrigin === 'edit') { this.set({ searchStep: null, searchCart: [], screen: 'home', editIdxs: null, confirmOrigin: 'search', confirmMode: 'duration', framePlan: null }); return; }
     // 実行画面の「記録」から来たときは、実行画面へ戻る（実行中のデータはそのまま）
-    if (this.state.confirmOrigin === 'run' && this.state.run) { this.set({ screen: 'run', searchStep: null, searchCart: [], catId: null, cart: {}, confirmOrigin: 'search', confirmMode: 'duration' }); return; }
+    if (this.state.confirmOrigin === 'run' && this.state.run) { this.set({ screen: 'run', searchStep: null, searchCart: [], catId: null, cart: {}, confirmOrigin: 'search', confirmMode: 'duration', anchorEnd: null }); return; }
     // リストから来たときは、行動はリストのカードに残っているので確認カートは空にして戻る
     if (this.state.confirmOrigin === 'list') { this.set({ searchStep: null, searchCart: [], catId: null, cart: {}, confirmOrigin: 'search' }); return; }
     // それ以外は「記録を開いたとき最初の画面」（検索/予定/大カテゴリの入口）へ。
@@ -1178,6 +1178,11 @@ export default class App extends React.Component {
     const durTotal = frameFill ? this.timeSpanMin() : (this.state.searchTotalMin || (n * 30));
     const durMins = fr.map(f => Math.max(1, Math.round(f * durTotal)));
     if (durMins.length) { const d = durTotal - durMins.reduce((a, b) => a + b, 0); durMins[n - 1] = Math.max(1, durMins[n - 1] + d); }
+    // 記録した時＝終わった時: 所要時間モードの記録は、終わりの時刻から逆にならべる。
+    // 終わり＝実行画面の「記録」から来たときはその時刻（anchorEnd）、ふだんは今日のいまの枠ならいま。予定・編集・ほかの枠/日は従来どおり
+    const endAnchor = (!timeMode && !frameFill && !isEdit && isToday)
+      ? (this.state.anchorEnd ? hmToTsOn(recDate, this.state.anchorEnd) : (slotId === this.slotNow() ? Math.floor(now / 60000) * 60000 : null)) : null;
+    let backCursor = endAnchor != null ? endAnchor - durMins.reduce((a, b) => a + b, 0) * 60000 : null;
     // 通常記録の配置位置: 同スロットの使用済み分（編集中は元の記録を除いて数える）
     let slotOffset = baseEntries
       .filter(e => e.date === recDate && !e.exp && !e.planned && this.slotOf(e) === slotId)
@@ -1233,8 +1238,10 @@ export default class App extends React.Component {
       } else {
         const min = durMins[i];
         const e = mkEntry(t, min, null, null, false, taskKey);
-        e.slot = slotId; e.from = this.slotHm(slot, slotOffset); e.to = this.slotHm(slot, slotOffset + min);
-        slotOffset += min; newEntries.push(e); learnMin[i] = min;
+        e.slot = slotId;
+        if (backCursor != null) { e.from = this.tsToHm(backCursor); e.to = this.tsToHm(backCursor + min * 60000); backCursor += min * 60000; }
+        else { e.from = this.slotHm(slot, slotOffset); e.to = this.slotHm(slot, slotOffset + min); slotOffset += min; }
+        newEntries.push(e); learnMin[i] = min;
       }
     });
     // mylifecoreタスクの累計: 同じ taskKey の既存記録があれば時間を合算して1件に更新（古いぶんは消す）
@@ -1278,7 +1285,7 @@ export default class App extends React.Component {
         : (this.state.confirmOrigin === 'run' && this.state.run && this.state.run.fromList)
           ? (() => { const done = new Set(this.state.run.doneUids || []), items = this.state.pickList.items.filter(x => !done.has(x.uid)); return { ...this.state.pickList, items, ...(items.length ? null : { name: '', tplKey: null }) }; })()
           : this.state.pickList,
-      entries, lastMins, tapLine: isEdit ? this.state.tapLine : null, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null,
+      entries, lastMins, tapLine: isEdit ? this.state.tapLine : null, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null, anchorEnd: null,
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
       // 編集で山が縮んだ場合に consumed が超過しないように
@@ -1764,7 +1771,7 @@ export default class App extends React.Component {
     this.toast('「' + sa.name + '」のデバフも調整しました');
   };
   dismissSymAdjust = () => this.set({ symAdjust: null });
-  openRecord(id) { this._pickMem = {}; this.set({ runAdd: false, slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
+  openRecord(id) { this._pickMem = {}; this.set({ runAdd: false, anchorEnd: null, slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
   toggleSlotMenu = () => this.set({ slotMenuOpen: !this.state.slotMenuOpen });
   pickSlot = (id) => this.set({ slotId: id, slotMenuOpen: false });
   selectCat = (id) => this.set({ catId: id });
@@ -1966,7 +1973,9 @@ export default class App extends React.Component {
     const total = cart.reduce((a, c) => a + c.defMin, 0);
     // 実行中のデータは記録が終わるまで残す（確認画面から戻ったら実行画面へ。区間は閉じて一時停止の状態）
     this.setRun({ ...r, segs, doneUids: done.map(li => li.uid) });
-    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: total, searchFracs: cart.map(c => c.defMin / total), confirmMode: 'time', startTime: hmOf(start), endTime: hmOf(Math.max(end, start + 60000)), cart: {}, confirmOrigin: 'run', framePlan: null });
+    // 確認画面は所要時間モードで、終わり（記録を押した時刻）にそろえる。分を変えても終わりは変わらない
+    const cartD = cart.map(({ ranges, ...c }) => c); // eslint-disable-line no-unused-vars
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cartD, searchTotalMin: total, searchFracs: cartD.map(c => c.defMin / total), confirmMode: 'duration', startTime: hmOf(start), endTime: hmOf(Math.max(end, start + 60000)), anchorEnd: hmOf(Math.max(end, start + 60000)), cart: {}, confirmOrigin: 'run', framePlan: null, recordDate: null });
   };
   goRun = () => { if (this.state.run) this.set({ screen: 'run', runAdd: false }); };
   /* 実行中のタスクを記録せずに捨てる */
@@ -3819,12 +3828,21 @@ export default class App extends React.Component {
         ...this.allPlans().map(p => ({ key: 'plan:' + p.id, kind: 'plan', name: p.name, glyph: '📋', meta: this.planMeta(p).metaText, onStart: () => this.loadPlanToList(p), onTrash: () => this.trashPlan(p.id) })),
         { key: 'newplan', kind: 'plan', name: '予定をつくる', glyph: '➕', meta: '', onStart: this.openPlanAdd },
       ] },
-      // 「表示・非表示の切り替え」中（pickShowHidden）は、非表示のカテゴリ・行動も出して目のボタンで切り替える
-      ...this.allCats().filter(c => st.pickShowHidden || !(st.hiddenCats || []).includes(c.id)).map(c => ({
+      // 右の目のボタン（pickShowHidden）で「表示中の行動」⇄「非表示の行動」を切り替える。
+      // 非表示の行動を見ているときは、非表示のカテゴリ（中身ごと）と、非表示にした行動だけを出す
+      ...this.allCats().filter(c => {
+        const ch = (st.hiddenCats || []).includes(c.id);
+        if (!st.pickShowHidden) return !ch;
+        return ch || c.items.some(t => hiddenActs0.has(normTitle(t.name)));
+      }).map(c => ({
         id: c.id, name: c.name, color: c.color, glyph: c.glyph || '⭐',
         hidden: (st.hiddenCats || []).includes(c.id), onToggleHide: () => this.toggleCatHidden(c.id),
         items: [
-          ...c.items.filter(t => st.pickShowHidden || !hiddenActs0.has(normTitle(t.name))).map(t => {
+          ...c.items.filter(t => {
+            const h = hiddenActs0.has(normTitle(t.name));
+            if (!st.pickShowHidden) return !h;
+            return h || (st.hiddenCats || []).includes(c.id);
+          }).map(t => {
             const pref = (st.prefs || {})[normTitle(t.name)] || 'normal';
             const fq = (st.actFreq || {})[normTitle(t.name)] || {};
             const mk = (pf) => this.actFatParts(t, pf === 'normal' ? null : pf);
@@ -3833,13 +3851,13 @@ export default class App extends React.Component {
               // 生活必須行動・やりたいこと（両方あるときの目標は生活必須行動の頻度）
               req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(t.name, kind, val) };
           }),
-          { key: 'copy:' + c.id, kind: 'copy', name: 'にているものをコピーして作る', glyph: '➕', onStart: () => { this.set({ catId: c.id }); this.openActAdd(); } },
+          ...(st.pickShowHidden ? [] : [{ key: 'copy:' + c.id, kind: 'copy', name: 'にているものをコピーして作る', glyph: '➕', onStart: () => { this.set({ catId: c.id }); this.openActAdd(); } }]),
         ],
       })),
       { id: '__mood', name: 'きもち', color: '#d97aa6', glyph: '💭', items: [
         { key: 'mood', kind: 'mood', name: 'きもち・できごと', glyph: '💭', meta: '時間なしで記録', onStart: this.openMood },
       ] },
-    ];
+    ].filter(c => !st.pickShowHidden || !c.id.startsWith('__')); // 非表示の行動を見ているときは、予定・きもち（隠せない）は出さない
     const plans = this.allPlans().map(p => { const m = this.planMeta(p); return { id: p.id, name: p.name, meta: m.metaText, onOpen: () => this.openPlan(p.id), onTrash: () => this.trashPlan(p.id) }; });
     const detailPlan = st.planDetailId ? this.planById(st.planDetailId) : null;
     const detailMeta = detailPlan ? this.planMeta(detailPlan) : null;

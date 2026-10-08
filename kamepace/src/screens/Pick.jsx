@@ -67,6 +67,8 @@ function EditAct({ it, onClose }) {
     <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: '#fff', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, WebkitTapHighlightColor: 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <span style={{ fontSize: 14, fontWeight: 900, flex: 1 }}>行動を編集</span>
+        {/* 表示・非表示（非表示にした行動は、右の目のボタンで「非表示の行動」を見ると出てくる） */}
+        {it.onToggleHide && <button onClick={() => { it.onToggleHide(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', color: '#55554e', fontSize: 11.5, fontWeight: 800, padding: '4px 10px 4px 7px', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', marginRight: 8 }}><span style={ms(16, '#55554e')}>{it.hidden ? 'visibility' : 'visibility_off'}</span>{it.hidden ? '表示する' : '非表示にする'}</button>}
         <button onClick={onClose} aria-label="閉じる" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(22, INK)}>close</span></button>
       </div>
       <div>
@@ -82,10 +84,10 @@ function EditAct({ it, onClose }) {
       <div style={{ fontSize: 10.5, color: '#8a8a82', fontWeight: 700 }}>マイナスで回復</div>
       <div style={{ flex: 1 }} />
       <div style={{ display: 'flex', gap: 8 }}>
-        {it.onReset && <button onClick={() => { it.onReset(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '10px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>元に戻す</button>}
+        {it.onReset && <button onClick={() => { it.onReset(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '10px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>元に戻す</button>}
         <span style={{ flex: 1 }} />
-        <button onClick={onClose} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '10px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>キャンセル</button>
-        <button onClick={save} style={{ border: 'none', borderRadius: 12, background: ok ? '#c4f000' : '#e4e1d8', color: ok ? '#2f3a00' : '#a5a39a', fontSize: 14, fontWeight: 900, padding: '10px 20px', cursor: ok ? 'pointer' : 'default', fontFamily: 'inherit' }}>保存</button>
+        <button onClick={onClose} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '10px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>キャンセル</button>
+        <button onClick={save} style={{ border: 'none', borderRadius: 12, background: ok ? '#c4f000' : '#e4e1d8', color: ok ? '#2f3a00' : '#a5a39a', fontSize: 14, fontWeight: 900, padding: '10px 20px', cursor: ok ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>保存</button>
       </div>
     </div>
   );
@@ -200,7 +202,7 @@ function Card({ row, cat, v, hist, setHist }) {
   // りれきを開く/閉じるときは、カードを裏返す（横に90度まわして中身を入れ替え、反対側から戻す）
   const ref = React.useRef(null);
   const [pop, setPop] = React.useState(null); // 頻度のポップアップ（'req'＝生活必須行動 / 'fav'＝やりたいこと）
-  const [editing, setEditing] = React.useState(false); // 行動の編集
+  const [editing, setEditing] = React.useState(false); // 行動・カテゴリの編集
   const flip = (b) => {
     const el = ref.current;
     if (!el || !el.animate) { setHist(b); return; }
@@ -227,6 +229,23 @@ function Card({ row, cat, v, hist, setHist }) {
           {row.type === 'cat' ? <Emo e={cat.glyph} size={64} /> : <span style={ms(56, '#fff')}>add</span>}
           <span style={{ fontSize: 24, fontWeight: 900, color: '#fff' }}>{row.type === 'cat' ? cat.name : '大カテゴリを追加'}</span>
         </div>
+        {row.type === 'cat' && cat.hidden && <span style={{ position: 'absolute', left: 16, bottom: 12, fontSize: 12, fontWeight: 800, color: '#fff', opacity: 0.85 }}>非表示中</span>}
+        {/* 右上の「編集」: カテゴリの表示・非表示 */}
+        {row.type === 'cat' && cat.onToggleHide && <button onClick={() => setEditing(true)} style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, border: 'none', borderRadius: 999, background: 'rgba(255,255,255,.92)', color: INK, fontSize: 11.5, fontWeight: 800, padding: '3px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
+        {row.type === 'cat' && editing && (
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: '#fff', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <span style={{ fontSize: 14, fontWeight: 900, flex: 1, color: INK }}>カテゴリを編集</span>
+              <button onClick={() => setEditing(false)} aria-label="閉じる" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(22, INK)}>close</span></button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Emo e={cat.glyph} size={44} /><span style={{ fontSize: 20, fontWeight: 900, color: INK }}>{cat.name}</span></div>
+            <div style={{ flex: 1 }} />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setEditing(false)} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '10px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>キャンセル</button>
+              <button onClick={() => { cat.onToggleHide(); setEditing(false); }} style={{ border: 'none', borderRadius: 12, background: INK, color: '#fff', fontSize: 13.5, fontWeight: 900, padding: '10px 16px', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={ms(17, '#fff')}>{cat.hidden ? 'visibility' : 'visibility_off'}</span>{cat.hidden ? '表示する' : '非表示にする'}</button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -349,18 +368,10 @@ function ListCard({ v, onPick }) {
 
 /* リストの1行（高さは全行共通の ROW_H。選択中は横に広げて目立たせるだけで高さは変えない＝スクロール位置から選択行を計算できる） */
 const ROW_H = 60, COPIES = 5;
-const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd, vis }) {
+const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd }) {
   const color = r.type === 'addcat' ? '#55554e' : r.cat.color;
-  // 表示・非表示の切り替え中: 非表示のものは薄く、右に目のボタン
-  const target = r.type === 'item' ? (r.item.onToggleHide ? r.item : null) : r.type === 'cat' && r.cat.onToggleHide ? r.cat : null;
-  const isHidden = !!(target && target.hidden) || (r.type === 'item' && r.cat.hidden);
   return (
-    <div onClick={() => onTap(r, i)} style={{ position: 'relative', height: ROW_H, display: 'flex', alignItems: 'center', padding: vis ? (on ? '0 92px 0 30px' : '0 98px 0 42px') : (on ? '0 54px 0 30px' : '0 60px 0 42px'), cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box', opacity: vis && isHidden ? 0.4 : 1 }}>
-      {vis && target && (
-        <button onClick={(e) => { e.stopPropagation(); target.onToggleHide(); }} aria-label={target.hidden ? '表示する' : '非表示にする'} style={{ position: 'absolute', right: 56, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 30, height: 30, borderRadius: '50%', border: 'none', background: target.hidden ? '#e4e1d8' : '#fff', boxShadow: '0 1px 3px rgba(27,27,24,.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
-          <span style={ms(18, target.hidden ? '#a5a39a' : INK)}>{target.hidden ? 'visibility_off' : 'visibility'}</span>
-        </button>
-      )}
+    <div onClick={() => onTap(r, i)} style={{ position: 'relative', height: ROW_H, display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
       {r.type === 'item' ? (
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 10, height: on ? 58 : 48, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
           <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 48 : 40, height: on ? 48 : 40, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
@@ -413,7 +424,7 @@ export default function Pick({ v }) {
       out.push({ key: 'cat:' + c.id, type: 'cat', cat: c });
       if (open[c.id]) c.items.forEach(it => out.push({ key: it.key, type: 'item', cat: c, item: it }));
     });
-    if (!filtering) out.push({ key: 'addcat', type: 'addcat' });
+    if (!filtering && !v.pickShowHidden) out.push({ key: 'addcat', type: 'addcat' });
     if (!out.length) out.push({ key: 'addcat', type: 'addcat' });
     return out;
   }, [cats, open, fil]);
@@ -546,12 +557,12 @@ export default function Pick({ v }) {
           <button onClick={toggleAll} aria-label={anyClosed ? 'カテゴリを全部開く' : 'カテゴリを全部閉じる'} style={side(false)}><span style={ms(22, INK)}>{anyClosed ? 'unfold_more' : 'unfold_less'}</span></button>
           <button onClick={() => setFil(f => ({ ...f, req: !f.req }))} aria-label="必須" style={side(fil.req)}><span style={{ fontSize: 17, fontWeight: 900, color: fil.req ? '#fff' : INK }}>必</span></button>
           <button onClick={() => setFil(f => ({ ...f, fav: !f.fav }))} aria-label="お気に入り" style={side(fil.fav)}><span style={ms(20, fil.fav ? '#fff' : INK, fil.fav)}>favorite</span></button>
-          {/* 表示・非表示の切り替え（押すと非表示のものも出て、目のボタンで切り替えられる） */}
-          <button onClick={v.togglePickHidden} aria-label="表示・非表示の切り替え" style={side(v.pickShowHidden)}><span style={ms(20, v.pickShowHidden ? '#fff' : INK)}>visibility</span></button>
+          {/* 表示中の行動 ⇄ 非表示の行動 の切り替え（非表示にする／戻すのは、カードの「編集」から） */}
+          <button onClick={v.togglePickHidden} aria-label={v.pickShowHidden ? '表示中の行動を見る' : '非表示の行動を見る'} style={side(v.pickShowHidden)}><span style={ms(20, v.pickShowHidden ? '#fff' : INK)}>{v.pickShowHidden ? 'visibility_off' : 'visibility'}</span></button>
         </div>
         <div ref={listRef} onScroll={onScroll} className="nos" style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory', overscrollBehavior: 'contain' }}>
           {all.map(({ r, i }) => (
-            <Row key={i} r={r} i={i} on={i === idx} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={(onList || v.runAdd) && i === idx} vis={v.pickShowHidden} />
+            <Row key={i} r={r} i={i} on={i === idx} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={(onList || v.runAdd) && i === idx} />
           ))}
         </div>
       </div>
