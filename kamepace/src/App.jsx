@@ -2938,19 +2938,9 @@ export default class App extends React.Component {
       // iOS(WebKit)対策: 動く絵文字に filter:drop-shadow を付けると DPR²(iPhoneは最大3)でフレーム毎に再ラスタライズされ非常に重い。
       // 3D絵文字自体に陰影があるため影は外す（perf実験・見た目は影が消えるのみ）。
       d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;will-change:transform;pointer-events:none';
-      // 未来の予定は灰色（グレースケール＋半透明）で「これから積む分」を示す。
-      // opacity は will-change と併用OKなので親に付ける。
-      if (m.gray) d.style.opacity = '0.45';
       d.style.width = d.style.height = (2 * r) + 'px';
       d.style.fontSize = Math.round(r * 1.6) + 'px';
       appendGlyph(d, glyph, Math.round(r * 1.9));
-      // iOS(WebKit)対策: will-change:transform の要素に filter を付けると効かないことがあるため、
-      // グレースケールは中の <img>（合成レイヤー化されていない子）側に付ける。テキスト時のみ親に付ける。
-      if (m.gray) {
-        const im = d.firstChild;
-        if (im && im.tagName === 'IMG') im.style.filter = 'grayscale(1)';
-        else d.style.filter = 'grayscale(1)';
-      }
       el.appendChild(d);
       this.bodies.push({ body, el: d, glyph, gray: !!m.gray });
     });
@@ -3150,11 +3140,9 @@ export default class App extends React.Component {
         const body = Bodies.circle(r + Math.random() * (W - 2 * r), this._spawnY(r, H), r, this.BODY_OPTS);
         World.add(this.engine.world, body);
         const d = document.createElement('div');
-        d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;will-change:transform;opacity:.45';
+        d.style.cssText = 'position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;will-change:transform';
         d.style.width = d.style.height = (2 * r) + 'px'; d.style.fontSize = Math.round(r * 1.6) + 'px';
         appendGlyph(d, g, Math.round(r * 1.9));
-        const im = d.firstChild;
-        if (im && im.tagName === 'IMG') im.style.filter = 'grayscale(1)'; else d.style.filter = 'grayscale(1)';
         el.appendChild(d);
         const pb = { body, el: d, glyph: g, gray: true, pred: true };
         this.bodies.push(pb); this.predBodies.push(pb);
@@ -3166,7 +3154,9 @@ export default class App extends React.Component {
     const restList = (this._predRest || []).filter(x => x.ts > T);
     const past = { hide: hideN, restore: restList.length };
     const solidAll = this.bodies.filter(b => !b.gray);
-    const M = Math.min(past.hide, solidAll.length);
+    // 未来で消える回復ぶんも、薄くせずに外す（過去で外す分と同じ扱い）
+    const negK = T > Date.now() ? this._pred.neg.filter(u => u.t <= T).length : 0;
+    const M = Math.min(past.hide + negK, solidAll.length);
     const rect0 = el.getBoundingClientRect(); const W0 = rect0.width || 350; const r0 = this.PR;
     solidAll.forEach((b, i) => {
       const hide = i >= solidAll.length - M;
@@ -3202,9 +3192,6 @@ export default class App extends React.Component {
       this.bodies.push(rb); this.restBodies.push(rb);
       this.resumeMotion();
     }
-    // 消える回復ぶん: 古い（下の）絵文字から薄くする
-    const k = this._pred.neg.filter(u => u.t <= T).length;
-    this.bodies.filter(b => !b.gray && !b.hidden).forEach((b, i) => { b.el.style.opacity = i < k ? '0.25' : ''; });
     clearTimeout(this._settleT);
     if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
   }
