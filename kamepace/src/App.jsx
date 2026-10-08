@@ -2671,12 +2671,14 @@ export default class App extends React.Component {
       let lv = w ? w.fatigue : carry;
       const start = w ? w.ts : hmToTsOn(d, '00:00');
       if (w) { recs.push(w); fat.push({ ts: w.ts, v: w.fatigue }); }
-      st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.delta && e.from && e.to)
-        .map(e => ({ e, t: entryEndTs(e) })).filter(x => x.t >= start && x.t <= now && (!b || x.t <= b.ts))
-        .sort((x, y) => x.t - y.t)
-        .forEach(({ e, t }) => {
-          if (lv == null) lv = 0;
-          const nv = Math.max(0, Math.min(100, lv + e.delta));
+      // 起床〜就寝（就寝が0時を過ぎたら翌日の日付の記録も就寝まで）の記録だけ。起床より前に進んだ分（睡眠など）は足さない
+      const end = Math.min(now, b ? b.ts : Infinity), d1 = shiftDate(d, 1);
+      const list = st.entries.filter(e => (e.date === d || (b && e.date === d1)) && !e.exp && !e.wakeAdd && e.delta && e.from && e.to);
+      const prog = (e, t) => { const a = entryStartTs(e), z = entryEndTs(e); return z <= a ? (t >= z ? 1 : 0) : Math.max(0, Math.min(1, (t - a) / (z - a))); };
+      const base = lv;
+      list.map(e => entryEndTs(e)).filter(t => t > start && t <= end).sort((x, y) => x - y)
+        .forEach(t => {
+          const nv = Math.max(0, Math.min(100, (base || 0) + list.reduce((sum, e) => sum + e.delta * (prog(e, t) - prog(e, start)), 0)));
           if (nv !== lv) fat.push({ ts: t, v: nv });
           lv = nv;
         });
