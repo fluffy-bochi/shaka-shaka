@@ -255,52 +255,59 @@ function Card({ row, cat, v, hist, setHist }) {
   const isAct = it.kind === 'act';
   if (isAct && hist) return <div ref={ref} style={wrap}><History it={it} cat={cat} onClose={() => flip(false)} /></div>;
   const parts = isAct ? it.prefParts[it.pref] : null;
-  const chip = { display: 'inline-flex', alignItems: 'center', gap: 3, height: 26, background: '#efece3', borderRadius: 999, padding: '0 8px', fontSize: 11, fontWeight: 700, color: INK };
-  const gray = { border: 'none', borderRadius: 10, background: '#efece3', color: '#55554e', fontSize: 13.5, fontWeight: 800, padding: '6px 14px', cursor: 'pointer' };
+  // 画面幅に合わせて文字を伸び縮み（小さい画面でも崩れないように）
+  const fz = (vw, min, max) => `clamp(${min}px, ${vw}vw, ${max}px)`;
+  const len = it.name.length;
+  const nameFz = len <= 6 ? fz(6, 18, 23) : len <= 10 ? fz(4.8, 15, 19) : fz(4.1, 13.5, 17);
+  const chip = { display: 'inline-flex', alignItems: 'center', gap: 2, height: 24, background: '#efece3', borderRadius: 999, padding: '0 8px', fontSize: 11, fontWeight: 700, color: INK, flex: '0 0 auto', whiteSpace: 'nowrap' };
+  const btn = { border: 'none', borderRadius: 10, fontSize: fz(3.5, 12, 13.5), fontWeight: 800, padding: '6px 0', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' };
+  const gray = { ...btn, background: '#efece3', color: '#55554e', flex: '0 0 auto', padding: '6px 12px' };
   return (
-    <div ref={ref} style={{ ...wrap, border: '3px solid ' + cat.color }}>
-      <div style={{ flex: '0 0 auto', height: HEAD_H, background: cat.color, display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 13, fontWeight: 800, color: cat.ink || '#fff' }}>{cat.name}</div>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 2px 20px', flex: 1, minHeight: 0 }}>
-        <span style={{ flex: '0 0 auto' }}><Emo e={it.glyph} size={72} /></span>
+    <div ref={ref} style={wrap}>
+      {/* 左上の色つき三角＋カテゴリ名 */}
+      <div style={{ position: 'absolute', left: 0, top: 0, width: '46%', height: 130, background: cat.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+      <span style={{ position: 'absolute', left: 14, top: 9, fontSize: 12.5, fontWeight: 800, color: cat.ink || '#fff', maxWidth: '40%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</span>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '28px 14px 0 18px', flex: 1, minHeight: 0 }}>
+        <span style={{ flex: '0 0 auto' }}><Emo e={it.glyph} size={64} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: it.name.length > 9 ? 17 : 23, fontWeight: 900, lineHeight: 1.3, wordBreak: 'break-all', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.name}</div>
+          <div style={{ fontSize: nameFz, fontWeight: 900, lineHeight: 1.25, wordBreak: 'break-all', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.name}</div>
           {isAct && (
-            <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
-              <button onClick={() => setPop(pop === 'req' ? null : 'req')} aria-label="生活必須行動" style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 900, background: it.req ? INK : chip.background, color: it.req ? '#fff' : INK }}>必</button>
-              <button onClick={() => setPop(pop === 'fav' ? null : 'fav')} aria-label="やりたいこと" style={{ ...chip, border: 'none', cursor: 'pointer', background: it.fav ? INK : chip.background }}><span style={ms(15, it.fav ? '#fff' : INK, true)}>favorite</span></button>
-              <button onClick={() => flip(true)} style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>りれき<span style={ms(15, INK)}>list</span><span style={ms(15, INK)}>calendar_month</span></button>
+            <div style={{ display: 'flex', gap: 5, marginTop: 7, overflow: 'hidden' }}>
+              <button onClick={() => setPop(pop === 'req' ? null : 'req')} aria-label="生活必須行動" style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 900, background: it.req ? INK : chip.background, color: it.req ? '#fff' : INK }}>必</button>
+              <button onClick={() => setPop(pop === 'fav' ? null : 'fav')} aria-label="やりたいこと" style={{ ...chip, border: 'none', cursor: 'pointer', background: it.fav ? INK : chip.background }}><span style={ms(14, it.fav ? '#fff' : INK, true)}>favorite</span></button>
+              <button onClick={() => flip(true)} style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>りれき<span style={ms(14, INK)}>calendar_month</span></button>
             </div>
           )}
-          {it.kind === 'plan' && it.meta && <div style={{ fontSize: 12, color: '#55554e', fontWeight: 700, marginTop: 8 }}>{it.meta}</div>}
-          {it.kind === 'mood' && <div style={{ fontSize: 12, color: '#55554e', fontWeight: 700, marginTop: 8 }}>{it.meta}</div>}
+          {it.kind === 'plan' && it.meta && <div style={{ fontSize: 12, color: '#55554e', fontWeight: 700, marginTop: 6 }}>{it.meta}</div>}
+          {it.kind === 'mood' && <div style={{ fontSize: 12, color: '#55554e', fontWeight: 700, marginTop: 6 }}>{it.meta}</div>}
         </div>
       </div>
       {isAct && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 14px 2px' }}>
-          <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 3, flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: fz(1.5, 2, 6), padding: `6px ${fz(3.6, 9, 14)} 0` }}>
+          <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2, flex: '0 0 auto' }}>
             {[['dislike', 'きらい'], ['normal', 'ふつう'], ['like', 'すき']].map(([k, t]) => (
-              <button key={k} onClick={() => it.onPref(k)} style={{ border: 'none', borderRadius: 999, padding: '5px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: it.pref === k ? INK : 'transparent', color: it.pref === k ? '#fff' : '#55554e' }}>{t}</button>
+              <button key={k} onClick={() => it.onPref(k)} style={{ border: 'none', borderRadius: 999, padding: `4px ${fz(2.1, 4, 8)}`, fontSize: fz(3, 10, 11.5), fontWeight: 700, cursor: 'pointer', background: it.pref === k ? INK : 'transparent', color: it.pref === k ? '#fff' : '#55554e', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>{t}</button>
             ))}
           </div>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 7, color: INK, whiteSpace: 'nowrap' }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: fz(1.3, 3, 5), color: INK, whiteSpace: 'nowrap', overflow: 'hidden' }}>
             {[['合計', parts.total], ['体', parts.body], ['心', parts.mind]].map(([l, n]) => (
-              <span key={l}><span style={{ fontSize: 8.5, fontWeight: 700, marginRight: 1, verticalAlign: 'super', color: '#8a8a82' }}>{l}</span><span style={{ fontSize: 15, fontWeight: 900, fontFamily: "'Space Mono',monospace" }}>{sg(n)}</span></span>
+              <span key={l}><span style={{ fontSize: 7.5, fontWeight: 700, marginRight: 1, verticalAlign: 'super', color: '#8a8a82' }}>{l}</span><span style={{ fontSize: fz(3.4, 10.5, 15), fontWeight: 900, fontFamily: "'Space Mono',monospace" }}>{sg(n)}</span></span>
             ))}
-            <span style={{ fontSize: 9, fontWeight: 700, color: '#8a8a82' }}>/{parts.minText}</span>
+            <span style={{ fontSize: 8, fontWeight: 700, color: '#8a8a82', marginLeft: -2 }}>/{parts.minText}</span>
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px 12px' }}>
         {it.kind === 'act' && <>
           <button onClick={it.onStart} style={gray}>予定</button>
           <button onClick={it.onStart} style={gray}>記録</button>
-          <button onClick={it.onList} style={{ flex: 1, border: '1.5px solid #e4e1d8', borderRadius: 10, background: CREAM, color: INK, fontSize: 13.5, fontWeight: 800, padding: '5px 0', cursor: 'pointer' }}>リスト ＋</button>
+          <button onClick={it.onList} style={{ ...btn, flex: 1, minWidth: 0, border: '1.5px solid #e4e1d8', background: CREAM, color: INK, padding: '5px 0' }}>リスト＋</button>
         </>}
         {it.onTrash && <button onClick={it.onTrash} aria-label="ゴミ箱へ" style={{ ...gray, padding: '4px 10px' }}><span style={ms(18, '#b4645a')}>delete</span></button>}
-        <button onClick={it.onRun || it.onStart} style={{ flex: it.kind === 'act' ? 1.1 : 1, border: 'none', borderRadius: 10, background: '#c4f000', color: '#2f3a00', fontSize: 14.5, fontWeight: 900, padding: '6px 0', cursor: 'pointer', letterSpacing: '.04em', boxShadow: '0 3px 10px rgba(122,154,0,.3)' }}>{it.kind === 'act' ? 'START' : 'ひらく'}</button>
+        <button onClick={it.onRun || it.onStart} style={{ ...btn, flex: it.kind === 'act' ? 1.15 : 1, minWidth: 0, background: '#c4f000', color: '#2f3a00', fontWeight: 900, letterSpacing: '.04em', boxShadow: '0 3px 10px rgba(122,154,0,.3)' }}>{it.kind === 'act' ? 'START' : 'ひらく'}</button>
       </div>
       {/* 右上の「編集」 */}
-      {isAct && it.onEdit && <button onClick={() => { setPop(null); setEditing(true); }} style={{ position: 'absolute', top: 3, right: 8, zIndex: 2, border: 'none', borderRadius: 999, background: CREAM, color: INK, fontSize: 11, fontWeight: 800, padding: '2px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
+      {isAct && it.onEdit && <button onClick={() => { setPop(null); setEditing(true); }} style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, border: '1.5px solid #e4e1d8', borderRadius: 999, background: CREAM, color: INK, fontSize: 11, fontWeight: 800, padding: '2px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
       {isAct && editing && <EditAct it={it} onClose={() => setEditing(false)} />}
       {isAct && pop && (
         <FreqPop key={pop} label={pop === 'req' ? '生活必須行動' : 'やりたいこと'} value={it[pop]}
