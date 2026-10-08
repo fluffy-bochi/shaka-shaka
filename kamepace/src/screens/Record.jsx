@@ -202,6 +202,9 @@ function Confirm({ v }) {
         <SlotPill v={v} />
       </div>
       <div className="nos" style={{ flex: 1, overflowY: 'auto', padding: '2px 16px 8px' }}>
+        {/* ホームの投稿に出す文章 */}
+        <textarea value={v.recNote} onChange={(e) => v.setRecNote(e.target.value)} placeholder="ひとこと" rows={2}
+          style={{ display: 'block', width: '100%', boxSizing: 'border-box', resize: 'none', border: 'none', borderRadius: 14, background: '#fff', padding: '12px 13px', marginBottom: 10, fontSize: 14, fontWeight: 600, lineHeight: 1.5, color: '#1b1b18', fontFamily: 'inherit', boxShadow: '0 1px 3px rgba(27,27,24,.05)', outline: 'none' }} />
         {v.searchCartRows.map(r => (
           <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', borderRadius: 14, padding: '11px 12px', marginBottom: 8, boxShadow: '0 1px 3px rgba(27,27,24,.05)' }}>
             <button onClick={r.onRemove} style={{ width: 26, height: 26, border: 'none', background: 'none', fontSize: 17, color: '#c9c7bf', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
@@ -584,7 +587,7 @@ function NewActPopup({ v }) {
 }
 
 /* ---- きもち・できごと popup（時間なしの心イベント） ---- */
-function MoodPopup({ v }) {
+export function MoodPopup({ v }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 7, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div className="nos" style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: '#fff', borderRadius: '22px 22px 0 0', padding: '16px 18px 20px', boxShadow: '0 -12px 40px rgba(27,27,24,.3)' }}>
@@ -592,7 +595,7 @@ function MoodPopup({ v }) {
           <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>きもち・できごと</div>
           <button onClick={v.closeMood} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
         </div>
-        <div style={{ fontSize: 11.5, color: '#8a8a82', textAlign: 'center', marginTop: 6, lineHeight: 1.6 }}>時間はつけません。きもちは心に、暑さ・寒さは体に効きます</div>
+        <div style={{ fontSize: 11.5, color: '#8a8a82', textAlign: 'center', marginTop: 6, lineHeight: 1.6 }}>きもちは心に、暑さ・寒さは体に効きます</div>
         {(() => {
           const moodBtn = (m) => (
             <button key={m.id} onClick={m.onPick} style={{ display: 'flex', alignItems: 'center', gap: 8, border: m.on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: m.on ? '#fbfdf0' : '#fff', borderRadius: 12, padding: '11px 12px', fontSize: 13, fontWeight: m.on ? 900 : 700, color: '#1b1b18', cursor: 'pointer', textAlign: 'left' }}>

@@ -1,9 +1,55 @@
 import React from 'react';
 import Emo from '../fluent';
 import { Speaker } from './Wake';
+import { MoodPopup } from './Record';
 
 const mono = { fontFamily: "'Space Mono',monospace" };
 const ndBtn = { width: 30, height: 30, background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#55554e', cursor: 'pointer', flex: '0 0 auto', padding: 0 };
+
+const fab = { width: 60, height: 60, borderRadius: '50%', border: 'none', background: '#fcfaf3', boxShadow: '0 4px 14px rgba(27,27,24,.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 };
+
+/* タイムラインの投稿1件: アイコン／見出し・時刻／本文／右に疲労の合計・…。中の行動は細い行で。
+   起床・就寝は体と心の調子（前回との差を矢印）。終わったものは薄く */
+function Post({ p }) {
+  const fade = p.past ? 0.55 : 1;
+  return (
+    <div onClick={p.onTap} style={{ position: 'relative', background: '#f7f4ec', borderTop: '1px solid #bab5a7', padding: '4px 20px 10px 72px', cursor: 'pointer', userSelect: 'none' }}>
+      <div style={{ opacity: fade }}>
+        <span style={{ position: 'absolute', left: 28, top: 8 }}><Emo e={p.glyph} size={24} /></span>
+        <div style={{ display: 'flex', alignItems: 'center', fontSize: 10.5, color: '#545454', lineHeight: '18px', paddingRight: 30, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {p.head}{p.head && p.time ? '・' : ''}{p.time}
+          {p.planned && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: '#fff', background: '#a5a39a', borderRadius: 4, padding: '0 5px', lineHeight: '15px' }}>予定</span>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 2 }}>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: p.empty ? '#8a8a82' : '#1b1b18', lineHeight: 1.45, wordBreak: 'break-all' }}>{p.empty ? '記録する' : (p.main || (p.cond ? '' : ''))}</div>
+          {p.sumText && <span style={{ ...mono, fontSize: 13.5, fontWeight: 700, color: '#1b1b18', whiteSpace: 'nowrap' }}>{p.sumText}</span>}
+        </div>
+        {p.frameHint && <div style={{ fontSize: 10.5, color: '#9d9b91', marginTop: 2 }}>{p.frameHint}</div>}
+        {p.cond && (p.cond.body != null || p.cond.mind != null) && (
+          <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 13, color: '#1b1b18' }}>
+            {p.cond.body != null && <span>💪{p.cond.body}<b style={{ marginLeft: 2 }}>{p.cond.bodyArrow}</b></span>}
+            {p.cond.mind != null && <span>♡{p.cond.mind}<b style={{ marginLeft: 2 }}>{p.cond.mindArrow}</b></span>}
+          </div>
+        )}
+        {p.items && p.items.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 8 }}>
+            {p.items.map((it, k) => (
+              <div key={k} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 5, height: 22, background: '#fcfaf3', borderRadius: 5, overflow: 'hidden', paddingRight: 8 }}>
+                <span style={{ position: 'absolute', left: 0, top: 0, width: 16, height: 16, background: it.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+                <span style={{ position: 'relative', marginLeft: 3, display: 'inline-flex' }}><Emo e={it.glyph} size={17} /></span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.name}</span>
+                {it.req && <span style={{ fontSize: 10, fontWeight: 900 }}>必</span>}
+                {it.fav && <span style={{ fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 12 }}>favorite</span>}
+                <span style={{ ...mono, fontSize: 10.5, fontWeight: 700, minWidth: 26, textAlign: 'right' }}>{it.sumText}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <button onClick={(e) => { e.stopPropagation(); p.onMenu(); }} aria-label="メニュー" style={{ position: 'absolute', right: 16, top: 2, width: 30, height: 22, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 16, letterSpacing: 1, color: '#b4b2a8', lineHeight: 1 }}>•••</button>
+    </div>
+  );
+}
 
 /* 記録の行: タップで編集、長押し（約450ms）でメニュー（編集・ゴミ箱へ）。
    マウス長押し・タッチ長押し・右クリックに対応。長押しが出たらタップは無効化する。 */
@@ -56,8 +102,8 @@ export default function Home({ v }) {
   React.useLayoutEffect(() => {
     const box = listRef.current; if (!box || !v.homeNowSlot) return;
     const el = box.querySelector('[data-slot="' + v.homeNowSlot + '"]'); if (!el) return;
-    const off = el.offsetHeight > box.clientHeight ? 0 : (box.clientHeight - el.offsetHeight) / 2;
-    box.scrollTop = Math.max(0, el.offsetTop - off);
+    // 区切り（朝・午前…）を画面の上から1/3あたりに置いて、その時間帯の投稿が真ん中に来るように
+    box.scrollTop = Math.max(0, el.offsetTop - box.clientHeight / 3);
   }, [v.homeDate, v.homeNowSlot]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
@@ -106,61 +152,14 @@ export default function Home({ v }) {
         </div>
         <Speaker text={v.homeComment} size={140} onTap={v.tapCharacter} onEdit={v.editIkoiLine} />
       </div>
-      <div ref={listRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 0 12px' }}>
-        {/* sleep card */}
-        <button onClick={v.goSleep} style={{ display: 'block', textAlign: 'left', background: '#fff', border: 'none', borderRadius: 16, padding: '13px 14px', margin: '0 16px 10px', boxShadow: '0 1px 3px rgba(27,27,24,.05)', cursor: 'pointer', width: 'calc(100% - 32px)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 15 }}>🛏</span>
-            <span style={{ fontSize: 13, fontWeight: 700, flex: 1, textAlign: 'left' }}>睡眠</span>
-            <span style={{ ...mono, fontSize: 10, color: '#8a8a82' }}>起床後の記録</span>
-            {v.sleepRecText && <span style={{ ...mono, fontSize: 13, fontWeight: 700, color: '#f5994e' }}>{v.sleepRecText}</span>}
+      <div ref={listRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 0 160px' }}>
+        {/* タイムライン（Figma「home」）: 時間帯の区切り＋投稿 */}
+        {v.homeFeed.map(p => p.divider ? (
+          <div key={p.key} data-slot={p.slot} style={{ display: 'flex', alignItems: 'center', gap: 8, height: 22, margin: '4px 0 2px' }}>
+            <span style={{ width: 45, height: 2, background: '#fff', boxShadow: '0 0 4px rgba(27,27,24,.25)' }} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', textShadow: '0 0 4px rgba(27,27,24,.55)' }}>{p.name}</span>
           </div>
-        </button>
-        {/* slots */}
-        {v.slots.map(s => (
-          <div key={s.id} data-slot={s.id} style={{ background: '#fff', borderRadius: 18, margin: '0 16px 12px', boxShadow: '0 1px 3px rgba(27,27,24,.06)', overflow: 'hidden' }}>
-            {/* ヘッダーをタップでアコーディオン開閉 */}
-            <div onClick={() => toggleSlot(s.id)} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px 12px', cursor: 'pointer', userSelect: 'none' }}>
-              <div style={{ position: 'relative', width: 42, height: 42, flex: '0 0 auto', borderRadius: '50%', background: s.circleBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-                {s.emoji}
-                {s.hasRecords && <span style={{ position: 'absolute', top: -1, right: -2, width: 17, height: 17, borderRadius: '50%', background: '#c4f000', border: '2.5px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 10, color: '#2f3a00' }}>check</span>}
-              </div>
-              <span style={{ fontSize: 15, fontWeight: 800, flex: 1, color: s.nameColor }}>{s.name}</span>
-              <span style={{ ...mono, fontSize: 13, fontWeight: 700, color: '#f5994e' }}>{s.sumText}</span>
-              <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#c9c7bf', transform: closedSlots[s.id] ? 'none' : 'rotate(180deg)', transition: 'transform .2s', flex: '0 0 auto' }}>expand_more</span>
-            </div>
-            {!closedSlots[s.id] && s.hasRecords && (
-              <div style={{ borderTop: '1px solid #f1efe8' }}>
-                {s.groups.map((g, gi) => (
-                  <RecordRow key={gi} g={g} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '9px 15px', borderBottom: '1px solid #f1efe8', cursor: 'pointer', userSelect: 'none', WebkitTouchCallout: 'none' }}>
-                    <span style={{ fontSize: 15, flex: '0 0 auto', marginTop: 1 }}>{g.glyph}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1b1b18', lineHeight: 1.4 }}>
-                        {g.planned && <span style={{ display: 'inline-block', ...mono, fontSize: 9, fontWeight: 700, letterSpacing: '.04em', color: '#fff', background: '#a5a39a', borderRadius: 5, padding: '1px 6px', marginRight: 6, verticalAlign: 'middle' }}>予定</span>}
-                        {g.title}
-                      </div>
-                      {g.hasSub && <div style={{ ...mono, fontSize: 10, color: '#b4b2a8', marginTop: 1 }}>{g.subText}</div>}
-                    </div>
-                    <span style={{ ...mono, fontSize: 13, fontWeight: 700, color: g.fatColor, flex: '0 0 auto', whiteSpace: 'nowrap', marginTop: 1 }}>{g.fatText}</span>
-                  </RecordRow>
-                ))}
-              </div>
-            )}
-            {!closedSlots[s.id] && (
-              <button onClick={s.onAdd} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', border: 'none', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#7a9a00' }}>
-                <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 16 }}>add</span>記録する
-              </button>
-            )}
-          </div>
-        ))}
-        {/* 就寝カード */}
-        <button onClick={v.goBed} style={{ display: 'block', textAlign: 'left', background: '#fff', border: 'none', borderRadius: 16, padding: '13px 14px', margin: '0 16px 10px', boxShadow: '0 1px 3px rgba(27,27,24,.05)', cursor: 'pointer', width: 'calc(100% - 32px)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 15 }}>🌙</span>
-            <span style={{ fontSize: 13, fontWeight: 700, flex: 1, textAlign: 'left' }}>就寝</span>
-            <span style={{ ...mono, fontSize: 10, color: '#8a8a82' }}>就寝前の記録</span>
-          </div>
-        </button>
+        ) : <Post key={p.key} p={p} />)}
         {/* タスク（mylifecore / Google ToDo / かめペースで手動追加）: 時間軸の下。
             チェックするとその時間帯に「行動」として記録される（紐づけた行動 or タスク名で推測） */}
         <div style={{ background: '#fff', borderRadius: 18, margin: '0 16px 12px', boxShadow: '0 1px 3px rgba(27,27,24,.06)', overflow: 'hidden' }}>
@@ -189,6 +188,12 @@ export default function Home({ v }) {
         </div>
       </div>
       </div>
+      {/* 右下: きもち・できごと・体調（💬）／記録（＋） */}
+      <div style={{ position: 'absolute', right: 20, bottom: v.run ? 136 : 80, zIndex: 3, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <button onClick={v.openMood} aria-label="きもち・できごと・体調" style={fab}><span style={{ fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 32, color: '#1b1b18' }}>chat_bubble</span></button>
+        <button onClick={v.openRecordNow} aria-label="記録する" style={fab}><span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 38, color: '#1b1b18', fontWeight: 300 }}>add</span></button>
+      </div>
+      {v.moodOpen && <MoodPopup v={v} />}
       {v.buffOpen && <BuffSheet v={v} />}
       {v.buffCheckOpen && <BuffCheckSheet v={v} />}
       {v.taskEditOpen && <TaskEditPopup v={v} />}

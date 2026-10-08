@@ -75,6 +75,8 @@ export function WakeCheck({ v }) {
     <div style={wrap}>
       <Head v={v} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingTop: 6 }}>
+        <textarea value={d.note || ''} onChange={(e) => v.setWakeDraft('note', e.target.value)} placeholder="ひとこと" rows={2}
+          style={{ display: 'block', width: 'calc(100% - 40px)', margin: '0 20px 12px', boxSizing: 'border-box', resize: 'none', border: 'none', borderRadius: 14, background: '#fff', padding: '12px 13px', fontSize: 14, fontWeight: 600, lineHeight: 1.5, color: INK, fontFamily: 'inherit', boxShadow: '0 2px 10px rgba(27,27,24,.05)', outline: 'none' }} />
         <SleepCard d={d} set={v.setWakeDraft} />
         <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setWakeDraft('cond', x)} />
         <Rating title="気分" opts={MOOD.map(([g], i) => [i + 1, g])} labels={MOOD.map(c => c[1])} value={d.mood} onPick={(x) => v.setWakeDraft('mood', x)} />
@@ -96,6 +98,8 @@ export function BedCheck({ v }) {
     <div style={wrap}>
       <Head v={v} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingTop: 6 }}>
+        <textarea value={d.note || ''} onChange={(e) => v.setBedDraft('note', e.target.value)} placeholder="ひとこと" rows={2}
+          style={{ display: 'block', width: 'calc(100% - 40px)', margin: '0 20px 12px', boxSizing: 'border-box', resize: 'none', border: 'none', borderRadius: 14, background: '#fff', padding: '12px 13px', fontSize: 14, fontWeight: 600, lineHeight: 1.5, color: INK, fontFamily: 'inherit', boxShadow: '0 2px 10px rgba(27,27,24,.05)', outline: 'none' }} />
         <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setBedDraft('cond', x)} />
         <Rating title="気分" opts={MOOD.map(([g], i) => [i + 1, g])} labels={MOOD.map(c => c[1])} value={d.mood} onPick={(x) => v.setBedDraft('mood', x)} />
         <Rating title="いまの疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setBedDraft('fat', x)} />
