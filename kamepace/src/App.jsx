@@ -307,20 +307,14 @@ export default class App extends React.Component {
     this.restoreSampleMode(data, true); // ゲストは標準でペルソナ1年サンプルを表示
     setTimeout(() => this.advancePlans(), 0); // アプリを閉じている間に進んだ予定をキャッチアップ
     setTimeout(() => this.sweepExpiredBuffs(), 0);
-    // 初回はオンボーディング（9問）→ 記録のないゲストはそのあとチュートリアル。
-    // ログアウトで戻ってきた同一セッションでは出さない（起動時の1回だけ判定）
+    // オンボーディングは「初めてログインした人」だけ（loadCloud）。ゲストには出さない。
+    // 記録のないゲストは操作チュートリアルだけ。ログアウトで戻ってきた同一セッションでは出さない（起動時の1回だけ判定）
     if (!this._autoTutChecked) {
       this._autoTutChecked = true;
-      // 「自分の記録」がある人にはチュートリアルを出さない。ペルソナ表示中(標準)は“自分の記録”ではないので
-      // ここには数えない＝初回ゲストにもチュートリアルを出す（チュートリアルは自前サンプルで動くので安全）。
+      // 「自分の記録」がある人にはチュートリアルを出さない。ペルソナ表示中(標準)は“自分の記録”ではないので数えない
       const hasData = (data.entries || []).some(e => !e.sample)
         || (data.collected && data.collected.length > 0);
-      if (!data.onboardDone) {
-        this._tutorialAfterOnboard = !hasData;
-        setTimeout(() => { if (!this.state.user) this.set({ screen: 'onboard', obStep: 1, obSel: {} }); }, 200);
-      } else if (!hasData) {
-        setTimeout(() => { if (!this.state.tutorial && !this.state.user) this.startTutorial(); }, 400);
-      }
+      if (!hasData) setTimeout(() => { if (!this.state.tutorial && !this.state.user) this.startTutorial(); }, 400);
     }
   }
   async loadCloud() {
@@ -353,9 +347,9 @@ export default class App extends React.Component {
       setTimeout(() => this.syncScheduleApp(), 400);
       clearInterval(this._schedT);
       this._schedT = setInterval(() => this.syncScheduleApp(), 5 * 60 * 1000);
-      // 既にオンボ済みのログインユーザーには出さない。初回（未オンボ）だけ出す
+      // オンボーディングは初めてログインした人（クラウドにまだデータがない）だけ。
       // → オンボ後に操作チュートリアルも出す（記録がまだ無いユーザーのみ）
-      if (!onboardDone) {
+      if (!data && !onboardDone) {
         this._tutorialAfterOnboard = !hadData;
         setTimeout(() => this.set({ screen: 'onboard', obStep: 1, obSel: {} }), 200);
       }
