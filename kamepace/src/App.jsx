@@ -4392,7 +4392,7 @@ export default class App extends React.Component {
       runAlarm: st.runAlarm, closeRunAlarm: this.closeRunAlarm, runAlarmNext: this.runAlarmNext,
       exitRun: () => this.set({ screen: 'record', runAdd: false }), minimizeRun: () => this.set({ screen: 'home', runAdd: false }), goRunAdd: this.goRunAdd, runAdd: !!st.runAdd && !!st.run,
       pickCats, pickCatId: st.catId, pickShowHidden: !!st.pickShowHidden, togglePickHidden: () => this.set({ pickShowHidden: !st.pickShowHidden }), pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
-      pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()), hmNow = this.tsToHm(Date.now()); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日　' + hmNow.replace(/^0/, ''); })(),
+      pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日'; })(),
       subItems, subName: activeCat ? activeCat.name : '', subIcon: activeCat ? activeCat.icon : 'category', subColor: activeCat ? activeCat.color : '#8a8a82',
       degreeOpen: !!st.degreeItem,
       degreeName: degItem ? degItem.name : '', degreeIcon: degItem ? degItem.icon : '', degreeColor: degCat ? degCat.color : '#4fa88a',
