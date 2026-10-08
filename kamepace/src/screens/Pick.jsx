@@ -222,14 +222,15 @@ function Card({ row, cat, v, hist, setHist }) {
   if (!row) return <div style={wrap} />;
   if (row.type === 'cat' || row.type === 'addcat') {
     const color = row.type === 'cat' ? cat.color : '#55554e';
+    const ink = row.type === 'cat' ? (cat.ink || '#fff') : '#fff';
     return (
       <div style={{ ...wrap, background: color, justifyContent: 'center' }}>
-        <span style={{ position: 'absolute', left: 16, top: 12, fontSize: 13, fontWeight: 800, color: '#fff' }}>{row.type === 'cat' ? 'カテゴリ' : '追加'}</span>
+        <span style={{ position: 'absolute', left: 16, top: 12, fontSize: 13, fontWeight: 800, color: ink }}>{row.type === 'cat' ? 'カテゴリ' : '追加'}</span>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 22 }}>
           {row.type === 'cat' ? <Emo e={cat.glyph} size={64} /> : <span style={ms(56, '#fff')}>add</span>}
-          <span style={{ fontSize: 24, fontWeight: 900, color: '#fff' }}>{row.type === 'cat' ? cat.name : '大カテゴリを追加'}</span>
+          <span style={{ fontSize: 24, fontWeight: 900, color: ink }}>{row.type === 'cat' ? cat.name : '大カテゴリを追加'}</span>
         </div>
-        {row.type === 'cat' && cat.hidden && <span style={{ position: 'absolute', left: 16, bottom: 12, fontSize: 12, fontWeight: 800, color: '#fff', opacity: 0.85 }}>非表示中</span>}
+        {row.type === 'cat' && cat.hidden && <span style={{ position: 'absolute', left: 16, bottom: 12, fontSize: 12, fontWeight: 800, color: ink, opacity: 0.85 }}>非表示中</span>}
         {/* 右上の「編集」: カテゴリの表示・非表示 */}
         {row.type === 'cat' && cat.onToggleHide && <button onClick={() => setEditing(true)} style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, border: 'none', borderRadius: 999, background: 'rgba(255,255,255,.92)', color: INK, fontSize: 11.5, fontWeight: 800, padding: '3px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
         {row.type === 'cat' && editing && (
@@ -254,11 +255,11 @@ function Card({ row, cat, v, hist, setHist }) {
   if (isAct && hist) return <div ref={ref} style={wrap}><History it={it} cat={cat} onClose={() => flip(false)} /></div>;
   const parts = isAct ? it.prefParts[it.pref] : null;
   const chip = { display: 'inline-flex', alignItems: 'center', gap: 3, height: 26, background: '#efece3', borderRadius: 999, padding: '0 8px', fontSize: 11, fontWeight: 700, color: INK };
-  const gray = { border: 'none', borderRadius: 12, background: '#efece3', color: '#55554e', fontSize: 14, fontWeight: 800, padding: '10px 14px', cursor: 'pointer' };
+  const gray = { border: 'none', borderRadius: 10, background: '#efece3', color: '#55554e', fontSize: 13.5, fontWeight: 800, padding: '6px 14px', cursor: 'pointer' };
   return (
     <div ref={ref} style={wrap}>
       <div style={{ position: 'absolute', left: 0, top: 0, width: '46%', height: 150, background: cat.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
-      <span style={{ position: 'absolute', left: 14, top: 10, fontSize: 13, fontWeight: 800, color: '#fff' }}>{cat.name}</span>
+      <span style={{ position: 'absolute', left: 14, top: 10, fontSize: 13, fontWeight: 800, color: cat.ink || '#fff' }}>{cat.name}</span>
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: '30px 16px 10px 22px', flex: 1, minHeight: 0 }}>
         <span style={{ flex: '0 0 auto' }}><Emo e={it.glyph} size={92} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -293,10 +294,10 @@ function Card({ row, cat, v, hist, setHist }) {
         {it.kind === 'act' && <>
           <button onClick={it.onStart} style={gray}>予定</button>
           <button onClick={it.onStart} style={gray}>記録</button>
-          <button onClick={it.onList} style={{ flex: 1, border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: INK, fontSize: 14, fontWeight: 800, padding: '9px 0', cursor: 'pointer' }}>リスト ＋</button>
+          <button onClick={it.onList} style={{ flex: 1, border: '1.5px solid #e4e1d8', borderRadius: 10, background: '#fff', color: INK, fontSize: 13.5, fontWeight: 800, padding: '5px 0', cursor: 'pointer' }}>リスト ＋</button>
         </>}
-        {it.onTrash && <button onClick={it.onTrash} aria-label="ゴミ箱へ" style={{ ...gray, padding: '8px 10px' }}><span style={ms(18, '#b4645a')}>delete</span></button>}
-        <button onClick={it.onRun || it.onStart} style={{ flex: it.kind === 'act' ? 1.1 : 1, border: 'none', borderRadius: 12, background: '#c4f000', color: '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: 'pointer', letterSpacing: '.04em', boxShadow: '0 4px 12px rgba(122,154,0,.3)' }}>{it.kind === 'act' ? 'START' : 'ひらく'}</button>
+        {it.onTrash && <button onClick={it.onTrash} aria-label="ゴミ箱へ" style={{ ...gray, padding: '4px 10px' }}><span style={ms(18, '#b4645a')}>delete</span></button>}
+        <button onClick={it.onRun || it.onStart} style={{ flex: it.kind === 'act' ? 1.1 : 1, border: 'none', borderRadius: 10, background: '#c4f000', color: '#2f3a00', fontSize: 14.5, fontWeight: 900, padding: '6px 0', cursor: 'pointer', letterSpacing: '.04em', boxShadow: '0 3px 10px rgba(122,154,0,.3)' }}>{it.kind === 'act' ? 'START' : 'ひらく'}</button>
       </div>
       {/* 右上の「編集」 */}
       {isAct && it.onEdit && <button onClick={() => { setPop(null); setEditing(true); }} style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', color: INK, fontSize: 11.5, fontWeight: 800, padding: '3px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
@@ -389,7 +390,7 @@ const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd }) {
           {!on && <FatNums it={r.item} />}
         </div>
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 30 : 26, borderRadius: 8, padding: '0 12px', background: color, color: '#fff', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 30 : 26, borderRadius: 8, padding: '0 12px', background: color, color: r.type === 'cat' ? (r.cat.ink || '#fff') : '#fff', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
           <span style={{ fontSize: on ? 11 : 9.5 }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
           <span style={{ flex: 1, textAlign: 'center', fontSize: on ? 14.5 : 13, fontWeight: 800, paddingRight: 20, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
         </div>

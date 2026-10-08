@@ -105,6 +105,8 @@ export default class App extends React.Component {
     endTime: '',
     recordDate: null, // 記録する日付（確認画面で指定・null=ホーム表示日）。前日の記録などに使う
     homeMotion: (() => { try { return localStorage.getItem('shaka_home_motion') === '1'; } catch (e) { return false; } })(),
+    // カテゴリの色: soft＝彩度を下げて明るく・黒字（標準）／vivid＝元のカラフル
+    catPalette: (() => { try { return localStorage.getItem('kame_cat_palette') === 'vivid' ? 'vivid' : 'soft'; } catch (e) { return 'soft'; } })(),
     // シャカの動かし方: false=加速度センサー（振る）／true=ジャイロ（傾き＝逆さで上辺に集まる）
     gyroMode: (() => { try { return localStorage.getItem('shaka_gyro_mode') === '1'; } catch (e) { return false; } })(),
     slotMenuOpen: false,
@@ -3053,6 +3055,23 @@ export default class App extends React.Component {
     this._savePileLayout();
   }
   resumeMotion() { if (!this.engine || this._running) return; this._running = true; Matter.Runner.run(this.runner, this.engine); if (!this._phys) this._startLoop(); }
+  setCatPalette = (p) => {
+    this.set({ catPalette: p });
+    try { localStorage.setItem('kame_cat_palette', p); } catch (e) { /* ignore */ }
+  };
+  // やさしい色: HSL で彩度を下げ、明度を上げる
+  catColor(hex) {
+    if (this.state.catPalette === 'vivid' || !/^#[0-9a-f]{6}$/i.test(hex || '')) return hex;
+    const n = parseInt(hex.slice(1), 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    let h = 0, sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+    if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+    const S = sat * 0.4, L = l + (1 - l) * 0.55;
+    const c = (1 - Math.abs(2 * L - 1)) * S, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = L - c / 2;
+    const [R, G, B] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    return '#' + [R, G, B].map(v => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('');
+  }
   setMotion = (on) => {
     if (this.state.homeMotion === on) return;
     this.set({ homeMotion: on });
@@ -3836,8 +3855,9 @@ export default class App extends React.Component {
     };
     const hiddenActs0 = this.hiddenActSet();
     const excl0 = this.profileExcl();
+    const catInk = st.catPalette === 'vivid' ? '#fff' : '#1b1b18';
     const pickCats = [
-      { id: '__plans', name: 'まとめて入力', color: '#7a9a00', glyph: '📋', items: [
+      { id: '__plans', name: 'まとめて入力', color: this.catColor('#7a9a00'), ink: catInk, glyph: '📋', items: [
         ...this.allPlans().map(p => ({ key: 'plan:' + p.id, kind: 'plan', name: p.name, glyph: '📋', meta: this.planMeta(p).metaText, onStart: () => this.loadPlanToList(p), onTrash: () => this.trashPlan(p.id) })),
         { key: 'newplan', kind: 'plan', name: 'まとめて入力をつくる', glyph: '➕', meta: '', onStart: this.openPlanAdd },
       ] },
@@ -3848,7 +3868,7 @@ export default class App extends React.Component {
         if (!st.pickShowHidden) return !ch;
         return ch || c.items.some(t => hiddenActs0.has(normTitle(t.name)) && !excl0.has(normTitle(t.name)));
       }).map(c => ({
-        id: c.id, name: c.name, color: c.color, glyph: c.glyph || '⭐',
+        id: c.id, name: c.name, color: this.catColor(c.color), ink: catInk, glyph: c.glyph || '⭐',
         hidden: (st.hiddenCats || []).includes(c.id), onToggleHide: () => this.toggleCatHidden(c.id),
         items: [
           ...c.items.filter(t => !excl0.has(normTitle(t.name))).filter(t => {
@@ -3867,7 +3887,7 @@ export default class App extends React.Component {
           ...(st.pickShowHidden ? [] : [{ key: 'copy:' + c.id, kind: 'copy', name: 'にているものをコピーして作る', glyph: '➕', onStart: () => { this.set({ catId: c.id }); this.openActAdd(); } }]),
         ],
       })),
-      { id: '__mood', name: 'きもち', color: '#d97aa6', glyph: '💭', items: [
+      { id: '__mood', name: 'きもち', color: this.catColor('#d97aa6'), ink: catInk, glyph: '💭', items: [
         { key: 'mood', kind: 'mood', name: 'きもち・できごと', glyph: '💭', meta: '時間なしで記録', onStart: this.openMood },
       ] },
     ].filter(c => !st.pickShowHidden || !c.id.startsWith('__')); // 非表示の行動を見ているときは、予定・きもち（隠せない）は出さない
@@ -4292,6 +4312,7 @@ export default class App extends React.Component {
       sensSub: '体×' + (st.bodyFatCoef || 1).toFixed(1) + ' ・ 心×' + (st.mindFatCoef || 1).toFixed(1),
       goSlotTimes: this.goSlotTimes, goCatsManage: this.goCatsManage,
       goTemplates: this.goTemplates, goSensitivity: this.goSensitivity,
+      catPalette: st.catPalette, setCatSoft: () => this.setCatPalette('soft'), setCatVivid: () => this.setCatPalette('vivid'),
       homeMotion: st.homeMotion, setMotionFixed: () => this.setMotion(false), setMotionMove: () => this.setMotion(true),
       mainScreen: st.mainScreen || 'shaka', setMainShaka: () => this.setMainScreen('shaka'), setMainHome: () => this.setMainScreen('home'),
       motionFixedBg: st.homeMotion ? '#fff' : '#1b1b18', motionFixedColor: st.homeMotion ? '#8a8a82' : '#fff',
