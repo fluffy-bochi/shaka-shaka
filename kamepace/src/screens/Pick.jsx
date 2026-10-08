@@ -366,12 +366,14 @@ function ListCard({ v, onPick }) {
   );
 }
 
-/* リストの1行（高さは全行共通の ROW_H。選択中は横に広げて目立たせるだけで高さは変えない＝スクロール位置から選択行を計算できる） */
-const ROW_H = 60, COPIES = 5;
+/* リストの1行（高さは行動 ROW_H・カテゴリ CAT_H で固定。選択中は横に広げて目立たせるだけで高さは変えない＝スクロール位置から選択行を計算できる）
+   カテゴリは細くして、閉じた状態でスクロールせずに一覧できるようにする */
+const ROW_H = 60, CAT_H = 32, COPIES = 5;
+const hOf = (r) => (r.type === 'item' ? ROW_H : CAT_H);
 const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd }) {
   const color = r.type === 'addcat' ? '#55554e' : r.cat.color;
   return (
-    <div onClick={() => onTap(r, i)} style={{ position: 'relative', height: ROW_H, display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
+    <div onClick={() => onTap(r, i)} style={{ position: 'relative', height: hOf(r), display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
       {r.type === 'item' ? (
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 10, height: on ? 58 : 48, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
           <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 48 : 40, height: on ? 48 : 40, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
@@ -387,9 +389,9 @@ const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd }) {
           {!on && <FatNums it={r.item} />}
         </div>
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 58 : 48, borderRadius: 10, padding: '0 14px', background: color, color: '#fff', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
-          <span style={{ fontSize: on ? 16 : 13 }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
-          <span style={{ flex: 1, textAlign: 'center', fontSize: on ? 18.5 : 15.5, fontWeight: 800, paddingRight: 20 }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 30 : 26, borderRadius: 8, padding: '0 12px', background: color, color: '#fff', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
+          <span style={{ fontSize: on ? 11 : 9.5 }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
+          <span style={{ flex: 1, textAlign: 'center', fontSize: on ? 14.5 : 13, fontWeight: 800, paddingRight: 20, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
         </div>
       )}
     </div>
@@ -433,8 +435,17 @@ export default function Pick({ v }) {
 
   React.useEffect(() => { mem.sel = selRow && selRow.key; mem.open = open; }, [selRow, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const topFor = (i) => { const box = listRef.current; return i * ROW_H + ROW_H / 2 - (box ? box.clientHeight / 2 : 0); };
-  const centerIdx = () => { const box = listRef.current; return box ? Math.floor((box.scrollTop + box.clientHeight / 2) / ROW_H) : 0; };
+  // 行ごとの上端位置（1コピーぶん）。行の高さが種類で違うので累積で持つ
+  const off = React.useMemo(() => { const o = [0]; rows.forEach(r => o.push(o[o.length - 1] + hOf(r))); return o; }, [rows]);
+  const P = off[N]; // 1コピーの高さ
+  const topOf = (i) => Math.floor(i / N) * P + off[((i % N) + N) % N];
+  const topFor = (i) => { const box = listRef.current; return topOf(i) + hOf(rows[((i % N) + N) % N]) / 2 - (box ? box.clientHeight / 2 : 0); };
+  const centerIdx = () => {
+    const box = listRef.current; if (!box || !P) return 0;
+    const y = box.scrollTop + box.clientHeight / 2, c = Math.floor(y / P), yy = y - c * P;
+    let j = 0; while (j < N - 1 && off[j + 1] <= yy) j++;
+    return c * N + j;
+  };
   const scrollToIdx = (i, smooth) => {
     const box = listRef.current; if (!box) return;
     box.scrollTo({ top: topFor(i), behavior: smooth ? 'smooth' : 'auto' });
@@ -459,7 +470,7 @@ export default function Pick({ v }) {
     const box = listRef.current; if (!box) return;
     let i = centerIdx();
     const mid = Math.floor(COPIES / 2) * N;
-    if (i < N || i >= (COPIES - 1) * N) { const ni = mid + (((i % N) + N) % N); box.scrollTop += (ni - i) * ROW_H; i = ni; }
+    if (i < N || i >= (COPIES - 1) * N) { const ni = mid + (((i % N) + N) % N); box.scrollTop += ((ni - i) / N) * P; i = ni; }
     if (Math.abs(box.scrollTop - topFor(i)) > 1) box.scrollTo({ top: topFor(i), behavior: 'smooth' });
     setIdx(i);
   };
