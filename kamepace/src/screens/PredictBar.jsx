@@ -60,7 +60,7 @@ export default function PredictBar({ v }) {
   const marks = [[p.start, hm(p.start)], ...(noon.getTime() > p.start && noon.getTime() < p.end ? [[noon.getTime(), '12:00']] : []), [p.end, hm(p.end).replace(/^(\d+):(\d+)$/, '$1:$2')]];
   return (
     <div style={{ position: 'absolute', left: 0, right: 0, bottom: 120, height: 100, zIndex: 4, animation: closing ? 'predClose .1s ease-in forwards' : 'predOpen .2s ease-out' }}>
-      <button onClick={doClose} aria-label={name + 'を閉じる'} style={{ ...tabShape(false) }}>▶</button>
+      <button onClick={doClose} aria-label={name + 'を閉じる'} style={{ ...tabShape(false), clipPath: 'none' }}>▶</button>{/* 右は四角 */}
       <button onClick={doClose} aria-label={name + 'を閉じる'} style={tabShape(true)}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>{name}</span></button>
       <div style={{ position: 'absolute', left: 29, right: 29, top: 0, bottom: 0, background: 'rgba(0,0,0,.2)', padding: '0 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
