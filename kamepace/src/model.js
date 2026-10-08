@@ -6,7 +6,25 @@ import { ACT_EMOJI, guessAct, slotOfEntry } from './data';
 export function pad2(n) { return String(n).padStart(2, '0'); }
 export function dateToStr(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
 export function strToDate(s) { const [y, m, dd] = s.split('-').map(Number); return new Date(y, m - 1, dd); }
-export function todayStr() { return dateToStr(new Date()); }
+/* 1日の区切り: 就寝を押したとき か 朝5時 の早いほう。
+   0時〜5時に就寝を押す前の記録は前日の 24時〜29時（例 01:30 → 前日の 25:30）。
+   就寝を押したら（23時台でも）その後は翌日。bedDates は就寝記録のある日（bedLog の date）を返す関数 */
+export const DAY_CUT_HOUR = 5;
+let _bedDates = () => [];
+export function setBedDatesSource(fn) { _bedDates = fn || (() => []); }
+export function calendarTodayStr() { return dateToStr(new Date()); }
+// 就寝ボタンを考えない「その夜が属する日」（0〜5時は前日）
+export function nightDayStr(now) { const d = now ? new Date(now) : new Date(); if (d.getHours() < DAY_CUT_HOUR) d.setDate(d.getDate() - 1); return dateToStr(d); }
+export function todayStr() {
+  const base = nightDayStr();
+  let list = []; try { list = _bedDates() || []; } catch (e) { /* noop */ }
+  return list.includes(base) ? shiftDate(base, 1) : base;
+}
+// その日の 00:00 を起点にした時刻表記（翌日にかかれば 24:30 のように 24 以上になる。前日にかかる分は 00:00）
+export function tsToHmOn(dateStr, ts) {
+  const min = Math.max(0, Math.floor((ts - strToDate(dateStr).getTime()) / 60000));
+  return pad2(Math.floor(min / 60)) + ':' + pad2(min % 60);
+}
 export function shiftDate(s, days) { const d = strToDate(s); d.setDate(d.getDate() + days); return dateToStr(d); }
 const MON_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const WD_ABBR = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];

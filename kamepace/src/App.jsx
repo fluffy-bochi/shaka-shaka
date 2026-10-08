@@ -11,7 +11,7 @@ import {
 } from './data';
 import {
   todayStr, shiftDate, strToDate, dateToStr, formatDateCaps, formatDateShort, pad2, hmToTsOn,
-  entryToRecord, entryGlyph, entryMin, planUnitsDue, entryStartTs, entryEndTs,
+  entryToRecord, entryGlyph, entryMin, planUnitsDue, entryStartTs, entryEndTs, tsToHmOn, nightDayStr, setBedDatesSource, calendarTodayStr,
   serialize, deserialize, freshState, sortEntries, normTitle, getTemplate, baseEntry,
 } from './model';
 import {
@@ -53,6 +53,9 @@ const IS_IOS_DEVICE = typeof navigator !== 'undefined' && (
 );
 
 export default class App extends React.Component {
+  // 「今日」の区切り（就寝 or 朝5時）に就寝記録を使う
+  // 起床の記録も「前の日はおわり」の合図にする（就寝を押し忘れて朝5時前に起きたとき）
+  _dayCut = setBedDatesSource(() => [...((this.state && this.state.bedLog) || []).map(b => b.date), ...((this.state && this.state.wakeLog) || []).map(w => shiftDate(w.date, -1))]);
   state = {
     screen: 'shaka',
     /* ---- 同期されるデータ（旧本番互換） ---- */
@@ -70,7 +73,7 @@ export default class App extends React.Component {
     bedDraft: { cond: null, mood: null, fat: null },
     wakeFlow: false, // 起床後記録の「つぎへ」待ち（シャカで🌙が降っている間）
     dayOffset: 0,
-    homeDate: todayStr(), // ホームで閲覧中の日付
+    homeDate: null, // ホームで閲覧中の日付（null＝今日。就寝や朝5時で今日が変わったら自動で追従）
     toast: null,
     catAddOpen: false,
     newCatName: '',
@@ -363,6 +366,7 @@ export default class App extends React.Component {
 
   /* ================= derived: entries → slots ================= */
   homeDateStr() { return this.state.homeDate || todayStr(); }
+  _homeDay(day) { return day === todayStr() ? null : day; }
   todayEntries() { const t = this.homeDateStr(); return sortEntries(this.state.entries).filter(e => e.date === t && !e.exp && !e.wakeAdd); }
   slotRecords() {
     const out = { asa: [], am: [], pm: [], yoru: [] };
@@ -396,7 +400,7 @@ export default class App extends React.Component {
   }
   slotDef(id) { const d = this.slotDefs(); return d.find(s => s.id === id) || d[0]; }
   slotOf(e) { return e.slot || slotOfEntry(e, this.slotHoursArr()); }
-  slotNow() { return slotForNow(this.slotHoursArr()); }
+  slotNow() { const h = Math.floor((Date.now() - hmToTsOn(todayStr(), '00:00')) / 3600000); return h >= 24 ? 'yoru' : slotForNow(this.slotHoursArr()); } // 0時過ぎ（就寝前）は前日の夜
   /* スロット基準時刻＋累積分 → "HH:MM"（通常記録の配置。CLAUDE.md §G） */
   slotHm(slot, offsetMin) {
     const [bh, bm] = slot.base.split(':').map(Number);
@@ -409,12 +413,13 @@ export default class App extends React.Component {
       .reduce((a, e) => a + entryMin(e), 0);
   }
   /* 日付ナビ */
-  homePrevDay = () => { const day = shiftDate(this.homeDateStr(), -1); if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: day }); this.ensureSample(day); };
-  homeNextDay = () => { const day = shiftDate(this.homeDateStr(), 1); if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: day }); this.ensureSample(day); };
+  homePrevDay = () => { const day = shiftDate(this.homeDateStr(), -1); if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: this._homeDay(day) }); this.ensureSample(day); };
+  homeNextDay = () => { const day = shiftDate(this.homeDateStr(), 1); if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: this._homeDay(day) }); this.ensureSample(day); };
   setHomeDate = (e) => { const v = e.target.value; if (v) { if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: v }); this.ensureSample(v); } };
-  goToday = () => { if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: todayStr() }); };
-  hmToTs(hm) { const [h, m] = (hm || '0:0').split(':').map(Number); const d = new Date(); d.setHours(h || 0, m || 0, 0, 0); return d.getTime(); }
-  tsToHm(ts) { const d = new Date(ts); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+  goToday = () => { if (this.state.sampleMode) this._pileLayout = null; this.set({ homeDate: null }); };
+  // 時刻は「今日（1日の区切りは就寝 or 朝5時）」の 00:00 起点。0時を過ぎても就寝前なら 24:30 のように 24 以上
+  hmToTs(hm) { return hmToTsOn(todayStr(), hm); }
+  tsToHm(ts) { return tsToHmOn(todayStr(), ts); }
   timeSpanMin() { const s = this.hmToTs(this.state.startTime), t = this.hmToTs(this.state.endTime); const d = Math.round((t - s) / 60000); return d < 1 ? 1 : d; }
 
   /* ================= categories / plans / search pools ================= */
@@ -1737,12 +1742,14 @@ export default class App extends React.Component {
     this._enterWake();
   };
   /* 起床後記録: 1) 体調・気分・残りの疲労を入力 → 2) シャカで🌙が降って残りの量まで減る → 3) 昨日のふりかえり → 4) 今日の予定 */
+  // 起床記録の日: 就寝を押し忘れて朝5時前に起きたときも、カレンダーの今日にする
+  wakeDay() { const t = todayStr(), c = calendarTodayStr(); return t < c && new Date().getHours() < 5 ? c : t; }
   _enterWake() {
     // 今日すでに記録していれば、入力した内容をそのまま出す。起床時刻の初期値は「いま（この画面を開いた時刻）」、就寝は前回の就寝時刻（なければ23:00）
-    const w = (this.state.wakeLog || []).find(x => x.date === todayStr());
+    const w = (this.state.wakeLog || []).find(x => x.date === this.wakeDay());
     const lastBed = [...(this.state.bedLog || [])].reverse().find(x => x.hm && Date.now() - x.ts < 30 * 3600000); // 前夜の就寝記録
     const last = lastBed ? { bed: lastBed.hm } : [...(this.state.wakeLog || [])].reverse().find(x => x.bed);
-    const nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes());
+    const nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes()); // 起床時刻の入力欄は実際の時計
     const draft = w
       ? { cond: w.cond, mood: w.mood, fat: w.fatigue, bed: w.bed || (last && last.bed) || '23:00', up: w.up || this.tsToHm(w.ts) }
       : { cond: null, mood: null, fat: null, bed: (last && last.bed) || '23:00', up: nowHm };
@@ -2565,7 +2572,7 @@ export default class App extends React.Component {
   finishWake1 = () => {
     const d = this.state.wakeDraft;
     if (d.fat == null) return;
-    const today = todayStr();
+    const today = this.wakeDay();
     const up = d.up || (pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes()));
     // ts=起床時刻（予測バーの左端になる）。bed=就寝時刻(HH:MM)。就寝〜起床の時間は bed/up から出せる
     const wakeLog = [...(this.state.wakeLog || []).filter(w => w.date !== today), { date: today, ts: hmToTsOn(today, up), bed: d.bed || null, up, cond: d.cond, mood: d.mood, fatigue: d.fat }];
@@ -2596,7 +2603,7 @@ export default class App extends React.Component {
         const pool = this.state.entries.filter(e => !e.exp && e.delta > 0 && !e.wakeAdd).map(e => entryGlyph(e));
         for (let i = 0; i < need; i++) { const g = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '😮‍💨'; cnt[g] = (cnt[g] || 0) + 1; }
       }
-      const now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+      const hm = tsToHmOn(today, Date.now()); // 就寝が0時過ぎなら 25:10 のように
       const add = Object.keys(cnt).filter(g => cnt[g] > 0).map(g => ({ ...baseEntry(title, cnt[g], today), glyph: g, from: hm, to: hm, wakeAdd: true, _new: true }));
       patch.entries = sortEntries([...this.state.entries, ...add]);
     }
@@ -2605,7 +2612,7 @@ export default class App extends React.Component {
     this.dropRecovery(recovered);
   }
   /* 就寝記録が属する日。0時を過ぎて（〜朝5時前に）記録したときは、まだ前の日の夜として扱う（日またぎ対策） */
-  bedDay() { return new Date().getHours() < 5 ? shiftDate(todayStr(), -1) : todayStr(); }
+  bedDay() { return nightDayStr(); }
   /* 就寝記録: 1) 体調・気分・疲労度 → 2) シャカで山を合わせる → 3) 今日のがんばりタイプ。記録した時刻は翌朝の起床記録の就寝時刻になる */
   goBed = () => this.set({ screen: 'bed1', bedDraft: { cond: null, mood: null, fat: null }, bedFlow: false });
   setBedDraft = (k, val) => this.setState(prev => ({ bedDraft: { ...prev.bedDraft, [k]: val } }));
@@ -3749,7 +3756,8 @@ export default class App extends React.Component {
   /* "HH:MM" に分を足す */
   addHm(hm, add) {
     const [h, m] = (hm || '0:0').split(':').map(Number);
-    const t = (((h || 0) * 60 + (m || 0) + add) % 1440 + 1440) % 1440;
+    // 0時をまたいでも 24:30 のように続ける（その日の 00:00 起点）。マイナスは 00:00 に
+    const t = Math.min(47 * 60 + 59, Math.max(0, (h || 0) * 60 + (m || 0) + add));
     return pad2(Math.floor(t / 60)) + ':' + pad2(t % 60);
   }
   /* カレンダーの予定は「枠」（タイトルだけ）として取り込む。
@@ -3765,9 +3773,12 @@ export default class App extends React.Component {
     items.forEach(it => {
       if (!it || !it.srcId || existing.has(it.srcId)) return; // 重複防止
       const title = it.title || '(無題)';
-      const date = it.date || todayStr();
-      const from = it.from || '00:00';
-      const to = it.to || '23:59';
+      let date = it.date || todayStr();
+      let from = it.from || '00:00';
+      let to = it.to || '23:59';
+      if (to < from) to = this.addHm(to, 1440); // 0時をまたぐ予定は 25:00 のように
+      // 0時〜5時に始まる予定は、前日の夜（24時〜29時）として置く
+      if (it.from && from < '05:00') { date = shiftDate(date, -1); from = this.addHm(from, 1440); to = this.addHm(to, 1440); }
       const tmpl = getTemplate(this.state.templates, title);
       if (tmpl && Array.isArray(tmpl.tasks) && tmpl.tasks.length) {
         // テンプレ自動適用: 枠の時間をテンプレのタスク構成比で配分（日またぎは+24h補正）
@@ -4148,7 +4159,7 @@ export default class App extends React.Component {
       bedDraft: st.bedDraft, setBedDraft: this.setBedDraft, finishBed1: this.finishBed1, goBed: this.goBed, goBed2: this.goBed2,
       bedFlow: st.bedFlow && st.screen === 'shaka', backBed: () => this.set({ screen: 'shaka' }), wakeRecs: st.screen === 'bed2' ? this.chartData([st.bedDay || this.bedDay()]) : null /* 夜はその日のぶんだけ */, bed: st.screen === 'bed2' ? this.bedVals() : null,
       homeComment: st.screen === 'home' ? (st.tapLine || (() => {
-        const d = this.homeDateStr(), nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes());
+        const d = this.homeDateStr(), nowHm = this.tsToHm(Date.now());
         const next = sortEntries(st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.title && e.from && (d !== todayStr() || e.from > nowHm)))[0];
         return homeLine(Math.min(100, this.pileCount()), next && { ...next, ...this.entryBodyMind(next) }, d, st.lastRec, Date.now());
       })()) : '',
@@ -4381,7 +4392,7 @@ export default class App extends React.Component {
       runAlarm: st.runAlarm, closeRunAlarm: this.closeRunAlarm, runAlarmNext: this.runAlarmNext,
       exitRun: () => this.set({ screen: 'record', runAdd: false }), minimizeRun: () => this.set({ screen: 'home', runAdd: false }), goRunAdd: this.goRunAdd, runAdd: !!st.runAdd && !!st.run,
       pickCats, pickCatId: st.catId, pickShowHidden: !!st.pickShowHidden, togglePickHidden: () => this.set({ pickShowHidden: !st.pickShowHidden }), pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
-      pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()), n = new Date(); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日　' + n.getHours() + ':' + pad2(n.getMinutes()); })(),
+      pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()), hmNow = this.tsToHm(Date.now()); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日　' + hmNow.replace(/^0/, ''); })(),
       subItems, subName: activeCat ? activeCat.name : '', subIcon: activeCat ? activeCat.icon : 'category', subColor: activeCat ? activeCat.color : '#8a8a82',
       degreeOpen: !!st.degreeItem,
       degreeName: degItem ? degItem.name : '', degreeIcon: degItem ? degItem.icon : '', degreeColor: degCat ? degCat.color : '#4fa88a',

@@ -1,4 +1,9 @@
 import React from 'react';
+
+/* 時刻入力は 0〜23時しか出せないので、24時以降（就寝前の0時過ぎ＝前日の 25:30 など）は 24 を引いて見せ、
+   もとが24時以降で 0〜11時を選んだら 24 を足して戻す */
+const hmIn = (hm) => { if (!hm) return ''; const [h, m] = hm.split(':').map(Number); return String((h || 0) % 24).padStart(2, '0') + ':' + String(m || 0).padStart(2, '0'); };
+const hmOut = (val, prev) => { const ph = prev ? Number(prev.split(':')[0]) || 0 : 0; const [h, m] = val.split(':').map(Number); return ph >= 24 && h < 12 ? String(h + 24).padStart(2, '0') + ':' + String(m).padStart(2, '0') : val; };
 import SlotPill from './SlotPill';
 import EmojiPicker from './EmojiPicker';
 import Emo from '../fluent';
@@ -240,11 +245,11 @@ function Confirm({ v }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
                 <HourStep dir={-1} onClick={() => v.onOverallStepFromH(-1)} />
-                <input type="time" value={v.overallFromHm} onChange={(e) => e.target.value && v.onOverallFrom(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
+                <input type="time" value={hmIn(v.overallFromHm)} onChange={(e) => e.target.value && v.onOverallFrom(hmOut(e.target.value, v.overallFromHm))} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
                 <HourStep dir={1} onClick={() => v.onOverallStepFromH(1)} />
                 <span style={{ color: '#8a8a82', fontSize: 12, margin: '0 1px' }}>→</span>
                 <HourStep dir={-1} onClick={() => v.onOverallStepToH(-1)} />
-                <input type="time" value={v.overallToHm} onChange={(e) => e.target.value && v.onOverallTo(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
+                <input type="time" value={hmIn(v.overallToHm)} onChange={(e) => e.target.value && v.onOverallTo(hmOut(e.target.value, v.overallToHm))} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
                 <HourStep dir={1} onClick={() => v.onOverallStepToH(1)} />
               </div>
             </div>
@@ -284,11 +289,11 @@ function Confirm({ v }) {
                   {s.ranges.map((r, ri) => (
                     <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
                       <HourStep dir={-1} onClick={() => r.onStepFromH(-1)} />
-                      <input type="time" value={r.fromHm} onChange={(e) => e.target.value && r.onSetFrom(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
+                      <input type="time" value={hmIn(r.fromHm)} onChange={(e) => e.target.value && r.onSetFrom(hmOut(e.target.value, r.fromHm))} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
                       <HourStep dir={1} onClick={() => r.onStepFromH(1)} />
                       <span style={{ color: '#8a8a82', fontSize: 12, margin: '0 1px' }}>→</span>
                       <HourStep dir={-1} onClick={() => r.onStepToH(-1)} />
-                      <input type="time" value={r.toHm} onChange={(e) => e.target.value && r.onSetTo(e.target.value)} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
+                      <input type="time" value={hmIn(r.toHm)} onChange={(e) => e.target.value && r.onSetTo(hmOut(e.target.value, r.toHm))} style={{ ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fff' }} />
                       <HourStep dir={1} onClick={() => r.onStepToH(1)} />
                       {s.canRemoveRange && <button onClick={r.onRemove} style={{ width: 24, height: 26, border: 'none', background: 'none', fontSize: 15, color: '#c9c7bf', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>}
                     </div>
