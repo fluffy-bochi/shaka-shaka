@@ -67,15 +67,13 @@ export const CATS = [
     act('tutor', '✏️', 'school', '塾講・指導', 3, 7, 180, { kw: ['仕事', 'バイト', '塾', '家庭教師', '指導'] }),
     act('lightwork', '🗃', 'package_2', '軽作業', 6, 3, 180, { kw: ['仕事', 'バイト', '軽作業', '倉庫', 'ピッキング'] }),
   ] },
-  { id: 'school', icon: 'school', color: '#5b8fd4', glyph: '🏫', name: '授業・学校', sub: '講義・演習・発表・テスト', items: [
+  { id: 'school', icon: 'school', color: '#5b8fd4', glyph: '🏫', name: '勉強・学校', sub: '講義・課題・テスト勉強・就活', items: [
     act('lecture', '📖', 'menu_book', '講義（聞く中心）', 2, 5, 90, { kw: ['授業', '講義', '学校', '大学'] }),
     act('seminar', '🔬', 'science', '演習・実習', 4, 6, 90, { kw: ['授業', '演習', '実習', 'ゼミ'] }),
     act('present', '🎤', 'co_present', '発表・プレゼン', 3, 9, 30, { kw: ['授業', '発表', 'プレゼン'] }),
     act('pe', '🏃', 'directions_run', '体育・実技', 9, 3, 90, { kw: ['運動', '体育', '実技'] }),
     act('online_class', '💻', 'computer', 'オンライン授業', 2, 4, 90, { kw: ['授業', 'オンライン', 'リモート'] }),
     act('exam', '✍️', 'quiz', 'テスト', 3, 8, 60, { kw: ['授業', 'テスト', '試験', '受験'] }),
-  ] },
-  { id: 'study', icon: 'edit_note', color: '#8a7bc4', glyph: '📝', name: '課題・勉強', sub: 'レポート・テスト勉強・就活', items: [
     act('report', '📝', 'edit_note', 'レポート・課題', 3, 6, 60, { kw: ['勉強', '課題', 'レポート', '宿題'] }),
     act('examstudy', '📚', 'menu_book', 'テスト勉強', 3, 6, 60, { kw: ['勉強', 'テスト', '試験', '暗記'] }),
     act('create', '🎨', 'palette', '制作・作品づくり', 4, 6, 90, { kw: ['勉強', '制作', '作品', 'デザイン'] }),

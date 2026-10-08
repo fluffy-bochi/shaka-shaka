@@ -119,7 +119,7 @@ export function adherence(days) {
 /* ---------- CSV ---------- */
 const esc = (v) => { if (v == null) return ''; const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
 const toCsv = (head, rows) => '﻿' + [head, ...rows].map(r => r.map(esc).join(',')).join('\n'); // BOM つき（Excel で文字化けしない）
-const CAT_NAME = Object.fromEntries([...CATS.map(c => [c.id, c.name]), ['custom', '自作']]);
+const CAT_NAME = Object.fromEntries([...CATS.map(c => [c.id, c.name]), ['custom', '自作'], ['study', '勉強・学校']]); // study は school にまとめた旧カテゴリ
 
 /* parts = [{ code, days: { date: summary } }] */
 export function csvFiles(parts) {
@@ -214,7 +214,7 @@ export function demoParticipants(nDays = 28) {
         for (let k = 0; k < tries; k++) if (r() < Math.min(1, per / tries * 1.15) * p.keep * drift * (a.key === 'cleanlaundry' && weekend ? 2.2 : 1)) cnt++;
         if (cnt) { acts[a.key] = { name: a.name, n: cnt, min: cnt * a.min }; cats[a.cat] = cats[a.cat] || { n: 0, min: 0 }; cats[a.cat].n += cnt; cats[a.cat].min += cnt * a.min; }
       });
-      if (!weekend) { cats.school = { n: 2 + Math.floor(r() * 3), min: 180 + Math.floor(r() * 120) }; cats.study = { n: 1 + Math.floor(r() * 2), min: 60 + Math.floor(r() * 90) }; }
+      if (!weekend) { cats.school = { n: 3 + Math.floor(r() * 4), min: 240 + Math.floor(r() * 210) }; }
       const plus = fat.slice(1, -1).reduce((s, q, i) => s + Math.max(0, q.v - fat[i].v), 0), minus = fat.slice(1, -1).reduce((s, q, i) => s + Math.max(0, fat[i].v - q.v), 0);
       days[d] = {
         v: 1, date: d,
