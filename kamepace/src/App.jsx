@@ -758,7 +758,7 @@ export default class App extends React.Component {
     };
     this.set({ cycle, cycForm: null, screen: this.state.cycFromOnboard ? 'onboard' : 'mypage' });
     this.save();
-    if (this.state.cycFromOnboard) { this.set({ obStep: 9 }); }
+    if (this.state.cycFromOnboard) { this.set({ obStep: 12 }); }
   };
   cancelCycle = () => this.set({ cycForm: null, screen: this.state.cycFromOnboard ? 'onboard' : 'mypage' });
   disableCycle = () => { this.set({ cycle: { ...(this.state.cycle || {}), enabled: false }, cycForm: null, screen: 'mypage' }); this.save(); };
@@ -2241,12 +2241,19 @@ export default class App extends React.Component {
   };
   obPick = (k, val) => {
     const obSel = { ...this.state.obSel, [k]: val };
+    // 職業を選んだら、非表示カテゴリの初期値をその職業のおすすめにする（自分で触っていなければ）
+    if (k === 'occupation' && !obSel.hideTouched) obSel.hide = this.OCC_HIDDEN[val] || [];
     this.set({ obSel });
     // 選択したら少し待って自動で次へ（あすけん式）
     clearTimeout(this._obT);
-    this._obT = setTimeout(() => { if (this.state.obStep < 9) this.set({ obStep: this.state.obStep + 1 }); }, 260);
+    this._obT = setTimeout(() => { if (this.state.obStep < 12) this.set({ obStep: this.state.obStep + 1 }); }, 260);
   };
-  obNext = () => { if (this.state.obStep < 9) this.set({ obStep: this.state.obStep + 1 }); };
+  // 複数選択（欠かさずやること・やりたいこと・非表示カテゴリ）
+  obToggle = (k, val) => this.setState(s => {
+    const cur = (s.obSel || {})[k] || [];
+    return { obSel: { ...s.obSel, [k]: cur.includes(val) ? cur.filter(x => x !== val) : [...cur, val], ...(k === 'hide' ? { hideTouched: true } : {}) } };
+  });
+  obNext = () => { if (this.state.obStep < 12) this.set({ obStep: this.state.obStep + 1 }); };
   obBack = () => { if (this.state.obStep > 1) this.set({ obStep: this.state.obStep - 1 }); };
   skipOnboard = () => this.applyOnboard(true);
   finishOnboard = () => this.applyOnboard(false);
@@ -2263,7 +2270,13 @@ export default class App extends React.Component {
       patch.bodyRecCoef = coef(sel.bodyRec);
       patch.mindFatCoef = coef(sel.mindFat);
       patch.mindRecCoef = coef(sel.mindRec);
-      if (sel.occupation && this.OCC_HIDDEN[sel.occupation]) patch.hiddenCats = this.OCC_HIDDEN[sel.occupation];
+      if (Array.isArray(sel.hide)) patch.hiddenCats = sel.hide;
+      else if (sel.occupation && this.OCC_HIDDEN[sel.occupation]) patch.hiddenCats = this.OCC_HIDDEN[sel.occupation];
+      // 欠かさずやること・やりたいことは「1日に1回」で登録
+      const all = { ...(this.state.actFreq || {}) }, day = { k: 1, unit: '日', n: 1 };
+      (sel.req || []).forEach(n => { const t = normTitle(n); all[t] = { ...(all[t] || {}), req: day }; });
+      (sel.fav || []).forEach(n => { const t = normTitle(n); all[t] = { ...(all[t] || {}), fav: day }; });
+      patch.actFreq = all;
     }
     this.set(patch);
     this.save();
@@ -4157,7 +4170,8 @@ export default class App extends React.Component {
         { label: '変わらない', v: 1.0 }, { label: '少し', v: 1.1 }, { label: 'まあまあ', v: 1.2 }, { label: 'かなり', v: 1.35 },
       ].map(o => ({ ...o, on: Math.abs((cur || 1) - o.v) < 0.001, onPick: () => this.onCycField(k, o.v) })),
       obStep: st.obStep || 1, obSel: st.obSel || {},
-      obPick: this.obPick, obNext: this.obNext, obBack: this.obBack,
+      obPick: this.obPick, obToggle: this.obToggle, obNext: this.obNext, obBack: this.obBack,
+      obCats: st.screen === 'onboard' ? this.allCats().map(c => ({ id: c.id, name: c.name, glyph: c.glyph || '⭐', items: c.items.map(t => ({ name: t.name, glyph: t.glyph })) })) : [],
       skipOnboard: this.skipOnboard, finishOnboard: this.finishOnboard,
       redoOnboard: () => this.set({ screen: 'onboard', obStep: 1, obSel: {} }),
       obIsFemale: (st.obSel && st.obSel.gender) === '女性',

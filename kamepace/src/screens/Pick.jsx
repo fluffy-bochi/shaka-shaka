@@ -95,7 +95,7 @@ function EditAct({ it, onClose }) {
 
 /* 頻度を決めるポップアップ（カードの上に出す）: [k] 日/週/月 に [n] 回。日/週/月 は きらい/ふつう/すき と同じ形の切り替え */
 export function FreqPop({ label, value, onSave, onDelete, onClose }) {
-  const [f, setF] = React.useState(() => (value ? { k: freqK(value), unit: value.unit, n: value.n } : { k: 1, unit: '週', n: 1 }));
+  const [f, setF] = React.useState(() => (value ? { k: freqK(value), unit: value.unit, n: value.n } : { k: 1, unit: '日', n: 1 }));
   const numIn = (key) => (
     <input type="number" inputMode="numeric" min={1} max={99} value={f[key] || ''} onChange={(e) => setF({ ...f, [key]: Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0)) })}
       style={{ width: 30, height: 28, border: 'none', borderRadius: 8, background: '#efece3', textAlign: 'center', fontSize: 15, fontWeight: 900, fontFamily: "'Space Mono',monospace", color: INK, padding: 0, flex: '0 0 auto' }} />
