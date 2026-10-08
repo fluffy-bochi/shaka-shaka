@@ -1110,6 +1110,7 @@ export default class App extends React.Component {
   /* mylifecoreタスクの累計: newEntries の taskKey ごとに、同じ taskKey の
      既存記録（baseEntries）と、新規どうしの重複を1件へ合算（分・疲労を足す）。古いぶんは消す。 */
   mergeTaskCumulative(baseEntries, newEntries, recDate, now, isToday, timeMode) {
+    const isFuture = recDate > todayStr();
     const keys = [...new Set(newEntries.filter(e => e.taskKey).map(e => e.taskKey))];
     if (!keys.length) return baseEntries;
     let base = baseEntries;
@@ -1136,10 +1137,11 @@ export default class App extends React.Component {
       // 時刻モードは累計後の予定/確定を to で判定し直す。所要時間モードは常に確定（即記録）
       if (timeMode) {
         const endTs = this.hmToTs(target.to);
-        const isPlanned = isToday && endTs > now;
-        if (isPlanned) { target.planned = true; target.dropped = planUnitsDue({ ...target, date: todayStr() }, now); target._new = target.dropped > 0; }
+        const isPlanned = isFuture || (isToday && endTs > now);
+        if (isPlanned) { target.planned = true; target.dropped = isFuture ? 0 : planUnitsDue({ ...target, date: todayStr() }, now); target._new = target.dropped > 0; }
         else { delete target.planned; delete target.dropped; target._new = true; }
-      } else { delete target.planned; delete target.dropped; target._new = true; }
+      } else if (isFuture) { target.planned = true; target.dropped = 0; target._new = false; }
+      else { delete target.planned; delete target.dropped; target._new = true; }
     });
     return base;
   }
@@ -1174,6 +1176,7 @@ export default class App extends React.Component {
       if (oe && oe.date) recDate = oe.date;
     }
     const isToday = recDate === todayStr();
+    const isFuture = recDate > todayStr(); // 明日以降の記録は予定あつかい（その日になるまで降らせない）
     // 所要時間モードの各行の分（比率×合計）。枠（取り込み予定）がある時は合計＝全体の時間(startTime→endTime)。
     const frameFill = this.state.framePlan && this.state.startTime && this.state.endTime;
     let frameCursor = 0; // 枠内での経過分（所要時間モードで枠の開始から連続配置）
@@ -1197,7 +1200,7 @@ export default class App extends React.Component {
       if (this.state.framePlan) e.plan = this.state.framePlan; else if (t.plan) e.plan = t.plan;
       if (t.after) e.after = Math.round(t.after * (min / 60));
       if (fromHm) { e.from = fromHm; e.to = toHm; }
-      if (planned) { e.planned = true; e.dropped = planUnitsDue({ ...e, date: todayStr() }, now); e._new = e.dropped > 0; }
+      if (planned) { e.planned = true; e.dropped = isFuture ? 0 : planUnitsDue({ ...e, date: todayStr() }, now); e._new = e.dropped > 0; }
       if (t.symptom && t.symId) { e.symptom = true; e.symId = t.symId; e.level = (t.picks && t.picks[0] != null) ? t.picks[0] : 1; e.buffLv = t.buffLv; }
       if (taskKey) e.taskKey = taskKey;
       return e;
@@ -1217,7 +1220,7 @@ export default class App extends React.Component {
             const fromTs = this.hmToTs(r.from); let toTs = this.hmToTs(r.to); if (toTs <= fromTs) toTs += 1440 * 60000;
             minFromTs = Math.min(minFromTs, fromTs); maxToTs = Math.max(maxToTs, toTs);
           });
-          newEntries.push(mkEntry(t, sum, this.tsToHm(minFromTs), this.tsToHm(maxToTs), isToday && maxToTs > now, taskKey));
+          newEntries.push(mkEntry(t, sum, this.tsToHm(minFromTs), this.tsToHm(maxToTs), isFuture || (isToday && maxToTs > now), taskKey));
           learnMin[i] = sum;
         } else {
           let sum = 0;
@@ -1226,7 +1229,7 @@ export default class App extends React.Component {
             sum += min;
             const fromTs = this.hmToTs(r.from);
             let toTs = this.hmToTs(r.to); if (toTs <= fromTs) toTs += 1440 * 60000;
-            newEntries.push(mkEntry(t, min, this.tsToHm(fromTs), this.tsToHm(toTs), isToday && toTs > now));
+            newEntries.push(mkEntry(t, min, this.tsToHm(fromTs), this.tsToHm(toTs), isFuture || (isToday && toTs > now)));
           });
           learnMin[i] = sum;
         }
@@ -1235,7 +1238,7 @@ export default class App extends React.Component {
         const min = durMins[i];
         const fromHm = this.addHm(this.state.startTime, frameCursor);
         const toHm = this.addHm(this.state.startTime, frameCursor + min);
-        const planned = isToday && hmToTsOn(recDate, toHm) > now;
+        const planned = isFuture || (isToday && hmToTsOn(recDate, toHm) > now);
         newEntries.push(mkEntry(t, min, fromHm, toHm, planned, taskKey));
         frameCursor += min; learnMin[i] = min;
       } else {
@@ -1244,6 +1247,7 @@ export default class App extends React.Component {
         e.slot = slotId;
         if (backCursor != null) { e.from = this.tsToHm(backCursor); e.to = this.tsToHm(backCursor + min * 60000); backCursor += min * 60000; }
         else { e.from = this.slotHm(slot, slotOffset); e.to = this.slotHm(slot, slotOffset + min); slotOffset += min; }
+        if (isFuture) { e.planned = true; e.dropped = 0; e._new = false; }
         newEntries.push(e); learnMin[i] = min;
       }
     });
@@ -1478,15 +1482,15 @@ export default class App extends React.Component {
       out.reverse(); // 古い→新しい
       // 実ユーザーの記録（非サンプル）があれば上に足す
       this.state.entries.forEach(r => {
-        if (r.exp || r._sample || (r.delta || 0) <= 0) return;
+        if (r.exp || r._sample || (r.delta || 0) <= 0 || (r.date && r.date > todayStr())) return;
         const n = r.planned ? (r.dropped || 0) : r.delta;
         for (let k = 0; k < n; k++) out.push({ g: entryGlyph(r), isNew: !!r._new });
       });
     } else {
       const src = day ? this.state.entries.filter(e => !e._sample || e.date === day) : this.state.entries;
-      const stack = [];
+      const stack = [], today = todayStr();
       sortEntries(src).forEach(r => {
-        if (r.exp) return;
+        if (r.exp || (r.date && r.date > today)) return; // 明日以降の記録は今日の山に入れない
         if (r.delta > 0) {
           const n = r.planned ? (r.dropped || 0) : r.delta;
           for (let i = 0; i < n; i++) stack.push({ g: entryGlyph(r), isNew: !!r._new });
@@ -1582,7 +1586,8 @@ export default class App extends React.Component {
     const date = shiftDate(todayStr(), this.state.dayOffset);
     const g = [];
     sortEntries(this.state.entries).filter(e => e.date === date && !e.exp).forEach(r => {
-      if (r.delta > 0) { const n = r.planned ? (r.dropped || 0) : r.delta; for (let i = 0; i < n; i++) g.push(entryGlyph(r)); }
+      // 明日以降の日を見ているときは、予定ぶんも全部積んだ形で見せる
+      if (r.delta > 0) { const n = r.planned && date <= todayStr() ? (r.dropped || 0) : r.delta; for (let i = 0; i < n; i++) g.push(entryGlyph(r)); }
     });
     return g;
   }
@@ -3059,7 +3064,7 @@ export default class App extends React.Component {
     this.set({ catPalette: p });
     try { localStorage.setItem('kame_cat_palette', p); } catch (e) { /* ignore */ }
   };
-  // やさしい色: HSL で彩度を下げ、明度を上げる
+  // やさしい色（パステル）: HSL で色相はそのまま、彩度を中くらい・明度を高く
   catColor(hex) {
     if (this.state.catPalette === 'vivid' || !/^#[0-9a-f]{6}$/i.test(hex || '')) return hex;
     const n = parseInt(hex.slice(1), 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
@@ -3067,7 +3072,7 @@ export default class App extends React.Component {
     let h = 0, sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
     if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
     h *= 60; if (h < 0) h += 360;
-    const S = sat * 0.4, L = l + (1 - l) * 0.55;
+    const S = sat < 0.08 ? sat : 0.72, L = 0.84; // パステル: 色味はそのまま、明るく・くすませない
     const c = (1 - Math.abs(2 * L - 1)) * S, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = L - c / 2;
     const [R, G, B] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
     return '#' + [R, G, B].map(v => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('');

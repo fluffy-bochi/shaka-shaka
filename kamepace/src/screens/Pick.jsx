@@ -7,7 +7,7 @@ import Emo from '../fluent';
    START・予定・記録は「時間を選ぶ画面（確認）」へ進む。「リスト＋」は右のリストのカードに積む（カードとリストは横にスワイプ）。 */
 const INK = '#1b1b18';
 const ms = (size, color, fill = false) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: fill ? "'FILL' 1" : "'FILL' 0", fontSize: size, color, lineHeight: 1 });
-const CARD_H = 252; // 上のカードの高さはカテゴリ・行動・予定で共通（切り替わってもリストの位置が動かないように）
+const CARD_H = 212; // 上のカードの高さはカテゴリ・行動・予定で共通（切り替わってもリストの位置が動かないように）
 const sg = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0');
 
 function FatNums({ it, big }) {
@@ -64,16 +64,16 @@ function EditAct({ it, onClose }) {
   const ok = (f.name || '').trim() && Number(f.min) > 0;
   const save = () => { if (!ok) return; it.onEdit({ name: f.name, body: Number(f.body) || 0, mind: Number(f.mind) || 0, min: Number(f.min) }); onClose(); };
   return (
-    <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: '#fff', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, WebkitTapHighlightColor: 'transparent' }}>
+    <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: '#fff', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 7, overflowY: 'auto', WebkitTapHighlightColor: 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <span style={{ fontSize: 14, fontWeight: 900, flex: 1 }}>行動を編集</span>
         {/* 表示・非表示（非表示にした行動は、右の目のボタンで「非表示の行動」を見ると出てくる） */}
         {it.onToggleHide && <button onClick={() => { it.onToggleHide(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', color: '#55554e', fontSize: 11.5, fontWeight: 800, padding: '4px 10px 4px 7px', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', marginRight: 8 }}><span style={ms(16, '#55554e')}>{it.hidden ? 'visibility' : 'visibility_off'}</span>{it.hidden ? '表示する' : '非表示にする'}</button>}
         <button onClick={onClose} aria-label="閉じる" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(22, INK)}>close</span></button>
       </div>
-      <div>
-        <div style={lab}>名前</div>
-        <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} style={{ width: '100%', boxSizing: 'border-box', height: 38, border: '1.5px solid #e4e1d8', borderRadius: 9, fontSize: 15, fontWeight: 800, padding: '0 10px', fontFamily: 'inherit', marginTop: 3 }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ ...lab, flex: '0 0 auto' }}>名前</div>
+        <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', height: 38, border: '1.5px solid #e4e1d8', borderRadius: 9, fontSize: 15, fontWeight: 800, padding: '0 10px', fontFamily: 'inherit' }} />
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
         <div><div style={lab}>体</div><div style={{ marginTop: 3 }}>{num('body')}</div></div>
@@ -81,13 +81,12 @@ function EditAct({ it, onClose }) {
         <span style={{ fontSize: 14, fontWeight: 800, paddingBottom: 8 }}>/</span>
         <div><div style={lab}>時間（時:分）</div><div style={{ marginTop: 3 }}><HmInput value={f.min} onChange={(n) => setF({ ...f, min: n })} /></div></div>
       </div>
-      <div style={{ fontSize: 10.5, color: '#8a8a82', fontWeight: 700 }}>マイナスで回復</div>
       <div style={{ flex: 1 }} />
-      <div style={{ display: 'flex', gap: 8 }}>
-        {it.onReset && <button onClick={() => { it.onReset(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '10px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>元に戻す</button>}
-        <span style={{ flex: 1 }} />
-        <button onClick={onClose} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '10px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>キャンセル</button>
-        <button onClick={save} style={{ border: 'none', borderRadius: 12, background: ok ? '#c4f000' : '#e4e1d8', color: ok ? '#2f3a00' : '#a5a39a', fontSize: 14, fontWeight: 900, padding: '10px 20px', cursor: ok ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>保存</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {it.onReset && <button onClick={() => { it.onReset(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>元に戻す</button>}
+        <span style={{ flex: 1, fontSize: 10.5, color: '#8a8a82', fontWeight: 700 }}>マイナスで回復</span>
+        <button onClick={onClose} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>キャンセル</button>
+        <button onClick={save} style={{ border: 'none', borderRadius: 12, background: ok ? '#c4f000' : '#e4e1d8', color: ok ? '#2f3a00' : '#a5a39a', fontSize: 14, fontWeight: 900, padding: '7px 20px', cursor: ok ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>保存</button>
       </div>
     </div>
   );
@@ -142,7 +141,7 @@ export function History({ it, cat, onClose, closeX }) { // closeX: 右上を↩�
   const cells = [];
   for (let i = 0; i < weeks * 7; i++) cells.push(new Date(y, mo, i - lead + 1));
   const isToday = (d) => d.toDateString() === now.toDateString();
-  const cellH = weeks > 5 ? 21 : 26;
+  const cellH = weeks > 5 ? 15 : 18;
   const stat = { flex: 1, minWidth: 0, background: '#f7f4ec', borderRadius: 9, padding: '4px 6px 5px', display: 'flex', flexDirection: 'column', justifyContent: 'center' };
   const lab = { fontSize: 8.5, fontWeight: 700, color: '#8a8a82', lineHeight: 1.2 };
   const val = { fontSize: 13, fontWeight: 900, color: INK, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
@@ -260,8 +259,8 @@ function Card({ row, cat, v, hist, setHist }) {
     <div ref={ref} style={wrap}>
       <div style={{ position: 'absolute', left: 0, top: 0, width: '46%', height: 150, background: cat.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
       <span style={{ position: 'absolute', left: 14, top: 10, fontSize: 13, fontWeight: 800, color: cat.ink || '#fff' }}>{cat.name}</span>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: '30px 16px 10px 22px', flex: 1, minHeight: 0 }}>
-        <span style={{ flex: '0 0 auto' }}><Emo e={it.glyph} size={92} /></span>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: '26px 16px 4px 20px', flex: 1, minHeight: 0 }}>
+        <span style={{ flex: '0 0 auto' }}><Emo e={it.glyph} size={72} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: it.name.length > 9 ? 17 : 23, fontWeight: 900, lineHeight: 1.3, wordBreak: 'break-all', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.name}</div>
           {isAct && (
@@ -290,7 +289,7 @@ function Card({ row, cat, v, hist, setHist }) {
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px 12px' }}>
         {it.kind === 'act' && <>
           <button onClick={it.onStart} style={gray}>予定</button>
           <button onClick={it.onStart} style={gray}>記録</button>
