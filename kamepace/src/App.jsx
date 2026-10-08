@@ -427,7 +427,9 @@ export default class App extends React.Component {
         last: '目安 ' + (recover ? '−' : '+') + est + '（' + this.fmtMin(e.defMin) + '）' };
     };
     return [...CATS, ...(this.state.customCats || [])].map(c => {
-      const items = extra[c.id] && extra[c.id].length ? [...c.items, ...extra[c.id]] : c.items;
+      // 旧「課題・勉強」(study) は「勉強・学校」(school) にまとめた。そこへ追加した自作行動もこちらに出す
+      const ex = c.id === 'school' ? [...(extra.school || []), ...(extra.study || [])] : extra[c.id];
+      const items = ex && ex.length ? [...c.items, ...ex] : c.items;
       return { ...c, items: items.map(apply) };
     });
   }
@@ -2233,10 +2235,10 @@ export default class App extends React.Component {
   };
   OCC_HIDDEN = {
     '学生': ['work', 'house'],
-    '会社員（デスクワーク）': ['baito', 'school', 'study', 'club'],
-    '立ち仕事・接客': ['baito', 'school', 'study', 'club'],
-    '医療・介護': ['baito', 'school', 'study', 'club'],
-    '主婦・主夫': ['work', 'baito', 'school', 'study', 'club'],
+    '会社員（デスクワーク）': ['baito', 'school', 'club'],
+    '立ち仕事・接客': ['baito', 'school', 'club'],
+    '医療・介護': ['baito', 'school', 'club'],
+    '主婦・主夫': ['work', 'baito', 'school', 'club'],
     'その他': [],
   };
   obPick = (k, val) => {
