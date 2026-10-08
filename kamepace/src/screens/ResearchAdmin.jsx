@@ -1,5 +1,5 @@
 import React from 'react';
-import { researchLoadAll, loadResearchConfig, saveResearchConfig } from '../firebase';
+import { researchLoadAll, loadResearchConfig, saveResearchConfig, createParticipantAccount } from '../firebase';
 import { adherence, csvFiles, downloadText, freqText, demoParticipants } from '../research';
 
 /* 研究者用（開発者モード）: 参加者ごとの疲労度の推移・生活必須行動/やりたいことの実行率と、CSV の書き出し。
@@ -198,6 +198,44 @@ function PeopleTable({ parts, sel, onSel }) {
   );
 }
 
+/* 参加者のアカウントを作る（実験番号＋パスワード）。参加者はログイン画面の「実験番号」でログインする */
+function AccountMaker({ onClose }) {
+  const [code, setCode] = React.useState('');
+  const [pass, setPass] = React.useState('');
+  const [msg, setMsg] = React.useState('');
+  const [made, setMade] = React.useState([]);
+  const [busy, setBusy] = React.useState(false);
+  const inp = { height: 38, border: '1.5px solid #e4e1d8', borderRadius: 9, fontSize: 15, fontWeight: 800, padding: '0 10px', fontFamily: "'Space Mono',monospace", boxSizing: 'border-box' };
+  const go = async () => {
+    const c = code.trim().toUpperCase();
+    if (!/^[A-Z][0-9]{2}$/.test(c)) { setMsg('実験番号はアルファベット1文字＋数字2桁です（例: A01）'); return; }
+    if (pass.length < 6) { setMsg('パスワードは6文字以上にしてください'); return; }
+    setBusy(true); setMsg('');
+    try { await createParticipantAccount(c, pass); setMade(m => [...m, { c, pass }]); setCode(''); setPass(''); setMsg(c + ' を作りました'); }
+    catch (e) { setMsg(e && e.code === 'auth/email-already-in-use' ? c + ' はもう作られています' : '作れませんでした（' + ((e && e.code) || '') + '）'); }
+    setBusy(false);
+  };
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: '#fff', borderRadius: 18, padding: '18px 18px 16px', boxShadow: '0 20px 50px rgba(27,27,24,.3)' }}>
+        <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 12 }}>参加者アカウントを作る</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="A01" autoCapitalize="characters" style={{ ...inp, width: 86 }} />
+          <input value={pass} onChange={(e) => setPass(e.target.value)} placeholder="パスワード（6文字以上）" style={{ ...inp, flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14 }} />
+          <button onClick={busy ? undefined : go} style={btn(true)}>{busy ? '作成中…' : '作る'}</button>
+        </div>
+        {msg && <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 8, color: msg.endsWith('作りました') ? GREEN : '#b4645a' }}>{msg}</div>}
+        {made.length > 0 && (
+          <div style={{ marginTop: 12, background: '#f7f4ec', borderRadius: 10, padding: '8px 10px' }}>
+            {made.map(m => <div key={m.c} style={{ ...mono, fontSize: 13, fontWeight: 800, padding: '2px 0' }}>{m.c}　{m.pass}</div>)}
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}><button onClick={onClose} style={btn(false)}>閉じる</button></div>
+      </div>
+    </div>
+  );
+}
+
 /* 期間の設定（参加者コードの頭のアルファベットごと: 名前・開始日・終了日） */
 function PeriodEditor({ periods, onSave, onClose, readOnly }) {
   const [rows, setRows] = React.useState(() => {
@@ -249,6 +287,7 @@ export default function ResearchAdmin({ v }) {
   const [cfg, setCfg] = React.useState({ periods: {} }); // 期間（config/research）
   const [per, setPer] = React.useState(''); // 表示する期間（''＝すべて）
   const [editPer, setEditPer] = React.useState(false);
+  const [mkAcc, setMkAcc] = React.useState(false); // 参加者アカウントを作る
   React.useEffect(() => { loadResearchConfig().then(setCfg).catch(() => {}); }, []);
   // PC では画面いっぱいに（スマホ枠を外す）
   React.useEffect(() => { document.body.classList.toggle('kame-wide', wide); return () => document.body.classList.remove('kame-wide'); }, [wide]);
@@ -269,10 +308,11 @@ export default function ResearchAdmin({ v }) {
   const pick = (c) => setSel(c);
 
   const header = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: wide ? '14px 28px' : '4px 20px 10px', borderBottom: wide ? '1px solid #e4e1d8' : 'none', background: wide ? '#fff' : 'none' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: wide ? '14px 28px' : '4px 20px 10px', borderBottom: wide ? '1px solid #e4e1d8' : 'none', background: wide ? '#fff' : 'none' }}>
       <button onClick={v.goMypage} style={{ background: 'none', border: 'none', fontSize: 19, color: MUTED, cursor: 'pointer' }}>‹</button>
       <div style={{ fontSize: wide ? 18 : 16, fontWeight: wide ? 900 : 700, flex: 1 }}>研究データ{demo && <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: '#d97a6a', borderRadius: 6, padding: '2px 7px', marginLeft: 8, verticalAlign: 'middle' }}>デモ</span>}</div>
       <button onClick={() => { setDemo(!demo); setSel(null); }} style={btn(false)}>{demo ? '実データに戻す' : 'デモ'}</button>
+      {!demo && <button onClick={() => setMkAcc(true)} style={btn(false)}>参加者アカウントを作る</button>}
       <button onClick={() => setEditPer(true)} style={btn(false)}>期間の設定</button>
       {parts && parts.length > 0 && <button onClick={csvAll} style={btn(true)}>{per ? '期間' + per + 'のCSV' : '全員のCSV'}</button>}
       {!demo && <button onClick={load} aria-label="読み込み直す" style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'Material Symbols Rounded', fontSize: 20, color: SUB }}>refresh</button>}
@@ -300,6 +340,7 @@ export default function ResearchAdmin({ v }) {
       {!demo && !err && !real && <div style={{ textAlign: 'center', color: MUTED, fontSize: 12.5, padding: 30 }}>読み込み中…</div>}
       {parts && !parts.length && <div style={{ ...card, fontSize: 12.5, color: MUTED }}>{per ? 'この期間の参加者はまだいません。' : 'まだ参加者がいません。「デモ」で見た目を確認できます。'}</div>}
       {editPer && <PeriodEditor periods={periods} readOnly={demo} onSave={savePeriods} onClose={() => setEditPer(false)} />}
+      {mkAcc && <AccountMaker onClose={() => setMkAcc(false)} />}
     </>
   );
   const detailHead = (x) => {

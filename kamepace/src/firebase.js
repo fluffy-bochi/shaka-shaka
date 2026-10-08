@@ -1,6 +1,6 @@
 /* Firebase ログイン・Firestore 同期・Google カレンダー/ToDo 取り込み
    （reference/index.html の module script から移植。データ形式は旧本番と同期互換） */
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth, onAuthStateChanged, signOut as fbSignOut,
   GoogleAuthProvider, signInWithPopup,
@@ -379,3 +379,17 @@ export async function loadResearchConfig() {
   return s.exists() ? s.data() : { periods: {} };
 }
 export async function saveResearchConfig(cfg) { await setDoc(doc(db, 'config', 'research'), { ...cfg, updatedAt: Date.now() }); }
+
+/* ---- 実験番号でログイン ----
+   実験番号（A01 など）を、ログイン用のメールアドレス（a01@exp.hodohodo.app）に置きかえて、メール＋パスワードのログインを使う。
+   参加者のアカウントは研究者が先に作っておく（別の Firebase アプリのインスタンスで作るので、研究者のログインはそのまま） */
+const CODE_DOMAIN = 'exp.hodohodo.app';
+export const codeEmail = (code) => (code || '').trim().toLowerCase() + '@' + CODE_DOMAIN;
+export const codeOfEmail = (email) => { const m = /^([a-z][0-9]{2})@exp\.hodohodo\.app$/.exec(email || ''); return m ? m[1].toUpperCase() : null; };
+export async function loginCode(code, pass) { await signInWithEmailAndPassword(auth, codeEmail(code), pass); }
+export async function createParticipantAccount(code, pass) {
+  const sec = getApps().find(a => a.name === 'kame-admin') || initializeApp(firebaseConfig, 'kame-admin');
+  const secAuth = getAuth(sec);
+  await createUserWithEmailAndPassword(secAuth, codeEmail(code), pass);
+  await fbSignOut(secAuth);
+}
