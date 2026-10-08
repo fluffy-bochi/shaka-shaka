@@ -6,6 +6,10 @@ import { MoodPopup } from './Record';
 const mono = { fontFamily: "'Space Mono',monospace" };
 const ndBtn = { width: 30, height: 30, background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#55554e', cursor: 'pointer', flex: '0 0 auto', padding: 0 };
 
+// 時間帯・タスクの区切り（黒）
+const divRow = { display: 'flex', alignItems: 'center', gap: 8, height: 22, margin: '4px 0 2px' };
+const divLine = { width: 45, height: 2, background: '#1b1b18' };
+const divText = { fontSize: 12, fontWeight: 800, color: '#1b1b18', textShadow: '0 0 3px #f7f4ec, 0 0 6px #f7f4ec' };
 const fab = { width: 60, height: 60, borderRadius: '50%', border: 'none', background: '#fcfaf3', boxShadow: '0 4px 14px rgba(27,27,24,.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 };
 
 /* タイムラインの投稿1件: アイコン／見出し・時刻／本文／右に疲労の合計・…。中の行動は細い行で。
@@ -155,37 +159,32 @@ export default function Home({ v }) {
       <div ref={listRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 0 160px' }}>
         {/* タイムライン（Figma「home」）: 時間帯の区切り＋投稿 */}
         {v.homeFeed.map(p => p.divider ? (
-          <div key={p.key} data-slot={p.slot} style={{ display: 'flex', alignItems: 'center', gap: 8, height: 22, margin: '4px 0 2px' }}>
-            <span style={{ width: 45, height: 2, background: '#fff', boxShadow: '0 0 4px rgba(27,27,24,.25)' }} />
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', textShadow: '0 0 4px rgba(27,27,24,.55)' }}>{p.name}</span>
+          <div key={p.key} data-slot={p.slot} style={divRow}>
+            <span style={divLine} />
+            <span style={divText}>{p.name}</span>
           </div>
         ) : <Post key={p.key} p={p} />)}
         {/* タスク（mylifecore / Google ToDo / かめペースで手動追加）: 時間軸の下。
             チェックするとその時間帯に「行動」として記録される（紐づけた行動 or タスク名で推測） */}
-        <div style={{ background: '#fff', borderRadius: 18, margin: '0 16px 12px', boxShadow: '0 1px 3px rgba(27,27,24,.06)', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px 10px' }}>
-            <div style={{ width: 42, height: 42, flex: '0 0 auto', borderRadius: '50%', background: '#eef0e6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📝</div>
-            <span style={{ fontSize: 15, fontWeight: 800, flex: 1 }}>タスク</span>
-            {v.homeTasks.length > 0 && <span style={{ ...mono, fontSize: 11, color: '#9d9b91' }}>{v.homeTasks.filter(t => t.done).length}/{v.homeTasks.length}</span>}
-          </div>
-          {v.homeTasks.length > 0 && (
-            <div style={{ borderTop: '1px solid #f1efe8' }}>
-              {v.homeTasks.map((t) => (
-                <div key={t.srcId} onClick={t.onToggle} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 15px', borderBottom: '1px solid #f1efe8', cursor: 'pointer', userSelect: 'none' }}>
-                  <span style={{ width: 22, height: 22, flex: '0 0 auto', borderRadius: '50%', border: t.done ? 'none' : '2px solid #d8d5cb', background: t.done ? '#c4f000' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 14, color: '#2f3a00' }}>{t.done ? 'check' : ''}</span>
-                  {t.glyph && <span style={{ flex: '0 0 auto', display: 'inline-flex' }}><Emo e={t.glyph} size={17} /></span>}
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: t.done ? '#b4b2a8' : '#1b1b18', textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</span>
-                  {t.srcLabel && <span style={{ ...mono, fontSize: 9, color: '#b4b2a8', flex: '0 0 auto' }}>{t.srcLabel}</span>}
-                  <button onClick={(e) => { e.stopPropagation(); t.onEdit(); }} style={{ flex: '0 0 auto', width: 26, height: 26, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'Material Symbols Rounded', fontSize: 16, color: '#c9c7bf', padding: 0 }}>edit</button>
-                  <button onClick={(e) => { e.stopPropagation(); t.onDelete(); }} aria-label="タスクを消す" style={{ flex: '0 0 auto', width: 26, height: 26, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'Material Symbols Rounded', fontSize: 16, color: '#d8b4ba', padding: 0 }}>delete</button>
-                </div>
-              ))}
-            </div>
-          )}
-          <button onClick={v.onAddTask} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '11px 0', border: 'none', borderTop: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#7a9a00' }}>
-            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 16 }}>add</span>タスクを追加
-          </button>
+        {/* タスクも投稿と同じ見た目: 区切り「タスク」＋行（チェック・アイコン・名前・…） */}
+        <div style={divRow}>
+          <span style={divLine} />
+          <span style={divText}>タスク{v.homeTasks.length > 0 ? '　' + v.homeTasks.filter(t => t.done).length + '/' + v.homeTasks.length : ''}</span>
         </div>
+        {v.homeTasks.map((t) => (
+          <div key={t.srcId} onClick={t.onToggle} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, minHeight: 46, background: '#f7f4ec', borderTop: '1px solid #bab5a7', padding: '6px 16px 6px 72px', cursor: 'pointer', userSelect: 'none' }}>
+            <span style={{ position: 'absolute', left: 28, top: '50%', marginTop: -12, width: 24, height: 24, borderRadius: '50%', border: t.done ? 'none' : '2px solid #bab5a7', background: t.done ? '#c4f000' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 15, color: '#2f3a00', boxSizing: 'border-box' }}>{t.done ? 'check' : ''}</span>
+            {t.glyph && <span style={{ flex: '0 0 auto', display: 'inline-flex' }}><Emo e={t.glyph} size={20} /></span>}
+            <div style={{ flex: 1, minWidth: 0, opacity: t.done ? 0.55 : 1 }}>
+              {t.srcLabel && <div style={{ fontSize: 10.5, color: '#545454', lineHeight: '16px' }}>{t.srcLabel}</div>}
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#1b1b18', textDecoration: t.done ? 'line-through' : 'none', lineHeight: 1.45, wordBreak: 'break-all' }}>{t.title}</div>
+            </div>
+            <button onClick={(e) => { e.stopPropagation(); t.onEdit(); }} aria-label="タスクの編集" style={{ flex: '0 0 auto', width: 30, height: 22, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 16, letterSpacing: 1, color: '#b4b2a8', lineHeight: 1 }}>•••</button>
+          </div>
+        ))}
+        <button onClick={v.onAddTask} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 10, minHeight: 46, border: 'none', borderTop: '1px solid #bab5a7', borderBottom: '1px solid #bab5a7', background: '#f7f4ec', padding: '6px 16px 6px 72px', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#8a8a82', fontFamily: 'inherit', position: 'relative' }}>
+          <span style={{ position: 'absolute', left: 28, top: '50%', marginTop: -12, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontSize: 22, color: '#55554e' }}>add</span>タスクを追加
+        </button>
       </div>
       </div>
       {/* 右下: きもち・できごと・体調（💬）／記録（＋） */}
