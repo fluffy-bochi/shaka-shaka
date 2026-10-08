@@ -15,7 +15,7 @@ import {
   serialize, deserialize, freshState, sortEntries, normTitle, getTemplate, baseEntry,
 } from './model';
 import {
-  watchAuth, loginGoogle, loginEmail, signupEmail, logout,
+  watchAuth, loginGoogle, loginEmail, signupEmail, logout, loginCode, codeOfEmail, auth,
   cloudSave, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
   loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete, loadResearchConfig,
 } from './firebase';
@@ -326,6 +326,9 @@ export default class App extends React.Component {
   async loadCloud() {
     try {
       const data = await loadUserData();
+      // 実験番号でログインした人は、その番号で研究への協力を自動で始める（まだなら）
+      const code = codeOfEmail(auth.currentUser && auth.currentUser.email);
+      if (code) setTimeout(() => { const r = this.state.research; if (!r || !r.on || r.code !== code) this.joinResearch(code).then(err => { if (err) this.toast(err); }); }, 1500);
       // ゲストの山の散らばりを持ち込まない
       this._pileLayout = null;
       // オンボ判定は「読み込んだデータ」で行う（this.set は非同期で this.state に即反映されないため）
@@ -3542,6 +3545,17 @@ export default class App extends React.Component {
     try { await loginEmail(this.state.authEmail.trim(), this.state.authPass); } catch (e) { this.set({ authErr: jpError(e && e.code) }); }
     this.set({ authBusy: false });
   };
+  /* 実験番号でログイン（アカウントは研究者が「研究データ」で作っておく） */
+  onAuthCode = (e) => this.set({ authCode: e.target.value });
+  setAuthMode = (m) => this.set({ authMode: m, authErr: '' });
+  doLoginCode = async () => {
+    const code = (this.state.authCode || '').trim().toUpperCase();
+    if (!/^[A-Z][0-9]{2}$/.test(code)) { this.set({ authErr: '実験番号はアルファベット1文字＋数字2桁です（例: A01）' }); return; }
+    this.set({ authErr: '', authBusy: true });
+    try { await loginCode(code, this.state.authPass); }
+    catch (e) { const c = e && e.code; this.set({ authErr: (c === 'auth/invalid-credential' || c === 'auth/user-not-found' || c === 'auth/wrong-password' || c === 'auth/invalid-email') ? '実験番号かパスワードが違います' : jpError(c) }); }
+    this.set({ authBusy: false });
+  };
   doSignupEmail = async () => {
     this.set({ authErr: '', authBusy: true });
     try { await signupEmail(this.state.authEmail.trim(), this.state.authPass); } catch (e) { this.set({ authErr: jpError(e && e.code) }); }
@@ -4464,7 +4478,7 @@ export default class App extends React.Component {
       user: st.user,
       authOpen: st.authOpen, authEmail: st.authEmail, authPass: st.authPass, authErr: st.authErr, authBusy: st.authBusy,
       openAuth: this.openAuth, closeAuth: this.closeAuth,
-      onAuthEmail: this.onAuthEmail, onAuthPass: this.onAuthPass,
+      onAuthEmail: this.onAuthEmail, onAuthPass: this.onAuthPass, onAuthCode: this.onAuthCode, authCode: st.authCode || '', authMode: st.authMode || 'email', setAuthMode: this.setAuthMode, doLoginCode: this.doLoginCode,
       doLoginGoogle: this.doLoginGoogle, doLoginEmail: this.doLoginEmail, doSignupEmail: this.doSignupEmail,
       doLogout: this.doLogout, doCalendarSync: this.doCalendarSync,
     };
