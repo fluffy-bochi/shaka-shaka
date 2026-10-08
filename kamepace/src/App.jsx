@@ -106,7 +106,7 @@ export default class App extends React.Component {
     recordDate: null, // 記録する日付（確認画面で指定・null=ホーム表示日）。前日の記録などに使う
     homeMotion: (() => { try { return localStorage.getItem('shaka_home_motion') === '1'; } catch (e) { return false; } })(),
     // カテゴリの色: soft＝彩度を下げて明るく・黒字（標準）／vivid＝元のカラフル
-    // カテゴリ行の見た目: dark＝濃いグレー帯（となりだけ色）／color＝全部カテゴリの色
+    // カテゴリ行の見た目: dark＝白地＋色の枠と左の四角／color＝全部カテゴリの色
     catStyle: (() => { try { return localStorage.getItem('kame_cat_style') === 'color' ? 'color' : 'dark'; } catch (e) { return 'dark'; } })(),
     catPalette: (() => { try { return localStorage.getItem('kame_cat_palette') === 'vivid' ? 'vivid' : 'soft'; } catch (e) { return 'soft'; } })(),
     // シャカの動かし方: false=加速度センサー（振る）／true=ジャイロ（傾き＝逆さで上辺に集まる）
