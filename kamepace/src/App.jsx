@@ -1593,7 +1593,7 @@ export default class App extends React.Component {
       return {
         cond: isTweet && (first.cond != null || first.mindCond != null || first.temp != null) ? condOf({ ts: entryStartTs(first), cond: first.cond, mood: first.mindCond, temp: first.temp }) : null,
         key: k, sortHm: from, slot: this.slotOf(first),
-        glyph: entryGlyph(top), head: note ? label : '', time: hmText(from), main: note || label, isNote: !!note,
+        glyph: entryGlyph(top), head: label, time: hmText(from), main: note, isNote: !!note, // タイトルはいつも時刻の左。本文はコメントだけ
         sumText: frame || (isTweet && !sum) ? '' : sg(sum), planned: es.some(e => e.planned),
         frameHint: frame ? 'タップして行動を入れる' : '',
         items: es.length > 1 ? es.map(e => {

@@ -20,14 +20,17 @@ function Post({ p }) {
     <div onClick={p.onTap} style={{ position: 'relative', background: '#f7f4ec', borderTop: '1px solid #bab5a7', padding: '4px 20px 10px 72px', cursor: 'pointer', userSelect: 'none' }}>
       <div style={{ opacity: fade }}>
         <span style={{ position: 'absolute', left: 28, top: 8 }}><Emo e={p.glyph} size={24} /></span>
-        <div style={{ display: 'flex', alignItems: 'center', fontSize: 10.5, color: '#545454', lineHeight: '18px', paddingRight: 30, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {p.head}{p.head && p.time ? '・' : ''}{p.time}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, lineHeight: '20px', paddingRight: 34, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+          {p.head && <span style={{ fontSize: 13, fontWeight: 700, color: '#1b1b18', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{p.head}</span>}
+          {p.time && <span style={{ fontSize: 10.5, color: '#545454', flex: '0 0 auto' }}>{p.time}</span>}
           {p.planned && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: '#fff', background: '#a5a39a', borderRadius: 4, padding: '0 5px', lineHeight: '15px' }}>予定</span>}
+          {/* コメントがないときは、疲労の合計を見出しの行の右に */}
+          {!p.main && !p.empty && p.sumText && <span style={{ ...mono, marginLeft: 'auto', fontSize: 13.5, fontWeight: 700, color: '#1b1b18', flex: '0 0 auto', paddingLeft: 8 }}>{p.sumText}</span>}
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 2 }}>
+        {(p.main || p.empty) && <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 2 }}>
           <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: p.isNote ? 400 : 600, color: p.empty ? '#8a8a82' : '#1b1b18', lineHeight: 1.45, wordBreak: 'break-all' }}>{p.empty ? '記録する' : (p.main || (p.cond ? '' : ''))}</div>
           {p.sumText && <span style={{ ...mono, fontSize: 13.5, fontWeight: 700, color: '#1b1b18', whiteSpace: 'nowrap' }}>{p.sumText}</span>}
-        </div>
+        </div>}
         {p.frameHint && <div style={{ fontSize: 10.5, color: '#9d9b91', marginTop: 2 }}>{p.frameHint}</div>}
         {p.cond && (p.cond.body != null || p.cond.mind != null || p.cond.temp != null) && (
           <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 13, color: '#1b1b18' }}>
