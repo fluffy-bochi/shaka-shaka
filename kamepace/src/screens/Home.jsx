@@ -211,7 +211,7 @@ function RecordMenu({ v }) {
           <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#55554e' }}>edit</span>編集する
         </button>
         <button onClick={v.recMenuTrash} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 11, border: 'none', background: '#fdeef0', borderRadius: 13, padding: '13px 14px', fontSize: 14, fontWeight: 700, color: '#c0395e', cursor: 'pointer' }}>
-          <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#c0395e' }}>delete</span>ゴミ箱へ移動{v.recMenuIsPlan ? '（予定ごと）' : ''}
+          <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#c0395e' }}>delete</span>{v.recMenuIsLog ? '削除' : 'ゴミ箱へ移動' + (v.recMenuIsPlan ? '（予定ごと）' : '')}
         </button>
         <button onClick={v.closeRecMenu} style={{ width: '100%', marginTop: 10, border: 'none', background: 'none', padding: '12px 0', fontSize: 13.5, fontWeight: 700, color: '#8a8a82', cursor: 'pointer' }}>キャンセル</button>
       </div>
