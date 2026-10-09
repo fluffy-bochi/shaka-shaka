@@ -1537,13 +1537,13 @@ export default class App extends React.Component {
       key: 'wake', kind: 'wake', sortHm: wakeHm || '00:00', slot: 'asa', glyph: '🌅',
       head: '起床後の記録', time: hmText(wakeHm), main: wk ? (wk.note || '') : '', empty: !wk,
       sumText: moon ? '−' + moon : '', past: !!wk, cond: cond(wk && { ...wk, ts: wk.ts }),
-      onTap: this.goSleep, onMenu: this.goSleep,
+      onTap: this.goSleep, onMenu: wk ? () => this.openRecMenu({ logKind: 'wake', logDate: d, title: '起床後の記録', glyph: '🌅' }) : this.goSleep,
     });
     posts.push({
       key: 'bed', kind: 'bed', sortHm: bedHm || '99:99', slot: 'yoru', glyph: '🌙',
       head: '就寝前の記録', time: hmText(bedHm), main: bd ? (bd.note || '') : '', empty: !bd,
       sumText: '', past: !!bd, cond: cond(bd),
-      onTap: () => this.goBed(d), onMenu: () => this.goBed(d),
+      onTap: () => this.goBed(d), onMenu: bd ? () => this.openRecMenu({ logKind: 'bed', logDate: d, title: '就寝前の記録', glyph: '🌙' }) : () => this.goBed(d),
     });
     // 就寝前の記録は薄くしない。就寝の記録をしたら、その日の記録はぜんぶ濃く
     posts.forEach(p => { if (p.kind === 'bed' || bd) p.past = false; });
@@ -2350,16 +2350,28 @@ export default class App extends React.Component {
   /* ================= ホーム記録の長押しメニュー =================
      時間帯カードの記録を長押し → 編集 or ゴミ箱へ移動を選べる小メニュー。 */
   openRecMenu = (g) => this.set({ recMenu: g });
+  /* 起床・就寝の記録を消す（まちがえて記録したとき）。そのとき足された疲労（起床/就寝時の疲労）の記録もいっしょに消す */
+  deleteDayLog = (kind, date) => {
+    const title = kind === 'wake' ? '起床時の疲労' : '就寝時の疲労';
+    const key = kind === 'wake' ? 'wakeLog' : 'bedLog';
+    const entries = this.state.entries.filter(e => !(e.wakeAdd && e.title === title && e.date === date));
+    this.set({ [key]: (this.state[key] || []).filter(x => x.date !== date), entries, consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)) });
+    this._pileLayout = null;
+    this.save();
+    this.toast(kind === 'wake' ? '起床後の記録を消しました' : '就寝前の記録を消しました');
+  };
   closeRecMenu = () => this.set({ recMenu: null });
   recMenuEdit = () => {
     const g = this.state.recMenu;
     this.set({ recMenu: null });
+    if (g && g.logKind) { if (g.logKind === 'wake') this.goSleep(); else this.goBed(g.logDate); return; }
     if (g) (g.isFrame ? this.openFrameFill(g) : this.openEditFlow(g));
   };
   recMenuTrash = () => {
     const g = this.state.recMenu;
     this.set({ recMenu: null });
     if (!g) return;
+    if (g.logKind) { this.deleteDayLog(g.logKind, g.logDate); return; }
     const idxs = g.idxs ? g.idxs : (g.idx != null ? [g.idx] : []);
     if (!idxs.length) return;
     const set = new Set(idxs);
@@ -4524,6 +4536,7 @@ export default class App extends React.Component {
       recMenuTitle: st.recMenu ? st.recMenu.title : '',
       recMenuGlyph: st.recMenu ? st.recMenu.glyph : '',
       recMenuIsPlan: st.recMenu ? !!st.recMenu.isPlan : false,
+      recMenuIsLog: st.recMenu ? !!st.recMenu.logKind : false,
       closeRecMenu: this.closeRecMenu, recMenuEdit: this.recMenuEdit, recMenuTrash: this.recMenuTrash,
       intensityOpen: !!intItem, intensityName: intItem ? intItem.name : '', intensityGlyph: intItem ? intItem.glyph : '',
       intensityFatText: (intFat >= 0 ? '+' + intFat : '' + intFat), intQuestions, closeIntensity: this.closeIntensity,
