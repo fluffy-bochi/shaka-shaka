@@ -98,6 +98,13 @@ export function BedCheck({ v }) {
     <div style={wrap}>
       <Head v={v} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingTop: 6 }}>
+        {/* 前の日の就寝をあとから記録するときだけ、寝た時刻を入れる */}
+        {d.hm != null && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderRadius: 18, margin: '0 20px 12px', padding: '12px 16px', boxShadow: '0 2px 10px rgba(27,27,24,.05)' }}>
+            <span style={{ fontSize: 15, fontWeight: 800 }}>寝た時刻</span>
+            <input type="time" value={d.hm} onChange={(e) => e.target.value && v.setBedDraft('hm', e.target.value)} aria-label="寝た時刻" style={timeBox} />
+          </div>
+        )}
         <textarea value={d.note || ''} onChange={(e) => v.setBedDraft('note', e.target.value)} placeholder="ひとこと" rows={2}
           style={{ display: 'block', width: 'calc(100% - 40px)', margin: '0 20px 12px', boxSizing: 'border-box', resize: 'none', border: 'none', borderRadius: 14, background: '#fff', padding: '12px 13px', fontSize: 14, fontWeight: 600, lineHeight: 1.5, color: INK, fontFamily: 'inherit', boxShadow: '0 2px 10px rgba(27,27,24,.05)', outline: 'none' }} />
         <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setBedDraft('cond', x)} />
