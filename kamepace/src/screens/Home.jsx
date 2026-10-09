@@ -25,7 +25,7 @@ function Post({ p }) {
           {p.planned && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: '#fff', background: '#a5a39a', borderRadius: 4, padding: '0 5px', lineHeight: '15px' }}>予定</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 2 }}>
-          <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: p.empty ? '#8a8a82' : '#1b1b18', lineHeight: 1.45, wordBreak: 'break-all' }}>{p.empty ? '記録する' : (p.main || (p.cond ? '' : ''))}</div>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: p.isNote ? 400 : 600, color: p.empty ? '#8a8a82' : '#1b1b18', lineHeight: 1.45, wordBreak: 'break-all' }}>{p.empty ? '記録する' : (p.main || (p.cond ? '' : ''))}</div>
           {p.sumText && <span style={{ ...mono, fontSize: 13.5, fontWeight: 700, color: '#1b1b18', whiteSpace: 'nowrap' }}>{p.sumText}</span>}
         </div>
         {p.frameHint && <div style={{ fontSize: 10.5, color: '#9d9b91', marginTop: 2 }}>{p.frameHint}</div>}
@@ -151,7 +151,7 @@ export default function Home({ v }) {
             <button onClick={v.goMypage} style={{ width: 38, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#55554e', cursor: 'pointer' }}>person</button>
           </div>
         </div>
-        <Speaker text={v.homeComment} size={140} onTap={v.tapCharacter} onEdit={v.editIkoiLine} regular />
+        <Speaker text={v.homeComment} size={140} onTap={v.tapCharacter} onEdit={v.editIkoiLine} />
       </div>
       <div ref={listRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 0 160px' }}>
         {/* タイムライン（Figma「home」）: 時間帯の区切り＋投稿 */}
