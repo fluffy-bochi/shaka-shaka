@@ -1593,7 +1593,7 @@ export default class App extends React.Component {
       return {
         cond: isTweet && (first.cond != null || first.mindCond != null || first.temp != null) ? condOf({ ts: entryStartTs(first), cond: first.cond, mood: first.mindCond, temp: first.temp }) : null,
         key: k, sortHm: from, slot: this.slotOf(first),
-        glyph: entryGlyph(top), head: note ? label : '', time: hmText(from), main: note || label,
+        glyph: entryGlyph(top), head: note ? label : '', time: hmText(from), main: note || label, isNote: !!note,
         sumText: frame || (isTweet && !sum) ? '' : sg(sum), planned: es.some(e => e.planned),
         frameHint: frame ? 'タップして行動を入れる' : '',
         items: es.length > 1 ? es.map(e => {
@@ -1612,13 +1612,13 @@ export default class App extends React.Component {
     const bedHm = bd ? tsToHmOn(d, bd.ts) : '';
     posts.push({
       key: 'wake', kind: 'wake', sortHm: wakeHm || '00:00', slot: 'asa', glyph: '🌅',
-      head: '起床後の記録', time: hmText(wakeHm), main: wk ? (wk.note || '') : '', empty: !wk,
+      head: '起床後の記録', time: hmText(wakeHm), main: wk ? (wk.note || '') : '', empty: !wk, isNote: !!(wk && wk.note),
       sumText: moon ? '−' + moon : '', past: !!wk, cond: wk ? condOf({ ts: wk.ts, cond: wk.cond, mood: wk.mood }) : null,
       onTap: this.goSleep, onMenu: wk ? () => this.openRecMenu({ logKind: 'wake', logDate: d, title: '起床後の記録', glyph: '🌅' }) : this.goSleep,
     });
     posts.push({
       key: 'bed', kind: 'bed', sortHm: bedHm || '99:99', slot: 'yoru', glyph: '🌙',
-      head: '就寝前の記録', time: hmText(bedHm), main: bd ? (bd.note || '') : '', empty: !bd,
+      head: '就寝前の記録', time: hmText(bedHm), main: bd ? (bd.note || '') : '', empty: !bd, isNote: !!(bd && bd.note),
       sumText: '', past: !!bd, cond: bd ? condOf({ ts: bd.ts, cond: bd.cond, mood: bd.mood }) : null,
       onTap: () => this.goBed(d), onMenu: bd ? () => this.openRecMenu({ logKind: 'bed', logDate: d, title: '就寝前の記録', glyph: '🌙' }) : () => this.goBed(d),
     });
