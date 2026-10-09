@@ -12,6 +12,8 @@ const ms = (size, color) => ({ fontFamily: 'Material Symbols Rounded', fontSize:
 
 const GROUPS = [
   { id: 'home', label: 'ホーム', size: 140, items: [
+    { key: 'HOME_MORNING_NOWAKE', label: '朝・まだ起床の記録がない' },
+    { key: 'HOME_BEDTIME', label: '寝る時間が近い（いつもの就寝の1時間前〜）' },
     { key: 'AFTER_FATIGUE', label: '記録直後（疲れる記録）' },
     { key: 'AFTER_RECOVER', label: '記録直後（回復の記録）' },
     { key: 'HOME_ZONE0', label: 'がんばりゲージ 0〜40' },
