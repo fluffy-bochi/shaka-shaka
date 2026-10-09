@@ -1580,6 +1580,22 @@ export default class App extends React.Component {
     return { rows: out, isToday: d === today };
   }
 
+  /* 時間に合わせたひとこと（ホーム）
+     - 朝（5〜12時）でまだ今日の起床の記録がない → 睡眠はどうだった？起床後の記録で教えて
+     - いつもの就寝の1時間前から（就寝の記録がまだ）→ そろそろ寝る時間ですね（いつもの就寝＝直近7回の平均、なければ23時） */
+  timeOfDayLine() {
+    const st = this.state, now = Date.now(), h = new Date(now).getHours();
+    const pickL = (k) => { const a = Ikoi.lines(k); return a.length ? a[Math.floor(now / 3600000) % a.length] : ''; };
+    if (h >= 5 && h < 12 && !(st.wakeLog || []).some(w => w.date === this.wakeDay())) return pickL('HOME_MORNING_NOWAKE');
+    const t = todayStr();
+    if ((st.bedLog || []).some(b => b.date === t)) return '';
+    const mins = (st.bedLog || []).filter(b => b.ts && !b.late).slice(-7).map(b => (b.ts - hmToTsOn(b.date, '00:00')) / 60000).filter(m => m >= 18 * 60 && m < 30 * 60);
+    const usual = mins.length ? mins.reduce((a, b) => a + b, 0) / mins.length : 23 * 60;
+    const nowMin = (now - hmToTsOn(t, '00:00')) / 60000;
+    if (nowMin >= usual - 60) return pickL('HOME_BEDTIME');
+    return '';
+  }
+
   /* 画面サイズ: 実際のアプリ画面要素を実測（PC表示のスマホ枠にも追従） */
   _screenRef = React.createRef();
   screenW() { const el = this._screenRef.current; return (el && el.clientWidth) || Math.min(480, window.innerWidth || 372); }
@@ -4343,6 +4359,8 @@ export default class App extends React.Component {
       homeComment: st.screen === 'home' ? (st.tapLine || (() => {
         const d = this.homeDateStr(), nowHm = this.tsToHm(Date.now());
         const next = sortEntries(st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.title && e.from && (d !== todayStr() || e.from > nowHm)))[0];
+        const timed = d === todayStr() ? this.timeOfDayLine() : '';
+        if (timed && !(st.lastRec && Date.now() - st.lastRec.ts < 3 * 60000)) return timed; // 記録した直後はそのひとことを優先
         return homeLine(Math.min(100, this.pileCount()), next && { ...next, ...this.entryBodyMind(next) }, d, st.lastRec, Date.now());
       })()) : '',
       tapCharacter: this.tapCharacter,
