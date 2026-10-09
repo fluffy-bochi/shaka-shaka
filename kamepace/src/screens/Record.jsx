@@ -7,7 +7,7 @@ const hmOut = (val, prev) => { const ph = prev ? Number(prev.split(':')[0]) || 0
 import SlotPill from './SlotPill';
 import EmojiPicker from './EmojiPicker';
 import Emo from '../fluent';
-import Pick from './Pick';
+import Pick, { HmInput } from './Pick';
 
 const mono = { fontFamily: "'Space Mono',monospace" };
 const msIcon = (size, color, fill = true) => ({ fontFamily: 'Material Symbols Rounded', ...(fill ? { fontVariationSettings: "'FILL' 1" } : {}), fontSize: size, color });
@@ -203,7 +203,7 @@ function Confirm({ v }) {
     </div>
   );
   const line = { border: 'none', borderBottom: '1px solid #5a5a5a', background: 'transparent', outline: 'none', fontFamily: 'inherit', color: '#1b1b18', padding: '6px 4px', boxSizing: 'border-box' };
-  const timeIn = { ...mono, fontSize: 12.5, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '5px 4px', width: 66, textAlign: 'center', color: '#1b1b18', background: '#fcfaf3' };
+  const timeIn = { ...mono, fontSize: 14, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '6px 6px', width: 84, boxSizing: 'border-box', textAlign: 'center', color: '#1b1b18', background: '#fcfaf3' };
   const sm = { width: 28, height: 26, borderRadius: 8, border: '1.5px solid #e4e1d8', background: '#fcfaf3', ...mono, fontSize: 11, fontWeight: 700, color: '#55554e', cursor: 'pointer', padding: 0 };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec' }}>
@@ -231,9 +231,7 @@ function Confirm({ v }) {
           <span>合計</span>
           {v.isDurationMode && !v.hasOverallTime ? (
             <>
-              <button onClick={v.addTotalM10} style={sm}>-10</button>
-              <MinEdit text={v.searchTotalText} raw={v.searchTotalMinRaw} onSet={v.setTotalMin} style={{ ...mono, fontSize: 13, fontWeight: 700, minWidth: 52, textAlign: 'center' }} />
-              <button onClick={v.addTotalP10} style={sm}>+10</button>
+              <span style={{ marginLeft: 4 }}><HmInput value={v.searchTotalMinRaw} onChange={(n) => n > 0 && v.setTotalMin(n)} size={14} /></span>
             </>
           ) : <span style={{ ...mono, fontWeight: 700, marginLeft: 4 }}>{v.searchTotalText}</span>}
           <span style={{ flex: 1 }} />
@@ -261,13 +259,9 @@ function Confirm({ v }) {
         {v.hasOverallTime && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap', marginTop: 10 }}>
             <span style={{ fontSize: 12, color: '#55554e', marginRight: 4 }}>全体</span>
-            <HourStep dir={-1} onClick={() => v.onOverallStepFromH(-1)} />
             <input type="time" value={hmIn(v.overallFromHm)} onChange={(e) => e.target.value && v.onOverallFrom(hmOut(e.target.value, v.overallFromHm))} style={timeIn} />
-            <HourStep dir={1} onClick={() => v.onOverallStepFromH(1)} />
-            <span style={{ color: '#8a8a82', fontSize: 12 }}>→</span>
-            <HourStep dir={-1} onClick={() => v.onOverallStepToH(-1)} />
+            <span style={{ color: '#8a8a82', fontSize: 12, margin: '0 4px' }}>→</span>
             <input type="time" value={hmIn(v.overallToHm)} onChange={(e) => e.target.value && v.onOverallTo(hmOut(e.target.value, v.overallToHm))} style={timeIn} />
-            <HourStep dir={1} onClick={() => v.onOverallStepToH(1)} />
           </div>
         )}
         {/* 行動ごと */}
@@ -289,19 +283,15 @@ function Confirm({ v }) {
                   {seg([['dislike', 'きらい'], ['normal', 'ふつう'], ['like', 'すき']], r.pref, r.onPref)}
                   {seg([['time', '時刻'], ['dur', '時間']], v.isTimeMode ? 'time' : 'dur', (k) => (k === 'time' ? v.setTimeMode() : v.setDurationMode()))}
                   {r.hasIntensity && <button onClick={r.onIntensity} style={{ border: '1px solid #1b1b18', background: '#fcfaf3', borderRadius: 14, padding: '3px 9px', fontSize: 11, fontWeight: 700, color: '#1b1b18', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{r.intensityText}</button>}
-                  {!a.timeMode && a.minText && <MinEdit text={a.minText} raw={a.rawMin} onSet={a.onSetMin} style={{ ...mono, fontSize: 12, fontWeight: 700, background: '#efece3', borderRadius: 8, padding: '3px 9px', marginLeft: 'auto' }} />}
+                  {!a.timeMode && a.minText && <span style={{ marginLeft: 'auto' }}><HmInput value={a.rawMin} onChange={(n) => n > 0 && a.onSetMin(n)} size={13} /></span>}
                 </div>
                 {a.timeMode && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, paddingLeft: 26 }}>
                     {a.ranges.map((rg, ri) => (
-                      <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
-                        <HourStep dir={-1} onClick={() => rg.onStepFromH(-1)} />
+                      <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                         <input type="time" value={hmIn(rg.fromHm)} onChange={(e) => e.target.value && rg.onSetFrom(hmOut(e.target.value, rg.fromHm))} style={timeIn} />
-                        <HourStep dir={1} onClick={() => rg.onStepFromH(1)} />
-                        <span style={{ color: '#8a8a82', fontSize: 12 }}>→</span>
-                        <HourStep dir={-1} onClick={() => rg.onStepToH(-1)} />
+                        <span style={{ color: '#8a8a82', fontSize: 12, margin: '0 4px' }}>→</span>
                         <input type="time" value={hmIn(rg.toHm)} onChange={(e) => e.target.value && rg.onSetTo(hmOut(e.target.value, rg.toHm))} style={timeIn} />
-                        <HourStep dir={1} onClick={() => rg.onStepToH(1)} />
                         {a.canRemoveRange && <button onClick={rg.onRemove} style={{ width: 22, height: 24, border: 'none', background: 'none', fontSize: 14, color: '#c9c7bf', cursor: 'pointer' }}>✕</button>}
                       </div>
                     ))}
