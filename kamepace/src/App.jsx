@@ -1594,7 +1594,7 @@ export default class App extends React.Component {
         cond: isTweet && (first.cond != null || first.mindCond != null || first.temp != null) ? condOf({ ts: entryStartTs(first), cond: first.cond, mood: first.mindCond, temp: first.temp }) : null,
         key: k, sortHm: from, slot: this.slotOf(first),
         glyph: entryGlyph(top), head: note ? label : '', time: hmText(from), main: note || label,
-        sumText: frame || (isTweet && !sum) ? '' : sg(sum), past: !!endTs && endTs < now - (isTweet ? 30 * 60000 : 0), // つぶやきは30分たってから薄く planned: es.some(e => e.planned),
+        sumText: frame || (isTweet && !sum) ? '' : sg(sum), planned: es.some(e => e.planned),
         frameHint: frame ? 'タップして行動を入れる' : '',
         items: es.length > 1 ? es.map(e => {
           const f = freq[normTitle(e.title)] || {};
@@ -1623,7 +1623,10 @@ export default class App extends React.Component {
       onTap: () => this.goBed(d), onMenu: bd ? () => this.openRecMenu({ logKind: 'bed', logDate: d, title: '就寝前の記録', glyph: '🌙' }) : () => this.goBed(d),
     });
     // 就寝前の記録は薄くしない。就寝の記録をしたら、その日の記録はぜんぶ濃く
-    posts.forEach(p => { if (p.kind === 'bed' || bd) p.past = false; });
+    // いまの時間帯（今日を見ているとき）の投稿だけ濃く、ほかの時間帯は薄く。
+    // 就寝前の記録はいつも濃く、就寝を記録したらその日は全部濃く。今日以外の日は全部濃く
+    const nowSlot = d === today ? this.slotNow() : null;
+    posts.forEach(p => { p.past = !!nowSlot && !bd && p.kind !== 'bed' && p.slot !== nowSlot; });
     posts.sort((a, b) => (a.sortHm || '').localeCompare(b.sortHm || ''));
     // 時間帯の区切り
     const names = Object.fromEntries(SLOTS.map(x => [x.id, x.name]));
