@@ -21,7 +21,7 @@ function Post({ p }) {
       <div style={{ opacity: fade }}>
         <span style={{ position: 'absolute', left: 28, top: 8 }}><Emo e={p.glyph} size={24} /></span>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, lineHeight: '20px', paddingRight: 34, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-          {p.head && <span style={{ fontSize: 13, fontWeight: 700, color: '#1b1b18', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{p.head}</span>}
+          {p.head && <span style={{ fontSize: 10.5, color: '#545454', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{p.head}</span>}
           {p.time && <span style={{ fontSize: 10.5, color: '#545454', flex: '0 0 auto' }}>{p.time}</span>}
           {p.planned && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: '#fff', background: '#a5a39a', borderRadius: 4, padding: '0 5px', lineHeight: '15px' }}>予定</span>}
           {/* コメントがないときは、疲労の合計を見出しの行の右に */}
