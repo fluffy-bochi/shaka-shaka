@@ -247,7 +247,7 @@ export default class App extends React.Component {
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
       prefs: s.prefs, actGoals: s.actGoals, actFreq: s.actFreq, research: s.research, actEdits: s.actEdits, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
-      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, wakeLog: s.wakeLog, bedLog: s.bedLog, mainScreen: s.mainScreen,
+      onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, wakeLog: s.wakeLog, bedLog: s.bedLog, mainScreen: s.mainScreen, screenTime: s.screenTime,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
       bookFav: s.bookFav, bookDiary: s.bookDiary,
@@ -2997,7 +2997,36 @@ export default class App extends React.Component {
       });
     });
   }
+  /* 画面ごとの利用時間（研究データのヒートマップ用）: 見えているあいだ、いまの画面に秒を足していく。
+     30日より前は消す。保存は他の保存のついでに（同期データに入る） */
+  screenLabel() {
+    const st = this.state;
+    if (st.moodOpen) return 'つぶやき';
+    const s = st.screen;
+    if (s === 'record') return st.searchStep === 'confirm' ? '登録確認' : '行動選択';
+    const map = { shaka: 'シャカ', home: 'ホーム', run: '実行中', mypage: 'マイページ', bookshelf: '本棚', collect: 'ためた回復', onboard: 'オンボーディング', cycle: 'マイページ', ikoiEdit: '開発', researchAdmin: '開発' };
+    if (map[s]) return map[s];
+    if (/^wake/.test(s)) return '起床の記録';
+    if (/^bed/.test(s)) return '就寝の記録';
+    return 'その他';
+  }
+  tickScreenTime = () => {
+    const now = Date.now(), last = this._stLast || now;
+    this._stLast = now;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    const sec = Math.round((now - last) / 1000);
+    if (sec <= 0 || sec > 120 || !this.state.booted || this.state.tutorial) return; // 長く止まっていた分は数えない
+    const d = calendarTodayStr(), lab = this._stLabel || this.screenLabel();
+    this.setState(s0 => {
+      const all = { ...(s0.screenTime || {}) };
+      const day = { ...(all[d] || {}) }; day[lab] = (day[lab] || 0) + sec; all[d] = day;
+      const keep = shiftDate(d, -30); Object.keys(all).forEach(k => { if (k < keep) delete all[k]; });
+      return { screenTime: all };
+    });
+  };
   componentDidMount() {
+    this._stTimer = setInterval(this.tickScreenTime, 15000);
+    document.addEventListener('visibilitychange', () => { this.tickScreenTime(); this._stLast = Date.now(); });
     initShakaSound();
     // 前回の山の散らばり（振って変わった形）を復元
     try {
@@ -3103,6 +3132,9 @@ export default class App extends React.Component {
     }
   }
   componentDidUpdate(prevProps, prevState) {
+    // 画面が変わったら、それまでの時間を前の画面に足してから切りかえる
+    const lab = this.screenLabel();
+    if (lab !== this._stLabel) { if (this._stLabel) this.tickScreenTime(); this._stLabel = lab; }
     if (this.state.tutorial) this.checkTutorial(prevState);
     if (this.state.predictOpen && this.state.screen !== 'shaka') { this._pred = null; this.set({ predictOpen: false }); }
   }

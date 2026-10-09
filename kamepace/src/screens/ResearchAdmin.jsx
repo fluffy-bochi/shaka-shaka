@@ -1,6 +1,6 @@
 import React from 'react';
 import { researchLoadAll, loadResearchConfig, saveResearchConfig, createParticipantAccount } from '../firebase';
-import { adherence, csvFiles, downloadText, freqText, demoParticipants } from '../research';
+import { adherence, csvFiles, downloadText, freqText, demoParticipants, SCREENS } from '../research';
 
 /* 研究者用（開発者モード）: 参加者ごとの疲労度の推移・生活必須行動/やりたいことの実行率と、CSV の書き出し。
    PC（幅900px以上）ではスマホ枠を外して画面いっぱいに、参加者一覧＋比較グラフ＋選んだ参加者の詳細を並べる。
@@ -13,6 +13,54 @@ const h3 = { fontSize: 14, fontWeight: 900, margin: '0 0 8px' };
 const pct = (r) => (r == null ? '—' : Math.round(r * 100) + '%');
 const md = (d) => Number(d.slice(5, 7)) + '/' + Number(d.slice(8));
 const btn = (main) => ({ border: main ? 'none' : '1.5px solid #e4e1d8', background: main ? INK : '#fff', color: main ? '#fff' : INK, borderRadius: 10, padding: '7px 12px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' });
+
+/* 画面ごとの利用時間のヒートマップ。cols=[{key,label,data:{画面:分}}]、最後に合計の列。濃いほど長い */
+const fmtM = (m) => (m == null || m === 0 ? '' : m < 1 ? '<1' : m >= 60 ? Math.floor(m / 60) + 'h' + String(Math.round(m % 60)).padStart(2, '0') : String(Math.round(m)));
+function Heat({ cols, totalLabel = '合計' }) {
+  const rows = [...SCREENS, ...[...new Set(cols.flatMap(c => Object.keys(c.data || {})))].filter(k => !SCREENS.includes(k))]
+    .filter(k => cols.some(c => (c.data || {})[k] > 0));
+  if (!rows.length) return <div style={{ fontSize: 12, color: MUTED, padding: '8px 0' }}>まだデータがありません</div>;
+  const tot = Object.fromEntries(rows.map(k => [k, cols.reduce((a, c) => a + ((c.data || {})[k] || 0), 0)]));
+  const max = Math.max(1, ...cols.flatMap(c => rows.map(k => (c.data || {})[k] || 0)));
+  const maxT = Math.max(1, ...Object.values(tot));
+  const cell = (m, mx) => {
+    const a = m ? 0.12 + 0.88 * Math.min(1, m / mx) : 0;
+    return { background: m ? `rgba(122,154,0,${a.toFixed(2)})` : '#f7f4ec', color: a > 0.55 ? '#fff' : INK };
+  };
+  const colTot = cols.map(c => rows.reduce((a, k) => a + ((c.data || {})[k] || 0), 0));
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ borderCollapse: 'separate', borderSpacing: 2, fontSize: 10.5, ...mono }}>
+        <thead>
+          <tr>
+            <th style={{ position: 'sticky', left: 0, background: '#fff', textAlign: 'left', fontFamily: 'inherit', fontSize: 11, padding: '0 6px 0 0', zIndex: 1 }} />
+            {cols.map(c => <th key={c.key} style={{ fontWeight: 700, color: SUB, padding: '0 2px', whiteSpace: 'nowrap' }}>{c.label}</th>)}
+            <th style={{ fontWeight: 900, color: INK, padding: '0 4px', whiteSpace: 'nowrap' }}>{totalLabel}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(k => (
+            <tr key={k}>
+              <td style={{ position: 'sticky', left: 0, background: '#fff', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', padding: '0 8px 0 0', zIndex: 1 }}>{k}</td>
+              {cols.map(c => { const m = (c.data || {})[k] || 0; return <td key={c.key} title={c.label + ' ' + k + ' ' + Math.round(m) + '分'} style={{ ...cell(m, max), minWidth: 30, height: 24, textAlign: 'center', borderRadius: 4 }}>{fmtM(m)}</td>; })}
+              <td style={{ ...cell(tot[k], maxT), minWidth: 44, textAlign: 'center', borderRadius: 4, fontWeight: 700 }}>{fmtM(tot[k])}</td>
+            </tr>
+          ))}
+          <tr>
+            <td style={{ position: 'sticky', left: 0, background: '#fff', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 11.5, fontWeight: 900, padding: '4px 8px 0 0' }}>計</td>
+            {colTot.map((m, i) => <td key={i} style={{ textAlign: 'center', color: SUB, paddingTop: 4 }}>{fmtM(m)}</td>)}
+            <td style={{ textAlign: 'center', fontWeight: 900, paddingTop: 4 }}>{fmtM(colTot.reduce((a, b) => a + b, 0))}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style={{ fontSize: 10, color: MUTED, marginTop: 6 }}>数字は分（60分以上は h:mm）。色が濃いほど長い</div>
+    </div>
+  );
+}
+// 1人ぶん: 日ごと
+const heatDays = (days) => Object.keys(days || {}).sort().map(d => ({ key: d, label: md(d), data: days[d].screens || {} }));
+// 全員: 参加者ごとの合計
+const heatPeople = (parts) => parts.map(p => ({ key: p.code, label: p.code, data: Object.values(p.days || {}).reduce((acc, s) => { Object.entries(s.screens || {}).forEach(([k, m]) => { acc[k] = (acc[k] || 0) + m; }); return acc; }, {}) }));
 
 /* 全体の実行率: 行動ごとの実行率（100%で頭打ち）の平均。やりすぎた行動で、ほかの未達が隠れないように */
 function overallRate(days) {
@@ -368,6 +416,7 @@ export default function ResearchAdmin({ v }) {
                 <div style={card}><div style={h3}>1日の最高疲労度の比較</div><CompareFatigue parts={parts} sel={p && p.code} onSel={pick} /></div>
                 <div style={card}><div style={h3}>全体の実行率</div><CompareRate parts={parts} sel={p && p.code} onSel={pick} /><div style={{ fontSize: 10.5, color: MUTED, marginTop: 8, lineHeight: 1.6 }}>行動ごとの実行率（100%で頭打ち）の平均</div></div>
               </div>
+              <div style={{ ...card, marginBottom: 16 }}><div style={h3}>画面ごとの利用時間（全員・期間の合計）</div><Heat cols={heatPeople(parts)} totalLabel="全員" /></div>
               {p && (
                 <div style={card}>
                   {detailHead(p)}
@@ -384,6 +433,8 @@ export default function ResearchAdmin({ v }) {
                       <Adherence days={p.days} />
                     </div>
                   </div>
+                  <div style={{ ...h3, marginTop: 20 }}>画面ごとの利用時間（日ごと）</div>
+                  <Heat cols={heatDays(p.days)} />
                 </div>
               )}
             </>}
@@ -408,9 +459,13 @@ export default function ResearchAdmin({ v }) {
             <TypeDays days={p.days} />
           </div>
           <div style={{ ...card, marginBottom: 12 }}><div style={h3}>体調・気分の推移</div><CondMoodChart days={p.days} /></div>
-          <div style={card}><div style={h3}>実行率（実施／目標）</div><Adherence days={p.days} /></div>
+          <div style={{ ...card, marginBottom: 12 }}><div style={h3}>実行率（実施／目標）</div><Adherence days={p.days} /></div>
+          <div style={card}><div style={h3}>画面ごとの利用時間（日ごと）</div><Heat cols={heatDays(p.days)} /></div>
         </> : (
-          <div style={card}><div style={h3}>参加者（{parts.length}人）</div><PeopleTable parts={parts} sel={null} onSel={pick} /></div>
+          <>
+            <div style={{ ...card, marginBottom: 12 }}><div style={h3}>参加者（{parts.length}人）</div><PeopleTable parts={parts} sel={null} onSel={pick} /></div>
+            <div style={card}><div style={h3}>画面ごとの利用時間（全員）</div><Heat cols={heatPeople(parts)} totalLabel="全員" /></div>
+          </>
         ))}
       </div>
     </div>

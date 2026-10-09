@@ -63,7 +63,7 @@ function ResearchJoin({ v, onClose }) {
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: '#fff', borderRadius: '22px 22px 0 0', padding: '18px 20px calc(20px + env(safe-area-inset-bottom))' }}>
         <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>研究への協力</div>
         <div style={{ ...li, fontWeight: 800, color: '#55554e', fontSize: 11.5 }}>送るもの（数値だけ）</div>
-        <div style={li}>疲労度の推移・朝夜の記録（体調・気分・疲労度）・生活必須行動とやりたいことの実施回数・カテゴリ別の回数と時間</div>
+        <div style={li}>疲労度の推移・朝夜の記録（体調・気分・疲労度）・生活必須行動とやりたいことの実施回数・カテゴリ別の回数と時間・画面ごとの利用時間</div>
         <div style={{ ...li, fontWeight: 800, color: '#55554e', fontSize: 11.5, marginTop: 8 }}>送らないもの</div>
         <div style={li}>予定の名前・自分で作った行動の名前・メモなどの文章</div>
         <div style={{ ...li, marginTop: 8 }}>いつでもやめられ、送ったデータは削除できます。</div>
