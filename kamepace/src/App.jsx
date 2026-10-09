@@ -302,10 +302,44 @@ export default class App extends React.Component {
       changed: true,
     };
   }
+  /* 1日の区切りの不具合で、日付がずれて保存された記録を直す（何度実行しても同じ結果）
+     - 起床の記録が「今日（カレンダー）」より先の日付 → 今日に戻す（時刻はそのまま）
+     - その日の起床より前に押された就寝 → 前の日の就寝（前の日に就寝がなければ）
+     - 不具合のあいだに「今日より先の日付」で入った記録（予定ではないもの・起床の調整）→ 今日に戻す */
+  repairDayCut(dd) {
+    const cal = calendarTodayStr();
+    let changed = false;
+    const shift = (ts, from, to) => ts + (strToDate(to) - strToDate(from));
+    const wakeLog = (dd.wakeLog || []).map(w => {
+      if (w.date > cal) { changed = true; return { ...w, date: cal, ts: w.ts ? shift(w.ts, w.date, cal) : w.ts }; }
+      return w;
+    });
+    let bedLog = [...(dd.bedLog || [])];
+    let badFrom = null;
+    bedLog = bedLog.map(b => {
+      const w = wakeLog.find(x => x.date === b.date);
+      const prev = shiftDate(b.date, -1);
+      if (w && b.ts && w.ts && b.ts < w.ts && !bedLog.some(x => x.date === prev)) {
+        changed = true; badFrom = badFrom == null ? b.ts : Math.min(badFrom, b.ts);
+        return { ...b, date: prev };
+      }
+      return b;
+    });
+    const gidTs = (g) => { const n = g && /^g[0-9a-z]+$/.test(g) ? parseInt(g.slice(1), 36) : NaN; return isNaN(n) ? null : n; };
+    const entries = (dd.entries || []).map(e => {
+      if (!(e.date > cal) || e.planned || e.exp) return e;
+      const t = gidTs(e.gid);
+      if (e.wakeAdd || (badFrom != null && t != null && t >= badFrom)) { changed = true; return { ...e, date: cal }; }
+      return e;
+    });
+    return { data: changed ? { ...dd, wakeLog, bedLog, entries } : dd, changed };
+  }
   loadGuest() {
     let g = null;
     try { const s = localStorage.getItem('shaka_guest'); if (s) g = JSON.parse(s); } catch (e) { /* ignore */ }
-    const { data, changed } = this.refreshGuestSamples(deserialize(g));
+    const fixed = this.repairDayCut(deserialize(g));
+    const { data, changed: ch0 } = this.refreshGuestSamples(fixed.data);
+    const changed = ch0 || fixed.changed;
     this.set({ ...data, booted: true, screen: data.mainScreen || 'shaka' });
     if (changed) { this._pileLayout = null; this.save(); }
     // 直前（ログイン中）の物理エンジン・山を捨てて、ゲストのデータで組み直す
@@ -334,7 +368,8 @@ export default class App extends React.Component {
       // オンボ判定は「読み込んだデータ」で行う（this.set は非同期で this.state に即反映されないため）
       let onboardDone, hadData = false;
       if (data) {
-        const dd = deserialize(data);
+        const fixed = this.repairDayCut(deserialize(data)), dd = fixed.data;
+        if (fixed.changed) setTimeout(() => this.save(), 500);
         this.set({ ...dd, booted: true, screen: dd.mainScreen || 'shaka', dayOffset: 0 });
         onboardDone = dd.onboardDone;
         hadData = (dd.entries || []).some(e => !e.sample && !e._sample) || (dd.collected || []).length > 0;
@@ -1508,7 +1543,7 @@ export default class App extends React.Component {
       key: 'bed', kind: 'bed', sortHm: bedHm || '99:99', slot: 'yoru', glyph: '🌙',
       head: '就寝前の記録', time: hmText(bedHm), main: bd ? (bd.note || '') : '', empty: !bd,
       sumText: '', past: !!bd, cond: cond(bd),
-      onTap: this.goBed, onMenu: this.goBed,
+      onTap: () => this.goBed(d), onMenu: () => this.goBed(d),
     });
     // 就寝前の記録は薄くしない。就寝の記録をしたら、その日の記録はぜんぶ濃く
     posts.forEach(p => { if (p.kind === 'bed' || bd) p.past = false; });
@@ -1833,7 +1868,8 @@ export default class App extends React.Component {
   };
   /* 起床後記録: 1) 体調・気分・残りの疲労を入力 → 2) シャカで🌙が降って残りの量まで減る → 3) 昨日のふりかえり → 4) 今日の予定 */
   // 起床記録の日: 就寝を押し忘れて朝5時前に起きたときも、カレンダーの今日にする
-  wakeDay() { const t = todayStr(), c = calendarTodayStr(); return t < c && new Date().getHours() < 5 ? c : t; }
+  // 起床はいつもカレンダーの今日（就寝の記録が遅れて入っても、起床の日がずれないように）
+  wakeDay() { return calendarTodayStr(); }
   _enterWake() {
     // 今日すでに記録していれば、入力した内容をそのまま出す。起床時刻の初期値は「いま（この画面を開いた時刻）」、就寝は前回の就寝時刻（なければ23:00）
     const w = (this.state.wakeLog || []).find(x => x.date === this.wakeDay());
@@ -2706,12 +2742,27 @@ export default class App extends React.Component {
   /* 就寝記録が属する日。0時を過ぎて（〜朝5時前に）記録したときは、まだ前の日の夜として扱う（日またぎ対策） */
   bedDay() { return nightDayStr(); }
   /* 就寝記録: 1) 体調・気分・疲労度 → 2) シャカで山を合わせる → 3) 今日のがんばりタイプ。記録した時刻は翌朝の起床記録の就寝時刻になる */
-  goBed = () => { const b = (this.state.bedLog || []).find(x => x.date === this.bedDay()); this.set({ screen: 'bed1', bedDraft: b ? { cond: b.cond, mood: b.mood, fat: b.fatigue, note: b.note || '' } : { cond: null, mood: null, fat: null, note: '' }, bedFlow: false }); };
+  // day: どの日の就寝か（ホームで前の日を見て押したらその日。ふだんは今夜＝nightDayStr）
+  goBed = (day) => {
+    const d = typeof day === 'string' ? day : this.bedDay();
+    const b = (this.state.bedLog || []).find(x => x.date === d);
+    const past = d < this.bedDay();
+    this.set({ screen: 'bed1', bedTarget: d, bedFlow: false,
+      bedDraft: { ...(b ? { cond: b.cond, mood: b.mood, fat: b.fatigue, note: b.note || '' } : { cond: null, mood: null, fat: null, note: '' }), hm: past ? ((b && b.hm) || '23:30') : null } });
+  };
   setBedDraft = (k, val) => this.setState(prev => ({ bedDraft: { ...prev.bedDraft, [k]: val } }));
   finishBed1 = () => {
     const d = this.state.bedDraft;
     if (d.fat == null) return;
-    const today = this.bedDay(), now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    const today = this.state.bedTarget || this.bedDay(), now = new Date(), hm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    // 前の日の就寝をあとから記録: 時刻は入力したもの（0〜5時なら翌日の夜中）。いまの山は動かさず、ふりかえりへ
+    if (today < this.bedDay()) {
+      const bh = d.hm || '23:30', ts = hmToTsOn(today, bh < '05:00' ? this.addHm(bh, 1440) : bh);
+      const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts, hm: bh, cond: d.cond, mood: d.mood, fatigue: d.fat, note: (d.note || '').trim(), late: true }];
+      this.set({ bedLog, bedDay: today, bedFlow: false, screen: 'bed2' });
+      this.save();
+      return;
+    }
     const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts: now.getTime(), hm, cond: d.cond, mood: d.mood, fatigue: d.fat, note: (d.note || '').trim() }];
     this.applyFatigue(d.fat, '就寝時の疲労', { bedLog, bedFlow: true, bedDay: today }, today);
   };
@@ -4277,7 +4328,7 @@ export default class App extends React.Component {
       wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null,
       wakeHeader: (() => {
         if (!st.screen.startsWith('wake') && !st.screen.startsWith('bed')) return '';
-        const t = todayStr(), d = strToDate(t);
+        const t = st.screen.startsWith('bed') ? (st.bedTarget || st.bedDay || this.bedDay()) : this.wakeDay(), d = strToDate(t);
         const firsts = [...st.entries.filter(e => !e._sample).map(e => e.date), ...(st.wakeLog || []).map(w => w.date)].filter(Boolean).sort();
         const n = firsts.length ? Math.round((d - strToDate(firsts[0])) / 86400000) + 1 : 1;
         return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + '日月火水木金土'[d.getDay()] + '曜日 ' + Math.max(1, n) + '日目';
