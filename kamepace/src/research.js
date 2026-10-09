@@ -65,6 +65,7 @@ export function summarizeDay(st, d, carry = null, now = Date.now()) {
     fat, fatMax: mx, fatMin: mn, zone, type: typeOfCurve(curve).id,
     rec: list.length, plus, minus, cats, acts, freq,
     end: lv,
+    screens: Object.fromEntries(Object.entries((st.screenTime || {})[d] || {}).map(([k, sec]) => [k, Math.round(sec / 6) / 10])), // 画面ごとの利用時間（分・小数1桁）
   };
 }
 
@@ -123,7 +124,7 @@ const CAT_NAME = Object.fromEntries([...CATS.map(c => [c.id, c.name]), ['custom'
 
 /* parts = [{ code, days: { date: summary } }] */
 export function csvFiles(parts) {
-  const days = [], pts = [], acts = [], adh = [], cats = [];
+  const days = [], pts = [], acts = [], adh = [], cats = [], scr = [];
   parts.forEach(({ code, days: ds }) => {
     Object.keys(ds).sort().forEach(d => {
       const s = ds[d], w = s.wake || {}, b = s.bed || {};
@@ -131,6 +132,7 @@ export function csvFiles(parts) {
       (s.fat || []).forEach(p => pts.push([code, d, p.t, p.v]));
       Object.entries(s.acts || {}).forEach(([k, a]) => { const f = (s.freq || {})[k] || {}; acts.push([code, d, k, a.name, a.n, a.min, f.req ? freqText(f.req) : '', f.fav ? freqText(f.fav) : '']); });
       Object.entries(s.cats || {}).forEach(([k, c]) => cats.push([code, d, CAT_NAME[k] || k, c.n, c.min]));
+      Object.entries(s.screens || {}).forEach(([k, m]) => scr.push([code, d, k, m]));
     });
     adherence(ds).forEach(a => a.weeks.forEach(w => adh.push([code, w.week, a.key, a.name, a.kind === 'req' ? '生活必須行動' : 'やりたいこと', freqText(a.freq), w.target, w.done, w.rate == null ? '' : Math.round(w.rate * 1000) / 10])));
   });
@@ -140,6 +142,7 @@ export function csvFiles(parts) {
     '行動.csv': toCsv(['参加者', '日付', '行動ID', '行動名', '回数', '分', '生活必須行動の頻度', 'やりたいことの頻度'], acts),
     '週ごとの実行率.csv': toCsv(['参加者', '週の始まり(月)', '行動ID', '行動名', '種類', '頻度', '目標回数', '実施回数', '実行率(%)'], adh),
     'カテゴリ.csv': toCsv(['参加者', '日付', 'カテゴリ', '回数', '分'], cats),
+    '画面の利用時間.csv': toCsv(['参加者', '日付', '画面', '分'], scr),
   };
 }
 export function downloadText(name, text) {
@@ -168,6 +171,9 @@ const DEMO_PEOPLE = [
   { code: 'C04', base: 30, swing: 60, keep: 0.85, from: 14, to: 28 }, // 波が大きい
   { code: 'C05', base: 50, swing: 40, keep: 0.45, from: 14, to: 28 }, // みちみち・続きにくい
 ];
+// 画面の並び（ヒートマップの行）とデモの目安（分）
+export const SCREENS = ['ホーム', 'シャカ', '行動選択', '登録確認', '実行中', 'つぶやき', '起床の記録', '就寝の記録', '本棚', 'マイページ', 'ためた回復', 'オンボーディング', 'その他'];
+const SCREEN_BASE = [6, 4, 3, 2, 5, 1, 1, 1, 0.8, 0.6, 0.3, 0, 0.3];
 function rng(seed) { let a = 0; for (let i = 0; i < seed.length; i++) a = Math.imul(a ^ seed.charCodeAt(i), 2654435761); return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 export function demoParticipants(nDays = 28) {
   const today = new Date();
@@ -222,6 +228,7 @@ export function demoParticipants(nDays = 28) {
         bed: { t: t(bedMin), cond: 1 + Math.floor(r() * 5), mood: 1 + Math.floor(r() * 5), fatigue: bf },
         fat, fatMax: mx, fatMin: mn, zone, type,
         rec: fat.length - 2 + Object.values(acts).reduce((s, x) => s + x.n, 0), plus, minus, cats, acts, freq, end: bf,
+        screens: Object.fromEntries(SCREENS.map((k, i) => [k, Math.round((SCREEN_BASE[i] * (0.5 + r()) * (p.keep + 0.3)) * 10) / 10]).filter(x => x[1] > 0.2)),
       };
     });
     return { code: p.code, active: p.code !== 'C05', demo: true, updatedAt: Date.now() - pi * 3600000, days };

@@ -123,6 +123,7 @@ export function serialize(st) {
     trashedPlans: st.trashedPlans || [],   // ゴミ箱の予定 [{plan,src,trashedAt}]
     purgedPlanIds: st.purgedPlanIds || [], // 完全削除した標準予定の id
     purgedTaskIds: st.purgedTaskIds || [], // 手動で消した取り込みタスクの srcId（再取り込みしない）
+    screenTime: st.screenTime || {}, // 画面ごとの利用時間 { 日付: { 画面: 秒 } }（研究データ用）
     updatedAt: Date.now(),
   };
 }
@@ -186,6 +187,7 @@ export function deserialize(data) {
     trashedPlans: Array.isArray(data.trashedPlans) ? data.trashedPlans : [],
     purgedPlanIds: Array.isArray(data.purgedPlanIds) ? data.purgedPlanIds : [],
     purgedTaskIds: Array.isArray(data.purgedTaskIds) ? data.purgedTaskIds : [],
+    screenTime: (data.screenTime && typeof data.screenTime === 'object') ? data.screenTime : {},
   };
 }
 
@@ -197,7 +199,7 @@ export function freshState() {
     slotHours: null, hiddenCats: [], hiddenActs: [],
     onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null, wakeLog: [], bedLog: [], mainScreen: null,
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1,
-    bookFav: {}, bookDiary: {},
+    bookFav: {}, bookDiary: {}, screenTime: {},
     trashedPlans: [], purgedPlanIds: [], purgedTaskIds: [],
   };
 }
