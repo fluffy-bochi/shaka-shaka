@@ -55,7 +55,11 @@ const IS_IOS_DEVICE = typeof navigator !== 'undefined' && (
 export default class App extends React.Component {
   // 「今日」の区切り（就寝 or 朝5時）に就寝記録を使う
   // 起床の記録も「前の日はおわり」の合図にする（就寝を押し忘れて朝5時前に起きたとき）
-  _dayCut = setBedDatesSource(() => [...((this.state && this.state.bedLog) || []).map(b => b.date), ...((this.state && this.state.wakeLog) || []).map(w => shiftDate(w.date, -1))]);
+  // 昼間（その日の18時より前）に押された就寝は「その日のおわり」にしない（前の日の分をあとから入れたときなどに日付が進まないように）
+  _dayCut = setBedDatesSource(() => [
+    ...((this.state && this.state.bedLog) || []).filter(b => !b.ts || b.ts >= hmToTsOn(b.date, '18:00')).map(b => b.date),
+    ...((this.state && this.state.wakeLog) || []).map(w => shiftDate(w.date, -1)),
+  ]);
   state = {
     screen: 'shaka',
     /* ---- 同期されるデータ（旧本番互換） ---- */
@@ -326,10 +330,19 @@ export default class App extends React.Component {
       return b;
     });
     const gidTs = (g) => { const n = g && /^g[0-9a-z]+$/.test(g) ? parseInt(g.slice(1), 36) : NaN; return isNaN(n) ? null : n; };
+    // 昼間に押された就寝（前の日の分のつもり）: 前の日に就寝がなければ前の日へ
+    bedLog = bedLog.map(b => {
+      const prev = shiftDate(b.date, -1);
+      if (b.ts && b.ts < hmToTsOn(b.date, '18:00') && dateToStr(new Date(b.ts)) === b.date && !b.late && !bedLog.some(x => x.date === prev)) {
+        changed = true; badFrom = badFrom == null ? b.ts : Math.min(badFrom, b.ts);
+        return { ...b, date: prev };
+      }
+      return b;
+    });
+    // 今日より先の日付なのに予定になっていない記録は、日付がずれて入ったもの（正しくは先の日付は予定になる）→ 今日へ
     const entries = (dd.entries || []).map(e => {
       if (!(e.date > cal) || e.planned || e.exp) return e;
-      const t = gidTs(e.gid);
-      if (e.wakeAdd || (badFrom != null && t != null && t >= badFrom)) { changed = true; return { ...e, date: cal }; }
+      if (e.wakeAdd || gidTs(e.gid) != null) { changed = true; return { ...e, date: cal }; }
       return e;
     });
     return { data: changed ? { ...dd, wakeLog, bedLog, entries } : dd, changed };
