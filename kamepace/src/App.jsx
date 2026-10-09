@@ -751,36 +751,65 @@ export default class App extends React.Component {
     this.save();
   };
   /* ===== きもち・できごと ===== */
-  openMood = () => this.set({ moodOpen: true, moodId: null, moodStrength: 'b', moodNote: '' });
-  closeMood = () => this.set({ moodOpen: false });
-  pickMood = (id) => this.set({ moodId: id });
+  // 💬 きもち・できごと・体調（つぶやき）: きもちを選ばなくてもOK。アイコンは気分の顔5種から。体調・心の調子・体温も
+  openMood = () => this.set({ moodOpen: true, moodId: null, moodStrength: 'b', moodNote: '', moodFace: '🙂', moodCond: null, moodMind: null, moodTemp: '', moodAt: this.tsToHm(Date.now()) });
+  closeMood = () => this.set({ moodOpen: false, moodEditIdx: null });
+  // つぶやきの編集: 入れた内容で開き、記録で置きかえる
+  openMoodEdit = (i) => {
+    const e = this.state.entries[i]; if (!e) return;
+    const m = MOODS.find(x => x.name === e.moodLabel);
+    this.set({ moodOpen: true, moodEditIdx: i, moodId: m ? m.id : null, moodStrength: 'b', moodNote: e.note || '', moodFace: m ? '🙂' : (e.glyph || '🙂'),
+      moodCond: e.cond != null ? e.cond : null, moodMind: e.mindCond != null ? e.mindCond : null, moodTemp: e.temp != null ? String(e.temp) : '', moodAt: e.from || '' });
+  };
+  pickMood = (id) => this.set({ moodId: this.state.moodId === id ? null : id });
   pickMoodStrength = (key) => this.set({ moodStrength: key });
   onMoodNote = (e) => this.set({ moodNote: e.target.value });
   commitMood = () => {
-    const mood = MOODS.find(m => m.id === this.state.moodId);
-    if (!mood) return;
+    const st0 = this.state;
+    const mood = MOODS.find(m => m.id === st0.moodId) || null;
+    const temp = parseFloat(String(st0.moodTemp || '').replace(',', '.'));
+    if (!mood && !(st0.moodNote || '').trim() && st0.moodCond == null && st0.moodMind == null && isNaN(temp)) return;
     const base = (MOOD_STRENGTHS.find(x => x.key === this.state.moodStrength) || MOOD_STRENGTHS[1]).v;
-    const recover = mood.kind === 'good';
-    const isBody = mood.axis === 'body'; // あつい・さむい＝体、きもち＝心
+    const recover = !!mood && mood.kind === 'good';
+    const isBody = !!mood && mood.axis === 'body'; // あつい・さむい＝体、きもち＝心
     const bm = this.buffMult();
     // 体/心それぞれの個人係数×バフ×周期を掛ける
     const coef = recover
       ? (isBody ? (this.state.bodyRecCoef || 1) * bm.bodyRec : (this.state.mindRecCoef || 1) * bm.mindRec)
       : (isBody ? (this.state.bodyFatCoef || 1) * bm.bodyFat : (this.state.mindFatCoef || 1) * bm.mindFat);
     const val = Math.max(1, Math.round(base * coef));
-    const delta = recover ? -val : val;
+    const delta = !mood ? 0 : recover ? -val : val; // きもちを選ばないつぶやきは疲労に関係しない
     const recDate = this.homeDateStr();
     const slotId = this.state.slotId || this.slotNow();
     const slot = this.slotDef(slotId);
     const off = this.slotUsedMin(slotId);
     const note = (this.state.moodNote || '').trim();
-    const at = recDate === todayStr() ? this.tsToHm(Date.now()) : this.slotHm(slot, off); // 今日はいまの時刻
+    const at = st0.moodAt || (recDate === todayStr() ? this.tsToHm(Date.now()) : this.slotHm(slot, off)); // いまの時刻（変更可）
     const e = {
-      ...baseEntry(note || mood.name, delta, recDate),
-      glyph: mood.glyph, min: 0, mood: 'event', event: true, _new: true, moodLabel: mood.name, gid: 'g' + Date.now().toString(36),
-      slot: slotId, from: at, to: at,
+      ...baseEntry(note || (mood ? mood.name : 'つぶやき'), delta, recDate),
+      glyph: mood ? mood.glyph : (st0.moodFace || '🙂'), min: 0, mood: 'event', event: true, _new: !!delta, moodLabel: mood ? mood.name : 'つぶやき', gid: 'g' + Date.now().toString(36),
+      slot: this.slotOf({ from: at }), from: at, to: at,
     };
     if (note) e.note = note;
+    if (st0.moodCond != null) e.cond = st0.moodCond;
+    if (st0.moodMind != null) e.mindCond = st0.moodMind;
+    if (!isNaN(temp)) e.temp = Math.round(temp * 10) / 10;
+    // 編集: 元のつぶやきを置きかえる（まとまり・日付は引き継ぐ）
+    const editI = st0.moodEditIdx;
+    if (editI != null && this.state.entries[editI]) {
+      const old = this.state.entries[editI];
+      const ne = { ...e, gid: old.gid || e.gid, date: old.date, _new: false };
+      const entries = this.state.entries.map((x, k) => (k === editI ? ne : x));
+      this.set({ entries: sortEntries(entries), moodOpen: false, moodEditIdx: null, moodId: null, moodNote: '' });
+      this.save(); this.toast('へんこうしました');
+      return;
+    }
+    if (!delta) {
+      // 疲労の増減がないつぶやきはシャカに行かずホームに残る
+      this.set({ entries: sortEntries([...this.state.entries, e]), moodOpen: false, moodId: null, moodNote: '' });
+      this.save(); this.toast('つぶやきました');
+      return;
+    }
     const entries = sortEntries([...this.state.entries, e]);
     const immediate = delta > 0;
     this.set({
@@ -1512,6 +1541,19 @@ export default class App extends React.Component {
       if (!groups[k]) { groups[k] = []; order.push(k); }
       groups[k].push({ e, i });
     });
+    // 体調・心の調子の記録（起床・就寝・つぶやき）。前回の記録との差を矢印で
+    const condRecs = [
+      ...(st.wakeLog || []).map(w => ({ ts: w.ts, cond: w.cond, mood: w.mood })),
+      ...(st.bedLog || []).map(b => ({ ts: b.ts, cond: b.cond, mood: b.mood })),
+      ...st.entries.filter(e => !e.exp && e.event && (e.cond != null || e.mindCond != null) && e.from).map(e => ({ ts: entryStartTs(e), cond: e.cond, mood: e.mindCond })),
+    ].filter(x => x.ts).sort((a, b) => a.ts - b.ts);
+    const arrow0 = (cur, prev) => (cur == null || prev == null ? '' : cur > prev ? '↑' : cur < prev ? '↓' : '→');
+    const condOf = (rec) => {
+      if (!rec) return null;
+      const before = condRecs.filter(x => x.ts < rec.ts);
+      const pc = [...before].reverse().find(x => x.cond != null), pm = [...before].reverse().find(x => x.mood != null);
+      return { body: rec.cond, mind: rec.mood, temp: rec.temp, bodyArrow: arrow0(rec.cond, pc && pc.cond), mindArrow: arrow0(rec.mood, pm && pm.mood) };
+    };
     const sg = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0');
     const hmText = (hm) => (hm || '').replace(/^0(\d)/, '$1');
     const posts = order.map(k => {
@@ -1528,27 +1570,22 @@ export default class App extends React.Component {
       const sum = es.reduce((a, e) => a + (e.delta || 0), 0);
       const frame = es.length === 1 && first.needsSetup;
       const g = { idxs: list.map(x => x.i), title: label, glyph: entryGlyph(top), isPlan: !!first.plan && !first.gid, planName: first.plan || null, isFrame: frame, plan: first.plan };
+      const isTweet = es.length === 1 && first.event;
       return {
+        cond: isTweet && (first.cond != null || first.mindCond != null || first.temp != null) ? condOf({ ts: entryStartTs(first), cond: first.cond, mood: first.mindCond, temp: first.temp }) : null,
         key: k, sortHm: from, slot: this.slotOf(first),
         glyph: entryGlyph(top), head: note ? label : '', time: hmText(from), main: note || label,
-        sumText: frame ? '' : sg(sum), past: !!endTs && endTs < now, planned: es.some(e => e.planned),
+        sumText: frame || (isTweet && !sum) ? '' : sg(sum), past: !!endTs && endTs < now - (isTweet ? 30 * 60000 : 0), // つぶやきは30分たってから薄く planned: es.some(e => e.planned),
         frameHint: frame ? 'タップして行動を入れる' : '',
         items: es.length > 1 ? es.map(e => {
           const f = freq[normTitle(e.title)] || {};
           return { glyph: entryGlyph(e), name: e.title, sumText: sg(e.delta || 0), color: colorOf[e.title] || '#d8d5cb', req: !!f.req, fav: !!f.fav };
         }) : [],
-        onTap: () => (frame ? this.openFrameFill({ ...g, isPlan: true }) : this.openEditFlow(g)),
-        onMenu: () => this.openRecMenu(g),
+        onTap: () => (isTweet ? this.openMoodEdit(list[0].i) : frame ? this.openFrameFill({ ...g, isPlan: true }) : this.openEditFlow(g)),
+        onMenu: () => this.openRecMenu(isTweet ? { ...g, tweetIdx: list[0].i } : g),
       };
     });
-    // 起床・就寝（記録がなくても出す。タップで記録画面へ）。調子は前回の記録との差を矢印で
-    const logs = [...(st.wakeLog || []).map(w => ({ ...w, kind: 'wake' })), ...(st.bedLog || []).map(b => ({ ...b, kind: 'bed' }))].filter(x => x.ts).sort((a, b) => a.ts - b.ts);
-    const arrow = (cur, prev) => (cur == null || prev == null ? '' : cur > prev ? '↑' : cur < prev ? '↓' : '→');
-    const cond = (rec) => {
-      if (!rec) return null;
-      const prev = [...logs].reverse().find(x => x.ts < rec.ts);
-      return { body: rec.cond, mind: rec.mood, bodyArrow: arrow(rec.cond, prev && prev.cond), mindArrow: arrow(rec.mood, prev && prev.mood) };
-    };
+    // 起床・就寝（記録がなくても出す。タップで記録画面へ）
     const wk = (st.wakeLog || []).find(w => w.date === d);
     const bd = (st.bedLog || []).find(b => b.date === d);
     const moon = (st.collected || []).reduce((a, c) => (c.glyph === '🌙' && c.ts && dateToStr(new Date(c.ts)) === d) ? a + (c.amount || 1) : a, 0);
@@ -1557,13 +1594,13 @@ export default class App extends React.Component {
     posts.push({
       key: 'wake', kind: 'wake', sortHm: wakeHm || '00:00', slot: 'asa', glyph: '🌅',
       head: '起床後の記録', time: hmText(wakeHm), main: wk ? (wk.note || '') : '', empty: !wk,
-      sumText: moon ? '−' + moon : '', past: !!wk, cond: cond(wk && { ...wk, ts: wk.ts }),
+      sumText: moon ? '−' + moon : '', past: !!wk, cond: wk ? condOf({ ts: wk.ts, cond: wk.cond, mood: wk.mood }) : null,
       onTap: this.goSleep, onMenu: wk ? () => this.openRecMenu({ logKind: 'wake', logDate: d, title: '起床後の記録', glyph: '🌅' }) : this.goSleep,
     });
     posts.push({
       key: 'bed', kind: 'bed', sortHm: bedHm || '99:99', slot: 'yoru', glyph: '🌙',
       head: '就寝前の記録', time: hmText(bedHm), main: bd ? (bd.note || '') : '', empty: !bd,
-      sumText: '', past: !!bd, cond: cond(bd),
+      sumText: '', past: !!bd, cond: bd ? condOf({ ts: bd.ts, cond: bd.cond, mood: bd.mood }) : null,
       onTap: () => this.goBed(d), onMenu: bd ? () => this.openRecMenu({ logKind: 'bed', logDate: d, title: '就寝前の記録', glyph: '🌙' }) : () => this.goBed(d),
     });
     // 就寝前の記録は薄くしない。就寝の記録をしたら、その日の記録はぜんぶ濃く
@@ -2402,6 +2439,7 @@ export default class App extends React.Component {
     const g = this.state.recMenu;
     this.set({ recMenu: null });
     if (g && g.logKind) { if (g.logKind === 'wake') this.goSleep(); else this.goBed(g.logDate); return; }
+    if (g && g.tweetIdx != null) { this.openMoodEdit(g.tweetIdx); return; }
     if (g) (g.isFrame ? this.openFrameFill(g) : this.openEditFlow(g));
   };
   recMenuTrash = () => {
@@ -4633,7 +4671,14 @@ export default class App extends React.Component {
       moodNote: st.moodNote || '', onMoodNote: this.onMoodNote,
       moodChoices: MOODS.map(m => ({ id: m.id, glyph: m.glyph, name: m.name, kind: m.kind, axis: m.axis || 'mind', on: st.moodId === m.id, onPick: () => this.pickMood(m.id) })),
       moodStrengths: MOOD_STRENGTHS.map(x => ({ key: x.key, label: x.label, on: st.moodStrength === x.key, onPick: () => this.pickMoodStrength(x.key) })),
-      moodCanSave: !!st.moodId,
+      moodCanSave: !!st.moodId || !!(st.moodNote || '').trim() || st.moodCond != null || st.moodMind != null || !!String(st.moodTemp || '').trim(),
+      moodFace: st.moodFace || '🙂', moodFaces: ['😆', '🙂', '😐', '😟', '😫'].map(g => ({ g, on: (st.moodFace || '🙂') === g, onPick: () => this.set({ moodFace: g }) })),
+      moodIcon: (MOODS.find(m => m.id === st.moodId) || {}).glyph || st.moodFace || '🙂',
+      moodCond: st.moodCond, setMoodCond: (n) => this.set({ moodCond: st.moodCond === n ? null : n }),
+      moodMind: st.moodMind, setMoodMind: (n) => this.set({ moodMind: st.moodMind === n ? null : n }),
+      moodTemp: st.moodTemp || '', setMoodTemp: (t) => this.set({ moodTemp: t }),
+      moodAt: st.moodAt || '', setMoodAt: (t) => this.set({ moodAt: t }),
+      moodPicked: !!st.moodId,
       /* バフ・デバフ */
       buffOpen: !!st.buffOpen, openBuffs: this.openBuffs, closeBuffs: this.closeBuffs,
       activeBuffGlyphs: this.buffEntries().map(en => (BUFFS.find(b => b.id === en.id) || {}).glyph).filter(Boolean),

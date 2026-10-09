@@ -29,10 +29,11 @@ function Post({ p }) {
           {p.sumText && <span style={{ ...mono, fontSize: 13.5, fontWeight: 700, color: '#1b1b18', whiteSpace: 'nowrap' }}>{p.sumText}</span>}
         </div>
         {p.frameHint && <div style={{ fontSize: 10.5, color: '#9d9b91', marginTop: 2 }}>{p.frameHint}</div>}
-        {p.cond && (p.cond.body != null || p.cond.mind != null) && (
+        {p.cond && (p.cond.body != null || p.cond.mind != null || p.cond.temp != null) && (
           <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 13, color: '#1b1b18' }}>
             {p.cond.body != null && <span>💪{p.cond.body}<b style={{ marginLeft: 2 }}>{p.cond.bodyArrow}</b></span>}
             {p.cond.mind != null && <span>♡{p.cond.mind}<b style={{ marginLeft: 2 }}>{p.cond.mindArrow}</b></span>}
+            {p.cond.temp != null && <span>🌡{p.cond.temp}℃</span>}
           </div>
         )}
         {p.items && p.items.length > 0 && (

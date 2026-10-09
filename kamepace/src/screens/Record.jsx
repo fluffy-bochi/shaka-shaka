@@ -582,44 +582,73 @@ function NewActPopup({ v }) {
 
 /* ---- きもち・できごと popup（時間なしの心イベント） ---- */
 export function MoodPopup({ v }) {
+  // 💬 つぶやき（きもち・できごと・体調）: 登録画面と同じ見た目。時刻は「いま」（変えられる）。
+  // きもちは選ばなくてもOK（アイコンは気分の顔5種から）。体調・心の調子・体温も入れられる
+  const line = { border: 'none', borderBottom: '1px solid #1b1b18', background: 'transparent', outline: 'none', fontFamily: 'inherit', color: '#1b1b18', padding: '6px 4px', boxSizing: 'border-box' };
+  const lab = { fontSize: 12.5, fontWeight: 800, color: '#1b1b18', marginTop: 22 };
+  const chip = (on) => ({ display: 'inline-flex', alignItems: 'center', gap: 5, border: on ? '1.5px solid #1b1b18' : '1px solid #bab5a7', background: on ? '#1b1b18' : '#fcfaf3', color: on ? '#fff' : '#1b1b18', borderRadius: 14, padding: '4px 10px 4px 6px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' });
+  const scale = (val, onPick, names) => (
+    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <button key={n} onClick={() => onPick(n)} style={{ flex: 1, border: val === n ? '1.5px solid #1b1b18' : '1px solid #bab5a7', background: val === n ? '#1b1b18' : '#fcfaf3', color: val === n ? '#fff' : '#1b1b18', borderRadius: 10, padding: '6px 0 5px', cursor: 'pointer', fontFamily: 'inherit' }}>
+          <div style={{ ...mono, fontSize: 14, fontWeight: 700 }}>{n}</div>
+          <div style={{ fontSize: 9.5, fontWeight: 700, marginTop: 1 }}>{names[n - 1]}</div>
+        </button>
+      ))}
+    </div>
+  );
+  const mind = v.moodChoices.filter(m => m.axis !== 'body');
+  const body = v.moodChoices.filter(m => m.axis === 'body');
   return (
-    <div style={{ position: 'absolute', inset: 0, zIndex: 7, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div className="nos" style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: '#fff', borderRadius: '22px 22px 0 0', padding: '16px 18px 20px', boxShadow: '0 -12px 40px rgba(27,27,24,.3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 900, paddingLeft: 28 }}>きもち・できごと</div>
-          <button onClick={v.closeMood} style={{ width: 28, height: 28, background: 'none', border: 'none', fontSize: 18, color: '#55554e', cursor: 'pointer', flex: '0 0 auto' }}>✕</button>
+    <div style={{ position: 'absolute', inset: 0, zIndex: 7, background: '#f7f4ec', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px 4px' }}>
+        <button onClick={v.closeMood} aria-label="もどる" style={{ background: 'none', border: 'none', fontSize: 26, lineHeight: 1, color: '#1b1b18', cursor: 'pointer', padding: '0 2px' }}>‹</button>
+        <div style={{ fontSize: 15.5, fontWeight: 700, flex: 1 }}>きもち・できごと</div>
+        <button onClick={v.moodCanSave ? v.commitMood : undefined} style={{ border: 'none', borderRadius: 8, background: v.moodCanSave ? '#1b1b18' : '#aeaeae', color: '#fff', fontSize: 15, fontWeight: 700, padding: '7px 16px', cursor: v.moodCanSave ? 'pointer' : 'default', fontFamily: 'inherit' }}>記録</button>
+      </div>
+      <div className="nos" style={{ flex: 1, overflowY: 'auto', padding: '14px 40px 30px 44px' }}>
+        {/* アイコン＋時刻 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span style={{ flex: '0 0 auto' }}><Emo e={v.moodIcon} size={44} /></span>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 12.5, color: '#3d3d3d' }}>時刻</span>
+          <input type="time" value={hmIn(v.moodAt)} onChange={(e) => e.target.value && v.setMoodAt(hmOut(e.target.value, v.moodAt))} style={{ ...mono, fontSize: 14, fontWeight: 700, border: '1.5px solid #e4e1d8', borderRadius: 8, padding: '6px 6px', width: 84, boxSizing: 'border-box', textAlign: 'center', color: '#1b1b18', background: '#fcfaf3' }} />
         </div>
-        <div style={{ fontSize: 11.5, color: '#8a8a82', textAlign: 'center', marginTop: 6, lineHeight: 1.6 }}>きもちは心に、暑さ・寒さは体に効きます</div>
-        {(() => {
-          const moodBtn = (m) => (
-            <button key={m.id} onClick={m.onPick} style={{ display: 'flex', alignItems: 'center', gap: 8, border: m.on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: m.on ? '#fbfdf0' : '#fff', borderRadius: 12, padding: '11px 12px', fontSize: 13, fontWeight: m.on ? 900 : 700, color: '#1b1b18', cursor: 'pointer', textAlign: 'left' }}>
-              <Emo e={m.glyph} size={22} />
-              <span style={{ flex: 1, minWidth: 0 }}>{m.name}</span>
-              <span style={{ ...mono, fontSize: 9, background: m.kind === 'bad' ? '#ffe3ef' : '#eef7cc', color: m.kind === 'bad' ? '#a33e6d' : '#5a7500', borderRadius: 5, padding: '2px 6px' }}>{m.kind === 'bad' ? '＋' : '−'}</span>
-            </button>
-          );
-          const mind = v.moodChoices.filter(m => m.axis !== 'body');
-          const body = v.moodChoices.filter(m => m.axis === 'body');
-          return (<>
-            {/* きもち（心） */}
-            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>どんなきもち？<span style={{ fontSize: 10.5, color: '#9d9b91', fontWeight: 700, marginLeft: 6 }}>心</span></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>{mind.map(moodBtn)}</div>
-            {/* からだの感覚（暑さ・寒さ） */}
-            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>からだの感覚<span style={{ fontSize: 10.5, color: '#9d9b91', fontWeight: 700, marginLeft: 6 }}>体</span></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>{body.map(moodBtn)}</div>
-          </>);
-        })()}
-        {/* 強さ */}
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>どれくらい？</div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          {v.moodStrengths.map(x => (
-            <button key={x.key} onClick={x.onPick} style={{ flex: 1, textAlign: 'center', border: x.on ? '2px solid #1b1b18' : '1.5px solid #e4e1d8', background: x.on ? '#fbfdf0' : '#fff', borderRadius: 12, padding: '11px 0', fontSize: 13, fontWeight: x.on ? 900 : 700, cursor: 'pointer' }}>{x.label}</button>
-          ))}
+        {/* 気分の顔（きもちを選ばないときのアイコン） */}
+        {!v.moodPicked && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14 }}>
+            {v.moodFaces.map(f => (
+              <button key={f.g} onClick={f.onPick} style={{ width: 48, height: 48, borderRadius: '50%', border: f.on ? '2px solid #1b1b18' : '1px solid transparent', background: f.on ? '#fcfaf3' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><Emo e={f.g} size={32} /></button>
+            ))}
+          </div>
+        )}
+        <textarea value={v.moodNote} onChange={v.onMoodNote} placeholder="つぶやき……" rows={3}
+          style={{ ...line, display: 'block', width: '100%', marginTop: 12, resize: 'none', fontSize: 14, lineHeight: 1.55 }} />
+        {/* きもち・できごと（あれば） */}
+        <div style={lab}>きもち<span style={{ fontSize: 10.5, color: '#8a8a82', marginLeft: 6 }}>心・あれば</span></div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {mind.map(m => <button key={m.id} onClick={m.onPick} style={chip(m.on)}><Emo e={m.glyph} size={18} />{m.name}<span style={{ fontSize: 10, opacity: 0.7 }}>{m.kind === 'bad' ? '＋' : '−'}</span></button>)}
         </div>
-        {/* ひとこと（手入力・任意） */}
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, color: '#55554e' }}>ひとこと（任意）</div>
-        <textarea value={v.moodNote} onChange={v.onMoodNote} placeholder="例：発表がうまくいった／急なキャンセルでへこんだ" rows={2} style={{ width: '100%', marginTop: 8, background: '#efece3', border: 'none', borderRadius: 12, padding: '12px 14px', fontFamily: "'Zen Kaku Gothic New',sans-serif", fontSize: 14, color: '#1b1b18', boxSizing: 'border-box', outline: 'none', resize: 'none', lineHeight: 1.6 }} />
-        <button onClick={v.commitMood} disabled={!v.moodCanSave} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 14, background: v.moodCanSave ? '#c4f000' : '#e4e1d8', color: v.moodCanSave ? '#2f3a00' : '#a5a39a', fontWeight: 700, fontSize: 16, padding: 16, cursor: v.moodCanSave ? 'pointer' : 'default' }}>きろくする</button>
+        <div style={lab}>からだの感覚<span style={{ fontSize: 10.5, color: '#8a8a82', marginLeft: 6 }}>体・あれば</span></div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {body.map(m => <button key={m.id} onClick={m.onPick} style={chip(m.on)}><Emo e={m.glyph} size={18} />{m.name}<span style={{ fontSize: 10, opacity: 0.7 }}>＋</span></button>)}
+        </div>
+        {v.moodPicked && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+            {v.moodStrengths.map(x => <button key={x.key} onClick={x.onPick} style={{ ...chip(x.on), flex: 1, justifyContent: 'center', padding: '5px 0' }}>{x.label}</button>)}
+          </div>
+        )}
+        {/* 体調・心の調子・体温 */}
+        <div style={lab}>体調</div>
+        {scale(v.moodCond, v.setMoodCond, ['最悪', '悪い', 'ふつう', '良い', '絶好調'])}
+        <div style={lab}>心の調子</div>
+        {scale(v.moodMind, v.setMoodMind, ['最悪', '悪い', 'ふつう', '良い', '最高'])}
+        <div style={{ ...lab, display: 'flex', alignItems: 'center', gap: 10 }}>
+          体温
+          <input type="number" inputMode="decimal" step="0.1" value={v.moodTemp} onChange={(e) => v.setMoodTemp(e.target.value)} placeholder="36.5"
+            style={{ ...mono, width: 84, height: 36, boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 9, background: '#fcfaf3', textAlign: 'center', fontSize: 15, fontWeight: 700, color: '#1b1b18' }} />
+          <span style={{ fontWeight: 700 }}>℃</span>
+        </div>
       </div>
     </div>
   );
