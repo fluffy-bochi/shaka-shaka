@@ -633,9 +633,19 @@ export function MoodPopup({ v }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
           {body.map(m => <button key={m.id} onClick={m.onPick} style={chip(m.on)}><Emo e={m.glyph} size={18} />{m.name}<span style={{ fontSize: 10, opacity: 0.7 }}>＋</span></button>)}
         </div>
-        {v.moodPicked && (
+        {v.moodIdPicked && (
           <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
             {v.moodStrengths.map(x => <button key={x.key} onClick={x.onPick} style={{ ...chip(x.on), flex: 1, justifyContent: 'center', padding: '5px 0' }}>{x.label}</button>)}
+          </div>
+        )}
+        {/* 体調・症状（頭痛など。つらさで疲れやすさのデバフがつく） */}
+        <div style={lab}>体調・症状<span style={{ fontSize: 10.5, color: '#8a8a82', marginLeft: 6 }}>あれば</span></div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {v.moodSyms.map(m => <button key={m.id} onClick={m.onPick} style={chip(m.on)}><Emo e={m.glyph} size={18} />{m.name}</button>)}
+        </div>
+        {v.moodSymPicked && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+            {v.moodSymLvs.map(x => <button key={x.label} onClick={x.onPick} style={{ ...chip(x.on), flex: 1, justifyContent: 'center', padding: '5px 0' }}>{x.label}</button>)}
           </div>
         )}
         {/* 体調・心の調子・体温 */}

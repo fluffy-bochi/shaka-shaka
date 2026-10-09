@@ -52,6 +52,10 @@ const IS_IOS_DEVICE = typeof navigator !== 'undefined' && (
   (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
 );
 
+// 行動選択・設定・検索から消したカテゴリ（体調・症状は💬つぶやきで記録）
+const PICK_REMOVED_CATS = ['health'];
+const REMOVED_NAMES = new Set((CATS.find(c => c.id === 'health') || { items: [] }).items.map(t => t.name));
+
 export default class App extends React.Component {
   // 「今日」の区切り（就寝 or 朝5時）に就寝記録を使う
   // 起床の記録も「前の日はおわり」の合図にする（就寝を押し忘れて朝5時前に起きたとき）
@@ -552,7 +556,7 @@ export default class App extends React.Component {
   hiddenActSet() { return new Set([...(this.state.hiddenActs || []).map(n => normTitle(n)), ...this.profileExcl()]); }
   searchPool() {
     const hidden = this.hiddenActSet();
-    return SEARCH_DB.concat(this.state.customActions || []).filter(e => !hidden.has(normTitle(e.name)));
+    return SEARCH_DB.concat(this.state.customActions || []).filter(e => !hidden.has(normTitle(e.name)) && !REMOVED_NAMES.has(e.name));
   }
   /* 前回つかった時間（行動名ごとに学習）。あれば標準所要時間より優先 */
   lastMinOf(name) {
@@ -752,14 +756,14 @@ export default class App extends React.Component {
   };
   /* ===== きもち・できごと ===== */
   // 💬 きもち・できごと・体調（つぶやき）: きもちを選ばなくてもOK。アイコンは気分の顔5種から。体調・心の調子・体温も
-  openMood = () => this.set({ moodOpen: true, moodId: null, moodStrength: 'b', moodNote: '', moodFace: '🙂', moodCond: null, moodMind: null, moodTemp: '', moodAt: this.tsToHm(Date.now()) });
+  openMood = () => this.set({ moodOpen: true, moodId: null, moodStrength: 'b', moodNote: '', moodFace: '🙂', moodCond: null, moodMind: null, moodTemp: '', moodAt: this.tsToHm(Date.now()), moodSym: null, moodSymLv: 1 });
   closeMood = () => this.set({ moodOpen: false, moodEditIdx: null });
   // つぶやきの編集: 入れた内容で開き、記録で置きかえる
   openMoodEdit = (i) => {
     const e = this.state.entries[i]; if (!e) return;
     const m = MOODS.find(x => x.name === e.moodLabel);
     this.set({ moodOpen: true, moodEditIdx: i, moodId: m ? m.id : null, moodStrength: 'b', moodNote: e.note || '', moodFace: m ? '🙂' : (e.glyph || '🙂'),
-      moodCond: e.cond != null ? e.cond : null, moodMind: e.mindCond != null ? e.mindCond : null, moodTemp: e.temp != null ? String(e.temp) : '', moodAt: e.from || '' });
+      moodCond: e.cond != null ? e.cond : null, moodMind: e.mindCond != null ? e.mindCond : null, moodTemp: e.temp != null ? String(e.temp) : '', moodAt: e.from || '', moodSym: e.symId || null, moodSymLv: e.level != null ? e.level : 1 });
   };
   pickMood = (id) => this.set({ moodId: this.state.moodId === id ? null : id });
   pickMoodStrength = (key) => this.set({ moodStrength: key });
@@ -768,7 +772,8 @@ export default class App extends React.Component {
     const st0 = this.state;
     const mood = MOODS.find(m => m.id === st0.moodId) || null;
     const temp = parseFloat(String(st0.moodTemp || '').replace(',', '.'));
-    if (!mood && !(st0.moodNote || '').trim() && st0.moodCond == null && st0.moodMind == null && isNaN(temp)) return;
+    const symIt = st0.moodSym ? this.allItems().find(t => t.id === st0.moodSym) : null;
+    if (!mood && !symIt && !(st0.moodNote || '').trim() && st0.moodCond == null && st0.moodMind == null && isNaN(temp)) return;
     const base = (MOOD_STRENGTHS.find(x => x.key === this.state.moodStrength) || MOOD_STRENGTHS[1]).v;
     const recover = !!mood && mood.kind === 'good';
     const isBody = !!mood && mood.axis === 'body'; // あつい・さむい＝体、きもち＝心
@@ -794,6 +799,15 @@ export default class App extends React.Component {
     if (st0.moodCond != null) e.cond = st0.moodCond;
     if (st0.moodMind != null) e.mindCond = st0.moodMind;
     if (!isNaN(temp)) e.temp = Math.round(temp * 10) / 10;
+    // 体調・症状（頭痛など）: つらさに合わせた疲労＋自動デバフ。きもちを選んでいなければ、このつぶやき自体を症状の記録にする
+    let symEntry = null;
+    if (symIt) {
+      const lv = st0.moodSymLv != null ? st0.moodSymLv : 1;
+      const sd = this.effFat({ ...symIt, picks: [lv] }, symIt.defMin || 60);
+      const symF = { symptom: true, symId: symIt.id, level: lv, buffLv: symIt.buffLv };
+      if (!mood) { Object.assign(e, symF, { delta: sd, glyph: symIt.glyph, moodLabel: symIt.name, title: note || symIt.name, _new: true }); symEntry = e; }
+      else symEntry = { ...baseEntry(symIt.name, sd, recDate), ...symF, glyph: symIt.glyph, min: 0, mood: 'event', event: true, _new: true, moodLabel: symIt.name, gid: e.gid, slot: e.slot, from: at, to: at };
+    }
     // 編集: 元のつぶやきを置きかえる（まとまり・日付は引き継ぐ）
     const editI = st0.moodEditIdx;
     if (editI != null && this.state.entries[editI]) {
@@ -804,22 +818,27 @@ export default class App extends React.Component {
       this.save(); this.toast('へんこうしました');
       return;
     }
-    if (!delta) {
+    const adds = [e, ...(symEntry && symEntry !== e ? [symEntry] : [])];
+    const sym = symEntry ? this.applySymptomEffects([symEntry], recDate, e.slot) : null;
+    if (sym && sym.extraEntries.length) adds.push(...sym.extraEntries);
+    const symPatch = sym ? { activeBuffs: sym.activeBuffs } : {};
+    const totalDelta = adds.reduce((a, x) => a + (x.delta || 0), 0);
+    if (!totalDelta) {
       // 疲労の増減がないつぶやきはシャカに行かずホームに残る
-      this.set({ entries: sortEntries([...this.state.entries, e]), moodOpen: false, moodId: null, moodNote: '' });
+      this.set({ entries: sortEntries([...this.state.entries, ...adds]), moodOpen: false, moodId: null, moodNote: '', moodSym: null, ...symPatch });
       this.save(); this.toast('つぶやきました');
       return;
     }
-    const entries = sortEntries([...this.state.entries, e]);
-    const immediate = delta > 0;
+    const entries = sortEntries([...this.state.entries, ...adds]);
     this.set({
+      ...symPatch, moodSym: null,
       entries, moodOpen: false, moodId: null, moodNote: '',
       screen: 'shaka', dayOffset: 0,
-      toast: isBody ? 'からだを記録' : (recover ? 'きもちを記録（回復）' : 'きもちを記録'),
+      toast: symIt && !mood ? '体調を記録' : isBody ? 'からだを記録' : (recover ? 'きもちを記録（回復）' : 'きもちを記録'),
     });
     this.save();
     this.stopPhysics();
-    if (delta < 0) this._pendingNeg = [...(this._pendingNeg || []), mood.glyph];
+    if (delta < 0 && mood) this._pendingNeg = [...(this._pendingNeg || []), mood.glyph];
     requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
     clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1600);
   };
@@ -1036,7 +1055,7 @@ export default class App extends React.Component {
     // コピー元候補は「全カテゴリの行動」から選べる（他のカテゴリの似た行動も参照できる）。
     // 追加先カテゴリ(newActCatId)とは独立。非表示にした行動は候補から除く。
     const hidden = this.hiddenActSet();
-    return this.allItems().filter(it => !hidden.has(normTitle(it.name)));
+    return this.allItems().filter(it => !hidden.has(normTitle(it.name)) && !REMOVED_NAMES.has(it.name));
   }
   addNewAction = (kwIndex, name) => {
     const visible = this.allCats().filter(c => !(this.state.hiddenCats || []).includes(c.id));
@@ -4146,7 +4165,8 @@ export default class App extends React.Component {
       ] },
       // 右の目のボタン（pickShowHidden）で「表示中の行動」⇄「非表示の行動」を切り替える。
       // 非表示の行動を見ているときは、非表示のカテゴリ（中身ごと）と、非表示にした行動だけを出す
-      ...this.allCats().filter(c => {
+      // 体調・症状は行動選択から外した（ホームの💬つぶやきで記録する）
+      ...this.allCats().filter(c => !PICK_REMOVED_CATS.includes(c.id)).filter(c => {
         const ch = (st.hiddenCats || []).includes(c.id);
         if (!st.pickShowHidden) return !ch;
         return ch || c.items.some(t => hiddenActs0.has(normTitle(t.name)) && !excl0.has(normTitle(t.name)));
@@ -4170,9 +4190,6 @@ export default class App extends React.Component {
           ...(st.pickShowHidden ? [] : [{ key: 'copy:' + c.id, kind: 'copy', name: 'にているものをコピーして作る', glyph: '➕', onStart: () => { this.set({ catId: c.id }); this.openActAdd(); } }]),
         ],
       })),
-      { id: '__mood', name: 'きもち', color: this.catColor('#d97aa6'), ink: catInk, glyph: '💭', items: [
-        { key: 'mood', kind: 'mood', name: 'きもち・できごと', glyph: '💭', meta: '時間なしで記録', onStart: this.openMood },
-      ] },
     ].filter(c => !st.pickShowHidden || !c.id.startsWith('__')); // 非表示の行動を見ているときは、予定・きもち（隠せない）は出さない
     const plans = this.allPlans().map(p => { const m = this.planMeta(p); return { id: p.id, name: p.name, meta: m.metaText, onOpen: () => this.openPlan(p.id), onTrash: () => this.trashPlan(p.id) }; });
     const detailPlan = st.planDetailId ? this.planById(st.planDetailId) : null;
@@ -4350,7 +4367,7 @@ export default class App extends React.Component {
     const slotTimesSub = sh.map(x => x).join(' / ');
     const hiddenActSet = this.hiddenActSet();
     const customItemsById = st.customItems || {};
-    const catRows = this.allCats().map(c => {
+    const catRows = this.allCats().filter(c => !PICK_REMOVED_CATS.includes(c.id)).map(c => {
       const hidden = hiddenCats.includes(c.id);
       const isCustom = (st.customCats || []).some(x => x.id === c.id);
       const customIds = new Set((customItemsById[c.id] || []).map(it => it.id));
@@ -4475,7 +4492,7 @@ export default class App extends React.Component {
       ].map(o => ({ ...o, on: Math.abs((cur || 1) - o.v) < 0.001, onPick: () => this.onCycField(k, o.v) })),
       obStep: st.obStep || 1, obSel: st.obSel || {},
       obPick: this.obPick, obToggle: this.obToggle, obNext: this.obNext, obBack: this.obBack,
-      obCats: st.screen === 'onboard' ? this.allCats().map(c => ({ id: c.id, name: c.name, glyph: c.glyph || '⭐', items: c.items.map(t => ({ name: t.name, glyph: t.glyph })) })) : [],
+      obCats: st.screen === 'onboard' ? this.allCats().filter(c => !PICK_REMOVED_CATS.includes(c.id)).map(c => ({ id: c.id, name: c.name, glyph: c.glyph || '⭐', items: c.items.map(t => ({ name: t.name, glyph: t.glyph })) })) : [],
       skipOnboard: this.skipOnboard, finishOnboard: this.finishOnboard,
       redoOnboard: () => this.set({ screen: 'onboard', obStep: 1, obSel: {} }),
       obIsFemale: (st.obSel && st.obSel.gender) === '女性',
@@ -4703,14 +4720,17 @@ export default class App extends React.Component {
       moodNote: st.moodNote || '', onMoodNote: this.onMoodNote,
       moodChoices: MOODS.map(m => ({ id: m.id, glyph: m.glyph, name: m.name, kind: m.kind, axis: m.axis || 'mind', on: st.moodId === m.id, onPick: () => this.pickMood(m.id) })),
       moodStrengths: MOOD_STRENGTHS.map(x => ({ key: x.key, label: x.label, on: st.moodStrength === x.key, onPick: () => this.pickMoodStrength(x.key) })),
-      moodCanSave: !!st.moodId || !!(st.moodNote || '').trim() || st.moodCond != null || st.moodMind != null || !!String(st.moodTemp || '').trim(),
+      moodCanSave: !!st.moodId || !!st.moodSym || !!(st.moodNote || '').trim() || st.moodCond != null || st.moodMind != null || !!String(st.moodTemp || '').trim(),
       moodFace: st.moodFace || '🙂', moodFaces: ['😆', '🙂', '😐', '😟', '😫'].map(g => ({ g, on: (st.moodFace || '🙂') === g, onPick: () => this.set({ moodFace: g }) })),
-      moodIcon: (MOODS.find(m => m.id === st.moodId) || {}).glyph || st.moodFace || '🙂',
+      moodIcon: (MOODS.find(m => m.id === st.moodId) || {}).glyph || (st.moodSym && (this.allItems().find(t => t.id === st.moodSym) || {}).glyph) || st.moodFace || '🙂',
+      // 体調・症状（行動選択から外して、つぶやきで記録する）
+      moodSyms: st.moodOpen ? ((CATS.find(c => c.id === 'health') || { items: [] }).items.filter(t => !this.profileExcl().has(normTitle(t.name))).map(t => ({ id: t.id, glyph: t.glyph, name: t.name, on: st.moodSym === t.id, onPick: () => this.set({ moodSym: st.moodSym === t.id ? null : t.id }) }))) : [],
+      moodSymLv: st.moodSymLv != null ? st.moodSymLv : 1, moodSymLvs: ['軽い', 'ふつう', '強い'].map((l, i) => ({ label: l, on: (st.moodSymLv != null ? st.moodSymLv : 1) === i, onPick: () => this.set({ moodSymLv: i }) })), moodSymPicked: !!st.moodSym,
       moodCond: st.moodCond, setMoodCond: (n) => this.set({ moodCond: st.moodCond === n ? null : n }),
       moodMind: st.moodMind, setMoodMind: (n) => this.set({ moodMind: st.moodMind === n ? null : n }),
       moodTemp: st.moodTemp || '', setMoodTemp: (t) => this.set({ moodTemp: t }),
       moodAt: st.moodAt || '', setMoodAt: (t) => this.set({ moodAt: t }),
-      moodPicked: !!st.moodId,
+      moodPicked: !!st.moodId || !!st.moodSym, moodIdPicked: !!st.moodId,
       /* バフ・デバフ */
       buffOpen: !!st.buffOpen, openBuffs: this.openBuffs, closeBuffs: this.closeBuffs,
       activeBuffGlyphs: this.buffEntries().map(en => (BUFFS.find(b => b.id === en.id) || {}).glyph).filter(Boolean),
