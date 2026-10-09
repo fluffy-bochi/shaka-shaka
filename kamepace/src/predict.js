@@ -37,7 +37,7 @@ export function consumedToday(collected, dateOf) {
   const out = [];
   Object.keys(byTs).forEach((ts) => {
     if (!dateOf(Number(ts))) return;
-    byTs[ts].forEach((c, i) => { if (i % 2 === 1) out.push({ ts: Number(ts), g: c.glyph }); });
+    byTs[ts].forEach((c, i) => { if (i % 2 === 1) out.push({ ts: Number(ts), g: c.glyph, rg: byTs[ts][i - 1].glyph }); }); // rg＝消した回復の絵文字
   });
   return out.sort((a, b) => b.ts - a.ts);
 }

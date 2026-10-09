@@ -3416,6 +3416,7 @@ export default class App extends React.Component {
     return { predictT: this._initPredict(off) };
   }
   openPredict = () => {
+    this._predSimTouched = false;
     const now = this._initPredict(this.state.dayOffset);
     this.set({ predictOpen: true, predictT: now });
     // 既存の未来予定（灰色）は外して、予測の時刻に合わせて足し直す
@@ -3427,6 +3428,7 @@ export default class App extends React.Component {
     this._applyPredict(now);
   };
   closePredict = () => {
+    if (this._predSimTouched) { this._predSimTouched = false; this.set({ predictOpen: false }); this._pred = null; this._predToday = null; this._predRest = null; this._pileLayout = null; this.rebuildPhysics(); return; }
     // 過去や未来の時刻のまま閉じても、現在に戻すときと同じ動きで絵文字を元に戻す
     // （外れていた絵文字は上から落ちて戻り、薄くしていたものも戻る）
     if (this.engine && this._pred) {
@@ -3443,6 +3445,8 @@ export default class App extends React.Component {
   };
   _applyPredict(T) {
     if (!this.engine || !this._pred) return;
+    // 過去の再生で回復を降らせて消した（シミュレーション）あと、いま以降に戻ったら、実際の山に組み直す
+    if (this._predSimTouched && T >= Date.now() - 60000) { this._predSimTouched = false; this._pileLayout = null; this.rebuildPhysics(); return; }
     const { World, Bodies } = Matter;
     const el = document.getElementById('shakacase'); if (!el) return;
     this.predBodies = this.predBodies || [];
@@ -3474,7 +3478,7 @@ export default class App extends React.Component {
     const hideN = Math.max(0, pastHide(this._predToday, T) - pastHide(this._predToday, Date.now()));
     const restList = (this._predRest || []).filter(x => x.ts > T);
     const past = { hide: hideN, restore: restList.length };
-    const solidAll = this.bodies.filter(b => !b.gray);
+    const solidAll = this.bodies.filter(b => !b.gray && !b.simHit);
     // 未来で消える回復ぶんも、薄くせずに外す（過去で外す分と同じ扱い）
     const negK = T > Date.now() ? this._pred.neg.filter(u => u.t <= T).length : 0;
     const M = Math.min(past.hide + negK, solidAll.length);
@@ -3494,13 +3498,35 @@ export default class App extends React.Component {
     });
     this.restBodies = this.restBodies || [];
     const wantRest = Math.min(60, past.restore);
-    while (this.restBodies.length > wantRest) {
-      const rb = this.restBodies.pop();
-      try { World.remove(this.engine.world, rb.body); } catch (e) { /* noop */ }
-      rb.el.remove(); this.bodies = this.bodies.filter(b => b !== rb);
+    // 回復ぶん: 時間を進めて回復の時刻を過ぎたら、上から回復を降らせて当たった絵文字を消す（シミュレーション）。
+    // 戻したら、消えた絵文字を上から戻す
+    const simHit = this.bodies.filter(b => b.simHit);
+    const pendingSim = (this.negBodies || []).filter(n => n.sim && !n.consumed);
+    let eff = this.restBodies.length - simHit.length - pendingSim.length;
+    if (eff > wantRest) {
+      this._predSimTouched = true;
+      const crossed = (this._predRest || []).filter(x => x.ts <= T).sort((a, b) => b.ts - a.ts); // いちばん最近に起きた回復から
+      this.dropNegativeBodies(Array.from({ length: eff - wantRest }, (_, k) => (crossed[k] && crossed[k].rg) || '🌙'), true);
+      eff = wantRest;
     }
-    while (this.restBodies.length < wantRest) {
-      const g = restList[this.restBodies.length].g || '😮‍💨';
+    if (eff < wantRest) {
+      let need = wantRest - eff;
+      // まだ降っている途中のシミュレーションを取り消す
+      pendingSim.slice(0, need).forEach(n => { n.consumed = true; try { World.remove(this.engine.world, n.body); } catch (e) { /* noop */ } n.el.remove(); need--; });
+      this.negBodies = (this.negBodies || []).filter(n => !n.consumed);
+      // シミュレーションで消した絵文字を上から戻す
+      simHit.slice(0, need).forEach(b => {
+        const nx = r0 + Math.random() * (W0 - 2 * r0), ny = this._spawnY(r0, rect0.height || 700);
+        Matter.Body.setPosition(b.body, { x: nx, y: ny }); Matter.Body.setVelocity(b.body, { x: 0, y: 0 });
+        b.el.style.transition = ''; b.el.style.transform = `translate(${nx - r0}px, ${ny - r0}px)`;
+        World.add(this.engine.world, b.body); b.el.style.opacity = ''; b.hidden = false; b.simHit = false; need--;
+      });
+      if (need > 0) this.resumeMotion();
+      eff = wantRest - need;
+    }
+    const addN = Math.max(0, wantRest - (this.restBodies.length - this.bodies.filter(b => b.simHit).length - (this.negBodies || []).filter(n => n.sim && !n.consumed).length));
+    for (let k = 0; k < addN; k++) {
+      const g = (restList[(this.restBodies.length) % Math.max(1, restList.length)] || {}).g || '😮‍💨';
       const r = this.PR;
       const body = Bodies.circle(r + Math.random() * (W0 - 2 * r), this._spawnY(r, rect0.height || 700), r, this.BODY_OPTS);
       World.add(this.engine.world, body);
@@ -3537,24 +3563,27 @@ export default class App extends React.Component {
     if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
   }
   /* ---- マイナス（回復）絵文字: 降らせて、プラスに触れたら両方消して「ためた回復」へ ---- */
-  dropNegativeBodies(glyphs) {
+  // sim: 予測（過去の再生）用のシミュレーション。当たった絵文字を消すが、記録（consumed・ためた回復）は変えない
+  dropNegativeBodies(glyphs, sim) {
     if (!glyphs || !glyphs.length) return;
     const el = document.getElementById('shakacase');
     if (!this.engine || !el) {
+      if (sim) return;
       // シャカ画面が開いていなければ、次に開いたときに降らせる
       this._pendingNeg = [...(this._pendingNeg || []), ...glyphs];
       return;
     }
     // 回復落下中は傾き(ジャイロ)を無視して重力を真下に固定
     this._recoverUntil = Date.now() + 6000;
-    if (this.state.gyroMode) { this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2; this._scheduleGyroRebuild(); }
+    if (this.state.gyroMode && !sim) { this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2; this._scheduleGyroRebuild(); }
     const { World, Bodies } = Matter;
     const rect = el.getBoundingClientRect();
     const W = rect.width || 350, H = rect.height || 700, r = this.PR;
     this.resumeMotion();
     glyphs.slice(0, 160).forEach(g => {
       const x = r + Math.random() * (W - 2 * r);
-      const y = -r - Math.random() * (H * 0.6);
+      // シミュレーションは箱の中（画面の上のほう）から落とす（傾きモードは上にふたがあるため）
+      const y = sim ? (this._lidY || 0) + r + Math.random() * r * 4 : -r - Math.random() * (H * 0.6);
       const body = Bodies.circle(x, y, r, this.BODY_OPTS);
       body.isNegative = true;
       World.add(this.engine.world, body);
@@ -3566,7 +3595,7 @@ export default class App extends React.Component {
       d.style.fontSize = Math.round(r * 1.6) + 'px';
       appendGlyph(d, g, Math.round(r * 1.9));
       el.appendChild(d);
-      const neg = { body, el: d, consumed: false, glyph: g };
+      const neg = { body, el: d, consumed: false, glyph: g, sim: !!sim };
       this.negBodies.push(neg);
       // 30秒ぶつからなければフェードアウト（旧本番と同じ）
       setTimeout(() => {
@@ -3596,10 +3625,22 @@ export default class App extends React.Component {
         const pos = this.bodies[pi];
         const dx = np.x - pos.body.position.x, dy = np.y - pos.body.position.y;
         if (dx * dx + dy * dy < hitDist2) {
+          if (pos.hidden) continue;
           const cx = (np.x + pos.body.position.x) / 2, cy = (np.y + pos.body.position.y) / 2;
           Matter.World.remove(this.engine.world, pos.body);
           Matter.World.remove(this.engine.world, neg.body);
           neg.consumed = true;
+          if (neg.sim) {
+            // 予測のシミュレーション: 戻した絵文字なら取りのぞく、もとからある絵文字なら隠すだけ（記録は変えない）
+            if (pos.predRest) { this.bodies.splice(pi, 1); this.restBodies = (this.restBodies || []).filter(b => b !== pos); }
+            else { pos.hidden = true; pos.simHit = true; }
+            pos.el.style.transition = 'opacity .15s'; pos.el.style.opacity = '0';
+            neg.el.style.transition = 'opacity .15s'; neg.el.style.opacity = '0';
+            if (el) { const fx = document.createElement('div'); fx.className = 'pop-fx'; fx.style.left = cx + 'px'; fx.style.top = cy + 'px'; el.appendChild(fx); setTimeout(() => fx.remove(), 450); }
+            const ne = neg.el, pe = pos.predRest ? pos.el : null;
+            setTimeout(() => { ne.remove(); if (pe) pe.remove(); }, 400);
+            break;
+          }
           this.bodies.splice(pi, 1);
           collectedAdd.push(neg.glyph, pos.glyph || pos.el.textContent); // 使った回復＋消えたプラスの記録
           hits++;
