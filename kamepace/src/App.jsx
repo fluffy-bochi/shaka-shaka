@@ -345,6 +345,12 @@ export default class App extends React.Component {
       if (e.wakeAdd || gidTs(e.gid) != null) { changed = true; return { ...e, date: cal }; }
       return e;
     });
+    // 終わりがまだ先なのに予定になっていない記録（日付がずれていたときに入れた予定）→ 予定にして時間どおりに降らせる
+    const nowTs = Date.now();
+    entries.forEach((e, i) => {
+      if (e.planned || e.exp || e.wakeAdd || e.needsSetup || !e.delta || !e.from || !e.to || !e.gid) return;
+      if (entryEndTs(e) > nowTs && entryStartTs(e) < entryEndTs(e)) { changed = true; entries[i] = { ...e, planned: true, dropped: planUnitsDue(e, nowTs) }; }
+    });
     return { data: changed ? { ...dd, wakeLog, bedLog, entries } : dd, changed };
   }
   loadGuest() {
@@ -1192,9 +1198,10 @@ export default class App extends React.Component {
       if (olds.length) base = base.filter(e => !(e.taskKey === key && e.date === recDate && !e.exp));
       // 時刻モードは累計後の予定/確定を to で判定し直す。所要時間モードは常に確定（即記録）
       if (timeMode) {
-        const endTs = this.hmToTs(target.to);
-        const isPlanned = isFuture || (isToday && endTs > now);
-        if (isPlanned) { target.planned = true; target.dropped = isFuture ? 0 : planUnitsDue({ ...target, date: todayStr() }, now); target._new = target.dropped > 0; }
+        // 予定かどうかは日付ではなく実際の時刻で（終わりがいまより先なら予定）
+        const endTs = hmToTsOn(recDate, target.to);
+        const isPlanned = isFuture || endTs > now;
+        if (isPlanned) { target.planned = true; target.dropped = isFuture ? 0 : planUnitsDue({ ...target, date: recDate }, now); target._new = target.dropped > 0; }
         else { delete target.planned; delete target.dropped; target._new = true; }
       } else if (isFuture) { target.planned = true; target.dropped = 0; target._new = false; }
       else { delete target.planned; delete target.dropped; target._new = true; }
@@ -1256,7 +1263,7 @@ export default class App extends React.Component {
       if (this.state.framePlan) e.plan = this.state.framePlan; else if (t.plan) e.plan = t.plan;
       if (t.after) e.after = Math.round(t.after * (min / 60));
       if (fromHm) { e.from = fromHm; e.to = toHm; }
-      if (planned) { e.planned = true; e.dropped = isFuture ? 0 : planUnitsDue({ ...e, date: todayStr() }, now); e._new = e.dropped > 0; }
+      if (planned) { e.planned = true; e.dropped = isFuture ? 0 : planUnitsDue(e, now); e._new = e.dropped > 0; }
       if (t.symptom && t.symId) { e.symptom = true; e.symId = t.symId; e.level = (t.picks && t.picks[0] != null) ? t.picks[0] : 1; e.buffLv = t.buffLv; }
       if (taskKey) e.taskKey = taskKey;
       return e;
@@ -1276,7 +1283,8 @@ export default class App extends React.Component {
             const fromTs = this.hmToTs(r.from); let toTs = this.hmToTs(r.to); if (toTs <= fromTs) toTs += 1440 * 60000;
             minFromTs = Math.min(minFromTs, fromTs); maxToTs = Math.max(maxToTs, toTs);
           });
-          newEntries.push(mkEntry(t, sum, this.tsToHm(minFromTs), this.tsToHm(maxToTs), isFuture || (isToday && maxToTs > now), taskKey));
+          const lastTo = ranges.reduce((m, r) => Math.max(m, hmToTsOn(recDate, r.to <= r.from ? this.addHm(r.to, 1440) : r.to)), 0);
+          newEntries.push(mkEntry(t, sum, this.tsToHm(minFromTs), this.tsToHm(maxToTs), isFuture || lastTo > now, taskKey));
           learnMin[i] = sum;
         } else {
           let sum = 0;
@@ -1285,7 +1293,7 @@ export default class App extends React.Component {
             sum += min;
             const fromTs = this.hmToTs(r.from);
             let toTs = this.hmToTs(r.to); if (toTs <= fromTs) toTs += 1440 * 60000;
-            newEntries.push(mkEntry(t, min, this.tsToHm(fromTs), this.tsToHm(toTs), isFuture || (isToday && toTs > now)));
+            newEntries.push(mkEntry(t, min, this.tsToHm(fromTs), this.tsToHm(toTs), isFuture || hmToTsOn(recDate, r.to <= r.from ? this.addHm(r.to, 1440) : r.to) > now));
           });
           learnMin[i] = sum;
         }
@@ -1294,7 +1302,7 @@ export default class App extends React.Component {
         const min = durMins[i];
         const fromHm = this.addHm(this.state.startTime, frameCursor);
         const toHm = this.addHm(this.state.startTime, frameCursor + min);
-        const planned = isFuture || (isToday && hmToTsOn(recDate, toHm) > now);
+        const planned = isFuture || hmToTsOn(recDate, toHm) > now;
         newEntries.push(mkEntry(t, min, fromHm, toHm, planned, taskKey));
         frameCursor += min; learnMin[i] = min;
       } else {
