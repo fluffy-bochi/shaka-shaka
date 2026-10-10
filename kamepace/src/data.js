@@ -112,6 +112,7 @@ export const CATS = [
     act('skincare', '🧴', 'sanitizer', 'スキンケア', 1, 2, 10, { kw: ['身じたく', 'スキンケア', '保湿'] }),
     act('hairset', '💇', 'content_cut', 'ヘアセット', 2, 3, 15, { kw: ['身じたく', '髪', 'ヘアセット', 'ドライヤー'] }),
     act('shaving', '🪒', 'cut', 'ひげそり', 2, 1, 10, { kw: ['身じたく', 'ひげ', '髭剃り'] }),
+    act('nailclip', '💅', 'content_cut', '爪切り', 1, 1, 10, { kw: ['身じたく', '爪切り', 'つめきり', '爪'] }),
   ] },
   { id: 'health', icon: 'sick', color: '#d98b5b', glyph: '🤒', name: '体調・症状', sub: '頭痛・腹痛・生理痛・発熱など', items: [
     act('headache', '🤕', 'sick', '頭痛', 4, 3, 60, { kw: ['体調', '頭痛', 'ずつう', '頭がいたい'], symptom: true, buffLv: [{ bodyFat: 1.1, mindFat: 1.1 }, { bodyFat: 1.2, mindFat: 1.15 }, { bodyFat: 1.35, mindFat: 1.25 }] }),
