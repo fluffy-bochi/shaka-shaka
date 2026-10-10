@@ -756,6 +756,16 @@ export default class App extends React.Component {
     this.set({ activeBuffs: [...rest, entry], buffCfgId: null, buffCfgIid: null });
     this.save();
   };
+  /* いこいさんの声かけ: 体調（いまの調子の症状）・きもちに合わせたひとこと。いこいさん編集で変えられる */
+  careLine(symId, moodId) {
+    const pick = (k) => { const a = Ikoi.lines(k).filter(Boolean); return a.length ? a[Math.floor(Math.random() * a.length)] : ''; };
+    return (symId && pick('CARE_' + symId.replace('sym:', ''))) || (moodId && pick('CARE_MOOD_' + moodId)) || '';
+  }
+  // いま付いている体調（症状）のうち、いちばん強いもの
+  topSymptom() {
+    const syms = this.buffEntries().filter(x => (x.id || '').startsWith('sym:'));
+    return syms.length ? syms.reduce((a, b) => ((b.lv != null ? b.lv : 1) >= (a.lv != null ? a.lv : 1) ? b : a)) : null;
+  }
   /* 記録画面（起床・就寝・つぶやき）の詳細から、いまの調子（バフ・デバフ）を強さつきでオン/オフ。lv=null でオフ */
   setBuffLevel = (id, lv) => {
     const cur = this.buffEntries();
@@ -767,16 +777,28 @@ export default class App extends React.Component {
     } else {
       const b = BUFFS.find(x => x.id === id);
       const prev = insts[0];
-      const entry = prev ? { ...prev, lv } : { id, iid: 'bf' + Date.now() + Math.floor(Math.random() * 1000), title: b ? b.name : '', until: null, key: 'none', from: todayStr(), lv };
-      this.set({ activeBuffs: [...cur.filter(x => x.id !== id), entry], buffTouched: true });
+      const entry = prev ? { ...prev, lv, mult: undefined } : { id, iid: 'bf' + Date.now() + Math.floor(Math.random() * 1000), title: b ? b.name : '', until: null, key: 'none', from: todayStr(), lv };
+      // つぶやき中に選んだ体調は、そのつぶやきのアイコン・いこいさんの声かけに使う
+      const tw = this.state.moodOpen && id.startsWith('sym:') ? { tweetSyms: [...(this.state.tweetSyms || []).filter(x => x !== id), id] } : {};
+      this.set({ activeBuffs: [...cur.filter(x => x.id !== id), entry], buffTouched: true, ...tw });
     }
     this.save();
   };
   // 体調（body）・心の調子（mind）の詳細に出す調子
-  BUFF_GROUPS = { body: ['sick', 'sleepless', 'injury', 'weather', 'good'], mind: ['mental', 'holiday', 'weather', 'good'] };
+  BUFF_GROUPS = {
+    sym: BUFFS.filter(b => b.sym).map(b => b.id),
+    body: [...BUFFS.filter(b => b.sym).map(b => b.id), 'sick', 'sleepless', 'injury', 'weather', 'good'],
+    mind: ['mental', 'holiday', 'weather', 'good'],
+    other: ['sick', 'mental', 'sleepless', 'injury', 'weather', 'good', 'holiday'],
+  };
   buffRows(group) {
     const cur = this.buffEntries();
-    return (this.BUFF_GROUPS[group] || []).map(id => {
+    const excl = this.profileExcl();
+    return (this.BUFF_GROUPS[group] || []).filter(id => {
+      const b = BUFFS.find(x => x.id === id) || {};
+      if (excl.has(normTitle(b.name || ''))) return false; // 男性には生理痛を出さない
+      return !b.legacy || cur.some(x => x.id === id); // 「体調がわるい」は付いているときだけ（外せるように）
+    }).map(id => {
       const b = BUFFS.find(x => x.id === id) || {};
       const en = cur.find(x => x.id === id);
       return { id, glyph: b.glyph, name: b.name, kind: b.kind, lv: en ? (en.lv != null ? en.lv : 1) : null, onSet: (lv) => this.setBuffLevel(id, lv) };
@@ -785,7 +807,7 @@ export default class App extends React.Component {
 
   /* ===== きもち・できごと ===== */
   // 💬 きもち・できごと・体調（つぶやき）: きもちを選ばなくてもOK。アイコンは気分の顔5種から。体調・心の調子・体温も
-  openMood = () => this.set({ buffTouched: false, moodOpen: true, moodId: null, moodStrength: 'b', moodNote: '', moodFace: '🙂', moodCond: null, moodMind: null, moodTemp: '', moodAt: this.tsToHm(Date.now()), moodSym: null, moodSymLv: 1 });
+  openMood = () => this.set({ buffTouched: false, tweetSyms: [], moodOpen: true, moodId: null, moodStrength: 'b', moodNote: '', moodFace: '🙂', moodCond: null, moodMind: null, moodTemp: '', moodAt: this.tsToHm(Date.now()), moodSym: null, moodSymLv: 1 });
   closeMood = () => this.set({ moodOpen: false, moodEditIdx: null });
   // つぶやきの編集: 入れた内容で開き、記録で置きかえる
   openMoodEdit = (i) => {
@@ -802,7 +824,7 @@ export default class App extends React.Component {
     const mood = MOODS.find(m => m.id === st0.moodId) || null;
     const temp = parseFloat(String(st0.moodTemp || '').replace(',', '.'));
     const symIt = st0.moodSym ? this.allItems().find(t => t.id === st0.moodSym) : null;
-    if (!mood && !symIt && !(st0.moodNote || '').trim() && st0.moodCond == null && st0.moodMind == null && isNaN(temp)) return;
+    if (!mood && !symIt && !(st0.tweetSyms || []).length && !(st0.moodNote || '').trim() && st0.moodCond == null && st0.moodMind == null && isNaN(temp)) return;
     const base = (MOOD_STRENGTHS.find(x => x.key === this.state.moodStrength) || MOOD_STRENGTHS[1]).v;
     const recover = !!mood && mood.kind === 'good';
     const isBody = !!mood && mood.axis === 'body'; // あつい・さむい＝体、きもち＝心
@@ -828,6 +850,14 @@ export default class App extends React.Component {
     if (st0.moodCond != null) e.cond = st0.moodCond;
     if (st0.moodMind != null) e.mindCond = st0.moodMind;
     if (!isNaN(temp)) e.temp = Math.round(temp * 10) / 10;
+    // つぶやき中に選んだ体調（いまの調子）。きもちを選んでいなければ、アイコンと見出しはその体調に
+    const twSyms = (st0.tweetSyms || []).map(id => this.buffEntries().find(x => x.id === id)).filter(Boolean);
+    const twTop = twSyms.length ? twSyms.reduce((a, b) => ((b.lv != null ? b.lv : 1) >= (a.lv != null ? a.lv : 1) ? b : a)) : null;
+    if (twSyms.length) e.syms = twSyms.map(x => ({ id: x.id, lv: x.lv != null ? x.lv : 1 }));
+    if (twTop && !mood) { const bb = BUFFS.find(x => x.id === twTop.id) || {}; e.glyph = bb.glyph || e.glyph; e.moodLabel = bb.name || e.moodLabel; if (!note) e.title = bb.name || e.title; }
+    // いこいさんの声かけ（体調 → きもち の順で）
+    const care = this.careLine(twTop ? twTop.id : null, mood ? mood.id : null);
+    if (care) this._careLine = care;
     // 体調・症状（頭痛など）: つらさに合わせた疲労＋自動デバフ。きもちを選んでいなければ、このつぶやき自体を症状の記録にする
     let symEntry = null;
     if (symIt) {
@@ -843,7 +873,7 @@ export default class App extends React.Component {
       const old = this.state.entries[editI];
       const ne = { ...e, gid: old.gid || e.gid, date: old.date, _new: false };
       const entries = this.state.entries.map((x, k) => (k === editI ? ne : x));
-      this.set({ entries: sortEntries(entries), moodOpen: false, moodEditIdx: null, moodId: null, moodNote: '' });
+      this.set({ entries: sortEntries(entries), moodOpen: false, moodEditIdx: null, moodId: null, moodNote: '', ...(this._careLine ? { tapLine: this._careLine } : null) }); this._careLine = null;
       this.save(); this.toast('へんこうしました');
       return;
     }
@@ -854,19 +884,20 @@ export default class App extends React.Component {
     const totalDelta = adds.reduce((a, x) => a + (x.delta || 0), 0);
     if (!totalDelta) {
       // 疲労の増減がないつぶやきはシャカに行かずホームに残る
-      this.set({ entries: sortEntries([...this.state.entries, ...adds]), moodOpen: false, moodId: null, moodNote: '', moodSym: null, ...symPatch });
+      this.set({ entries: sortEntries([...this.state.entries, ...adds]), moodOpen: false, moodId: null, moodNote: '', moodSym: null, ...symPatch, ...(this._careLine ? { tapLine: this._careLine } : null) }); this._careLine = null;
       this.save(); this.toast('つぶやきました');
       return;
     }
     const entries = sortEntries([...this.state.entries, ...adds]);
     this.set({
-      ...symPatch, moodSym: null,
+      ...symPatch, moodSym: null, ...(this._careLine ? { tapLine: this._careLine } : null),
       entries, moodOpen: false, moodId: null, moodNote: '',
       screen: 'shaka', dayOffset: 0,
       toast: symIt && !mood ? '体調を記録' : isBody ? 'からだを記録' : (recover ? 'きもちを記録（回復）' : 'きもちを記録'),
     });
     this.save();
     this.stopPhysics();
+    this._careLine = null;
     if (delta < 0 && mood) this._pendingNeg = [...(this._pendingNeg || []), mood.glyph];
     requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
     clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1600);
@@ -2855,7 +2886,9 @@ export default class App extends React.Component {
     const up = d.up || (pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes()));
     // ts=起床時刻（予測バーの左端になる）。bed=就寝時刻(HH:MM)。就寝〜起床の時間は bed/up から出せる
     const wakeLog = [...(this.state.wakeLog || []).filter(w => w.date !== today), { date: today, ts: hmToTsOn(today, up), bed: d.bed || null, up, cond: d.cond, mood: d.mood, fatigue: d.fat, note: (d.note || '').trim() }];
-    this.applyFatigue(d.fat, '起床時の疲労', { wakeLog, wakeFlow: true });
+    // 体調（症状）が付いていれば、ホームに戻ったときにいこいさんが声をかける
+    const tsym = this.topSymptom(); const care = tsym ? this.careLine(tsym.id, null) : '';
+    this.applyFatigue(d.fat, '起床時の疲労', { wakeLog, wakeFlow: true, ...(care ? { tapLine: care } : null) });
   };
   /* 申告した疲労度に山を合わせる: 多ければ使った行動の絵文字から足し、少なければ差ぶんの🌙を降らせる */
   applyFatigue(fat, title, patch, day) {
@@ -4806,10 +4839,10 @@ export default class App extends React.Component {
       moodNote: st.moodNote || '', onMoodNote: this.onMoodNote,
       moodChoices: MOODS.map(m => ({ id: m.id, glyph: m.glyph, name: m.name, kind: m.kind, axis: m.axis || 'mind', on: st.moodId === m.id, onPick: () => this.pickMood(m.id) })),
       moodStrengths: MOOD_STRENGTHS.map(x => ({ key: x.key, label: x.label, on: st.moodStrength === x.key, onPick: () => this.pickMoodStrength(x.key) })),
-      buffRowsBody: this.buffRows('body'), buffRowsMind: this.buffRows('mind'), buffTouched: !!st.buffTouched,
-      moodCanSave: !!st.moodId || !!st.moodSym || !!(st.moodNote || '').trim() || st.moodCond != null || st.moodMind != null || !!String(st.moodTemp || '').trim(),
+      buffRowsBody: this.buffRows('body'), buffRowsMind: this.buffRows('mind'), buffRowsSym: this.buffRows('sym'), buffRowsOther: this.buffRows('other'), buffTouched: !!st.buffTouched,
+      moodCanSave: !!st.moodId || !!st.moodSym || (st.tweetSyms || []).length > 0 || !!(st.moodNote || '').trim() || st.moodCond != null || st.moodMind != null || !!String(st.moodTemp || '').trim(),
       moodFace: st.moodFace || '🙂', moodFaces: ['😆', '🙂', '😐', '😟', '😫'].map(g => ({ g, on: (st.moodFace || '🙂') === g, onPick: () => this.set({ moodFace: g }) })),
-      moodIcon: (MOODS.find(m => m.id === st.moodId) || {}).glyph || (st.moodSym && (this.allItems().find(t => t.id === st.moodSym) || {}).glyph) || st.moodFace || '🙂',
+      moodIcon: (MOODS.find(m => m.id === st.moodId) || {}).glyph || (() => { const ids = (st.tweetSyms || []).filter(id => this.buffEntries().some(x => x.id === id)); const b = ids.length && BUFFS.find(x => x.id === ids[ids.length - 1]); return b ? b.glyph : null; })() || st.moodFace || '🙂',
       // 体調・症状（行動選択から外して、つぶやきで記録する）
       moodSyms: st.moodOpen ? ((CATS.find(c => c.id === 'health') || { items: [] }).items.filter(t => !this.profileExcl().has(normTitle(t.name))).map(t => ({ id: t.id, glyph: t.glyph, name: t.name, on: st.moodSym === t.id, onPick: () => this.set({ moodSym: st.moodSym === t.id ? null : t.id }) }))) : [],
       moodSymLv: st.moodSymLv != null ? st.moodSymLv : 1, moodSymLvs: ['軽い', 'ふつう', '強い'].map((l, i) => ({ label: l, on: (st.moodSymLv != null ? st.moodSymLv : 1) === i, onPick: () => this.set({ moodSymLv: i }) })), moodSymPicked: !!st.moodSym,
@@ -4817,11 +4850,11 @@ export default class App extends React.Component {
       moodMind: st.moodMind, setMoodMind: (n) => this.set({ moodMind: st.moodMind === n ? null : n }),
       moodTemp: st.moodTemp || '', setMoodTemp: (t) => this.set({ moodTemp: t }),
       moodAt: st.moodAt || '', setMoodAt: (t) => this.set({ moodAt: t }),
-      moodPicked: !!st.moodId || !!st.moodSym, moodIdPicked: !!st.moodId,
+      moodPicked: !!st.moodId || !!st.moodSym || (st.tweetSyms || []).some(id => this.buffEntries().some(x => x.id === id)), moodIdPicked: !!st.moodId,
       /* バフ・デバフ */
       buffOpen: !!st.buffOpen, openBuffs: this.openBuffs, closeBuffs: this.closeBuffs,
       activeBuffGlyphs: this.buffEntries().map(en => (BUFFS.find(b => b.id === en.id) || {}).glyph).filter(Boolean),
-      buffChoices: BUFFS.map(b => {
+      buffChoices: BUFFS.filter(b => (!b.legacy || this.buffEntries().some(x => x.id === b.id)) && !this.profileExcl().has(normTitle(b.name))).map(b => {
         const eff = [];
         if (b.mult.bodyFat) eff.push('体の疲労 ×' + b.mult.bodyFat);
         if (b.mult.mindFat) eff.push('心の疲労 ×' + b.mult.mindFat);

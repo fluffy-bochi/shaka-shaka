@@ -268,7 +268,8 @@ export const MOOD_STRENGTHS = [
 export const BUFFS = [
   { id: 'mental', glyph: '😵‍💫', name: '心がつかれ気味', desc: '就活・人間関係などでメンタル消耗中', kind: 'debuff',
     mult: { mindFat: 1.25, mindRec: 0.9 } },
-  { id: 'sick', glyph: '🤒', name: '体調がわるい', desc: '風邪ぎみ・だるいなど', kind: 'debuff',
+  // 「体調がわるい」はざっくりすぎるので選べなくした（下の体調・症状に分けた）。前に付けた分のために残す
+  { id: 'sick', glyph: '🤒', name: '体調がわるい', desc: '風邪ぎみ・だるいなど', kind: 'debuff', legacy: true,
     mult: { bodyFat: 1.25, bodyRec: 0.9 } },
   { id: 'sleepless', glyph: '😪', name: '睡眠不足', desc: 'ねむりが足りていない', kind: 'debuff',
     mult: { bodyFat: 1.15, mindFat: 1.15 } },
@@ -280,6 +281,16 @@ export const BUFFS = [
     mult: { bodyFat: 0.9, mindFat: 0.9 } },
   { id: 'holiday', glyph: '🏖', name: '休暇・のんびり期間', desc: '休み中で心に余裕がある', kind: 'buff',
     mult: { mindFat: 0.85, mindRec: 1.15, bodyRec: 1.1 } },
+  // 体調・症状（つぶやき・起床/就寝の詳細・🎭で共通。強さは 軽い/ふつう/強い）
+  { id: 'sym:headache', glyph: '🤕', name: '頭痛', desc: '頭がいたい', kind: 'debuff', sym: true, mult: { bodyFat: 1.2, mindFat: 1.15 } },
+  { id: 'sym:stomachache', glyph: '😣', name: '腹痛', desc: 'おなかがいたい', kind: 'debuff', sym: true, mult: { bodyFat: 1.2 } },
+  { id: 'sym:noappetite', glyph: '🍽', name: '食欲がない', desc: 'ごはんが入らない', kind: 'debuff', sym: true, mult: { bodyFat: 1.15, bodyRec: 0.9 } },
+  { id: 'sym:nausea', glyph: '🤢', name: '吐き気', desc: '気持ち悪い', kind: 'debuff', sym: true, mult: { bodyFat: 1.2, mindFat: 1.15 } },
+  { id: 'sym:fever', glyph: '🤒', name: '発熱', desc: '熱っぽい', kind: 'debuff', sym: true, mult: { bodyFat: 1.3, mindFat: 1.15, bodyRec: 0.9 } },
+  { id: 'sym:cramps', glyph: '😖', name: '生理痛', desc: 'おなか・腰がいたい', kind: 'debuff', sym: true, mult: { bodyFat: 1.25, mindFat: 1.1 } },
+  { id: 'sym:sluggish', glyph: '😮‍💨', name: 'だるさ・倦怠感', desc: 'しんどい', kind: 'debuff', sym: true, mult: { bodyFat: 1.2, mindFat: 1.15 } },
+  { id: 'sym:cold', glyph: '🤧', name: '風邪ぎみ', desc: '鼻水・せき', kind: 'debuff', sym: true, mult: { bodyFat: 1.25, mindFat: 1.15 } },
+  { id: 'sym:hangover', glyph: '🥴', name: '二日酔い', desc: 'お酒がのこっている', kind: 'debuff', sym: true, mult: { bodyFat: 1.25, mindFat: 1.05 } },
 ];
 
 /* 記録の編集で選べる絵文字（SEARCH_DB・ACT_EMOJI の行動グリフから） */
