@@ -162,11 +162,11 @@ const SERIES = [
    体調・気分は記録の点に丸。疲労度は増減のたびに線を引き、いちばん高い・低いところだけ丸と時刻をつける */
 function Chart({ data }) {
   const [hide, setHide] = React.useState({});
-  const W = 320, H = 170, PX = 24, PT = 18, PB = 34;
   const recs = (data && data.recs) || [], fat = ((data && data.fat) || []).filter(p => p.v != null);
   const all = [...recs.map(r => r.ts), ...fat.map(p => p.ts)];
   const t0 = all.length ? Math.min(...all) : 0, t1 = all.length ? Math.max(...all) : 0;
   const oneDay = t1 - t0 < 24 * 3600000;
+  const W = 320, H = oneDay ? 170 : 160, PX = 24, PT = oneDay ? 18 : 24, PB = oneDay ? 34 : 14;
   const X = (ts) => (t1 === t0 ? W / 2 : PX + (ts - t0) / (t1 - t0) * (W - 2 * PX));
   const Y = (t) => PT + (1 - t) * (H - PT - PB);
   const hm = (ts) => { const d = new Date(ts); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
@@ -176,20 +176,38 @@ function Chart({ data }) {
   fat.forEach(p => { if (!hi || p.v > hi.v) hi = p; if (!lo || p.v < lo.v) lo = p; });
   const marks = hi && lo && hi !== lo ? [[hi, -9], [lo, 15]] : hi ? [[hi, -9]] : [];
   const fs = SERIES.find(x => x.key === 'fatigue');
+  // 1日ごとの帯: 記録の日付（起床〜就寝）でまとめ、日と日のあいだで区切る
+  const bands = (() => {
+    if (oneDay || !recs.length) return [];
+    const byDate = {};
+    recs.forEach(r => { const k = r.date || md(r.ts); (byDate[k] = byDate[k] || []).push(r.ts); });
+    const days = Object.keys(byDate).sort().map(k => ({ k, a: Math.min(...byDate[k]), b: Math.max(...byDate[k]) }));
+    return days.map((d, i) => {
+      const x0 = i === 0 ? 0 : (X(days[i - 1].b) + X(d.a)) / 2;
+      const x1 = i === days.length - 1 ? W : (X(d.b) + X(days[i + 1].a)) / 2;
+      return { x0, x1, label: md(d.a) };
+    });
+  })();
   return (
     <div style={{ margin: '0 20px' }}>
-      <div style={{ background: '#fff', borderRadius: 18, padding: '6px 0 2px', boxShadow: '0 2px 10px rgba(27,27,24,.05)' }}>
+      <div style={{ background: '#fff', borderRadius: 18, padding: '6px 0 2px', boxShadow: '0 2px 10px rgba(27,27,24,.05)', overflow: 'hidden' }}>
         {!all.length ? (
           <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#a5a39a' }}>まだ記録がありません</div>
         ) : (
           <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+            {/* 複数日: 1日ごとに背景の色を分けて、上に日付 */}
+            {bands.map((b, i) => (
+              <g key={'b' + i}>
+                <rect x={b.x0} y={0} width={Math.max(0, b.x1 - b.x0)} height={H} fill={i % 2 ? '#fff' : '#ede8db'} />
+                <text x={(b.x0 + b.x1) / 2} y={11} textAnchor="middle" fontSize="9" fontWeight="700" fill="#55554e" style={mono}>{b.label}</text>
+              </g>
+            ))}
             {[0, .5, 1].map((t, i) => <line key={i} x1={PX - 8} x2={W - PX + 8} y1={Y(t)} y2={Y(t)} stroke="#efece3" strokeWidth="1" />)}
             {/* 朝・夜の記録の時刻（1日なら時刻だけ、複数日なら日付と時刻） */}
             {recs.map((r, i) => (
               <g key={i}>
                 <line x1={X(r.ts)} x2={X(r.ts)} y1={PT} y2={H - PB} stroke="#f3f1ea" strokeWidth="1" />
-                <text x={X(r.ts)} y={H - PB + 13} textAnchor="middle" fontSize="8.5" fill="#8a8a82" style={mono}>{oneDay ? hm(r.ts) : md(r.ts)}</text>
-                {!oneDay && <text x={X(r.ts)} y={H - PB + 24} textAnchor="middle" fontSize="8.5" fill="#8a8a82" style={mono}>{hm(r.ts)}</text>}
+                {oneDay && <text x={X(r.ts)} y={H - PB + 13} textAnchor="middle" fontSize="8.5" fill="#8a8a82" style={mono}>{hm(r.ts)}</text>}
               </g>
             ))}
             {SERIES.filter(x => x.key !== 'fatigue' && !hide[x.key]).map(x => {
