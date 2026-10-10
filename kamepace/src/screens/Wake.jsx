@@ -44,7 +44,7 @@ const LVN = ['軽い', 'ふつう', '強い'];
 // 閉じている詳細の帯に出す、いまの調子のまとめ
 export const buffSummary = (rows) => (rows || []).filter(r => r.lv != null).map(r => r.name + '（' + LVN[r.lv] + '）').join('・');
 
-function Rating({ title, opts, value, onPick, labels, rows, touched, slider }) {
+function Rating({ title, opts, value, onPick, labels, rows, touched, slider, here }) {
   const [open, setOpen] = React.useState(false);
   const sum = buffSummary(rows);
   const has = !!sum;
@@ -71,7 +71,16 @@ function Rating({ title, opts, value, onPick, labels, rows, touched, slider }) {
           </div>
         )}
         {open && slider && (
-          <input type="range" min={0} max={100} step={1} value={value == null ? 50 : value} onChange={onSlide} style={{ width: '100%', marginTop: 12, accentColor: INK }} aria-label={title} />
+          <div style={{ position: 'relative', marginTop: here != null ? 26 : 12 }}>
+            {/* 現在地＝いまの山の量。つまみの中心(幅16px想定)に合わせて置く */}
+            {here != null && (
+              <div style={{ position: 'absolute', bottom: '100%', left: `calc(${here}% + ${8 - here * 0.16}px)`, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none', color: '#7a9a00', fontWeight: 800, lineHeight: 1 }}>
+                <span style={{ fontSize: 10, whiteSpace: 'nowrap', transform: `translateX(${(50 - here) * 0.9}%)` }}>現在地 <span style={mono}>{here}</span></span>
+                <span style={{ fontSize: 9, marginTop: 1 }}>▼</span>
+              </div>
+            )}
+            <input type="range" min={0} max={100} step={1} value={value == null ? 50 : value} onChange={onSlide} style={{ display: 'block', width: '100%', margin: 0, accentColor: INK }} aria-label={title} />
+          </div>
         )}
         {open && rows && <BuffDetail rows={rows} />}
       </div>
@@ -116,7 +125,7 @@ export function WakeCheck({ v }) {
         <SleepCard d={d} set={v.setWakeDraft} />
         <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setWakeDraft('cond', x)} rows={v.buffRowsBody} touched={v.buffTouched} />
         <Rating title="気分" opts={MOOD.map(([g], i) => [i + 1, g])} labels={MOOD.map(c => c[1])} value={d.mood} onPick={(x) => v.setWakeDraft('mood', x)} rows={v.buffRowsMind} touched={v.buffTouched} />
-        <Rating title="残っている疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setWakeDraft('fat', x)} slider />
+        <Rating title="残っている疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setWakeDraft('fat', x)} slider here={v.fatHere} />
       </div>
       <div style={{ ...foot, justifyContent: 'space-between' }}>
         <button onClick={v.goHome} style={btnSub}>やめる</button>
@@ -145,7 +154,7 @@ export function BedCheck({ v }) {
           style={{ display: 'block', width: 'calc(100% - 40px)', margin: '0 20px 12px', boxSizing: 'border-box', resize: 'none', border: 'none', borderRadius: 14, background: '#fff', padding: '12px 13px', fontSize: 14, fontWeight: 600, lineHeight: 1.5, color: INK, fontFamily: 'inherit', boxShadow: '0 2px 10px rgba(27,27,24,.05)', outline: 'none' }} />
         <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setBedDraft('cond', x)} rows={v.buffRowsBody} touched={v.buffTouched} />
         <Rating title="気分" opts={MOOD.map(([g], i) => [i + 1, g])} labels={MOOD.map(c => c[1])} value={d.mood} onPick={(x) => v.setBedDraft('mood', x)} rows={v.buffRowsMind} touched={v.buffTouched} />
-        <Rating title="いまの疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setBedDraft('fat', x)} slider />
+        <Rating title="いまの疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setBedDraft('fat', x)} slider here={v.fatHere} />
       </div>
       <div style={{ ...foot, justifyContent: 'space-between' }}>
         <button onClick={v.goHome} style={btnSub}>やめる</button>
