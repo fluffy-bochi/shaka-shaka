@@ -42,6 +42,7 @@ export const FLUENT_MAP = {
   '⚽': 'Soccer ball/3D/soccer_ball_3d.png',
   '🏆': 'Trophy/3D/trophy_3d.png',
   '📋': 'Clipboard/3D/clipboard_3d.png',
+  '💅': 'Nail polish/Default/3D/nail_polish_3d_default.png',
   '🏪': 'Convenience store/3D/convenience_store_3d.png',
   '🏫': 'School/3D/school_3d.png',
   '💭': 'Thought balloon/3D/thought_balloon_3d.png',
