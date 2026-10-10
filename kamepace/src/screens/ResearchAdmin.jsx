@@ -103,6 +103,98 @@ function FatigueChart({ days, W = 320, H = 150 }) {
   );
 }
 
+/* 日ごとの折れ線（複数の線）。series=[{label,color,get(day)→数値|null,dash}]。yFmt で目盛りの表示 */
+function LineChart({ days, series, W = 320, H = 140, yFmt = (v) => String(Math.round(v)), yMin, yMax, legend = true }) {
+  const ds = Object.keys(days).sort();
+  const vals = ds.flatMap(d => series.map(sr => sr.get(days[d]))).filter(v => v != null && !isNaN(v));
+  if (!vals.length) return <div style={{ fontSize: 12, color: MUTED, padding: '20px 0', textAlign: 'center' }}>データがありません</div>;
+  let lo = yMin != null ? yMin : Math.min(0, ...vals), hi = yMax != null ? yMax : Math.max(...vals);
+  if (hi === lo) hi = lo + 1;
+  const PX = 34, PT = 10, PB = 24;
+  const X = (i) => (ds.length === 1 ? W / 2 : PX + i * (W - PX - 14) / (ds.length - 1));
+  const Y = (v) => PT + (1 - (v - lo) / (hi - lo)) * (H - PT - PB);
+  const ticks = [lo, lo + (hi - lo) / 2, hi];
+  const step = Math.max(1, Math.ceil(ds.length / (W > 400 ? 10 : 6)));
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+        {ticks.map((v, i) => <g key={i}><line x1={PX} x2={W - 14} y1={Y(v)} y2={Y(v)} stroke={LINE} /><text x={PX - 5} y={Y(v) + 3} textAnchor="end" fontSize="8" fill={MUTED} style={mono}>{yFmt(v)}</text></g>)}
+        {series.map(sr => {
+          const pts = ds.map((d, i) => [i, sr.get(days[d])]).filter(p => p[1] != null && !isNaN(p[1])).map(([i, v]) => [X(i), Y(v), ds[i], v]);
+          return (
+            <g key={sr.label}>
+              {pts.length > 1 && <path d={'M' + pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' L')} fill="none" stroke={sr.color} strokeWidth="2" strokeDasharray={sr.dash ? '4 3' : undefined} strokeLinejoin="round" />}
+              {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="2.6" fill={sr.color}><title>{md(p[2]) + ' ' + sr.label + ' ' + yFmt(p[3])}</title></circle>)}
+            </g>
+          );
+        })}
+        {ds.map((d, i) => ((i % step === 0 && i <= ds.length - 1 - step) || i === ds.length - 1) && <text key={d} x={X(i)} y={H - 8} textAnchor="middle" fontSize="8.5" fill={MUTED} style={mono}>{md(d)}</text>)}
+      </svg>
+      {legend && (
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginTop: 4, fontSize: 10.5, color: SUB, fontWeight: 700 }}>
+          {series.map(sr => <span key={sr.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 14, height: 0, borderTop: '2px ' + (sr.dash ? 'dashed ' : 'solid ') + sr.color }} />{sr.label}</span>)}
+        </div>
+      )}
+    </div>
+  );
+}
+// 時刻（HH:MM）→ 分。就寝が0〜12時なら翌日の夜中として +24時間
+const tMin = (t, night) => { if (!t) return null; const [h, m] = t.split(':').map(Number); let v = h * 60 + m; if (night && h < 12) v += 1440; return v; };
+const fmtT = (v) => { const t = Math.round(v), h = Math.floor(t / 60), m = t % 60; return h + ':' + String(m).padStart(2, '0'); };
+
+/* 日ごとの記録の量（投稿・行動の記録・つぶやき） */
+function CountChart({ days, W, H }) {
+  return <LineChart days={days} W={W} H={H} series={[
+    { label: '投稿（起床・就寝・まとまり・つぶやき）', color: INK, get: (s) => (s.counts ? s.counts.posts : null) },
+    { label: '行動の記録（1つずつ）', color: GREEN, get: (s) => (s.counts ? s.counts.acts : null) },
+    { label: 'つぶやき', color: '#ff5fa2', get: (s) => (s.counts ? s.counts.tweets : null) },
+  ]} />;
+}
+/* 1日の中のゆったり・ほどほど・みちみちの割合（起床〜就寝。寝ているあいだは入れない） */
+const ZCOL = { yuttari: '#bfe0a3', hodohodo: '#f2cf6b', michimichi: '#e8836f' };
+function ZoneBars({ days, W = 320, H = 130 }) {
+  const ds = Object.keys(days).sort().filter(d => { const z = days[d].zone || {}; return (z.yuttari || 0) + (z.hodohodo || 0) + (z.michimichi || 0) > 0; });
+  if (!ds.length) return <div style={{ fontSize: 12, color: MUTED, padding: '20px 0', textAlign: 'center' }}>データがありません</div>;
+  const PX = 34, PT = 6, PB = 24, bw = Math.max(4, Math.min(22, (W - PX - 14) / ds.length - 3));
+  const X = (i) => PX + (i + 0.5) * (W - PX - 14) / ds.length;
+  const hh = H - PT - PB;
+  const step = Math.max(1, Math.ceil(ds.length / (W > 400 ? 10 : 6)));
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+        {[0, 50, 100].map(v => <g key={v}><line x1={PX} x2={W - 14} y1={PT + (1 - v / 100) * hh} y2={PT + (1 - v / 100) * hh} stroke={LINE} /><text x={PX - 5} y={PT + (1 - v / 100) * hh + 3} textAnchor="end" fontSize="8" fill={MUTED} style={mono}>{v}%</text></g>)}
+        {ds.map((d, i) => {
+          const z = days[d].zone, tot = z.yuttari + z.hodohodo + z.michimichi;
+          let y = PT + hh;
+          return (
+            <g key={d}>
+              {['yuttari', 'hodohodo', 'michimichi'].map(k => { const h = hh * (z[k] || 0) / tot; y -= h; return <rect key={k} x={X(i) - bw / 2} y={y} width={bw} height={h} fill={ZCOL[k]}><title>{md(d) + ' ' + ({ yuttari: 'ゆったり', hodohodo: 'ほどほど', michimichi: 'みちみち' })[k] + ' ' + Math.round(100 * (z[k] || 0) / tot) + '%'}</title></rect>; })}
+            </g>
+          );
+        })}
+        {ds.map((d, i) => ((i % step === 0 && i <= ds.length - 1 - step) || i === ds.length - 1) && <text key={d} x={X(i)} y={H - 8} textAnchor="middle" fontSize="8.5" fill={MUTED} style={mono}>{md(d)}</text>)}
+      </svg>
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 4, fontSize: 10.5, color: SUB, fontWeight: 700 }}>
+        {[['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].map(([k, n]) => <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: ZCOL[k] }} />{n}</span>)}
+      </div>
+    </div>
+  );
+}
+/* 寝ているあいだの回復量（前の日の就寝の疲労度 − 起床の疲労度） */
+function SleepRecChart({ days, W, H }) {
+  return <LineChart days={days} W={W} H={H} series={[{ label: '睡眠中の回復', color: '#5b8fd4', get: (s) => (s.sleepRec != null ? s.sleepRec : null) }]} />;
+}
+/* 寝た時刻・起きた時刻の変化 */
+function SleepTimeChart({ days, W, H }) {
+  // 縦軸は記録のある時刻のまわりだけ（1時間きざみにそろえる）
+  const vs = Object.values(days).flatMap(s0 => [tMin(s0.wake && s0.wake.t, false), tMin(s0.bed && s0.bed.t, true)]).filter(v => v != null);
+  const yMin = vs.length ? Math.floor((Math.min(...vs) - 30) / 60) * 60 : 0, yMax = vs.length ? Math.ceil((Math.max(...vs) + 30) / 60) * 60 : 1440;
+  return <LineChart days={days} W={W} H={H} yFmt={fmtT} yMin={yMin} yMax={yMax} series={[
+    { label: '起きた時刻', color: '#f2a93b', get: (s) => tMin(s.wake && s.wake.t, false) },
+    { label: '寝た時刻（記録した時刻）', color: '#4b4f8f', get: (s) => tMin(s.bed && s.bed.t, true), dash: true },
+  ]} />;
+}
+
 /* 体調・気分（1〜5）の推移: 体調＝黒・気分＝ピンク、朝＝実線・夜＝点線 */
 function CondMoodChart({ days, W = 320, H = 140 }) {
   const ds = Object.keys(days).sort();
@@ -427,6 +519,14 @@ export default function ResearchAdmin({ v }) {
                       <TypeDays days={p.days} />
                       <div style={{ ...h3, marginTop: 18 }}>体調・気分の推移 <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>朝・夜の記録（1〜5）</span></div>
                       <CondMoodChart days={p.days} W={640} H={190} />
+                      <div style={{ ...h3, marginTop: 18 }}>記録の量 <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>1日ごと</span></div>
+                      <CountChart days={p.days} W={640} H={190} />
+                      <div style={{ ...h3, marginTop: 18 }}>ゆったり・ほどほど・みちみちの割合 <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>起床〜就寝（寝ているあいだは入れない）</span></div>
+                      <ZoneBars days={p.days} W={640} H={170} />
+                      <div style={{ ...h3, marginTop: 18 }}>寝ているあいだの回復 <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>前の日の就寝の疲労度 − 起床の疲労度</span></div>
+                      <SleepRecChart days={p.days} W={640} H={170} />
+                      <div style={{ ...h3, marginTop: 18 }}>寝た時刻・起きた時刻</div>
+                      <SleepTimeChart days={p.days} W={640} H={190} />
                     </div>
                     <div>
                       <div style={h3}>実行率（実施／目標）</div>
@@ -459,6 +559,10 @@ export default function ResearchAdmin({ v }) {
             <TypeDays days={p.days} />
           </div>
           <div style={{ ...card, marginBottom: 12 }}><div style={h3}>体調・気分の推移</div><CondMoodChart days={p.days} /></div>
+          <div style={{ ...card, marginBottom: 12 }}><div style={h3}>記録の量</div><CountChart days={p.days} /></div>
+          <div style={{ ...card, marginBottom: 12 }}><div style={h3}>ゆったり・ほどほど・みちみちの割合</div><ZoneBars days={p.days} /></div>
+          <div style={{ ...card, marginBottom: 12 }}><div style={h3}>寝ているあいだの回復</div><SleepRecChart days={p.days} /></div>
+          <div style={{ ...card, marginBottom: 12 }}><div style={h3}>寝た時刻・起きた時刻</div><SleepTimeChart days={p.days} /></div>
           <div style={{ ...card, marginBottom: 12 }}><div style={h3}>実行率（実施／目標）</div><Adherence days={p.days} /></div>
           <div style={card}><div style={h3}>画面ごとの利用時間（日ごと）</div><Heat cols={heatDays(p.days)} /></div>
         </> : (
