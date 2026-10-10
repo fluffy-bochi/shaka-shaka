@@ -20,6 +20,7 @@ import {
   loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete, loadResearchConfig,
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
+import { dayParts, calibrate } from './calib';
 import ResearchAdmin from './screens/ResearchAdmin';
 import Run, { MiniRun } from './screens/Run';
 import * as Ikoi from './ikoi';
@@ -254,6 +255,7 @@ export default class App extends React.Component {
       onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, wakeLog: s.wakeLog, bedLog: s.bedLog, mainScreen: s.mainScreen, screenTime: s.screenTime,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
+      calibLog: s.calibLog, actCal: s.actCal, calibUndo: s.calibUndo, calibAnchor: s.calibAnchor,
       bookFav: s.bookFav, bookDiary: s.bookDiary,
       trashedPlans: s.trashedPlans, purgedPlanIds: s.purgedPlanIds,
       purgedTaskIds: s.purgedTaskIds,
@@ -600,6 +602,9 @@ export default class App extends React.Component {
       const mult = item.fh >= 0 ? { dislike: 1.3, like: 0.7 } : { dislike: 0.7, like: 1.3 };
       if (mult[pref]) m *= mult[pref];
     }
+    // 夜の申告から少しずつ合わせた、行動ごとの補正（calib.js）
+    const cal = (this.state.actCal || {})[normTitle(item.name)];
+    if (cal) m *= cal;
     // 体・心の2軸: 行動の（体, 心）固有値に軸別の個人係数×バフ・デバフを掛けて合算
     // 例) 接客(体5, 心8)・心の疲れやすさ×1.2 → 5×1.0 + 8×1.2 = 14.6/h
     const st = this.state;
@@ -626,10 +631,11 @@ export default class App extends React.Component {
     const p = pref !== undefined ? pref : (st.prefs || {})[normTitle(item.name)];
     const pm = p ? ({ dislike: recover ? 0.7 : 1.3, like: recover ? 1.3 : 0.7 }[p] || 1) : 1;
     const min = item.defMin || 30;
+    const cal = (st.actCal || {})[normTitle(item.name)] || 1; // 行動ごとの補正（calib.js）
     let b, m;
     if (typeof item.body === 'number' && typeof item.mind === 'number') { const sg = recover ? -1 : 1; b = item.body * bc * sg; m = item.mind * mc * sg; }
     else { b = item.fh * bc / 2; m = item.fh * mc / 2; }
-    const k = pm * min / 60;
+    const k = pm * cal * min / 60;
     const tot = (b + m) * k;
     return { body: Math.round(b * k), mind: Math.round(m * k), total: Math.round(tot) || (tot < 0 ? -1 : 1), min, minText: this.fmtMin(min) };
   }
@@ -2598,6 +2604,7 @@ export default class App extends React.Component {
       patch.bodyRecCoef = coef(sel.bodyRec);
       patch.mindFatCoef = coef(sel.mindFat);
       patch.mindRecCoef = coef(sel.mindRec);
+      patch.calibAnchor = { bodyFatCoef: patch.bodyFatCoef, mindFatCoef: patch.mindFatCoef, bodyRecCoef: patch.bodyRecCoef, mindRecCoef: patch.mindRecCoef }; // 夜の調整の引きとめ先
       if (Array.isArray(sel.hide)) patch.hiddenCats = sel.hide;
       else if (sel.occupation && this.OCC_HIDDEN[sel.occupation]) patch.hiddenCats = this.OCC_HIDDEN[sel.occupation];
       // 欠かさずやること・やりたいことは「1日に1回」で登録
@@ -2781,7 +2788,8 @@ export default class App extends React.Component {
     this.save();
     this.toast('テンプレを削除しました');
   };
-  setAxisCoef = (key, v) => { this.set({ [key]: v }); this.save(); };
+  // 自分で選んだ疲れやすさは、夜の調整の引きとめ先にもなる
+  setAxisCoef = (key, v) => { this.set({ [key]: v, calibAnchor: { ...(this.state.calibAnchor || { bodyFatCoef: this.state.bodyFatCoef || 1, mindFatCoef: this.state.mindFatCoef || 1, bodyRecCoef: this.state.bodyRecCoef || 1, mindRecCoef: this.state.mindRecCoef || 1 }), [key]: v } }); this.save(); };
   restoreTrash = (idx) => {
     const entries = this.state.entries.map((e, i) => i === idx ? { ...e, exp: false, trashedAt: null } : e);
     this.set({ entries });
@@ -2947,9 +2955,34 @@ export default class App extends React.Component {
       this.save();
       return;
     }
-    const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts: now.getTime(), hm, cond: d.cond, mood: d.mood, fatigue: d.fat, note: (d.note || '').trim() }];
-    this.applyFatigue(d.fat, '就寝時の疲労', { bedLog, bedFlow: true, bedDay: today }, today);
+    const cal = this.calibNight(today, d.fat, !!d.seen);
+    const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts: now.getTime(), hm, cond: d.cond, mood: d.mood, fatigue: d.fat, note: (d.note || '').trim(), pred: cal.predicted, seen: !!d.seen }];
+    this.applyFatigue(d.fat, '就寝時の疲労', { bedLog, bedFlow: true, bedDay: today, ...cal.patch }, today);
   };
+  /* 夜の申告で体感に合わせる（calib.js）: ずれ＝申告 − 現在地 と、その日の内訳を残し、係数と行動ごとの補正を少し動かす。
+     同じ夜に記録しなおしたときは、最初の現在地・内訳を使い、その夜の調整をやり直す（2回ぶん動かさない） */
+  calibNight(today, reported, seen) {
+    const st = this.state;
+    const prev = (st.calibLog || []).find(x => x.date === today);
+    const predicted = prev ? prev.predicted : this.pileCount();
+    if (st.sampleMode) return { predicted, patch: {} };
+    const undo = st.calibUndo && st.calibUndo.date === today ? st.calibUndo : null;
+    const base = undo ? undo.coefs : { bodyFatCoef: st.bodyFatCoef || 1, mindFatCoef: st.mindFatCoef || 1, bodyRecCoef: st.bodyRecCoef || 1, mindRecCoef: st.mindRecCoef || 1 };
+    const baseAct = undo ? undo.actCal : (st.actCal || {});
+    // 係数・行動ごとの補正を外した「もとの量」に直すための割り算（記録したときの値はわからないので、いまの値で近似）
+    const div = (e) => ({ bf: base.bodyFatCoef, mf: base.mindFatCoef, rec: (base.bodyRecCoef + base.mindRecCoef) / 2, w: baseAct[normTitle(e.title)] || 1 });
+    const parts = prev && prev.Bb != null ? { B: prev.B, M: prev.M, R: prev.R, Bb: prev.Bb, Mb: prev.Mb, Rb: prev.Rb, acts: prev.acts } : dayParts(
+      st.entries.filter(e => e.date === today && !e.exp && !e.wakeAdd && !e._sample && e.delta),
+      (e) => this.entryBodyMind(e), div, (e) => (e.event ? null : normTitle(e.title)));
+    const rec = { date: today, reported, predicted, seen, buff: this.buffEntries().length > 0, ...parts };
+    const calibLog = [...(st.calibLog || []).filter(x => x.date !== today), rec].sort((a, b) => a.date.localeCompare(b.date)).slice(-60);
+    // 引きとめ先＝本人が設定した疲れやすさ（はじめての夜はその時の値）
+    const calibAnchor = st.calibAnchor || base;
+    const r = calibrate(calibLog, base, baseAct, calibAnchor);
+    const patch = { calibLog, calibAnchor };
+    if (r) Object.assign(patch, r.coefs, { actCal: r.actCal, calibUndo: { date: today, coefs: base, actCal: baseAct } });
+    return { predicted, patch };
+  }
   /* 🌙が落ち切る前に「つぎへ」を押しても、選んだ疲労度の数まで山を減らす */
   settleFatigue() {
     const target = this._fatTarget;
@@ -4517,7 +4550,7 @@ export default class App extends React.Component {
     const COEF_STEPS = [0.8, 0.9, 1, 1.1, 1.2];
     const coefOpts = (key, labels) => COEF_STEPS.map((v, i) => ({
       text: labels[i], v,
-      on: Math.abs((st[key] || 1) - v) < 0.001,
+      on: COEF_STEPS.reduce((a, x) => Math.abs(x - (st[key] || 1)) < Math.abs(a - (st[key] || 1)) ? x : a) === v, // 夜の申告で少しずつ動くので、いちばん近い段を選択中にする
       onPick: () => this.setAxisCoef(key, v),
     }));
     const FAT_LABELS = ['かなり疲れにくい', '疲れにくい', 'ふつう', '疲れやすい', 'かなり疲れやすい'];
@@ -4581,6 +4614,7 @@ export default class App extends React.Component {
       })() : null,
       openPredict: this.openPredict, closePredict: this.closePredict, setPredictT: this.setPredictT,
       wakeDraft: st.wakeDraft, setWakeDraft: this.setWakeDraft, finishWake1: this.finishWake1,
+      seenBedHere: () => { if (!(st.bedDraft && st.bedDraft.seen)) this.setBedDraft('seen', true); },
       // 疲労度スライダーの「現在地」＝いまの山の個数（あとから前の日の就寝を記録するときは出さない）
       fatHere: (st.screen === 'wake1' || (st.screen === 'bed1' && !(st.bedDraft && st.bedDraft.hm != null))) ? Math.min(100, Math.max(0, this.pileCount())) : null,
       wakeFlow: st.wakeFlow && st.screen === 'shaka', goWake2: this.goWake2, goWake3: this.goWake3, backWake: this.backWake,
@@ -4742,7 +4776,7 @@ export default class App extends React.Component {
       trashRows, trashPlanRows, trashCount: trashRows.length + trashPlanRows.length, goTrash: this.goTrash,
       /* マイページの設定サブ画面 */
       slotTimeRows, slotTimesSub, catRows, templateRows, sensSections,
-      sensSub: '体×' + (st.bodyFatCoef || 1).toFixed(1) + ' ・ 心×' + (st.mindFatCoef || 1).toFixed(1),
+      sensSub: '体×' + (st.bodyFatCoef || 1).toFixed(2) + ' ・ 心×' + (st.mindFatCoef || 1).toFixed(2),
       goSlotTimes: this.goSlotTimes, goCatsManage: this.goCatsManage,
       goTemplates: this.goTemplates, goSensitivity: this.goSensitivity,
       catPalette: st.catPalette, setCatSoft: () => this.setCatPalette('soft'), setCatVivid: () => this.setCatPalette('vivid'),

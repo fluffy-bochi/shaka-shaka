@@ -44,8 +44,10 @@ const LVN = ['軽い', 'ふつう', '強い'];
 // 閉じている詳細の帯に出す、いまの調子のまとめ
 export const buffSummary = (rows) => (rows || []).filter(r => r.lv != null).map(r => r.name + '（' + LVN[r.lv] + '）').join('・');
 
-function Rating({ title, opts, value, onPick, labels, rows, touched, slider, here }) {
+function Rating({ title, opts, value, onPick, labels, rows, touched, slider, here, onSeen }) {
   const [open, setOpen] = React.useState(false);
+  // 現在地を見た（詳細を開いた）ことを記録する（夜の調整で重みを下げる）
+  React.useEffect(() => { if (open && here != null && onSeen) onSeen(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const sum = buffSummary(rows);
   const has = !!sum;
   // 疲労度のスライダー: 0〜100 を 1 きざみ
@@ -154,7 +156,7 @@ export function BedCheck({ v }) {
           style={{ display: 'block', width: 'calc(100% - 40px)', margin: '0 20px 12px', boxSizing: 'border-box', resize: 'none', border: 'none', borderRadius: 14, background: '#fff', padding: '12px 13px', fontSize: 14, fontWeight: 600, lineHeight: 1.5, color: INK, fontFamily: 'inherit', boxShadow: '0 2px 10px rgba(27,27,24,.05)', outline: 'none' }} />
         <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setBedDraft('cond', x)} rows={v.buffRowsBody} touched={v.buffTouched} />
         <Rating title="気分" opts={MOOD.map(([g], i) => [i + 1, g])} labels={MOOD.map(c => c[1])} value={d.mood} onPick={(x) => v.setBedDraft('mood', x)} rows={v.buffRowsMind} touched={v.buffTouched} />
-        <Rating title="いまの疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setBedDraft('fat', x)} slider here={v.fatHere} />
+        <Rating title="いまの疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setBedDraft('fat', x)} slider here={v.fatHere} onSeen={v.seenBedHere} />
       </div>
       <div style={{ ...foot, justifyContent: 'space-between' }}>
         <button onClick={v.goHome} style={btnSub}>やめる</button>
