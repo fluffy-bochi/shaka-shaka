@@ -42,6 +42,12 @@ export function summarizeDay(st, d, carry = null, now = Date.now()) {
   const curve = fatigueCurve(list, d, wk && wk.fatigue != null ? wk.fatigue : (carry || 0), { from: wk ? wk.ts : null, to: bd ? bd.ts : null }); // 起床〜就寝
   const zone = { yuttari: 0, hodohodo: 0, michimichi: 0 };
   curve.forEach(v => { zone[['yuttari', 'hodohodo', 'michimichi'][zoneOf(v)]] += 10; });
+  // 投稿の数: 起床・就寝の記録＋1回の記録のまとまり＋つぶやき。行動の記録は1つずつ数える（まとまりの中の歯みがき・洗顔…も1つずつ）
+  const all = (st.entries || []).filter(e => e.date === d && !e.exp && !e.wakeAdd && !e.autoSym && !e.needsSetup && !isSample(e) && done(e));
+  const tweets = all.filter(e => e.event).length;
+  const actsN = all.filter(e => !e.event).length;
+  const groups = new Set(all.filter(e => !e.event).map((e, i) => e.gid || (e.plan ? 'p:' + e.plan : 'i:' + i))).size;
+  const counts = { posts: groups + tweets + (wk ? 1 : 0) + (bd ? 1 : 0), acts: actsN, tweets };
   // カテゴリ別・行動別
   const cats = {}, acts = {};
   let plus = 0, minus = 0;
@@ -64,7 +70,7 @@ export function summarizeDay(st, d, carry = null, now = Date.now()) {
     wake: rec(wk), bed: rec(bd),
     fat, fatMax: mx, fatMin: mn, zone, type: typeOfCurve(curve).id,
     rec: list.length, plus, minus, cats, acts, freq,
-    end: lv,
+    end: lv, counts,
     screens: Object.fromEntries(Object.entries((st.screenTime || {})[d] || {}).map(([k, sec]) => [k, Math.round(sec / 6) / 10])), // 画面ごとの利用時間（分・小数1桁）
   };
 }
@@ -82,7 +88,11 @@ export function summarizeDays(st, dates) {
   const out = {}; let carry = null, prev = null;
   dates.forEach(d => {
     if (prev && shiftDate(prev, 1) !== d) carry = null; // 間が空いたら引き継がない
-    const s = summarizeDay(st, d, carry); out[d] = s; carry = s.end; prev = d;
+    const s = summarizeDay(st, d, carry);
+    // 寝ているあいだの回復＝前の日の就寝の疲労度 − この日の起床の疲労度
+    const pb = (st.bedLog || []).find(b => b.date === shiftDate(d, -1));
+    if (pb && pb.fatigue != null && s.wake && s.wake.fatigue != null) s.sleepRec = pb.fatigue - s.wake.fatigue;
+    out[d] = s; carry = s.end; prev = d;
   });
   return out;
 }
@@ -128,7 +138,7 @@ export function csvFiles(parts) {
   parts.forEach(({ code, days: ds }) => {
     Object.keys(ds).sort().forEach(d => {
       const s = ds[d], w = s.wake || {}, b = s.bed || {};
-      days.push([code, d, w.t, w.cond, w.mood, w.fatigue, b.t, b.cond, b.mood, b.fatigue, s.fatMax && s.fatMax.v, s.fatMax && s.fatMax.t, s.fatMin && s.fatMin.v, s.fatMin && s.fatMin.t, s.zone && s.zone.yuttari, s.zone && s.zone.hodohodo, s.zone && s.zone.michimichi, s.type, s.rec, s.plus, s.minus]);
+      days.push([code, d, w.t, w.cond, w.mood, w.fatigue, b.t, b.cond, b.mood, b.fatigue, s.fatMax && s.fatMax.v, s.fatMax && s.fatMax.t, s.fatMin && s.fatMin.v, s.fatMin && s.fatMin.t, s.zone && s.zone.yuttari, s.zone && s.zone.hodohodo, s.zone && s.zone.michimichi, s.type, s.rec, s.plus, s.minus, (s.counts || {}).posts, (s.counts || {}).acts, (s.counts || {}).tweets, s.sleepRec]);
       (s.fat || []).forEach(p => pts.push([code, d, p.t, p.v]));
       Object.entries(s.acts || {}).forEach(([k, a]) => { const f = (s.freq || {})[k] || {}; acts.push([code, d, k, a.name, a.n, a.min, f.req ? freqText(f.req) : '', f.fav ? freqText(f.fav) : '']); });
       Object.entries(s.cats || {}).forEach(([k, c]) => cats.push([code, d, CAT_NAME[k] || k, c.n, c.min]));
@@ -137,7 +147,7 @@ export function csvFiles(parts) {
     adherence(ds).forEach(a => a.weeks.forEach(w => adh.push([code, w.week, a.key, a.name, a.kind === 'req' ? '生活必須行動' : 'やりたいこと', freqText(a.freq), w.target, w.done, w.rate == null ? '' : Math.round(w.rate * 1000) / 10])));
   });
   return {
-    '日ごと.csv': toCsv(['参加者', '日付', '起床時刻', '起床_体調', '起床_気分', '起床_疲労度', '就寝時刻', '就寝_体調', '就寝_気分', '就寝_疲労度', '疲労度_最高', '最高_時刻', '疲労度_最低', '最低_時刻', 'ゆったり_分', 'ほどほど_分', 'みちみち_分', 'タイプ', '記録数', '疲労_合計', '回復_合計'], days),
+    '日ごと.csv': toCsv(['参加者', '日付', '起床時刻', '起床_体調', '起床_気分', '起床_疲労度', '就寝時刻', '就寝_体調', '就寝_気分', '就寝_疲労度', '疲労度_最高', '最高_時刻', '疲労度_最低', '最低_時刻', 'ゆったり_分', 'ほどほど_分', 'みちみち_分', 'タイプ', '記録数', '疲労_合計', '回復_合計', '投稿数', '行動の記録数', 'つぶやき数', '睡眠中の回復'], days),
     '疲労度の推移.csv': toCsv(['参加者', '日付', '時刻', '疲労度'], pts),
     '行動.csv': toCsv(['参加者', '日付', '行動ID', '行動名', '回数', '分', '生活必須行動の頻度', 'やりたいことの頻度'], acts),
     '週ごとの実行率.csv': toCsv(['参加者', '週の始まり(月)', '行動ID', '行動名', '種類', '頻度', '目標回数', '実施回数', '実行率(%)'], adh),
@@ -228,6 +238,8 @@ export function demoParticipants(nDays = 28) {
         bed: { t: t(bedMin), cond: 1 + Math.floor(r() * 5), mood: 1 + Math.floor(r() * 5), fatigue: bf },
         fat, fatMax: mx, fatMin: mn, zone, type,
         rec: fat.length - 2 + Object.values(acts).reduce((s, x) => s + x.n, 0), plus, minus, cats, acts, freq, end: bf,
+        counts: (() => { const acts = 4 + Math.floor(r() * 8 * p.keep + 2), tw = Math.floor(r() * 4 * p.keep); return { posts: 2 + Math.ceil(acts / 2) + tw, acts, tweets: tw }; })(),
+        sleepRec: di ? Math.max(0, Math.round(30 + r() * 40 - 10)) : undefined,
         screens: Object.fromEntries(SCREENS.map((k, i) => [k, Math.round((SCREEN_BASE[i] * (0.5 + r()) * (p.keep + 0.3)) * 10) / 10]).filter(x => x[1] > 0.2)),
       };
     });
