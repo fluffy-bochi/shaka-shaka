@@ -1,4 +1,7 @@
 import React from 'react';
+import Emo from '../fluent';
+import { FreqPop } from './Pick';
+import { freqText } from '../research';
 
 /* オンボーディング（記録フロー設計.dc.html のオンボーディングを移植）
    1問1画面・上部プログレスバー・大きな選択カード。約1分・あとでマイページから変更可 */
@@ -20,8 +23,8 @@ export default function Onboard({ v }) {
       </div>
       <div className="nos" style={{ flex: 1, overflowY: 'auto', padding: '14px 24px 24px', display: 'flex', flexDirection: 'column' }}>
         {step === 1 && <Welcome v={v} />}
-        {step === 2 && <ActPick v={v} k="req" icon="📌" q="欠かさずやりたいことは？" sub="生活に必須なこと（1日1回で登録・あとで変更できます）" />}
-        {step === 3 && <ActPick v={v} k="fav" icon="💗" q="やりたいことは？" sub="楽しみにしたいこと（1日1回で登録・あとで変更できます）" />}
+        {step === 2 && <OnbWheel v={v} k="req" q="生活に必要なことは？" onlyCat="house" />}
+        {step === 3 && <OnbWheel v={v} k="fav" q="やりたいことは？" />}
         {step === 4 && <Choice v={v} k="age" icon="🎂" q="年代を教えてください" sub="周りとくらべる基準に使います" opts={['10代', '20代', '30代', '40代', '50代', '60代〜']} cols={2} />}
         {step === 5 && <Choice v={v} k="gender" icon="🧍" q="からだの性別は？" sub="疲労の目安の参考にします" opts={['女性', '男性', 'その他', '答えない']} cols={2} />}
         {step === 6 && <Choice v={v} k="occupation" icon="💼" q="おもな職業・活動は？" sub="記録するカテゴリのおすすめ表示に使います" opts={['会社員（デスクワーク）', '学生', '立ち仕事・接客', '医療・介護', '主婦・主夫', 'その他']} emojis={['💻', '🎒', '🙋', '🩺', '🏠', '✨']} cols={1} />}
@@ -60,6 +63,102 @@ function Head({ icon, q, sub }) {
       <div style={{ textAlign: 'center', fontSize: 20, fontWeight: 900, marginTop: 10, lineHeight: 1.5 }}>{q}</div>
       <div style={{ textAlign: 'center', fontSize: 11.5, color: '#8a8a82', marginTop: 6, lineHeight: 1.6 }}>{sub}</div>
     </>
+  );
+}
+
+/* 行動選択と同じ「くるくる回る」縦のリストで選ぶ（アプリの操作に慣れてもらうため）。
+   行の右の「必」（やりたいことは♡）を押すと選べて、その横の頻度（はじめは1日1回）を押すと回数を変えられる。
+   onlyCat: そのカテゴリの行動だけ（生活に必要なこと＝家事・生活） */
+const ROW_I = 58, ROW_C = 34;
+function OnbWheel({ v, k, q, onlyCat }) {
+  const sel = v.obSel[k] || [], freqs = v.obSel[k + 'F'] || {};
+  const [open, setOpen] = React.useState({});
+  const [idx, setIdx] = React.useState(0);
+  const [pop, setPop] = React.useState(null);
+  const box = React.useRef(null);
+  const cats = onlyCat ? v.obCats.filter(c => c.id === onlyCat) : v.obCats;
+  const rows = [];
+  cats.forEach(c => {
+    if (!onlyCat) rows.push({ type: 'cat', cat: c, key: 'c:' + c.id });
+    if (onlyCat || open[c.id]) c.items.forEach(it => rows.push({ type: 'item', cat: c, it, key: c.id + ':' + it.name }));
+  });
+  const hOf = (r) => (r.type === 'item' ? ROW_I : ROW_C);
+  const offs = []; rows.reduce((a, r) => { offs.push(a); return a + hOf(r); }, 0);
+  const onScroll = () => {
+    const el = box.current; if (!el) return;
+    const mid = el.scrollTop + el.clientHeight / 2 - el.clientHeight / 2; // 上の余白ぶんずらした位置
+    let best = 0, bd = Infinity;
+    rows.forEach((r, i) => { const c = offs[i] + hOf(r) / 2; const d = Math.abs(c - mid - 0); if (d < bd) { bd = d; best = i; } });
+    if (best !== idx) setIdx(best);
+  };
+  const center = (i) => { const el = box.current; if (!el) return; el.scrollTo({ top: offs[i] + hOf(rows[i]) / 2 - 0, behavior: 'smooth' }); };
+  // はじめは真ん中あたりの行から（上下に行が並んで見えるように）
+  React.useLayoutEffect(() => {
+    const el = box.current; if (!el || !rows.length) return;
+    const mid = Math.floor((rows.length - 1) / 2);
+    el.scrollTop = offs[mid] + hOf(rows[mid]) / 2; setIdx(mid);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const keepKey = React.useRef(null);
+  // カテゴリを開け閉めしたら、そのカテゴリを真ん中に保つ
+  React.useLayoutEffect(() => {
+    const el = box.current; if (!el || !keepKey.current) return;
+    const i = rows.findIndex(r => r.key === keepKey.current); keepKey.current = null;
+    if (i >= 0) { el.scrollTop = offs[i] + hOf(rows[i]) / 2; setIdx(i); }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tap = (r, i) => {
+    if (i !== idx) { center(i); return; }
+    if (r.type === 'cat') { keepKey.current = r.key; setOpen(o => ({ ...o, [r.cat.id]: !o[r.cat.id] })); }
+  };
+  const mark = k === 'req' ? '必' : '♡';
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, margin: '0 -24px -24px' }}>
+      <div style={{ textAlign: 'center', fontSize: 20, fontWeight: 900, lineHeight: 1.5, padding: '4px 24px 0' }}>{q}</div>
+      <div style={{ textAlign: 'center', fontSize: 11.5, color: '#8a8a82', marginTop: 4 }}>{mark === '必' ? '「必」' : '「♡」'}を押して選んでね</div>
+      <div style={{ position: 'relative', flex: 1, minHeight: 300, marginTop: 10 }}>
+        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 0, height: 0, borderTop: '8px solid transparent', borderBottom: '8px solid transparent', borderLeft: '12px solid #1b1b18', pointerEvents: 'none' }} />
+        <div ref={box} onScroll={onScroll} className="nos" style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory' }}>
+          <div style={{ height: '50%' }} />
+          {rows.map((r, i) => {
+            const on = i === idx;
+            if (r.type === 'cat') {
+              return (
+                <div key={r.key} onClick={() => tap(r, i)} style={{ height: ROW_C, display: 'flex', alignItems: 'center', padding: on ? '0 28px 0 26px' : '0 36px 0 38px', scrollSnapAlign: 'center', boxSizing: 'border-box', cursor: 'pointer' }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', height: on ? 30 : 26, borderRadius: 7, background: '#fcfaf3', border: '2px solid ' + r.cat.color, overflow: 'hidden', boxSizing: 'border-box' }}>
+                    <span style={{ flex: '0 0 30px', alignSelf: 'stretch', background: r.cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5 }}>{open[r.cat.id] ? '▼' : '▶'}</span>
+                    <span style={{ flex: 1, textAlign: 'center', fontSize: on ? 14.5 : 13, fontWeight: 800, paddingRight: 30 }}>{r.cat.name}</span>
+                  </div>
+                </div>
+              );
+            }
+            const picked = sel.includes(r.it.name);
+            const f = freqs[r.it.name] || { k: 1, unit: '日', n: 1 };
+            return (
+              <div key={r.key} onClick={() => tap(r, i)} style={{ height: ROW_I, display: 'flex', alignItems: 'center', padding: on ? '0 22px 0 26px' : '0 30px 0 38px', scrollSnapAlign: 'center', boxSizing: 'border-box', cursor: 'pointer' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: on ? 52 : 46, background: '#fcfaf3', borderRadius: 10, overflow: 'hidden', padding: '0 8px', boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
+                  <span style={{ position: 'absolute', left: 0, top: 0, width: 36, height: 36, background: r.cat.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+                  <span style={{ position: 'relative', flex: '0 0 auto' }}><Emo e={r.it.glyph} size={on ? 28 : 24} /></span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: on ? 15 : 14, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.it.name}</span>
+                  {picked && <button onClick={(e) => { e.stopPropagation(); setPop(r.it.name); }} style={{ flex: '0 0 auto', border: '1px solid #1b1b18', background: '#fff', borderRadius: 999, padding: '3px 8px', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{freqText(f)}</button>}
+                  <button onClick={(e) => { e.stopPropagation(); v.obToggle(k, r.it.name); }} aria-label={mark} style={{ flex: '0 0 auto', width: 34, height: 30, borderRadius: 999, border: 'none', background: picked ? '#1b1b18' : '#efece3', color: picked ? '#fff' : '#1b1b18', fontSize: 14, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit' }}>{mark}</button>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ height: '50%' }} />
+        </div>
+        {pop && (
+          <div onClick={() => setPop(null)} style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(27,27,24,.3)' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: 0, right: 0, bottom: 72, height: 120 }}>
+              <FreqPop key={pop} label={(k === 'req' ? '生活に必要なこと' : 'やりたいこと') + '・' + pop} value={freqs[pop] || { k: 1, unit: '日', n: 1 }}
+                onSave={(f) => { v.obSetFreq(k, pop, f); setPop(null); }} onDelete={() => { v.obToggle(k, pop); setPop(null); }} onClose={() => setPop(null)} />
+            </div>
+          </div>
+        )}
+      </div>
+      <div style={{ padding: '10px 24px 24px' }}>
+        <button onClick={v.obNext} style={{ ...nextBtn, marginTop: 0 }}>{sel.length ? '次へ →（' + sel.length + '）' : 'とばす →'}</button>
+      </div>
+    </div>
   );
 }
 
