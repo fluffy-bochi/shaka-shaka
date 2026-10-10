@@ -2602,8 +2602,8 @@ export default class App extends React.Component {
       else if (sel.occupation && this.OCC_HIDDEN[sel.occupation]) patch.hiddenCats = this.OCC_HIDDEN[sel.occupation];
       // 欠かさずやること・やりたいことは「1日に1回」で登録
       const all = { ...(this.state.actFreq || {}) }, day = { k: 1, unit: '日', n: 1 };
-      (sel.req || []).forEach(n => { const t = normTitle(n); all[t] = { ...(all[t] || {}), req: day }; });
-      (sel.fav || []).forEach(n => { const t = normTitle(n); all[t] = { ...(all[t] || {}), fav: day }; });
+      (sel.req || []).forEach(n => { const t = normTitle(n); all[t] = { ...(all[t] || {}), req: (sel.reqF || {})[n] || day }; });
+      (sel.fav || []).forEach(n => { const t = normTitle(n); all[t] = { ...(all[t] || {}), fav: (sel.favF || {})[n] || day }; });
       patch.actFreq = all;
     }
     this.set(patch);
@@ -4611,7 +4611,8 @@ export default class App extends React.Component {
       ].map(o => ({ ...o, on: Math.abs((cur || 1) - o.v) < 0.001, onPick: () => this.onCycField(k, o.v) })),
       obStep: st.obStep || 1, obSel: st.obSel || {},
       obPick: this.obPick, obToggle: this.obToggle, obNext: this.obNext, obBack: this.obBack,
-      obCats: st.screen === 'onboard' ? this.allCats().filter(c => !PICK_REMOVED_CATS.includes(c.id)).map(c => ({ id: c.id, name: c.name, glyph: c.glyph || '⭐', items: c.items.map(t => ({ name: t.name, glyph: t.glyph })) })) : [],
+      obCats: st.screen === 'onboard' ? this.allCats().filter(c => !PICK_REMOVED_CATS.includes(c.id)).map(c => ({ id: c.id, name: c.name, glyph: c.glyph || '⭐', color: this.catColor(c.color), items: c.items.filter(t => !this.profileExcl().has(normTitle(t.name))).map(t => ({ name: t.name, glyph: t.glyph })) })) : [],
+      obSetFreq: (k, name, f) => this.setState(s0 => ({ obSel: { ...s0.obSel, [k + 'F']: { ...((s0.obSel || {})[k + 'F'] || {}), [name]: f } } })),
       skipOnboard: this.skipOnboard, finishOnboard: this.finishOnboard,
       redoOnboard: () => this.set({ screen: 'onboard', obStep: 1, obSel: {} }),
       obIsFemale: (st.obSel && st.obSel.gender) === '女性',
