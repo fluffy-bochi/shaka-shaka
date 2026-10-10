@@ -114,7 +114,8 @@ function OnbWheel({ v, k, q, onlyCat }) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, margin: '0 -24px -24px' }}>
       <div style={{ textAlign: 'center', fontSize: 20, fontWeight: 900, lineHeight: 1.5, padding: '4px 24px 0' }}>{q}</div>
       <div style={{ textAlign: 'center', fontSize: 11.5, color: '#8a8a82', marginTop: 4 }}>{mark === '必' ? '「必」' : '「♡」'}を押して選んでね</div>
-      <div style={{ position: 'relative', flex: 1, minHeight: 300, marginTop: 10 }}>
+      {/* 行動選択の下のリストと同じくらいの高さ */}
+      <div style={{ position: 'relative', flex: '0 0 auto', height: 'min(500px, 58vh)', marginTop: 10 }}>
         <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', zIndex: 2, width: 0, height: 0, borderTop: '8px solid transparent', borderBottom: '8px solid transparent', borderLeft: '12px solid #1b1b18', pointerEvents: 'none' }} />
         <div ref={box} onScroll={onScroll} className="nos" style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory' }}>
           <div style={{ height: '50%' }} />
@@ -155,6 +156,7 @@ function OnbWheel({ v, k, q, onlyCat }) {
           </div>
         )}
       </div>
+      <div style={{ flex: 1 }} />
       <div style={{ padding: '10px 24px 24px' }}>
         <button onClick={v.obNext} style={{ ...nextBtn, marginTop: 0 }}>{sel.length ? '次へ →（' + sel.length + '）' : 'とばす →'}</button>
       </div>
