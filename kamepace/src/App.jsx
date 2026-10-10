@@ -4581,6 +4581,8 @@ export default class App extends React.Component {
       })() : null,
       openPredict: this.openPredict, closePredict: this.closePredict, setPredictT: this.setPredictT,
       wakeDraft: st.wakeDraft, setWakeDraft: this.setWakeDraft, finishWake1: this.finishWake1,
+      // 疲労度スライダーの「現在地」＝いまの山の個数（あとから前の日の就寝を記録するときは出さない）
+      fatHere: (st.screen === 'wake1' || (st.screen === 'bed1' && !(st.bedDraft && st.bedDraft.hm != null))) ? Math.min(100, Math.max(0, this.pileCount())) : null,
       wakeFlow: st.wakeFlow && st.screen === 'shaka', goWake2: this.goWake2, goWake3: this.goWake3, backWake: this.backWake,
       wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null,
       wakeHeader: (() => {
