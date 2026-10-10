@@ -1197,7 +1197,8 @@ export default class App extends React.Component {
     this.set({ searchCart: cart, searchTotalMin: total, searchFracs: cart.length ? mins.map(m => m / total) : [] });
   };
   // 「メニューを追加」は検索窓ではなく記録の入口画面（検索・予定・大カテゴリ）へ。確認カートは保持
-  addMoreMenu = () => this.set({ searchStep: null, catId: null, cart: {}, keywords: [''], resolvedIdx: [], moreKw: null });
+  // 実行中から記録した確認画面で「行動を追加」→ 実行中のリストに足す画面へ（STARTしても実行した時間は残る）
+  addMoreMenu = () => this.set({ searchStep: null, catId: null, cart: {}, keywords: [''], resolvedIdx: [], moreKw: null, ...(this.state.confirmOrigin === 'run' && this.state.run ? { runAdd: true } : null) });
   openIntensity = (id) => this.set({ intensityId: id });
   closeIntensity = () => this.set({ intensityId: null });
   setIntensityPick = (qIdx, optIdx) => {
@@ -2158,6 +2159,18 @@ export default class App extends React.Component {
     if (!items.length) return;
     const now = Date.now();
     this.unlockBeep();
+    // すでに実行中（記録の確認画面から行動を足したときなど）なら、置きかえずに足して続ける。
+    // それまでに実行した時間は消さない（消えるのは「削除」か記録したときだけ）
+    const cur0 = this.state.run;
+    if (cur0 && Array.isArray(cur0.segs) && cur0.segs.length) {
+      const segs = this.runClose(cur0, now);
+      const add = items.map(x => ({ ...x }));
+      const its = [...cur0.items, ...add];
+      const idx = cur0.items.length;
+      this.setRun({ ...cur0, items: its, cur: idx, segs: [...segs, { uid: its[idx].uid, a: now, b: null }] });
+      this.set({ screen: 'run', runAdd: false, searchStep: null, confirmOrigin: 'search', searchCart: [], cart: {}, anchorEnd: null });
+      return;
+    }
     // alarm: 全体（all）と実施中（cur）。mode='alarm'＝時刻 at に鳴る／'timer'＝all は開始から min 分、cur はその行動の実施時間が予定（items[cur].min）に達したら
     this.setRun({ items: items.map(x => ({ ...x })), cur: 0, segs: [{ uid: items[0].uid, a: now, b: null }], name: name || '', fromList: !!fromList, startAt: now,
       alarm: { all: { mode: 'timer', at: '', min: 0 }, cur: { mode: 'timer', at: '', none: true } }, fired: {} }); // 実施中は最初は時間なし（none）
