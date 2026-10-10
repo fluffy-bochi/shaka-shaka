@@ -8,6 +8,7 @@ import SlotPill from './SlotPill';
 import EmojiPicker from './EmojiPicker';
 import Emo from '../fluent';
 import Pick, { HmInput } from './Pick';
+import { BuffDetail, buffSummary } from './Wake';
 
 const mono = { fontFamily: "'Space Mono',monospace" };
 const msIcon = (size, color, fill = true) => ({ fontFamily: 'Material Symbols Rounded', ...(fill ? { fontVariationSettings: "'FILL' 1" } : {}), fontSize: size, color });
@@ -581,6 +582,23 @@ function NewActPopup({ v }) {
 }
 
 /* ---- きもち・できごと popup（時間なしの心イベント） ---- */
+/* つぶやきの体調の詳細: いまの調子（バフ・デバフ）を強さつきで。入っていれば帯の色が変わり、前のままなら確認する */
+function TweetBuffDetail({ v }) {
+  const [open, setOpen] = React.useState(false);
+  const seen = new Set();
+  const rows = [...v.buffRowsBody, ...v.buffRowsMind].filter(r => (seen.has(r.id) ? false : seen.add(r.id)));
+  const sum = buffSummary(rows);
+  return (
+    <div style={{ marginTop: 12, borderRadius: 12, overflow: 'hidden', border: '1px solid #bab5a7' }}>
+      {open && <div style={{ padding: '2px 12px 12px', background: '#fcfaf3' }}><BuffDetail rows={rows} /></div>}
+      <button onClick={() => setOpen(!open)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', border: 'none', background: sum ? '#c4f000' : '#8a8a82', color: sum ? '#2f3a00' : '#fff', fontSize: 11, fontWeight: 700, padding: '7px 12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+        <span style={{ fontSize: 9 }}>{open ? '▼' : '▶'}</span>
+        <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{!open && sum ? sum + (v.buffTouched ? '' : '　これで大丈夫ですか？') : '詳細（いまの調子）'}</span>
+      </button>
+    </div>
+  );
+}
+
 export function MoodPopup({ v }) {
   // 💬 つぶやき（きもち・できごと・体調）: 登録画面と同じ見た目。時刻は「いま」（変えられる）。
   // きもちは選ばなくてもOK（アイコンは気分の顔5種から）。体調・心の調子・体温も入れられる
@@ -653,6 +671,7 @@ export function MoodPopup({ v }) {
         {scale(v.moodCond, v.setMoodCond, ['最悪', '悪い', 'ふつう', '良い', '絶好調'])}
         <div style={lab}>心の調子</div>
         {scale(v.moodMind, v.setMoodMind, ['最悪', '悪い', 'ふつう', '良い', '最高'])}
+        <TweetBuffDetail v={v} />
         <div style={{ ...lab, display: 'flex', alignItems: 'center', gap: 10 }}>
           体温
           <input type="number" inputMode="decimal" step="0.1" value={v.moodTemp} onChange={(e) => v.setMoodTemp(e.target.value)} placeholder="36.5"
