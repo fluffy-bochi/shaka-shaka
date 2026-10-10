@@ -43,14 +43,20 @@ function monthTarget(f, dim) {
 }
 /* 時間の入力 [時]:[分]（何時間でも）。value・onChange は合計の分 */
 export function HmInput({ value, onChange, size = 16 }) {
-  const v = Math.max(0, Math.round(Number(value) || 0)), h = Math.floor(v / 60), m = v % 60;
+  // 入力中は打った文字をそのまま持つ（いったん空・0分にしても戻されない）。欄から出たら値に合わせて整える。
+  // 分は 60 以上でも OK（75分 → 1:15）
+  const v = Math.max(0, Math.round(Number(value) || 0));
+  const [d, setD] = React.useState(null);
+  const h = d ? d.h : (v ? String(Math.floor(v / 60)) : '');
+  const m = d ? d.m : (v ? String(v % 60).padStart(2, '0') : '');
   const box = { height: 36, boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 9, background: CREAM, textAlign: 'center', fontSize: size, fontWeight: 900, fontFamily: "'Space Mono',monospace", color: INK, padding: 0 };
-  const clean = (x) => Math.max(0, parseInt(x, 10) || 0);
+  const num = (x) => Math.max(0, parseInt(x, 10) || 0);
+  const edit = (nh, nm) => { const sh = nh.replace(/\D/g, '').slice(0, 2), sm = nm.replace(/\D/g, '').slice(0, 3); setD({ h: sh, m: sm }); onChange(num(sh) * 60 + num(sm)); };
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-      <input type="number" inputMode="numeric" min={0} max={99} value={v ? h : ''} placeholder="0" aria-label="時間" onChange={(e) => onChange(Math.min(99, clean(e.target.value)) * 60 + m)} style={{ ...box, width: 42 }} />
+    <span onFocus={() => { if (!d) setD({ h, m }); }} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setD(null); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+      <input type="text" inputMode="numeric" value={h} placeholder="0" aria-label="時間" onChange={(e) => edit(e.target.value, m)} style={{ ...box, width: 42 }} />
       <span style={{ fontSize: size, fontWeight: 900 }}>:</span>
-      <input type="number" inputMode="numeric" min={0} max={59} value={v ? String(m).padStart(2, '0') : ''} placeholder="00" aria-label="分" onChange={(e) => onChange(h * 60 + Math.min(59, clean(e.target.value)))} style={{ ...box, width: 46 }} />
+      <input type="text" inputMode="numeric" value={m} placeholder="00" aria-label="分" onChange={(e) => edit(h, e.target.value)} style={{ ...box, width: 46 }} />
     </span>
   );
 }
