@@ -118,6 +118,10 @@ export function serialize(st) {
     mindFatCoef: st.mindFatCoef || 1,
     bodyRecCoef: st.bodyRecCoef || 1,
     mindRecCoef: st.mindRecCoef || 1,
+    calibLog: st.calibLog || [],  // 夜の申告と現在地のずれ・その日の内訳 [{date,reported,predicted,seen,buff,coef,B,M,R,acts}]（calib.js）
+    actCal: st.actCal || {},      // 行動ごとの補正 { normTitle: 倍率 }
+    calibUndo: st.calibUndo || null, // その夜の調整前の値（記録しなおし用）
+    calibAnchor: st.calibAnchor || null, // 本人が設定した疲れやすさ（夜の調整の引きとめ先）
     bookFav: st.bookFav || {},      // 本棚: お気に入り（付箋） dateStr→true
     bookDiary: st.bookDiary || {},  // 本棚: 日記 dateStr→string
     trashedPlans: st.trashedPlans || [],   // ゴミ箱の予定 [{plan,src,trashedAt}]
@@ -182,6 +186,10 @@ export function deserialize(data) {
     mindFatCoef: typeof data.mindFatCoef === 'number' ? data.mindFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
     bodyRecCoef: typeof data.bodyRecCoef === 'number' ? data.bodyRecCoef : (typeof data.recoverCoef === 'number' ? data.recoverCoef : 1),
     mindRecCoef: typeof data.mindRecCoef === 'number' ? data.mindRecCoef : (typeof data.recoverCoef === 'number' ? data.recoverCoef : 1),
+    calibLog: Array.isArray(data.calibLog) ? data.calibLog : [],
+    actCal: (data.actCal && typeof data.actCal === 'object') ? data.actCal : {},
+    calibUndo: (data.calibUndo && typeof data.calibUndo === 'object') ? data.calibUndo : null,
+    calibAnchor: (data.calibAnchor && typeof data.calibAnchor === 'object') ? data.calibAnchor : null,
     bookFav: (data.bookFav && typeof data.bookFav === 'object') ? data.bookFav : {},
     bookDiary: (data.bookDiary && typeof data.bookDiary === 'object') ? data.bookDiary : {},
     trashedPlans: Array.isArray(data.trashedPlans) ? data.trashedPlans : [],
@@ -198,7 +206,7 @@ export function freshState() {
     customCats: [], customPlans: [], customActions: [], customItems: {}, prefs: {}, actGoals: {}, actFreq: {}, research: null, actEdits: {},
     slotHours: null, hiddenCats: [], hiddenActs: [],
     onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null, wakeLog: [], bedLog: [], mainScreen: null,
-    bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1,
+    bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1, calibLog: [], actCal: {}, calibUndo: null, calibAnchor: null,
     bookFav: {}, bookDiary: {}, screenTime: {},
     trashedPlans: [], purgedPlanIds: [], purgedTaskIds: [],
   };

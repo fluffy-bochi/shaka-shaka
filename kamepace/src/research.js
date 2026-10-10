@@ -64,7 +64,7 @@ export function summarizeDay(st, d, carry = null, now = Date.now()) {
     const it = look(name);
     freq[it.key] = { name: it.name, ...(f.req ? { req: { k: f.req.k || (f.req.every === '隔' ? 2 : 1), unit: f.req.unit, n: f.req.n } } : null), ...(f.fav ? { fav: { k: f.fav.k || (f.fav.every === '隔' ? 2 : 1), unit: f.fav.unit, n: f.fav.n } } : null) };
   });
-  const rec = (r) => (r ? { t: hm(r.ts), cond: r.cond ?? null, mood: r.mood ?? null, fatigue: r.fatigue ?? null } : null);
+  const rec = (r) => (r ? { t: hm(r.ts), cond: r.cond ?? null, mood: r.mood ?? null, fatigue: r.fatigue ?? null, ...(r.pred != null ? { pred: r.pred, seen: !!r.seen } : null) } : null);
   return {
     v: 1, date: d,
     wake: rec(wk), bed: rec(bd),
@@ -138,7 +138,7 @@ export function csvFiles(parts) {
   parts.forEach(({ code, days: ds }) => {
     Object.keys(ds).sort().forEach(d => {
       const s = ds[d], w = s.wake || {}, b = s.bed || {};
-      days.push([code, d, w.t, w.cond, w.mood, w.fatigue, b.t, b.cond, b.mood, b.fatigue, s.fatMax && s.fatMax.v, s.fatMax && s.fatMax.t, s.fatMin && s.fatMin.v, s.fatMin && s.fatMin.t, s.zone && s.zone.yuttari, s.zone && s.zone.hodohodo, s.zone && s.zone.michimichi, s.type, s.rec, s.plus, s.minus, (s.counts || {}).posts, (s.counts || {}).acts, (s.counts || {}).tweets, s.sleepRec]);
+      days.push([code, d, w.t, w.cond, w.mood, w.fatigue, b.t, b.cond, b.mood, b.fatigue, s.fatMax && s.fatMax.v, s.fatMax && s.fatMax.t, s.fatMin && s.fatMin.v, s.fatMin && s.fatMin.t, s.zone && s.zone.yuttari, s.zone && s.zone.hodohodo, s.zone && s.zone.michimichi, s.type, s.rec, s.plus, s.minus, (s.counts || {}).posts, (s.counts || {}).acts, (s.counts || {}).tweets, s.sleepRec, b.pred, b.pred == null ? '' : (b.seen ? 1 : 0)]);
       (s.fat || []).forEach(p => pts.push([code, d, p.t, p.v]));
       Object.entries(s.acts || {}).forEach(([k, a]) => { const f = (s.freq || {})[k] || {}; acts.push([code, d, k, a.name, a.n, a.min, f.req ? freqText(f.req) : '', f.fav ? freqText(f.fav) : '']); });
       Object.entries(s.cats || {}).forEach(([k, c]) => cats.push([code, d, CAT_NAME[k] || k, c.n, c.min]));
@@ -147,7 +147,7 @@ export function csvFiles(parts) {
     adherence(ds).forEach(a => a.weeks.forEach(w => adh.push([code, w.week, a.key, a.name, a.kind === 'req' ? '生活必須行動' : 'やりたいこと', freqText(a.freq), w.target, w.done, w.rate == null ? '' : Math.round(w.rate * 1000) / 10])));
   });
   return {
-    '日ごと.csv': toCsv(['参加者', '日付', '起床時刻', '起床_体調', '起床_気分', '起床_疲労度', '就寝時刻', '就寝_体調', '就寝_気分', '就寝_疲労度', '疲労度_最高', '最高_時刻', '疲労度_最低', '最低_時刻', 'ゆったり_分', 'ほどほど_分', 'みちみち_分', 'タイプ', '記録数', '疲労_合計', '回復_合計', '投稿数', '行動の記録数', 'つぶやき数', '睡眠中の回復'], days),
+    '日ごと.csv': toCsv(['参加者', '日付', '起床時刻', '起床_体調', '起床_気分', '起床_疲労度', '就寝時刻', '就寝_体調', '就寝_気分', '就寝_疲労度', '疲労度_最高', '最高_時刻', '疲労度_最低', '最低_時刻', 'ゆったり_分', 'ほどほど_分', 'みちみち_分', 'タイプ', '記録数', '疲労_合計', '回復_合計', '投稿数', '行動の記録数', 'つぶやき数', '睡眠中の回復', '就寝_計算値', '就寝_現在地を見た'], days),
     '疲労度の推移.csv': toCsv(['参加者', '日付', '時刻', '疲労度'], pts),
     '行動.csv': toCsv(['参加者', '日付', '行動ID', '行動名', '回数', '分', '生活必須行動の頻度', 'やりたいことの頻度'], acts),
     '週ごとの実行率.csv': toCsv(['参加者', '週の始まり(月)', '行動ID', '行動名', '種類', '頻度', '目標回数', '実施回数', '実行率(%)'], adh),
