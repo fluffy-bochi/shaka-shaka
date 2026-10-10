@@ -21,6 +21,7 @@ import {
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
 import { dayParts, calibrate } from './calib';
+import { dripRate, sleepSpans, awakeMs } from './drip';
 import ResearchAdmin from './screens/ResearchAdmin';
 import Run, { MiniRun } from './screens/Run';
 import * as Ikoi from './ikoi';
@@ -677,9 +678,50 @@ export default class App extends React.Component {
       .map(x => (typeof x === 'string' ? { id: x, title: null, until: null, key: 'none' } : x))
       .filter(x => x && x.id && (!x.until || x.until >= t));
   }
+  isDebuff(en) { const b = BUFFS.find(x => x.id === en.id); return b ? b.kind === 'debuff' : !!en.symptom; }
+  /* 体調のデバフ: 起きているあいだ、そのアイコンを少しずつ降らせる（drip.js）。
+     デバフごとに dripAt（ここまで降らせた時刻）を持ち、そこから起きていた時間×1時間あたりの個数ぶん、今日の「体調」の記録を増やす。
+     1個に満たないうちは dripAt を進めない（保存を毎回しないため）。アプリを閉じていたぶんも、開いたときに最大24時間ぶん降る */
+  dripDebuffs() {
+    const st = this.state;
+    if (!st.booted) return;
+    const now = Date.now(), today = todayStr();
+    const raw = (st.activeBuffs || []).map(x => (typeof x === 'string' ? { id: x } : x));
+    const live = new Set(this.buffEntries().filter(en => this.isDebuff(en)).map(en => en.iid || en.id));
+    if (!live.size) return;
+    let spans = null, changed = false;
+    let entries = st.entries;
+    const drops = [];
+    const activeBuffs = raw.map(en => {
+      const key = en.iid || en.id;
+      if (!live.has(key)) return en;
+      // はじめて見るデバフ（時刻のない古いもの）は、いまから数えはじめる
+      if (!en.dripAt && !en.since) { changed = true; return { ...en, dripAt: now }; }
+      const from = Math.max(en.dripAt || en.since, now - 24 * 3600000);
+      spans = spans || sleepSpans(st.wakeLog, st.bedLog, now - 3 * 86400000, now);
+      const b = BUFFS.find(x => x.id === en.id) || {};
+      const name = en.title || b.name || '体調';
+      const rate = dripRate(en, b, st, (st.actCal || {})[normTitle(name)] || 1);
+      const n = Math.floor(awakeMs(from, now, spans) / 3600000 * rate);
+      if (n < 1) return en;
+      const glyph = en.glyph || b.glyph || '🤒';
+      const hm = this.tsToHm(now);
+      const i = entries.findIndex(e => e.date === today && !e.exp && e.drip === key);
+      if (i >= 0) entries = entries.map((e, k) => (k === i ? { ...e, delta: e.delta + n, to: hm, _new: true } : e));
+      else entries = sortEntries([...entries, { ...baseEntry(name, n, today), glyph, min: 0, drip: key, symId: en.symId, from: hm, to: hm, slot: this.slotOf({ from: hm }), _new: true }]);
+      for (let k = 0; k < n; k++) drops.push(glyph);
+      changed = true;
+      return { ...en, dripAt: now };
+    });
+    if (!changed) return;
+    this.set({ activeBuffs, entries });
+    this.save();
+    if (st.screen === 'shaka' && drops.length) this.addFallingBodies(drops);
+  }
   buffMult() {
     const out = { bodyFat: 1, mindFat: 1, bodyRec: 1, mindRec: 1 };
     this.buffEntries().forEach(en => {
+      if (this.isDebuff(en)) return; // 体調のデバフは倍率ではなく、アイコンが降る（dripDebuffs）
       const m = en.mult || (BUFFS.find(x => x.id === en.id) || {}).mult;
       // 強さ（lv: 0軽い・1ふつう・2強い）で効き目を弱める／強める
       const sc = en.lv == null || en.mult ? 1 : [0.5, 1, 1.6][en.lv] || 1;
@@ -756,7 +798,7 @@ export default class App extends React.Component {
     const iid = this.state.buffCfgIid;
     const cur = this.buffEntries();
     const prev = iid ? cur.find(x => x.iid === iid) : null;
-    const entry = { id, iid: iid || ('bf' + Date.now() + Math.floor(Math.random() * 1000)), title, until, key: period.key, from: (prev && prev.from) || todayStr() };
+    const entry = { id, iid: iid || ('bf' + Date.now() + Math.floor(Math.random() * 1000)), title, until, key: period.key, from: (prev && prev.from) || todayStr(), since: (prev && (prev.since || prev.dripAt)) || Date.now(), ...(prev && prev.dripAt ? { dripAt: prev.dripAt } : null) };
     // 編集ならそのインスタンスを差し替え、新規なら他を全部残して追加（＝同じ種類を重複できる）
     const rest = iid ? cur.filter(x => x.iid !== iid) : cur;
     this.set({ activeBuffs: [...rest, entry], buffCfgId: null, buffCfgIid: null });
@@ -783,7 +825,7 @@ export default class App extends React.Component {
     } else {
       const b = BUFFS.find(x => x.id === id);
       const prev = insts[0];
-      const entry = prev ? { ...prev, lv, mult: undefined } : { id, iid: 'bf' + Date.now() + Math.floor(Math.random() * 1000), title: b ? b.name : '', until: null, key: 'none', from: todayStr(), lv };
+      const entry = prev ? { ...prev, lv, mult: undefined } : { id, iid: 'bf' + Date.now() + Math.floor(Math.random() * 1000), title: b ? b.name : '', until: null, key: 'none', from: todayStr(), since: Date.now(), lv };
       // つぶやき中に選んだ体調は、そのつぶやきのアイコン・いこいさんの声かけに使う
       const tw = this.state.moodOpen && id.startsWith('sym:') ? { tweetSyms: [...(this.state.tweetSyms || []).filter(x => x !== id), id] } : {};
       this.set({ activeBuffs: [...cur.filter(x => x.id !== id), entry], buffTouched: true, ...tw });
@@ -1502,13 +1544,12 @@ export default class App extends React.Component {
     clearTimeout(this._t); this._t = setTimeout(() => this.set({ toast: null }), 1800);
   };
 
-  /* 体調・症状の副作用: 自動デバフのオン＋その日の後続時間帯へ同じ症状を複製 */
+  /* 体調・症状の副作用: 自動デバフのオン（そのあとは起きているあいだアイコンが降る＝dripDebuffs） */
   applySymptomEffects(newEntries, recDate, slotId) {
     const out = { activeBuffs: this.state.activeBuffs || [], extraEntries: [], buffAdded: null };
     const symEntries = newEntries.filter(e => e.symptom && e.symId);
     if (!symEntries.length) return out;
     let buffs = [...(this.state.activeBuffs || [])];
-    const slotIdx = SLOTS.findIndex(x => x.id === slotId);
     const seen = new Set();
     symEntries.forEach(e => {
       if (seen.has(e.symId)) return;
@@ -1520,26 +1561,10 @@ export default class App extends React.Component {
       // 自動デバフをオン（既にあれば mult/level を更新）
       const norm = buffs.map(x => (typeof x === 'string' ? { id: x } : x));
       const exists = norm.find(x => x.id === id);
-      const entry = { id, title: nm, glyph: e.glyph, mult, symptom: true, symId: e.symId, level: lv, from: recDate, until: null, key: 'symptom' };
+      const entry = { id, title: nm, glyph: e.glyph, mult, symptom: true, symId: e.symId, level: lv, from: recDate, until: null, key: 'symptom', since: (exists && (exists.since || exists.dripAt)) || Date.now(), ...(exists && exists.dripAt ? { dripAt: exists.dripAt } : null) };
       buffs = norm.filter(x => x.id !== id).concat(entry);
       if (!exists) out.buffAdded = nm;
-      // 後続の時間帯にも同じ症状を自動で入れる（まだその症状が無い時間帯のみ・当日のみ）
-      if (slotIdx >= 0 && recDate === todayStr()) {
-        for (let k = slotIdx + 1; k < SLOTS.length; k++) {
-          const sd = SLOTS[k];
-          const has = [...this.state.entries, ...newEntries, ...out.extraEntries]
-            .some(x => x.date === recDate && !x.exp && x.symId === e.symId && this.slotOf(x) === sd.id);
-          if (has) continue;
-          const def = this.slotDefs()[k];
-          const min = Math.max(15, Math.round((e.min || 30) * 0.6));
-          const fat = Math.max(1, Math.round((e.delta || 4) * 0.6));
-          out.extraEntries.push({
-            ...baseEntry(nm, fat, recDate),
-            glyph: e.glyph, min, slot: sd.id, symptom: true, symId: e.symId, level: lv, buffLv: e.buffLv, autoSym: true,
-            from: this.slotHm(def, 0), to: this.slotHm(def, min),
-          });
-        }
-      }
+      // 後続の時間帯へのコピーはやめた（起きているあいだ、アイコンが少しずつ降る＝dripDebuffs）
     });
     out.activeBuffs = buffs;
     return out;
@@ -2974,7 +2999,7 @@ export default class App extends React.Component {
     const parts = prev && prev.Bb != null ? { B: prev.B, M: prev.M, R: prev.R, Bb: prev.Bb, Mb: prev.Mb, Rb: prev.Rb, acts: prev.acts } : dayParts(
       st.entries.filter(e => e.date === today && !e.exp && !e.wakeAdd && !e._sample && e.delta),
       (e) => this.entryBodyMind(e), div, (e) => (e.event ? null : normTitle(e.title)));
-    const rec = { date: today, reported, predicted, seen, buff: this.buffEntries().length > 0, ...parts };
+    const rec = { date: today, reported, predicted, seen, buff: this.buffEntries().some(en => !this.isDebuff(en)), ...parts }; // デバフはアイコンで入っているので、バフ（倍率）のある晩だけ軽く扱う
     const calibLog = [...(st.calibLog || []).filter(x => x.date !== today), rec].sort((a, b) => a.date.localeCompare(b.date)).slice(-60);
     // 引きとめ先＝本人が設定した疲れやすさ（はじめての夜はその時の値）
     const calibAnchor = st.calibAnchor || base;
@@ -3194,7 +3219,10 @@ export default class App extends React.Component {
         if (this.collectEngine) this.stopCollectPhysics();
       }
     }, 160);
-    this._planT = setInterval(() => { this.advancePlans(); this.checkRunAlarms(); }, 1000);
+    this._planT = setInterval(() => {
+      this.advancePlans(); this.checkRunAlarms();
+      if (!this._dripAt || Date.now() - this._dripAt > 20000) { this._dripAt = Date.now(); this.dripDebuffs(); } // 体調のデバフのアイコン（20秒ごと）
+    }, 1000);
     // シャカ画面のロック画面風時計（旧本番 tickClock 相当）
     this._clockT = setInterval(() => {
       const hm = this.tsToHm(Date.now());
@@ -4893,10 +4921,13 @@ export default class App extends React.Component {
       activeBuffGlyphs: this.buffEntries().map(en => (BUFFS.find(b => b.id === en.id) || {}).glyph).filter(Boolean),
       buffChoices: BUFFS.filter(b => (!b.legacy || this.buffEntries().some(x => x.id === b.id)) && !this.profileExcl().has(normTitle(b.name))).map(b => {
         const eff = [];
-        if (b.mult.bodyFat) eff.push('体の疲労 ×' + b.mult.bodyFat);
-        if (b.mult.mindFat) eff.push('心の疲労 ×' + b.mult.mindFat);
-        if (b.mult.bodyRec) eff.push('体の回復 ×' + b.mult.bodyRec);
-        if (b.mult.mindRec) eff.push('心の回復 ×' + b.mult.mindRec);
+        if (b.kind === 'debuff') eff.push('1時間に約' + (Math.round(dripRate({ id: b.id }, b, st) * 10) / 10) + '個');
+        else {
+          if (b.mult.bodyFat) eff.push('体の疲労 ×' + b.mult.bodyFat);
+          if (b.mult.mindFat) eff.push('心の疲労 ×' + b.mult.mindFat);
+          if (b.mult.bodyRec) eff.push('体の回復 ×' + b.mult.bodyRec);
+          if (b.mult.mindRec) eff.push('心の回復 ×' + b.mult.mindRec);
+        }
         const insts = this.buffEntries().filter(x => x.id === b.id);
         const pText = (en) => en.until ? `${parseInt(en.until.split('-')[1], 10)}/${parseInt(en.until.split('-')[2], 10)}まで` : 'ずっと';
         const first = insts[0];
