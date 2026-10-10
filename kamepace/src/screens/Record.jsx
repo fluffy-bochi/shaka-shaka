@@ -586,7 +586,7 @@ function NewActPopup({ v }) {
 function TweetBuffDetail({ v }) {
   const [open, setOpen] = React.useState(false);
   const seen = new Set();
-  const rows = [...v.buffRowsBody, ...v.buffRowsMind].filter(r => (seen.has(r.id) ? false : seen.add(r.id)));
+  const rows = v.buffRowsOther.filter(r => (seen.has(r.id) ? false : seen.add(r.id)));
   const sum = buffSummary(rows);
   return (
     <div style={{ marginTop: 12, borderRadius: 12, overflow: 'hidden', border: '1px solid #bab5a7' }}>
@@ -656,16 +656,9 @@ export function MoodPopup({ v }) {
             {v.moodStrengths.map(x => <button key={x.key} onClick={x.onPick} style={{ ...chip(x.on), flex: 1, justifyContent: 'center', padding: '5px 0' }}>{x.label}</button>)}
           </div>
         )}
-        {/* 体調・症状（頭痛など。つらさで疲れやすさのデバフがつく） */}
+        {/* 体調・症状（いまの調子と同じ。強さを選ぶと疲れやすさに効く） */}
         <div style={lab}>体調・症状<span style={{ fontSize: 10.5, color: '#8a8a82', marginLeft: 6 }}>あれば</span></div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-          {v.moodSyms.map(m => <button key={m.id} onClick={m.onPick} style={chip(m.on)}><Emo e={m.glyph} size={18} />{m.name}</button>)}
-        </div>
-        {v.moodSymPicked && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-            {v.moodSymLvs.map(x => <button key={x.label} onClick={x.onPick} style={{ ...chip(x.on), flex: 1, justifyContent: 'center', padding: '5px 0' }}>{x.label}</button>)}
-          </div>
-        )}
+        <BuffDetail rows={v.buffRowsSym} />
         {/* 体調・心の調子・体温 */}
         <div style={lab}>体調</div>
         {scale(v.moodCond, v.setMoodCond, ['最悪', '悪い', 'ふつう', '良い', '絶好調'])}

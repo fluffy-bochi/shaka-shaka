@@ -13,6 +13,8 @@ const ms = (size, color) => ({ fontFamily: 'Material Symbols Rounded', fontSize:
 const GROUPS = [
   { id: 'home', label: 'ホーム', size: 140, items: [
     { key: 'HOME_MORNING_NOWAKE', label: '朝・まだ起床の記録がない' },
+    ...[['headache', '頭痛'], ['stomachache', '腹痛'], ['noappetite', '食欲がない'], ['nausea', '吐き気'], ['fever', '発熱'], ['cramps', '生理痛'], ['sluggish', 'だるさ'], ['cold', '風邪ぎみ'], ['hangover', '二日酔い']].map(([k, n]) => ({ key: 'CARE_' + k, label: '声かけ・体調：' + n })),
+    ...[['shock', 'ショックなこと'], ['sad', 'かなしい'], ['angry', 'いらいら'], ['anxious', '不安・心配'], ['happy', 'うれしい'], ['love', 'しあわせ'], ['relief', 'ほっとした'], ['fun', 'たのしかった']].map(([k, n]) => ({ key: 'CARE_MOOD_' + k, label: '声かけ・きもち：' + n })),
     { key: 'HOME_BEDTIME', label: '寝る時間が近い（いつもの就寝の1時間前〜）' },
     { key: 'AFTER_FATIGUE', label: '記録直後（疲れる記録）' },
     { key: 'AFTER_RECOVER', label: '記録直後（回復の記録）' },
