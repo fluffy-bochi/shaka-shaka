@@ -20,17 +20,48 @@ function Head({ v }) {
   return <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, padding: '16px 20px 10px' }}>{v.wakeHeader}</div>;
 }
 
-function Rating({ title, opts, value, onPick, labels }) {
+/* 詳細の中の「いまの調子」（バフ・デバフ）: なし／軽い／ふつう／強い */
+export function BuffDetail({ rows }) {
+  const LV = ['軽い', 'ふつう', '強い'];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+      {rows.map(r => (
+        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16, width: 22, textAlign: 'center' }}>{r.glyph}</span>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
+          <div style={{ display: 'flex', background: '#f1efe8', borderRadius: 999, padding: 2, flex: '0 0 auto' }}>
+            {[null, 0, 1, 2].map(lv => {
+              const on = r.lv === lv;
+              return <button key={String(lv)} onClick={() => r.onSet(lv)} style={{ border: 'none', borderRadius: 999, padding: '4px 8px', fontSize: 10.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', background: on ? (lv == null ? '#8a8a82' : INK) : 'transparent', color: on ? '#fff' : '#55554e' }}>{lv == null ? 'なし' : LV[lv]}</button>;
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+const LVN = ['軽い', 'ふつう', '強い'];
+// 閉じている詳細の帯に出す、いまの調子のまとめ
+export const buffSummary = (rows) => (rows || []).filter(r => r.lv != null).map(r => r.name + '（' + LVN[r.lv] + '）').join('・');
+
+function Rating({ title, opts, value, onPick, labels, rows, touched, slider }) {
   const [open, setOpen] = React.useState(false);
+  const sum = buffSummary(rows);
+  const has = !!sum;
+  // 疲労度のスライダー: 0〜100 を 1 きざみ
+  const onSlide = (e) => onPick(Number(e.target.value));
   return (
     <div style={{ background: '#fff', borderRadius: 18, margin: '0 20px 12px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(27,27,24,.05)' }}>
       <div style={{ padding: '14px 16px 10px' }}>
-        <div style={{ fontSize: 15, fontWeight: 800 }}>{title}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, flex: 1 }}>{title}</div>
+          {slider && value != null && <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 15, fontWeight: 800 }}>{value}</span>}
+        </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
           {opts.map(([val, glyph], i) => {
             const on = value === val;
             return (
-              <button key={i} onClick={() => onPick(val)} style={{ width: 52, height: 52, borderRadius: '50%', border: on ? '3px solid ' + INK : '3px solid transparent', background: on ? LIME : '#f1efe8', fontSize: 15, fontWeight: 800, color: INK, cursor: 'pointer', padding: 0, transition: 'background .15s' }}>{glyph}</button>
+              <button key={i} onClick={() => onPick(val)} style={{ width: 52, height: 52, borderRadius: '50%', border: on ? '3px solid ' + INK : '3px solid transparent', background: on ? LIME : '#f1efe8', fontSize: 15, fontWeight: 800, color: INK, cursor: 'pointer' }}>{glyph}</button>
             );
           })}
         </div>
@@ -39,9 +70,14 @@ function Rating({ title, opts, value, onPick, labels }) {
             {labels.map((l, i) => <span key={i} style={{ width: 52, textAlign: 'center', fontSize: 10, color: '#8a8a82', fontWeight: 700 }}>{l}</span>)}
           </div>
         )}
+        {open && slider && (
+          <input type="range" min={0} max={100} step={1} value={value == null ? 50 : value} onChange={onSlide} style={{ width: '100%', marginTop: 12, accentColor: INK }} aria-label={title} />
+        )}
+        {open && rows && <BuffDetail rows={rows} />}
       </div>
-      <button onClick={() => setOpen(!open)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', border: 'none', background: '#8a8a82', color: '#fff', fontSize: 11, fontWeight: 700, padding: '6px 16px', cursor: 'pointer' }}>
-        <span style={{ fontSize: 9 }}>{open ? '▼' : '▶'}</span>詳細
+      <button onClick={() => setOpen(!open)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', border: 'none', background: has ? LIME : '#8a8a82', color: has ? '#2f3a00' : '#fff', fontSize: 11, fontWeight: 700, padding: '6px 16px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+        <span style={{ fontSize: 9 }}>{open ? '▼' : '▶'}</span>
+        <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{!open && has ? sum + (touched ? '' : '　これで大丈夫ですか？') : '詳細'}</span>
       </button>
     </div>
   );
@@ -78,9 +114,9 @@ export function WakeCheck({ v }) {
         <textarea value={d.note || ''} onChange={(e) => v.setWakeDraft('note', e.target.value)} placeholder="ひとこと" rows={2}
           style={{ display: 'block', width: 'calc(100% - 40px)', margin: '0 20px 12px', boxSizing: 'border-box', resize: 'none', border: 'none', borderRadius: 14, background: '#fff', padding: '12px 13px', fontSize: 14, fontWeight: 600, lineHeight: 1.5, color: INK, fontFamily: 'inherit', boxShadow: '0 2px 10px rgba(27,27,24,.05)', outline: 'none' }} />
         <SleepCard d={d} set={v.setWakeDraft} />
-        <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setWakeDraft('cond', x)} />
-        <Rating title="気分" opts={MOOD.map(([g], i) => [i + 1, g])} labels={MOOD.map(c => c[1])} value={d.mood} onPick={(x) => v.setWakeDraft('mood', x)} />
-        <Rating title="残っている疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setWakeDraft('fat', x)} />
+        <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setWakeDraft('cond', x)} rows={v.buffRowsBody} touched={v.buffTouched} />
+        <Rating title="気分" opts={MOOD.map(([g], i) => [i + 1, g])} labels={MOOD.map(c => c[1])} value={d.mood} onPick={(x) => v.setWakeDraft('mood', x)} rows={v.buffRowsMind} touched={v.buffTouched} />
+        <Rating title="残っている疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setWakeDraft('fat', x)} slider />
       </div>
       <div style={{ ...foot, justifyContent: 'space-between' }}>
         <button onClick={v.goHome} style={btnSub}>やめる</button>
@@ -107,9 +143,9 @@ export function BedCheck({ v }) {
         )}
         <textarea value={d.note || ''} onChange={(e) => v.setBedDraft('note', e.target.value)} placeholder="ひとこと" rows={2}
           style={{ display: 'block', width: 'calc(100% - 40px)', margin: '0 20px 12px', boxSizing: 'border-box', resize: 'none', border: 'none', borderRadius: 14, background: '#fff', padding: '12px 13px', fontSize: 14, fontWeight: 600, lineHeight: 1.5, color: INK, fontFamily: 'inherit', boxShadow: '0 2px 10px rgba(27,27,24,.05)', outline: 'none' }} />
-        <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setBedDraft('cond', x)} />
-        <Rating title="気分" opts={MOOD.map(([g], i) => [i + 1, g])} labels={MOOD.map(c => c[1])} value={d.mood} onPick={(x) => v.setBedDraft('mood', x)} />
-        <Rating title="いまの疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setBedDraft('fat', x)} />
+        <Rating title="体調" opts={COND.map(([g], i) => [i + 1, g])} labels={COND.map(c => c[1])} value={d.cond} onPick={(x) => v.setBedDraft('cond', x)} rows={v.buffRowsBody} touched={v.buffTouched} />
+        <Rating title="気分" opts={MOOD.map(([g], i) => [i + 1, g])} labels={MOOD.map(c => c[1])} value={d.mood} onPick={(x) => v.setBedDraft('mood', x)} rows={v.buffRowsMind} touched={v.buffTouched} />
+        <Rating title="いまの疲労度" opts={FAT.map(([n]) => [n, String(n)])} labels={FAT.map(c => c[1])} value={d.fat} onPick={(x) => v.setBedDraft('fat', x)} slider />
       </div>
       <div style={{ ...foot, justifyContent: 'space-between' }}>
         <button onClick={v.goHome} style={btnSub}>やめる</button>
