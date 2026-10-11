@@ -109,6 +109,9 @@ export function snapshot() { const c = cur(); return { lines: JSON.parse(JSON.st
 export function lines(key) { const a = cur().lines[key]; return a ? a.map(x => x.t) : (DEFAULT_LINES[key] || []); }
 export function dateKeys() { return Object.keys(cur().lines).filter(k => k.startsWith('TAP_DATE:') && cur().lines[k].length).map(k => k.slice(9)); }
 export function fill(tpl, vals) { return (tpl || '').replace(/\{([^}]+)\}/g, (m, k) => (vals[k] != null ? vals[k] : m)); }
+/* おすすめの休み方の一文。休み方が「。？！」で終わる文なら語尾まで休み方のとおりに言い、
+   そうでなければ「おすすめの文」（TPL_REST_TIP）の {休み方} に差し込む */
+export function restTip(tpl, tip) { const t = (tip || '').trim(); return /[。．.！!？?]$/.test(t) ? t : fill(tpl, { 休み方: t }); }
 export function faces() { return cur().faces; }
 export function faceSrc(key) { const f = cur().faces[key] || cur().faces.normal; return f.src; }
 

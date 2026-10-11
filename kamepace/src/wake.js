@@ -3,7 +3,7 @@
    1日の疲労の推移を滑らかな曲線にして、一番長く居たゾーンをその日のタイプにする。 */
 import { hmToTsOn, entryGlyph } from './model';
 import { REST_FROM, AFTER_RECORD_MIN, TAP_NO_REPEAT } from './serifu';
-import { lines as L, fill, faceKeyFor, faceSrc } from './ikoi'; // セリフはいこいさん編集で変えられる（初期値は serifu.js）
+import { lines as L, fill, restTip, faceKeyFor, faceSrc } from './ikoi'; // セリフはいこいさん編集で変えられる（初期値は serifu.js）
 
 export const WAKE_TYPES = [
   { id: 'yuttari', name: 'ゆったりタイプ', glyph: '🌿' },
@@ -118,7 +118,7 @@ export function homeLine(count, next, dateStr, lastRec, now) {
   const hr = new Date(now).getHours();
   const allTips = L('REST_TIPS'), nightTips = allTips.filter(t => !OUTDOOR.test(t));
   const tips = (hr >= 18 || hr < 6) && nightTips.length ? nightTips : allTips; // 夜（18時〜6時）は外に出る休み方は勧めない
-  const restLine = () => pick(seed + 'i', L('REST_INTRO')) + fill(pick(seed + 'f', L('TPL_REST_TIP')), { 休み方: pick(seed + 't', tips) });
+  const restLine = () => pick(seed + 'i', L('REST_INTRO')) + restTip(pick(seed + 'f', L('TPL_REST_TIP')), pick(seed + 't', tips));
   if (lastRec && now - lastRec.ts < AFTER_RECORD_MIN * 60000) {
     const head = pick(seed + 'a' + lastRec.ts, L(lastRec.rec ? 'AFTER_RECOVER' : 'AFTER_FATIGUE'));
     return head + (tired ? restLine() : '');
