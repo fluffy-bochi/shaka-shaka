@@ -7,6 +7,9 @@ const mono = { fontFamily: "'Space Mono',monospace" };
 const ndBtn = { width: 30, height: 30, background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#55554e', cursor: 'pointer', flex: '0 0 auto', padding: 0 };
 
 // 時間帯・タスクの区切り（黒）
+// 「タスクを追加」「記録を追加」の行（タスクと同じ見た目）
+const addRow = { display: 'flex', width: '100%', alignItems: 'center', gap: 10, minHeight: 46, border: 'none', borderTop: '1px solid #bab5a7', borderBottom: '1px solid #bab5a7', background: '#f7f4ec', padding: '6px 16px 6px 72px', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#8a8a82', fontFamily: 'inherit', position: 'relative' };
+const addIcon = { position: 'absolute', left: 28, top: '50%', marginTop: -12, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontSize: 22, color: '#55554e' };
 const divRow = { display: 'flex', alignItems: 'center', gap: 8, height: 22, margin: '4px 0 2px' };
 const divLine = { width: 45, height: 2, background: '#1b1b18' };
 const divText = { fontSize: 12, fontWeight: 800, color: '#1b1b18', textShadow: '0 0 3px #f7f4ec, 0 0 6px #f7f4ec' };
@@ -163,6 +166,10 @@ export default function Home({ v }) {
             <span style={divLine} />
             <span style={divText}>{p.name}</span>
           </div>
+        ) : p.addRec ? (
+          <button key={p.key} onClick={p.onAdd} style={addRow}>
+            <span style={addIcon}>add</span>記録を追加
+          </button>
         ) : <Post key={p.key} p={p} />)}
         {/* タスク（mylifecore / Google ToDo / かめペースで手動追加）: 時間軸の下。
             チェックするとその時間帯に「行動」として記録される（紐づけた行動 or タスク名で推測） */}
@@ -182,8 +189,8 @@ export default function Home({ v }) {
             <button onClick={(e) => { e.stopPropagation(); t.onEdit(); }} aria-label="タスクの編集" style={{ flex: '0 0 auto', width: 30, height: 22, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 16, letterSpacing: 1, color: '#b4b2a8', lineHeight: 1 }}>•••</button>
           </div>
         ))}
-        <button onClick={v.onAddTask} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 10, minHeight: 46, border: 'none', borderTop: '1px solid #bab5a7', borderBottom: '1px solid #bab5a7', background: '#f7f4ec', padding: '6px 16px 6px 72px', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#8a8a82', fontFamily: 'inherit', position: 'relative' }}>
-          <span style={{ position: 'absolute', left: 28, top: '50%', marginTop: -12, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontSize: 22, color: '#55554e' }}>add</span>タスクを追加
+        <button onClick={v.onAddTask} style={addRow}>
+          <span style={addIcon}>add</span>タスクを追加
         </button>
       </div>
       </div>

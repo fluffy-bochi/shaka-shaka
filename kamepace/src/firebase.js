@@ -8,7 +8,7 @@ import {
   linkWithPopup, reauthenticateWithPopup,
 } from 'firebase/auth';
 import {
-  initializeFirestore, persistentLocalCache, doc, getDoc, setDoc,
+  initializeFirestore, persistentLocalCache, doc, getDoc, getDocFromServer, setDoc,
   collection, query, where, getDocs, Timestamp, writeBatch, deleteDoc, updateDoc,
 } from 'firebase/firestore';
 import { serialize } from './model';
@@ -65,18 +65,34 @@ export async function logout() { googleAccessToken = null; await fbSignOut(auth)
    かめペースのデータは users/{uid}/apps/kamepace に置いて衝突を避ける */
 function userDoc() { return doc(db, 'users', auth.currentUser.uid, 'apps', 'kamepace'); }
 let saveTimer = null;
+// この端末が最後に読んだ／書いたクラウドの updatedAt（ほかの端末があとから書いたかを見分ける）
+let lastStamp = 0;
 export function cloudSave(st) {
   if (!auth.currentUser) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     // ユーザーごと（users/{uid}）に「日にち→予定・行動／task」の親子構造で保存
-    setDoc(userDoc(), serialize(st)).catch(err => console.warn('[kamepace] save failed', err));
+    const data = serialize(st);
+    setDoc(userDoc(), data).then(() => { lastStamp = Math.max(lastStamp, data.updatedAt || 0); }).catch(err => console.warn('[kamepace] save failed', err));
   }, 600);
+}
+/* 自動で起きた変更（体調のアイコンが降った など）の保存。開きっぱなしの古い端末が、ほかの端末の新しい記録を上書きしないように、
+   クラウドのほうが新しければ保存せず onNewer（読み込み直し）を呼ぶ */
+export async function cloudSavePassive(st, onNewer) {
+  if (!auth.currentUser) return;
+  try {
+    const snap = await getDocFromServer(userDoc());
+    const remote = snap.exists() ? (snap.data().updatedAt || 0) : 0;
+    if (remote > lastStamp) { onNewer(); return; }
+  } catch (e) { return; } // 確かめられないときは書かない（次の機会に）
+  cloudSave(st);
 }
 
 export async function loadUserData() {
   const snap = await getDoc(userDoc());
-  return snap.exists() ? snap.data() : null;
+  const data = snap.exists() ? snap.data() : null;
+  if (data) lastStamp = Math.max(lastStamp, data.updatedAt || 0);
+  return data;
 }
 
 /* ---- カレンダーアプリ(my-schedule-app)からの取り込み ----

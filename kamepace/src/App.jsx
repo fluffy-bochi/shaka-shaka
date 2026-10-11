@@ -16,7 +16,7 @@ import {
 } from './model';
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout, loginCode, codeOfEmail, auth,
-  cloudSave, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
+  cloudSave, cloudSavePassive, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
   loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete, loadResearchConfig,
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
@@ -383,7 +383,8 @@ export default class App extends React.Component {
       if (!hasData) setTimeout(() => { if (!this.state.tutorial && !this.state.user) this.startTutorial(); }, 400);
     }
   }
-  async loadCloud() {
+  // soft: ほかの端末の新しい記録を読み込み直すとき（いまの画面・見ている日はそのまま）
+  async loadCloud(soft) {
     try {
       const data = await loadUserData();
       // 実験番号でログインした人は、その番号で研究への協力を自動で始める（まだなら）
@@ -396,7 +397,7 @@ export default class App extends React.Component {
       if (data) {
         const fixed = this.repairDayCut(deserialize(data)), dd = fixed.data;
         if (fixed.changed) setTimeout(() => this.save(), 500);
-        this.set({ ...dd, booted: true, screen: dd.mainScreen || 'shaka', dayOffset: 0 });
+        this.set(soft ? { ...dd, booted: true } : { ...dd, booted: true, screen: dd.mainScreen || 'shaka', dayOffset: 0 });
         onboardDone = dd.onboardDone;
         hadData = (dd.entries || []).some(e => !e.sample && !e._sample) || (dd.collected || []).length > 0;
         this.restoreSampleMode(dd);
@@ -678,6 +679,8 @@ export default class App extends React.Component {
       .map(x => (typeof x === 'string' ? { id: x, title: null, until: null, key: 'none' } : x))
       .filter(x => x && x.id && (!x.until || x.until >= t));
   }
+  /* 「予定」として数える記録か: 体調（症状・デバフで降ったぶん）・きもちのつぶやき・起床/就寝の調整は予定ではない */
+  isPlanLike(e) { return !e.exp && !e.wakeAdd && !!e.title && !e.drip && !e.symptom && !e.autoSym && !e.event; }
   isDebuff(en) { const b = BUFFS.find(x => x.id === en.id); return b ? b.kind === 'debuff' : !!en.symptom; }
   /* 体調のデバフ: 起きているあいだ、そのアイコンを少しずつ降らせる（drip.js）。
      デバフごとに dripAt（ここまで降らせた時刻）を持ち、そこから起きていた時間×1時間あたりの個数ぶん、今日の「体調」の記録を増やす。
@@ -715,7 +718,9 @@ export default class App extends React.Component {
     });
     if (!changed) return;
     this.set({ activeBuffs, entries });
-    this.save();
+    // 自動の変更: クラウドにほかの端末の新しい記録があれば、上書きせずに読み込み直す（そのあと改めて降る）
+    if (st.user) setTimeout(() => cloudSavePassive(this.dataState(), () => this.loadCloud(true)), 0);
+    else this.save();
     if (st.screen === 'shaka' && drops.length) this.addFallingBodies(drops);
   }
   buffMult() {
@@ -1722,11 +1727,13 @@ export default class App extends React.Component {
     posts.sort((a, b) => (a.sortHm || '').localeCompare(b.sortHm || ''));
     // 時間帯の区切り
     const names = Object.fromEntries(SLOTS.map(x => [x.id, x.name]));
-    const out = []; let last = null;
-    posts.forEach(p => {
-      const sid = p.kind === 'wake' ? (out.length ? last : 'asa') : p.slot;
-      if (sid !== last) { out.push({ divider: true, key: 'div:' + sid + out.length, slot: sid, name: names[sid] || '' }); last = sid; }
-      out.push(p);
+    // 時間帯はいつも全部出し、それぞれのいちばん下に「記録を追加」（その時間帯で記録画面を開く）
+    const sidOf = (p) => (p.kind === 'wake' ? (wakeHm ? this.slotOf({ from: wakeHm }) : 'asa') : p.slot);
+    const out = [];
+    SLOTS.forEach(sl => {
+      out.push({ divider: true, key: 'div:' + sl.id, slot: sl.id, name: names[sl.id] || '' });
+      posts.filter(p => sidOf(p) === sl.id).forEach(p => out.push(p));
+      out.push({ addRec: true, key: 'add:' + sl.id, slot: sl.id, onAdd: () => this.openRecord(sl.id) });
     });
     return { rows: out, isToday: d === today };
   }
@@ -3095,7 +3102,7 @@ export default class App extends React.Component {
     const yRec = recs.find(w => w.date === y);
     const yBed = (st.bedLog || []).find(b => b.date === y);
     const sum = daySummary(st.entries, y, yRec ? yRec.fatigue : 0, { from: yRec ? yRec.ts : null, to: yBed ? yBed.ts : null });
-    const plans = sortEntries(st.entries.filter(e => e.date === today && !e.exp && !e.wakeAdd && e.title)).map(e => ({ title: e.title, from: e.from, to: e.to, glyph: entryGlyph(e), delta: e.delta }));
+    const plans = sortEntries(st.entries.filter(e => e.date === today && this.isPlanLike(e))).map(e => ({ title: e.title, from: e.from, to: e.to, glyph: entryGlyph(e), delta: e.delta }));
     const tasks = (st.tasks || []).filter(t => t.date === today && t.title);
     const chart = this.chartData([...new Set(recs.map(r => r.date))].sort()); // 朝は直近7回ぶんの日
     return { recs, chart, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks };
@@ -4625,7 +4632,7 @@ export default class App extends React.Component {
       bedFlow: st.bedFlow && st.screen === 'shaka', backBed: () => this.set({ screen: 'shaka' }), wakeRecs: st.screen === 'bed2' ? this.chartData([st.bedDay || this.bedDay()]) : null /* 夜はその日のぶんだけ */, bed: st.screen === 'bed2' ? this.bedVals() : null,
       homeComment: st.screen === 'home' ? (st.tapLine || (() => {
         const d = this.homeDateStr(), nowHm = this.tsToHm(Date.now());
-        const next = sortEntries(st.entries.filter(e => e.date === d && !e.exp && !e.wakeAdd && e.title && e.from && (d !== todayStr() || e.from > nowHm)))[0];
+        const next = sortEntries(st.entries.filter(e => e.date === d && this.isPlanLike(e) && e.from && (d !== todayStr() || e.from > nowHm)))[0];
         const timed = d === todayStr() ? this.timeOfDayLine() : '';
         if (timed && !(st.lastRec && Date.now() - st.lastRec.ts < 3 * 60000)) return timed; // 記録した直後はそのひとことを優先
         return homeLine(Math.min(100, this.pileCount()), next && { ...next, ...this.entryBodyMind(next) }, d, st.lastRec, Date.now());
