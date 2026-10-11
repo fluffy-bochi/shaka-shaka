@@ -1,7 +1,7 @@
 import React from 'react';
 import { Speaker } from './Wake';
 import * as Ikoi from '../ikoi';
-import { fill } from '../ikoi';
+import { fill, restTip } from '../ikoi';
 import { publishIkoi, revertIkoi, loadIkoi } from '../firebase';
 
 /* 開発者用「いこいさん編集」: シチュエーションを選ぶと、いつもの見た目でいこいさんがしゃべる。
@@ -64,7 +64,7 @@ const GROUPS = [
 const EX = { 行動: 'レポート・課題', 回復: '入浴', 予定: '1限 デザイン史', 時刻: '14:00', 件数: 3, 最初の予定: '1限 デザイン史' };
 function compose(key, line, L) {
   const f0 = (k, vals) => fill(L(k)[0] || '', vals || {});
-  const tip = (t) => fill(L('TPL_REST_TIP')[0] || '', { 休み方: t });
+  const tip = (t) => restTip(L('TPL_REST_TIP')[0] || '', t);
   const mid = (type) => (type === 'yuttari' ? f0('TPL_REVIEW_YUTTARI_REC', { 行動: EX.回復 })
     : type === 'none' ? '' : f0('TPL_REVIEW_UP', { 行動: EX.行動 }) + f0('TPL_REVIEW_REC', { 行動: EX.回復 }));
   const plan = (has, tasks, closer) => has + tasks + closer;
@@ -78,7 +78,7 @@ function compose(key, line, L) {
       return (L('HOME_ZONE' + (key === 'TPL_NEXT_OVER' ? 1 : 0))[0] || '') + fill(line, EX);
     case 'REST_INTRO': return line + tip(L('REST_TIPS')[0] || '');
     case 'REST_TIPS': return (L('REST_INTRO')[0] || '') + tip(line);
-    case 'TPL_REST_TIP': return (L('REST_INTRO')[0] || '') + fill(line, { 休み方: L('REST_TIPS')[0] || '' });
+    case 'TPL_REST_TIP': return (L('REST_INTRO')[0] || '') + restTip(line, L('REST_TIPS')[0] || '');
     case 'TPL_REVIEW_UP': return (L('REVIEW_BASE_hodohodo')[0] || '') + fill(line, EX) + f0('TPL_REVIEW_REC', { 行動: EX.回復 }) + (L('REVIEW_CLOSER_hodohodo')[0] || '');
     case 'TPL_REVIEW_REC': return (L('REVIEW_BASE_hodohodo')[0] || '') + f0('TPL_REVIEW_UP', { 行動: EX.行動 }) + fill(line, { 行動: EX.回復 }) + (L('REVIEW_CLOSER_hodohodo')[0] || '');
     case 'TPL_REVIEW_YUTTARI_REC': return (L('REVIEW_BASE_yuttari')[0] || '') + fill(line, { 行動: EX.回復 }) + (L('REVIEW_CLOSER_yuttari')[0] || '');
