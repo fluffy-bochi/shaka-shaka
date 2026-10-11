@@ -76,7 +76,7 @@ export function serialize(st) {
   const bucket = (d) => { if (!days[d]) days[d] = { entries: [], tasks: [] }; return days[d]; };
   (st.entries || []).forEach(e => {
     if (e._sample) return; // サンプル（ペルソナ・デモ）データはクラウド/ローカルに保存しない
-    const { date, _new, ...rest } = e;
+    const { date, _new, _newSkip, ...rest } = e; // eslint-disable-line no-unused-vars
     bucket(date || todayStr()).entries.push(rest);
   });
   (st.tasks || []).forEach(t => {
