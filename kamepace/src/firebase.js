@@ -27,7 +27,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 // オフラインでも直近データを表示できるようローカルキャッシュを有効化
-const db = initializeFirestore(app, { localCache: persistentLocalCache() });
+// ignoreUndefinedProperties: 値が undefined の項目は書かずに飛ばす（入っていると保存そのものが失敗し、記録が消える。2026-10-11 の不具合）
+const db = initializeFirestore(app, { localCache: persistentLocalCache(), ignoreUndefinedProperties: true });
 const googleProvider = new GoogleAuthProvider();
 // カレンダー/ToDo取り込み用（読み取り権限つき）。ログインとは分けて、連携時だけ許可を求める
 const calendarProvider = new GoogleAuthProvider();
@@ -67,13 +68,19 @@ function userDoc() { return doc(db, 'users', auth.currentUser.uid, 'apps', 'kame
 let saveTimer = null;
 // この端末が最後に読んだ／書いたクラウドの updatedAt（ほかの端末があとから書いたかを見分ける）
 let lastStamp = 0;
+// 保存に失敗したときの知らせ先（画面にトーストを出す）。黙って失敗すると、リロードで記録が消えるまで気づけない
+let onSaveError = null;
+export function setSaveErrorHandler(fn) { onSaveError = fn; }
 export function cloudSave(st) {
   if (!auth.currentUser) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     // ユーザーごと（users/{uid}）に「日にち→予定・行動／task」の親子構造で保存
-    const data = serialize(st);
-    setDoc(userDoc(), data).then(() => { lastStamp = Math.max(lastStamp, data.updatedAt || 0); }).catch(err => console.warn('[kamepace] save failed', err));
+    const fail = (err) => { console.warn('[kamepace] save failed', err); if (onSaveError) onSaveError(err); };
+    try {
+      const data = serialize(st);
+      setDoc(userDoc(), data).then(() => { lastStamp = Math.max(lastStamp, data.updatedAt || 0); }).catch(fail);
+    } catch (err) { fail(err); } // 中身がおかしいときは setDoc がその場で例外を投げる
   }, 600);
 }
 /* 自動で起きた変更（体調のアイコンが降った など）の保存。開きっぱなしの古い端末が、ほかの端末の新しい記録を上書きしないように、
