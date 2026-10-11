@@ -1517,6 +1517,22 @@ export default class App extends React.Component {
     // 実行画面から記録したら、実行中のデータはここで終わり（確認画面から戻るまでは残している）
     const fromRun = this.state.confirmOrigin === 'run';
     if (fromRun) { try { localStorage.removeItem('kame_run'); } catch (e) { /* ignore */ } }
+    // 実行中にもう降らせたぶんは二重に降らせない（プラスは上から降らせない・回復はそのぶん減らす）。
+    // 記録で時間を短くして回復が減ったら、降らせすぎて消したぶんを戻す
+    let runRestore = 0;
+    const rd = fromRun ? this.state.run : null;
+    if (rd && rd.drip) {
+      const vals = Object.values(rd.drip);
+      let p0 = vals.reduce((a, v) => a + (v > 0 ? v : 0), 0);
+      const n0 = vals.reduce((a, v) => a + (v < 0 ? -v : 0), 0);
+      newEntries.forEach(e => { if (!e.planned && e.delta > 0 && p0 > 0) { const k = Math.min(e.delta, p0); e._newSkip = k; p0 -= k; } });
+      const negTotal = negGlyphs.length;
+      negGlyphs.splice(0, Math.min(n0, negTotal));
+      if (n0 > negTotal) runRestore = Math.min(rd.negHit || 0, n0 - negTotal);
+      // まだ降っていない・落ちている途中の回復は、記録した回復としてそのまま消せるようにする
+      this._pendingNeg = (this._pendingNeg || []).map(x => (x && typeof x === 'object' && x.run === rd.startAt ? x.g : x));
+      (this.negBodies || []).forEach(n => { if (n.run === rd.startAt) n.run = null; });
+    }
     this.setState({
       run: fromRun ? null : this.state.run,
       // リストで記録したらリストは空に。実行画面から記録したときは、実行した行動だけリストのカードから外す（実行していない行動は残す）
@@ -1528,7 +1544,7 @@ export default class App extends React.Component {
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
       // 編集で山が縮んだ場合に consumed が超過しないように
-      consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)),
+      consumed: Math.min(Math.max(0, (this.state.consumed || 0) - runRestore), this.pilePositiveTotal(entries)),
       // 症状のつらさが変わったら、デバフの強さも合わせるか確認
       symAdjust: symLevelChange,
     }, () => {
@@ -1795,7 +1811,7 @@ export default class App extends React.Component {
     const consumedRaw = this.state.consumed || 0;
     const day = this.state.sampleMode ? this._sampleWindowDay() : null;
     // 軽いキャッシュ（entries参照・consumed・当日が同じなら再計算しない）
-    if (this._psRef === this.state.entries && this._psConsumed === consumedRaw && this._psDay === day && this._psArr) return this._psArr;
+    if (this._psRef === this.state.entries && this._psConsumed === consumedRaw && this._psDay === day && this._psRun === this.state.run && this._psArr) return this._psArr;
     let out;
     const bal = day != null && this._sampleBalance ? this._sampleBalance[day] : null;
     if (day != null && bal != null) {
@@ -1815,8 +1831,9 @@ export default class App extends React.Component {
       this.state.entries.forEach(r => {
         if (r.exp || r._sample || (r.delta || 0) <= 0 || (r.date && r.date > todayStr())) return;
         const n = r.planned ? (r.dropped || 0) : r.delta;
-        for (let k = 0; k < n; k++) out.push({ g: entryGlyph(r), isNew: !!r._new });
+        for (let k = 0; k < n; k++) out.push({ g: entryGlyph(r), isNew: !!r._new && k >= (r._newSkip || 0) });
       });
+      this._pushRunUnits(out);
     } else {
       const src = day ? this.state.entries.filter(e => !e._sample || e.date === day) : this.state.entries;
       const stack = [], today = todayStr();
@@ -1824,18 +1841,25 @@ export default class App extends React.Component {
         if (r.exp || (r.date && r.date > today)) return; // 明日以降の記録は今日の山に入れない
         if (r.delta > 0) {
           const n = r.planned ? (r.dropped || 0) : r.delta;
-          for (let i = 0; i < n; i++) stack.push({ g: entryGlyph(r), isNew: !!r._new });
+          for (let i = 0; i < n; i++) stack.push({ g: entryGlyph(r), isNew: !!r._new && i >= (r._newSkip || 0) }); // _newSkip: 実行中にもう降らせたぶん
         }
       });
+      this._pushRunUnits(stack);
       const consumed = Math.min(consumedRaw, stack.length);
       out = stack.slice(consumed);
     }
-    this._psRef = this.state.entries; this._psConsumed = consumedRaw; this._psDay = day; this._psArr = out;
+    this._psRef = this.state.entries; this._psConsumed = consumedRaw; this._psDay = day; this._psRun = this.state.run; this._psArr = out;
     return out;
+  }
+  // 実行中にもう降らせたプラスの絵文字（いちばん新しい側に積む）
+  _pushRunUnits(arr) {
+    const units = this.runPosUnits(), nw = (this.state.run && this.state.run.newPos) || 0;
+    units.forEach((g, k) => arr.push({ g, isNew: k >= units.length - nw }));
   }
   /* 山の正の合計（consumed のキャップ用・旧本番 pilePositiveTotal） */
   pilePositiveTotal(entries) {
-    return (entries || this.state.entries).reduce((a, e) => a + (e.delta > 0 && !e.exp ? (e.planned ? (e.dropped || 0) : e.delta) : 0), 0);
+    return (entries || this.state.entries).reduce((a, e) => a + (e.delta > 0 && !e.exp ? (e.planned ? (e.dropped || 0) : e.delta) : 0), 0)
+      + (entries ? 0 : this.runPosUnits().length);
   }
   pileGlyphs() { return this.pileSource().map(x => x.g); }
   // old/new を分け、新しく記録した分だけ上から降らせる
@@ -1845,8 +1869,9 @@ export default class App extends React.Component {
     return [...old, ...nw];
   }
   clearNewFlags() {
+    if (this.state.run && this.state.run.newPos) this.updRun(run => ({ ...run, newPos: 0 }));
     if (!this.state.entries.some(e => e._new)) return;
-    const entries = this.state.entries.map(e => e._new ? { ...e, _new: false } : e);
+    const entries = this.state.entries.map(e => { if (!e._new) return e; const { _newSkip, ...rest } = e; return { ...rest, _new: false }; }); // eslint-disable-line no-unused-vars
     this.set({ entries });
   }
 
@@ -2309,6 +2334,44 @@ export default class App extends React.Component {
     this.setRun({ ...r, items, segs: r.segs.filter(s => s.uid !== uid), cur: items.findIndex(x => x.uid === curUid) });
   };
   runMs(r, uid, now) { return r.segs.filter(s => s.uid === uid).reduce((a, s) => a + ((s.b == null ? now : s.b) - s.a), 0); }
+  /* 実行中の行動は、記録する前から実行した時間に合わせて降らせる（食事 −8/時なら 7分30秒ごとに1個）。
+     run.drip[uid] = 降らせた個数（プラスの行動は＋、回復は−）。プラスは山に入り（pileSource）、
+     回復はシャカで降らせて、ぶつかって消したぶんを run.negHit に数える。
+     記録したら降らせたぶんは二重に降らせない。削除したらプラスは山から消え、回復で消したぶんは戻す */
+  runRate(li) { const { it } = this.listItemVals(li); return it ? this.effFh(it) : (li.min ? (li.fat || 0) * 60 / li.min : 0); }
+  runPosUnits(run = this.state.run) {
+    const out = [];
+    if (!run || !run.drip) return out;
+    run.items.forEach(li => { for (let i = 0; i < (run.drip[li.uid] || 0); i++) out.push(li.glyph || '📝'); });
+    return out;
+  }
+  // 実行中データの一部だけを確実に更新する（ぶつかった数は毎フレーム数えるため関数型で）
+  updRun(fn) {
+    this.setState(prev => {
+      if (!prev.run) return null;
+      const run = fn(prev.run);
+      try { localStorage.setItem('kame_run', JSON.stringify(run)); } catch (e) { /* ignore */ }
+      return { run };
+    });
+  }
+  advanceRun() {
+    const r = this.state.run; if (!r || !r.items || !r.segs) return;
+    const now = Date.now(), upd = {}, pos = [], neg = [];
+    r.items.forEach(li => {
+      const rate = this.runRate(li); if (!rate) return;
+      const due = Math.floor(Math.abs(rate) * this.runMs(r, li.uid, now) / 3600000);
+      const had = Math.abs((r.drip || {})[li.uid] || 0);
+      if (due <= had) return;
+      for (let i = had; i < due; i++) (rate > 0 ? pos : neg).push(li.glyph || '📝');
+      upd[li.uid] = rate > 0 ? due : -due;
+    });
+    if (!pos.length && !neg.length) return;
+    // シャカを見ているときはその場で降らせる。見ていなければ次にシャカを開いたときに上から降る
+    const onShaka = this.state.screen === 'shaka' && !!this.engine;
+    this.updRun(run => ({ ...run, drip: { ...(run.drip || {}), ...upd }, newPos: (run.newPos || 0) + (onShaka ? 0 : pos.length) }));
+    if (pos.length && onShaka) this.addFallingBodies(pos);
+    if (neg.length) this.dropNegativeBodies(neg.map(g => ({ g, run: r.startAt })));
+  }
   /* 記録: やった行だけを、実際の時刻（区間）つきで確認画面へ */
   runFinish = () => {
     const r = this.state.run; if (!r) return;
@@ -2334,7 +2397,17 @@ export default class App extends React.Component {
   goRun = () => { if (this.state.run) this.set({ screen: 'run', runAdd: false }); };
   /* 実行中のタスクを記録せずに捨てる */
   runRename = (name) => { const r = this.state.run; if (r) this.setRun({ ...r, name: (name || '').trim() }); };
-  runDiscard = () => { this.setRun(null); this.set({ screen: 'record', runAdd: false, runAlarm: null }); this.toast('実行中のタスクを削除しました'); };
+  runDiscard = () => {
+    const r = this.state.run, id = r && r.startAt, hit = (r && r.negHit) || 0;
+    // 降らせた回復のうち、まだ降っていない・落ちている途中のものは消す（ぶつかっても消さない）
+    this._pendingNeg = (this._pendingNeg || []).filter(x => !(x && x.run === id));
+    this.setRun(null);
+    // 回復で消したぶんは戻す（ためた回復からも外す）。プラスは run が消えれば山から消える
+    this.set({ screen: 'record', runAdd: false, runAlarm: null,
+      ...(hit ? { consumed: Math.max(0, (this.state.consumed || 0) - hit), collected: (this.state.collected || []).filter(c => c.run !== id) } : null) });
+    if (hit) this.save();
+    this.toast('実行中のタスクを削除しました');
+  };
   /* ---- アラーム・タイマー ---- */
   // which='all'|'cur'。cur のタイマーの分は、いまの行動の予定時間（items[cur].min）として持つ
   setRunAlarm = (which, patch) => {
@@ -3235,7 +3308,7 @@ export default class App extends React.Component {
       }
     }, 160);
     this._planT = setInterval(() => {
-      this.advancePlans(); this.checkRunAlarms();
+      this.advancePlans(); this.checkRunAlarms(); this.advanceRun();
       if (!this._dripAt || Date.now() - this._dripAt > 20000) { this._dripAt = Date.now(); this.dripDebuffs(); } // 体調のデバフのアイコン（20秒ごと）
     }, 1000);
     // シャカ画面のロック画面風時計（旧本番 tickClock 相当）
@@ -3734,10 +3807,14 @@ export default class App extends React.Component {
     const rect = el.getBoundingClientRect();
     const W = rect.width || 350, H = rect.height || 700, r = this.PR;
     this.resumeMotion();
-    glyphs.slice(0, 160).forEach(g => {
+    glyphs.slice(0, 160).forEach(g0 => {
+      // { g, run }: 実行中の行動が降らせた回復（削除したら戻せるように印をつける）
+      const g = typeof g0 === 'string' ? g0 : g0.g, runId = typeof g0 === 'string' ? null : g0.run;
       const x = r + Math.random() * (W - 2 * r);
-      // シミュレーションは箱の中（画面の上のほう）から落とす（傾きモードは上にふたがあるため）
-      const y = sim ? (this._lidY || 0) + r + Math.random() * r * 4 : -r - Math.random() * (H * 0.6);
+      // シミュレーションと、傾きモードで箱が閉じているとき（シャカを見ている最中に降る実行中・予定の回復）は
+      // 箱の中（画面の上のほう）から落とす。蓋の上に出すと蓋に乗ったまま山に届かない
+      const inside = sim || (this.state.gyroMode && (this._lidY || 0) >= 0);
+      const y = inside ? (this._lidY || 0) + r + Math.random() * r * 4 : -r - Math.random() * (H * 0.6);
       const body = Bodies.circle(x, y, r, this.BODY_OPTS);
       body.isNegative = true;
       World.add(this.engine.world, body);
@@ -3749,7 +3826,7 @@ export default class App extends React.Component {
       d.style.fontSize = Math.round(r * 1.6) + 'px';
       appendGlyph(d, g, Math.round(r * 1.9));
       el.appendChild(d);
-      const neg = { body, el: d, consumed: false, glyph: g, sim: !!sim };
+      const neg = { body, el: d, consumed: false, glyph: g, sim: !!sim, run: runId };
       this.negBodies.push(neg);
       // 30秒ぶつからなければフェードアウト（旧本番と同じ）
       setTimeout(() => {
@@ -3770,10 +3847,12 @@ export default class App extends React.Component {
     const el = document.getElementById('shakacase');
     const r = this.PR, hitDist2 = (r * 2) * (r * 2);
     const collectedAdd = [];
-    let hits = 0;
+    let hits = 0, runHits = 0;
     for (let ni = this.negBodies.length - 1; ni >= 0; ni--) {
       const neg = this.negBodies[ni];
       if (neg.consumed) continue;
+      // 削除した実行中の回復はもう消さない
+      if (neg.run && !(this.state.run && this.state.run.startAt === neg.run)) continue;
       const np = neg.body.position;
       for (let pi = this.bodies.length - 1; pi >= 0; pi--) {
         const pos = this.bodies[pi];
@@ -3796,8 +3875,9 @@ export default class App extends React.Component {
             break;
           }
           this.bodies.splice(pi, 1);
-          collectedAdd.push(neg.glyph, pos.glyph || pos.el.textContent); // 使った回復＋消えたプラスの記録
+          collectedAdd.push({ g: neg.glyph, run: neg.run }, { g: pos.glyph || pos.el.textContent, run: neg.run }); // 使った回復＋消えたプラスの記録
           hits++;
+          if (neg.run) runHits++;
           // パッと消える＋リングのポップエフェクト
           pos.el.style.transition = 'opacity .15s'; pos.el.style.opacity = '0';
           neg.el.style.transition = 'opacity .15s'; neg.el.style.opacity = '0';
@@ -3817,7 +3897,7 @@ export default class App extends React.Component {
     this.negBodies = this.negBodies.filter(n => !n.consumed);
     if (hits) {
       const now = Date.now();
-      const add = collectedAdd.map(g => ({ act: EMOJI_ACT[g] || '', glyph: g, amount: 1, ts: now }));
+      const add = collectedAdd.map(({ g, run }) => ({ act: EMOJI_ACT[g] || '', glyph: g, amount: 1, ts: now, ...(run ? { run } : null) }));
       const cap = this.pilePositiveTotal();
       // 関数型 setState で確実に累積する。毎フレーム呼ばれるため this.state を直接読むと
       // 非同期バッチで古い値のまま上書きされ、消したぶん(consumed)が数個しか永続化されない不具合になる。
@@ -3826,6 +3906,7 @@ export default class App extends React.Component {
         // マイナスで消したぶんを永続化（山を再構築しても戻らないように）
         consumed: Math.min((prev.consumed || 0) + hits, cap),
       }));
+      if (runHits) this.updRun(run => ({ ...run, negHit: (run.negHit || 0) + runHits }));
       this.save();
     }
   }
