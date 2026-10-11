@@ -1645,7 +1645,7 @@ export default class App extends React.Component {
   }
 
   /* ホームのタイムライン（Figma「home」）: 1回の記録＝1つの投稿。起床・就寝は記録がなくても枠を出す。
-     投稿の見出し＝テンプレ/予定名 → なければいちばん多かった行動（同数なら上のもの）。アイコンもその行動。
+     投稿の見出し＝テンプレ/予定名 → なければいちばん多かった行動（同数なら上のもの）。アイコンは実行時間がいちばん長い行動。
      終わった投稿は薄く。時間帯の区切り（朝・午前・午後・夜）ごとに並べる */
   homePosts() {
     const st = this.state, d = this.homeDateStr(), now = Date.now(), today = todayStr();
@@ -1680,18 +1680,23 @@ export default class App extends React.Component {
       // いちばん多かった行動（同数なら上）
       const cnt = {}; es.forEach(e => { cnt[e.title] = (cnt[e.title] || 0) + 1; });
       let top = es[0]; es.forEach(e => { if (cnt[e.title] > cnt[top.title]) top = e; });
+      // アイコンは実行時間がいちばん長い行動（同じ行動は合計・同じなら上）
+      const durOf = {}; es.forEach(e => { durOf[e.title] = (durOf[e.title] || 0) + (entryMin(e) || 0); });
+      let longest = es[0]; es.forEach(e => { if (durOf[e.title] > durOf[longest.title]) longest = e; });
       const label = (es.find(e => e.postTitle) || {}).postTitle || first.moodLabel || first.plan || top.title;
       const note = (es.find(e => e.note) || {}).note || '';
       const from = first.from || '';
+      const lastEnd = es.filter(e => e.to).sort((a, b) => entryEndTs(b) - entryEndTs(a))[0];
+      const to = lastEnd ? lastEnd.to : '';
       const endTs = Math.max(...es.map(e => (e.to ? entryEndTs(e) : 0)));
       const sum = es.reduce((a, e) => a + (e.delta || 0), 0);
       const frame = es.length === 1 && first.needsSetup;
-      const g = { idxs: list.map(x => x.i), title: label, glyph: entryGlyph(top), isPlan: !!first.plan && !first.gid, planName: first.plan || null, isFrame: frame, plan: first.plan };
+      const g = { idxs: list.map(x => x.i), title: label, glyph: entryGlyph(longest), isPlan: !!first.plan && !first.gid, planName: first.plan || null, isFrame: frame, plan: first.plan };
       const isTweet = es.length === 1 && first.event;
       return {
         cond: isTweet && (first.cond != null || first.mindCond != null || first.temp != null) ? condOf({ ts: entryStartTs(first), cond: first.cond, mood: first.mindCond, temp: first.temp }) : null,
         key: k, sortHm: from, slot: this.slotOf(first),
-        glyph: entryGlyph(top), head: label, time: hmText(from), main: note, isNote: !!note, // タイトルはいつも時刻の左。本文はコメントだけ
+        glyph: entryGlyph(longest), head: label, time: hmText(from) + (!isTweet && to && to !== from ? '〜' + hmText(to) : ''), main: note, isNote: !!note, // タイトルはいつも時刻の左。本文はコメントだけ
         sumText: frame || (isTweet && !sum) ? '' : sg(sum), planned: es.some(e => e.planned),
         frameHint: frame ? 'タップして行動を入れる' : '',
         items: es.length > 1 ? es.map(e => {
@@ -4111,33 +4116,38 @@ export default class App extends React.Component {
   };
 
   /* ホームのタスク（夜の下）: チェックで完了。
-     完了時は「チェックした時間帯」に行動としてタスク名で記録し、mylifecore由来は本家側にも完了を書き戻す */
+     完了時は「押した時刻」で終わる記録にして、その時刻の時間帯へ移す（タスク欄からは消える）。
+     タイトルは紐づけた行動（なければタスク名）、紐づけたときはタスク名をコメントに。mylifecore由来は本家側にも完了を書き戻す */
+  taskRecLive = (srcId) => this.state.entries.some(e => e.srcId === 'taskrec:' + srcId && !e.exp);
   toggleHomeTask = (srcId) => {
-    const tasks = (this.state.tasks || []).map(t => (t.srcId === srcId ? { ...t, done: !t.done } : t));
+    const t0 = (this.state.tasks || []).find(x => x.srcId === srcId);
+    // 記録がゴミ箱に行ったタスクは「未完了」に見せているので、押したら完了にし直す
+    const nextDone = t0 ? !(t0.done && this.taskRecLive(srcId)) : true;
+    const tasks = (this.state.tasks || []).map(t => (t.srcId === srcId ? { ...t, done: nextDone } : t));
     const t = tasks.find(x => x.srcId === srcId);
     let entries = this.state.entries;
-    if (t && t.done) {
-      // 二重記録防止（一度チェック→外して再チェックでも増やさない）
+    if (t && t.done && !this.taskRecLive(srcId)) {
+      // 二重記録防止（ゴミ箱に入れた記録は数えない）
       const recId = 'taskrec:' + srcId;
-      if (!entries.some(e => e.srcId === recId)) {
-        const slotId = this.slotNow();
-        const slot = this.slotDef(slotId);
-        const off = this.slotUsedMin(slotId);
-        const min = t.linkMin || 30;
-        // 紐づけた行動があればその疲労/絵文字、なければ推測＋標準の目安
-        const fh = (t.linkFh != null) ? t.linkFh : null;
-        const delta = fh != null ? Math.max(1, Math.round(fh * min / 60)) : IMPORT_DEFAULT_DELTA;
-        const glyph = t.linkGlyph || ACT_EMOJI[guessAct(t.title)] || '📝';
-        const isMylife = /^(ptask:|daily:)/.test(String(srcId || ''));
-        const recDate = t.date || todayStr(); // タスクに紐づく日付に記録（当日固定にしない）
-        entries = sortEntries([...entries, {
-          ...baseEntry(t.title, delta, recDate),
-          act: t.linkAct || guessAct(t.title), glyph, min, srcId: recId, _new: true,
-          slot: slotId, from: this.slotHm(slot, off), to: this.slotHm(slot, off + min),
-          ...(isMylife ? { taskKey: 'mlt:' + normTitle(t.title) } : {}),
-        }]);
-        this.toast('✅ ' + t.title + ' を' + slot.name + 'に記録しました');
-      }
+      const min = t.linkMin || 30;
+      const now = Date.now(), today = todayStr();
+      const startTs = Math.max(hmToTsOn(today, '00:00'), now - min * 60000);
+      const slotId = this.slotOf({ from: this.tsToHm(now) });
+      const slot = this.slotDef(slotId);
+      // 紐づけた行動があればその疲労/絵文字、なければ推測＋標準の目安
+      const fh = (t.linkFh != null) ? t.linkFh : null;
+      const delta = fh != null ? Math.max(1, Math.round(fh * min / 60)) : IMPORT_DEFAULT_DELTA;
+      const glyph = t.linkGlyph || ACT_EMOJI[guessAct(t.title)] || '📝';
+      const isMylife = /^(ptask:|daily:)/.test(String(srcId || ''));
+      const title = t.linkName || t.title;
+      entries = sortEntries([...entries, {
+        ...baseEntry(title, delta, today),
+        act: t.linkAct || guessAct(t.title), glyph, min, srcId: recId, _new: true,
+        slot: slotId, from: this.tsToHm(startTs), to: this.tsToHm(now),
+        ...(t.linkName && t.linkName !== t.title ? { note: t.title } : {}),
+        ...(isMylife ? { taskKey: 'mlt:' + normTitle(t.title) } : {}),
+      }]);
+      this.toast('✅ ' + t.title + ' を' + slot.name + 'に記録しました');
     }
     this.set({ tasks, entries });
     this.save();
@@ -4733,8 +4743,9 @@ export default class App extends React.Component {
       homePrevDay: this.homePrevDay, homeNextDay: this.homeNextDay,
       setHomeDate: this.setHomeDate, goToday: this.goToday,
       // 時間軸の下に出すタスク（mylifecore / GoogleのToDo / かめペースで手動追加）
-      homeTasks: (st.tasks || []).filter(t => t.date === this.homeDateStr()).map(t => ({
-        srcId: t.srcId, title: t.title, done: !!t.done,
+      // 完了して記録に移ったタスクはタスク欄に出さない（記録をゴミ箱に入れたら未完了として戻る）
+      homeTasks: (st.tasks || []).filter(t => t.date === this.homeDateStr() && !(t.done && this.taskRecLive(t.srcId))).map(t => ({
+        srcId: t.srcId, title: t.title, done: false,
         glyph: t.linkGlyph || null, linkName: t.linkName || '',
         srcLabel: /^(ptask:|daily:)/.test(String(t.srcId || '')) ? 'mylifecore'
           : /^local:/.test(String(t.srcId || '')) ? '' : 'Google',

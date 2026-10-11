@@ -172,11 +172,11 @@ export default function Home({ v }) {
           </button>
         ) : <Post key={p.key} p={p} />)}
         {/* タスク（mylifecore / Google ToDo / かめペースで手動追加）: 時間軸の下。
-            チェックするとその時間帯に「行動」として記録される（紐づけた行動 or タスク名で推測） */}
+            チェックすると押した時刻の時間帯に記録として移る（タイトル＝紐づけた行動・コメント＝タスク名） */}
         {/* タスクも投稿と同じ見た目: 区切り「タスク」＋行（チェック・アイコン・名前・…） */}
         <div style={divRow}>
           <span style={divLine} />
-          <span style={divText}>タスク{v.homeTasks.length > 0 ? '　' + v.homeTasks.filter(t => t.done).length + '/' + v.homeTasks.length : ''}</span>
+          <span style={divText}>タスク</span>
         </div>
         {v.homeTasks.map((t) => (
           <div key={t.srcId} onClick={t.onToggle} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, minHeight: 46, background: '#f7f4ec', borderTop: '1px solid #bab5a7', padding: '6px 16px 6px 72px', cursor: 'pointer', userSelect: 'none' }}>
