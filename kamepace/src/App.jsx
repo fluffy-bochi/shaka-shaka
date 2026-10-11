@@ -16,7 +16,7 @@ import {
 } from './model';
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout, loginCode, codeOfEmail, auth,
-  cloudSave, cloudSavePassive, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
+  cloudSave, cloudSavePassive, setSaveErrorHandler, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
   loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete, loadResearchConfig,
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
@@ -711,7 +711,7 @@ export default class App extends React.Component {
       const hm = this.tsToHm(now);
       const i = entries.findIndex(e => e.date === today && !e.exp && e.drip === key);
       if (i >= 0) entries = entries.map((e, k) => (k === i ? { ...e, delta: e.delta + n, to: hm, _new: true } : e));
-      else entries = sortEntries([...entries, { ...baseEntry(name, n, today), glyph, min: 0, drip: key, symId: en.symId, from: hm, to: hm, slot: this.slotOf({ from: hm }), _new: true }]);
+      else entries = sortEntries([...entries, { ...baseEntry(name, n, today), glyph, min: 0, drip: key, ...(en.symId ? { symId: en.symId } : null), from: hm, to: hm, slot: this.slotOf({ from: hm }), _new: true }]);
       for (let k = 0; k < n; k++) drops.push(glyph);
       changed = true;
       return { ...en, dripAt: now };
@@ -830,7 +830,8 @@ export default class App extends React.Component {
     } else {
       const b = BUFFS.find(x => x.id === id);
       const prev = insts[0];
-      const entry = prev ? { ...prev, lv, mult: undefined } : { id, iid: 'bf' + Date.now() + Math.floor(Math.random() * 1000), title: b ? b.name : '', until: null, key: 'none', from: todayStr(), since: Date.now(), lv };
+      // 強さを変えたら、つぶやき由来の mult は外す（undefined を入れると保存そのものが失敗するので、項目ごと消す）
+      const entry = prev ? (({ mult, ...rest }) => ({ ...rest, lv }))(prev) : { id, iid: 'bf' + Date.now() + Math.floor(Math.random() * 1000), title: b ? b.name : '', until: null, key: 'none', from: todayStr(), since: Date.now(), lv };
       // つぶやき中に選んだ体調は、そのつぶやきのアイコン・いこいさんの声かけに使う
       const tw = this.state.moodOpen && id.startsWith('sym:') ? { tweetSyms: [...(this.state.tweetSyms || []).filter(x => x !== id), id] } : {};
       this.set({ activeBuffs: [...cur.filter(x => x.id !== id), entry], buffTouched: true, ...tw });
@@ -3203,6 +3204,8 @@ export default class App extends React.Component {
     loadIkoi().then(d => { if (d) Ikoi.setPublished(d); }).catch(() => { /* 読めなければ serifu.js の初期値 */ });
     // 研究の期間（参加者コードのアルファベットごとの収集期間）
     loadResearchConfig().then(c => { this._resCfg = c; }).catch(() => { /* 読めなければ期間の制限なし */ });
+    // 保存に失敗したら知らせる（黙って失敗すると、リロードで記録が消えるまで気づけない）
+    setSaveErrorHandler(() => { clearTimeout(this._saveErrT); this._saveErrT = setTimeout(() => this.toast('保存できませんでした。通信を確かめてください'), 300); });
     this._unwatch = watchAuth((user) => {
       this.set({ user, authOpen: false, authPass: '' });
       if (user) this.loadCloud(); else this.loadGuest();
