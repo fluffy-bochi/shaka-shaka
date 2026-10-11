@@ -31,7 +31,7 @@ function Post({ p }) {
           {!p.main && !p.empty && p.sumText && <span style={{ ...mono, marginLeft: 'auto', fontSize: 13.5, fontWeight: 700, color: '#1b1b18', flex: '0 0 auto', paddingLeft: 8 }}>{p.sumText}</span>}
         </div>
         {(p.main || p.empty) && <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 2 }}>
-          <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: p.isNote ? 400 : 600, color: p.empty ? '#8a8a82' : '#1b1b18', lineHeight: 1.45, wordBreak: 'break-all' }}>{p.empty ? '記録する' : (p.main || (p.cond ? '' : ''))}</div>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: p.isNote ? 400 : 600, color: p.empty ? '#8a8a82' : '#1b1b18', lineHeight: 1.45, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>{p.empty ? '記録する' : (p.main || (p.cond ? '' : ''))}</div>
           {p.sumText && <span style={{ ...mono, fontSize: 13.5, fontWeight: 700, color: '#1b1b18', whiteSpace: 'nowrap' }}>{p.sumText}</span>}
         </div>}
         {p.frameHint && <div style={{ fontSize: 10.5, color: '#9d9b91', marginTop: 2 }}>{p.frameHint}</div>}
