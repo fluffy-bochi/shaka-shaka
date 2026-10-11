@@ -2301,8 +2301,10 @@ export default class App extends React.Component {
       return;
     }
     // alarm: 全体（all）と実施中（cur）。mode='alarm'＝時刻 at に鳴る／'timer'＝all は開始から min 分、cur はその行動の実施時間が予定（items[cur].min）に達したら
+    // リスト（テンプレ）から始めたときは「再生」: 行動ごとに決めた時間で実施中タイマーを入れておき、
+    // 時間がたったら知らせて「次へ」で次の行動へ。1つの行動から始めたときは時間なし（none）
     this.setRun({ items: items.map(x => ({ ...x })), cur: 0, segs: [{ uid: items[0].uid, a: now, b: null }], name: name || '', fromList: !!fromList, startAt: now,
-      alarm: { all: { mode: 'timer', at: '', min: 0 }, cur: { mode: 'timer', at: '', none: true } }, fired: {} }); // 実施中は最初は時間なし（none）
+      alarm: { all: { mode: 'timer', at: '', min: 0 }, cur: { mode: 'timer', at: '', none: !fromList } }, fired: {} });
     this.set({ screen: 'run' });
   };
   runClose(run, now) { return run.segs.map(s => (s.b == null ? { ...s, b: now } : s)); }
