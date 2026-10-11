@@ -74,14 +74,14 @@ function Rating({ title, opts, value, onPick, labels, rows, touched, slider, her
         )}
         {open && slider && (
           <div style={{ position: 'relative', marginTop: here != null ? 26 : 12 }}>
-            {/* 現在地＝いまの山の量。つまみの中心(幅16px想定)に合わせて置く */}
+            {/* 現在地＝いまの山の量。つまみの中心(幅16px想定)に合わせて置く。上の丸ボタン（100→0）と同じく左が大きい */}
             {here != null && (
-              <div style={{ position: 'absolute', bottom: '100%', left: `calc(${here}% + ${8 - here * 0.16}px)`, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none', color: '#7a9a00', fontWeight: 800, lineHeight: 1 }}>
-                <span style={{ fontSize: 10, whiteSpace: 'nowrap', transform: `translateX(${(50 - here) * 0.9}%)` }}>現在地 <span style={mono}>{here}</span></span>
+              <div style={{ position: 'absolute', bottom: '100%', right: `calc(${here}% + ${8 - here * 0.16}px)`, transform: 'translateX(50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none', color: '#7a9a00', fontWeight: 800, lineHeight: 1 }}>
+                <span style={{ fontSize: 10, whiteSpace: 'nowrap', transform: `translateX(${(here - 50) * 0.9}%)` }}>現在地 <span style={mono}>{here}</span></span>
                 <span style={{ fontSize: 9, marginTop: 1 }}>▼</span>
               </div>
             )}
-            <input type="range" min={0} max={100} step={1} value={value == null ? 50 : value} onChange={onSlide} style={{ display: 'block', width: '100%', margin: 0, accentColor: INK }} aria-label={title} />
+            <input type="range" min={0} max={100} step={1} value={value == null ? 50 : value} onChange={onSlide} style={{ display: 'block', width: '100%', margin: 0, accentColor: INK, direction: 'rtl' }} aria-label={title} />
           </div>
         )}
         {open && rows && <BuffDetail rows={rows} />}
