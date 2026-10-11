@@ -476,10 +476,18 @@ export default function Pick({ v }) {
   };
 
   // 開閉・初回: 指定の行（なければ今の行）をまんなかのコピーで中央に置く
+  const prevRows = React.useRef(rows);
   React.useLayoutEffect(() => {
     const k = want.current || mem.sel; // mem.sel はまだ開閉前の選択（この後の effect で更新される）
     want.current = null;
-    let i = rows.findIndex(r => r.key === k); if (i < 0) i = 0;
+    let i = rows.findIndex(r => r.key === k);
+    // 選んでいた行が消えた（非表示にした など）ときは、その1つ上でまだある行へ（いちばん上に戻さない）
+    if (i < 0) {
+      const old = prevRows.current, j = old.findIndex(r => r.key === k);
+      for (let t = j - 1; t >= 0 && i < 0; t--) i = rows.findIndex(r => r.key === old[t].key);
+    }
+    if (i < 0) i = 0;
+    prevRows.current = rows;
     scrollToIdx(Math.floor(COPIES / 2) * N + i, false);
   }, [rows]); // eslint-disable-line react-hooks/exhaustive-deps
 
