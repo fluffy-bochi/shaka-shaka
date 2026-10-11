@@ -1,6 +1,7 @@
 import React from 'react';
 import { nurseSrc } from '../wake';
 import * as Ikoi from '../ikoi';
+import Emo from '../fluent';
 
 /* 起床後記録（ホームの睡眠カードから）: 1 入力 → シャカで🌙 → 2 昨日のふりかえり → 3 今日の予定。
    体調・気分は今は数字の1〜5（あとでイラストに差し替える予定）。背景はホームと同じ #f7f4ec。 */
@@ -318,6 +319,27 @@ function TypeBlock({ sum, label }) {
   );
 }
 
+/* 今日のランキング（がんばりポイント／回復）: 実施中画面のアラームの行のように上下に線、左に行動・右にポイント。1位は大きめ */
+function RankList({ title, rows, sign }) {
+  if (!rows || !rows.length) return null;
+  return (
+    <div style={{ margin: '10px 20px 18px' }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: '#55554e', margin: '0 4px 6px' }}>{title}</div>
+      {rows.map((r, i) => {
+        const big = i === 0;
+        return (
+          <div key={r.title} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: big ? '14px 4px' : '10px 4px', borderTop: i === 0 ? '1px solid ' + INK : 'none', borderBottom: '1px solid ' + INK }}>
+            <span style={{ fontFamily: "'Space Mono',monospace", fontSize: big ? 15 : 12, fontWeight: 700, color: '#55554e', minWidth: 16 }}>{i + 1}</span>
+            <span style={{ flex: '0 0 auto', display: 'flex' }}><Emo e={r.glyph} size={big ? 32 : 22} /></span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: big ? 18 : 14, fontWeight: big ? 900 : 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+            <span style={{ fontFamily: "'Space Mono',monospace", fontSize: big ? 22 : 15, fontWeight: 700 }}>{sign}{r.pt}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* 就寝記録 3: 今日のがんばりタイプ・セリフ・推移グラフ（がんばりタイプは就寝時に診断する） */
 export function BedReview({ v }) {
   const b = v.bed;
@@ -327,6 +349,8 @@ export function BedReview({ v }) {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <TypeBlock sum={b.sum} label="今日のがんばりタイプ" />
         <Speaker text={b.reviewText} onEdit={v.editIkoiLine} />
+        <RankList title="がんばりポイント" rows={b.sum.ups} sign="+" />
+        <RankList title="回復" rows={b.sum.recs} sign="−" />
         <Chart data={v.wakeRecs} />
         <div style={{ height: 8 }} />
       </div>
