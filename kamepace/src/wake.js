@@ -63,12 +63,17 @@ export function typeOfCurve(curve) {
 export function daySummary(entries, dateStr, startFat, range) {
   const curve = fatigueCurve(entries, dateStr, startFat, range); // 起床〜就寝で一番長く居たゾーン
   const list = (entries || []).filter(e => e.date === dateStr && !e.exp && !e.wakeAdd && e.delta && e.title);
-  let up = null, rec = null;
-  list.forEach(e => {
-    if (e.delta > 0 && (!up || e.delta > up.delta)) up = e;
-    if (e.delta < 0 && (!rec || e.delta < rec.delta)) rec = e;
-  });
-  return { type: typeOfCurve(curve), up: up && up.title, rec: rec && rec.title, upGlyph: up && entryGlyph(up), recGlyph: rec && entryGlyph(rec), has: list.length > 0 };
+  // 行動ごとに合計して、がんばりポイント（＋）・回復（−）の多い順に3位まで。いこいさんの「〇〇に力を入れましたね」は1位の行動
+  const rank = (sign) => {
+    const by = {};
+    list.filter(e => e.delta * sign > 0).forEach(e => {
+      const r = by[e.title] || (by[e.title] = { title: e.title, glyph: entryGlyph(e), pt: 0 });
+      r.pt += Math.abs(e.delta);
+    });
+    return Object.values(by).filter(r => r.pt >= 0.5).sort((a, b) => b.pt - a.pt).slice(0, 3).map(r => ({ ...r, pt: Math.round(r.pt) }));
+  };
+  const ups = rank(1), recs = rank(-1), up = ups[0], rec = recs[0];
+  return { type: typeOfCurve(curve), up: up && up.title, rec: rec && rec.title, upGlyph: up && up.glyph, recGlyph: rec && rec.glyph, ups, recs, has: list.length > 0 };
 }
 
 /* 画面3: 昨日のふりかえりのセリフ */
