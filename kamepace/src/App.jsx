@@ -118,8 +118,8 @@ export default class App extends React.Component {
     endTime: '',
     recordDate: null, // 記録する日付（確認画面で指定・null=ホーム表示日）。前日の記録などに使う
     homeMotion: (() => { try { return localStorage.getItem('shaka_home_motion') === '1'; } catch (e) { return false; } })(),
-    // カテゴリの色: soft＝彩度を下げて明るく・黒字（標準）／vivid＝元のカラフル
-    catPalette: (() => { try { return localStorage.getItem('kame_cat_palette') === 'vivid' ? 'vivid' : 'soft'; } catch (e) { return 'soft'; } })(),
+    // カテゴリの色: vivid＝カラフル（標準）／soft＝彩度を下げて明るく・黒字（マイページで「やさしい」を選んだときだけ）
+    catPalette: (() => { try { return localStorage.getItem('kame_cat_palette') === 'soft' ? 'soft' : 'vivid'; } catch (e) { return 'vivid'; } })(),
     // シャカの動かし方: false=加速度センサー（振る）／true=ジャイロ（傾き＝逆さで上辺に集まる）
     gyroMode: true, // シャカの動かし方は「傾き」のみ（振るモードはマイページから外した）
     slotMenuOpen: false,
