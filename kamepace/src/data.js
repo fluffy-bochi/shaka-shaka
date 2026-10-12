@@ -38,11 +38,13 @@ const act = (id, glyph, icon, name, body, mind, defMin, extra = {}) => {
 };
 
 /* 名前を変えた行動（旧名 → 新名）。りれきで旧名の記録も新名として数える */
-export const RENAMED_ACTS = { '散歩・軽い運動': '散歩', '洗顔・歯みがき': '洗顔' }; // 洗顔・歯みがきは分けた（前の記録は洗顔として数える）
+export const RENAMED_ACTS = { '散歩・軽い運動': '散歩', '洗顔・歯みがき': '洗顔', '通勤・通学（電車バス）': '電車', '通学（電車バス）': '電車', '通勤（電車バス）': '電車', '帰宅（電車バス）': '電車' }; // 洗顔・歯みがきは分けた（前の記録は洗顔として数える）
 
 export const CATS = [
-  { id: 'idou', icon: 'directions_subway', color: '#6f8fbf', glyph: '🚃', name: 'いどう', sub: '通勤通学・運転・送迎', items: [
-    act('commute', '🚃', 'directions_subway', '通勤・通学（電車バス）', 5, 4, 30, { kw: ['移動', '電車', '満員電車', 'バス', '地下鉄', '通勤', '通学'] }),
+  { id: 'idou', icon: 'directions_subway', color: '#6f8fbf', glyph: '🚃', name: '移動', sub: '電車・バス・運転・送迎', items: [
+    // 電車とバスは分ける（前の「通勤・通学（電車バス）」は電車として数える＝RENAMED_ACTS）。id は前のまま（すき嫌い・頻度などを引き継ぐ）
+    act('commute', '🚃', 'directions_subway', '電車', 5, 4, 30, { kw: ['移動', '電車', '満員電車', '地下鉄', '通勤', '通学'] }),
+    act('bus', '🚌', 'directions_bus', 'バス', 4, 4, 30, { kw: ['移動', 'バス', '通勤', '通学'] }),
     act('drive', '🚗', 'directions_car', '車の運転', 5, 7, 30, { kw: ['移動', '運転', '車', '渋滞'] }),
     act('pickup', '🚙', 'airport_shuttle', '送迎', 4, 5, 20, { kw: ['移動', '送り', 'お迎え', '子供'] }),
     act('walkmove', '🚶', 'directions_walk', '徒歩移動', 7, 2, 15, { kw: ['移動', '徒歩', '歩き'] }),

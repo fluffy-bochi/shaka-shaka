@@ -115,19 +115,19 @@ export function buildAcademicYear(ay, opts = {}) {
     const tt = inSpringClass ? SPRING_TT[wd] : (inFallClass ? FALL_TT[wd] : null);
     if (tt && isWeekday) {
       hadClassOrWork = true;
-      add(date, '08:10', '08:40', '通学（電車バス）', '🚃', D(9, 30));
+      add(date, '08:10', '08:40', '電車', '🚃', D(9, 30));
       tt.forEach(([f, t, name, g, fh]) => add(date, f, t, name, g, D(fh, 90)));
     }
 
     // ---- テスト（前期2日・後期1日） ----
     if (inSpringExam && (wd === 1 || wd === 3)) {
       hadClassOrWork = true;
-      add(date, '08:10', '08:40', '通学（電車バス）', '🚃', D(9, 30));
+      add(date, '08:10', '08:40', '電車', '🚃', D(9, 30));
       add(date, '09:00', '10:00', 'テスト', '✍️', D(11, 60));
     }
     if (inFallExam && wd === 3) {
       hadClassOrWork = true;
-      add(date, '08:10', '08:40', '通学（電車バス）', '🚃', D(9, 30));
+      add(date, '08:10', '08:40', '電車', '🚃', D(9, 30));
       add(date, '09:00', '10:00', 'テスト', '✍️', D(11, 60));
     }
 
@@ -146,7 +146,7 @@ export function buildAcademicYear(ay, opts = {}) {
     if (isBreak && !inWinterGap && isWeekday && rnd('bb' + date) < 0.4) {
       add(date, '11:00', '16:00', 'バイト（ホール・配膳）', '🍽', D(8, 300)); baito = true;
     }
-    if (baito && !tt) add(date, '16:20', '16:50', '通勤（電車バス）', '🚃', D(9, 30));
+    if (baito && !tt) add(date, '16:20', '16:50', '電車', '🚃', D(9, 30));
 
     // ---- 課題（レポート＝簡単2h／制作＝重め）。制作期は増やす ----
     if (inSpringClass || inFallClass) {

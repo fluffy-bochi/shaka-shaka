@@ -205,9 +205,12 @@ export default class App extends React.Component {
       Object.assign(this._sampleWake, wakeByDay || {});
       this._sampleYears.add(y);
     });
-    this._pileLayout = null;
     // 関数型: 読込時の advancePlans 等のバッチ更新と競合しても最新の entries に足す
-    this.setState(prev => ({ entries: [...prev.entries, ...add], collected: [...(prev.collected || []), ...addColl] }));
+    // サンプルを入れる前に作ったシャカの山は少ないので、その形は保存せずにサンプル込みで作り直す
+    // （保存すると、振ったあとの形が少ない山の形で上書きされ、リロードのたびに山が変わる）
+    this.setState(prev => ({ entries: [...prev.entries, ...add], collected: [...(prev.collected || []), ...addColl] }), () => {
+      if (this.engine && this.state.screen === 'shaka' && this.state.dayOffset === 0) { this._skipPileSave = true; this.rebuildPhysics(); }
+    });
   }
   clearSample() {
     this._sampleYears = new Set(); this._sampleDiary = {}; this._sampleFav = {}; this._sampleBalance = {}; this._sampleWake = {}; this._pileLayout = null;
@@ -279,13 +282,13 @@ export default class App extends React.Component {
       date: t, glyph, min, slot, sample: true,
     });
     return [
-      S('07:40', '08:10', '通学（電車バス）', '🚃', 30, 5, 'asa'),
+      S('07:40', '08:10', '電車', '🚃', 30, 5, 'asa'),
       S('09:00', '10:30', '講義（聞く中心）', '📖', 90, 11, 'am'),
       S('10:40', '11:40', '自習', '📚', 60, 9, 'am'),
       S('13:00', '14:00', 'レポート・課題', '📝', 60, 9, 'pm'),
       S('14:10', '15:10', 'グループワーク', '👥', 60, 10, 'pm'),
       S('17:30', '20:30', 'バイト接客', '🙋', 180, 39, 'yoru'),
-      S('21:00', '21:30', '帰宅（電車バス）', '🚃', 30, 5, 'yoru'),
+      S('21:00', '21:30', '電車', '🚃', 30, 5, 'yoru'),
       S('21:40', '22:40', 'ゲーム', '🎮', 60, -7, 'yoru'),
     ];
   }
@@ -368,8 +371,8 @@ export default class App extends React.Component {
     const changed = ch0 || fixed.changed;
     this.set({ ...data, booted: true, screen: data.mainScreen || 'shaka' });
     if (changed) { this._pileLayout = null; this.save(); }
-    // 直前（ログイン中）の物理エンジン・山を捨てて、ゲストのデータで組み直す
-    this.stopPhysics(); this._pileLayout = null;
+    // 直前（ログイン中）の物理エンジン・山を捨てて、ゲストのデータで組み直す（振った形はゲストの保存分を使う）
+    this.stopPhysics(); this._pileLayout = this.readPileLayout(null);
     this.restoreSampleMode(data, true); // ゲストは標準でペルソナ1年サンプルを表示
     setTimeout(() => this.advancePlans(), 0); // アプリを閉じている間に進んだ予定をキャッチアップ
     setTimeout(() => this.sweepExpiredBuffs(), 0);
@@ -409,7 +412,8 @@ export default class App extends React.Component {
       }
       // ログイン前（ゲスト）の物理エンジン・山を必ず捨てて、このユーザーのデータで組み直す。
       // 残したままだと前の山が居座って「ぎっちぎち」になる（再起動で直る症状の原因）。
-      this.stopPhysics(); this._pileLayout = null;
+      // 振った形は、このユーザーの端末に保存した分を使う（毎回捨てると、リロードのたびに山の形が変わる）
+      this.stopPhysics(); this._pileLayout = this.readPileLayout(auth.currentUser && auth.currentUser.uid);
       setTimeout(() => this.advancePlans(), 0);
       // カレンダーアプリ(my-schedule-app)の予定を自動取り込み（ログイン時＋以後5分ごと）
       setTimeout(() => this.syncScheduleApp(), 400);
@@ -1729,10 +1733,11 @@ export default class App extends React.Component {
     const moon = (st.collected || []).reduce((a, c) => (c.glyph === '🌙' && c.ts && dateToStr(new Date(c.ts)) === d) ? a + (c.amount || 1) : a, 0);
     const wakeHm = wk ? (wk.up || tsToHmOn(d, wk.ts)) : '';
     const bedHm = bd ? tsToHmOn(d, bd.ts) : '';
+    // 起床後の記録をまだ入れていない日は、右の回復の数（🌙）を出さない
     posts.push({
       key: 'wake', kind: 'wake', sortHm: wakeHm || '00:00', slot: 'asa', glyph: '🌅',
       head: '起床後の記録', time: hmText(wakeHm), main: wk ? (wk.note || '') : '', empty: !wk, isNote: !!(wk && wk.note),
-      sumText: moon ? '−' + moon : '', past: !!wk, cond: wk ? condOf({ ts: wk.ts, cond: wk.cond, mood: wk.mood }) : null,
+      sumText: wk && moon ? '−' + moon : '', past: !!wk, cond: wk ? condOf({ ts: wk.ts, cond: wk.cond, mood: wk.mood }) : null,
       onTap: this.goSleep, onMenu: wk ? () => this.openRecMenu({ logKind: 'wake', logDate: d, title: '起床後の記録', glyph: '🌅' }) : this.goSleep,
     });
     posts.push({
@@ -2746,7 +2751,7 @@ export default class App extends React.Component {
     const t = todayStr();
     // 学生サンプル: 午前まで記入済み
     const entries = [
-      { from: '07:40', to: '08:10', title: '通学（電車バス）', act: '通勤', mood: '🙂', delta: 5, exp: false, date: t, glyph: '🚃', min: 30, slot: 'asa' },
+      { from: '07:40', to: '08:10', title: '電車', act: '通勤', mood: '🙂', delta: 5, exp: false, date: t, glyph: '🚃', min: 30, slot: 'asa' },
       { from: '09:00', to: '10:30', title: '講義（聞く中心）', act: '勉強', mood: '🙂', delta: 10, exp: false, date: t, glyph: '📖', min: 90, slot: 'am' },
       { from: '10:40', to: '11:40', title: '自習', act: '勉強', mood: '🙂', delta: 6, exp: false, date: t, glyph: '📚', min: 60, slot: 'am' },
     ];
@@ -2782,7 +2787,7 @@ export default class App extends React.Component {
       const t = todayStr();
       const evening = [
         { from: '18:00', to: '20:00', title: 'バイト接客', act: '仕事', mood: '🙂', delta: 26, exp: false, date: t, glyph: '🙋', min: 120, slot: 'yoru' },
-        { from: '21:00', to: '21:30', title: '帰宅（電車バス）', act: '通勤', mood: '🙂', delta: 5, exp: false, date: t, glyph: '🚃', min: 30, slot: 'yoru' },
+        { from: '21:00', to: '21:30', title: '電車', act: '通勤', mood: '🙂', delta: 5, exp: false, date: t, glyph: '🚃', min: 30, slot: 'yoru' },
       ];
       patch.entries = sortEntries([...this.state.entries, ...evening]);
       patch.screen = 'home';
@@ -3397,6 +3402,7 @@ export default class App extends React.Component {
 
   startPhysics(el) {
     if (!el || this.engine) return;
+    this._pileKey = this.pileLayoutKey(this.state.user && this.state.user.uid);
     const { Engine, World, Bodies, Runner } = Matter;
     const rect = el.getBoundingClientRect();
     const W = rect.width || 350, H = rect.height || 700;
@@ -3440,11 +3446,14 @@ export default class App extends React.Component {
     const perRow = Math.max(1, Math.floor(W / (2 * r)));
     // 前回保存した散らばり（振って変わった形）。今日の山のときだけ使う
     let saved = (this.state.dayOffset === 0 && this._pileLayout && this._pileLayout.length) ? this._pileLayout : null;
-    // 山が減っていたら古い側から間引いて既存分と揃える
-    if (saved && saved.length > oldCount) saved = saved.slice(saved.length - oldCount);
+    // 保存した位置は「同じ絵文字」に返す（並び順で返すと、回復で山の途中の絵文字が消えたあとなどに
+    // 絵文字と位置の組み合わせがずれて、リロード後に山の見た目が変わる）。絵文字ごとに保存順で取り出す
+    const savedBy = {};
+    if (saved) saved.forEach(s => { if (s && s.g) (savedBy[s.g] = savedBy[s.g] || []).push(s); });
     marks.forEach((m, idx) => {
       const glyph = m.g;
       const isNew = idx >= oldCount;
+      const sv = !isNew && savedBy[glyph] && savedBy[glyph].length ? savedBy[glyph].shift() : null;
       let x, y, angle = 0;
       if (isNew) {
         // 新規記録分は「画面上端のすぐ上」から段積みで落とす＝全部そろってすぐ降ってくる。
@@ -3453,11 +3462,11 @@ export default class App extends React.Component {
         const col = ni % perRow, row = Math.floor(ni / perRow);
         x = r + col * (2 * r) + (Math.random() - 0.5) * r * 0.4;
         y = -r - row * (2 * r) - Math.random() * r * 0.4;
-      } else if (saved && saved[idx]) {
+      } else if (sv) {
         // 保存した位置・角度を復元（勝手に整列し直さない）
-        x = Math.max(r, Math.min(W - r, saved[idx].x * W));
-        y = Math.max(r, Math.min(H - r, saved[idx].y * H));
-        angle = saved[idx].a || 0;
+        x = Math.max(r, Math.min(W - r, sv.x * W));
+        y = Math.max(r, Math.min(H - r, sv.y * H));
+        angle = sv.a || 0;
       } else {
         // 初期配置は重なりを作らない（2r間隔）。重なると解消時に底が床を突き抜けて画面下へ弾かれる
         const row = Math.floor(idx / perRow), col = idx % perRow;
@@ -3546,7 +3555,17 @@ export default class App extends React.Component {
     this.freezeMotion();
   }
   /* 山の散らばりを保存（振って変わった形を維持する）。今日の山のときだけ */
+  /* 振った形（山の配置）はアカウントごとに端末に保存する（ゲストとログイン中で混ざらないように） */
+  pileLayoutKey(uid) { return 'shaka_pile_layout:' + (uid || 'guest'); }
+  readPileLayout(uid) {
+    try {
+      const s = localStorage.getItem(this.pileLayoutKey(uid)) || localStorage.getItem('shaka_pile_layout'); // 旧キーも読む
+      const l = s ? JSON.parse(s) : null;
+      return Array.isArray(l) && l.length ? l : null;
+    } catch (e) { return null; }
+  }
   _savePileLayout() {
+    if (this._skipPileSave) { this._skipPileSave = false; return; } // データを入れる前に作った山の形は保存しない
     if (this.state.dayOffset !== 0) return;
     if (!this.bodies || !this.bodies.length) return;
     // 落下・散らばりの途中で画面を離れても「宙に浮いた形」を保存しない。
@@ -3572,7 +3591,7 @@ export default class App extends React.Component {
     }));
     this._pileLayout = layout;
     if (!this.state.tutorial) {
-      try { localStorage.setItem('shaka_pile_layout', JSON.stringify(layout)); } catch (e) { /* ignore */ }
+      try { localStorage.setItem(this._pileKey || this.pileLayoutKey(this.state.user && this.state.user.uid), JSON.stringify(layout)); } catch (e) { /* ignore */ }
     }
   }
   freezeMotion() {
