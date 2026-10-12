@@ -340,19 +340,21 @@ function RankList({ title, rows, sign }) {
   );
 }
 
-/* 就寝記録 3: 今日のがんばりタイプ・セリフ・推移グラフ（がんばりタイプは就寝時に診断する） */
+/* 就寝記録 3: セリフ・今日のがんばりタイプ・推移グラフ・ランキング（がんばりタイプは就寝時に診断する） */
 export function BedReview({ v }) {
   const b = v.bed;
   return (
     <div style={wrap}>
       <Head v={v} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-        <TypeBlock sum={b.sum} label="今日のがんばりタイプ" />
+        {/* 上から いこいさん → がんばりタイプ → グラフ → ランキング */}
+        <div style={{ height: 10 }} />
         <Speaker text={b.reviewText} onEdit={v.editIkoiLine} />
-        <RankList title="がんばりポイント" rows={b.sum.ups} sign="+" />
-        <RankList title="回復" rows={b.sum.recs} sign="−" />
+        <TypeBlock sum={b.sum} label="今日のがんばりタイプ" />
         <Chart data={v.wakeRecs} />
         <div style={{ height: 8 }} />
+        <RankList title="がんばりポイント" rows={b.sum.ups} sign="+" />
+        <RankList title="回復" rows={b.sum.recs} sign="−" />
       </div>
       <div style={foot}>
         <button onClick={v.backBed} style={btnSub}>もどる</button>
