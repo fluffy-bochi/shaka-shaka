@@ -383,6 +383,29 @@ export function WakeReview({ v }) {
 }
 
 /* 3: 今日の予定 */
+/* 昨日やっていないタスクを今日に引き継ぐか聞く（チェックしたものだけ引き継ぐ） */
+function CarryTasks({ list, onCarry }) {
+  const [off, setOff] = React.useState({}); // チェックを外したもの
+  if (!list || !list.length) return null;
+  const on = list.filter(t => !off[t.id]).map(t => t.id);
+  const small = (main) => ({ border: main ? 'none' : '1.5px solid #e4e1d8', borderRadius: 12, padding: '8px 14px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', background: main ? LIME : '#fff', color: main ? LIME_INK : '#55554e' });
+  return (
+    <div style={{ background: '#fff', borderRadius: 14, padding: '12px 14px', marginBottom: 12 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>昨日のやっていないタスクを引き継ぐ？</div>
+      {list.map(t => (
+        <div key={t.id} onClick={() => setOff(o => ({ ...o, [t.id]: !o[t.id] }))} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', cursor: 'pointer' }}>
+          <span style={{ width: 18, height: 18, borderRadius: 6, border: '2px solid ' + (!off[t.id] ? '#7a9a00' : '#c9c5b8'), background: !off[t.id] ? LIME : '#fff', flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: LIME_INK }}>{!off[t.id] ? '✓' : ''}</span>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+        </div>
+      ))}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+        <button onClick={() => onCarry([])} style={small(false)}>引き継がない</button>
+        <button onClick={() => onCarry(on)} style={small(true)}>引き継ぐ</button>
+      </div>
+    </div>
+  );
+}
+
 export function WakePlan({ v }) {
   const w = v.wake;
   return (
@@ -391,13 +414,15 @@ export function WakePlan({ v }) {
       <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, margin: '4px 0 10px' }}>今日の予定</div>
       <Speaker text={w.planText} onEdit={v.editIkoiLine} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: '#efece3', borderRadius: '22px 22px 0 0', padding: '16px 20px 8px' }}>
+        <CarryTasks list={w.carry} onCarry={v.carryTasks} />
         {w.plans.length === 0 && w.tasks.length === 0 && <div style={{ textAlign: 'center', fontSize: 12.5, color: '#a5a39a', padding: '30px 0' }}>予定もタスクもありません</div>}
         {w.plans.map((p, i) => (
-          <div key={'p' + i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', borderRadius: 14, padding: '11px 14px', marginBottom: 8 }}>
+          <div key={'p' + i} onClick={p.onTap} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', borderRadius: 14, padding: '11px 14px', marginBottom: 8, cursor: 'pointer' }}>
             <span style={{ ...mono, fontSize: 11.5, fontWeight: 700, color: '#55554e', flex: '0 0 auto' }}>{p.from}</span>
             <span style={{ fontSize: 18, flex: '0 0 auto' }}>{p.glyph}</span>
             <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
             {p.delta ? <span style={{ ...mono, fontSize: 12, fontWeight: 700, color: '#f5994e', flex: '0 0 auto' }}>{p.delta > 0 ? '+' + p.delta : p.delta}</span> : null}
+            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 18, color: '#a5a39a', flex: '0 0 auto' }}>chevron_right</span>
           </div>
         ))}
         {w.tasks.map((t, i) => (
