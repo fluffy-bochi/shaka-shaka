@@ -3188,11 +3188,49 @@ export default class App extends React.Component {
     const yRec = recs.find(w => w.date === y);
     const yBed = (st.bedLog || []).find(b => b.date === y);
     const sum = daySummary(st.entries, y, yRec ? yRec.fatigue : 0, { from: yRec ? yRec.ts : null, to: yBed ? yBed.ts : null });
-    const plans = sortEntries(st.entries.filter(e => e.date === today && this.isPlanLike(e))).map(e => ({ title: e.title, from: e.from, to: e.to, glyph: entryGlyph(e), delta: e.delta }));
+    // 今日の予定: 押すと中身の登録（枠なら行動を入れる・それ以外は編集）へ。終わったらこの画面に戻る
+    const plans = st.entries.map((e, i) => ({ e, i })).filter(({ e }) => e.date === today && this.isPlanLike(e))
+      .sort((a, b) => (a.e.from || '').localeCompare(b.e.from || ''))
+      .map(({ e, i }) => ({
+        title: e.title, from: e.from, to: e.to, glyph: entryGlyph(e), delta: e.delta,
+        onTap: () => this.openPlanFromWake(i),
+      }));
     const tasks = (st.tasks || []).filter(t => t.date === today && t.title);
+    // 昨日やっていないタスク（まだ引き継ぐか聞いていないもの）
+    const carry = (st.tasks || []).filter(t => t.date === y && t.title && !t.done && !t.carryAsked);
     const chart = this.chartData([...new Set(recs.map(r => r.date))].sort()); // 朝は直近7回ぶんの日
-    return { recs, chart, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks };
+    return { recs, chart, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks, carry: carry.map(t => ({ id: t.srcId, title: t.title })) };
   }
+  /* 朝の「今日の予定」から予定を押したとき: 中身の登録へ。保存・やめるのあとは「今日の予定」に戻る */
+  openPlanFromWake = (i) => {
+    const e = this.state.entries[i];
+    if (!e) return;
+    this._afterRecord = 'wake3';
+    if (e.needsSetup) { this.openFrameFill({ idxs: [i] }); return; }
+    const idxs = e.gid ? this.state.entries.map((x, k) => (x.gid === e.gid && x.date === e.date ? k : -1)).filter(k => k >= 0) : [i];
+    this.openEditFlow({ idxs, isPlan: !!e.plan && !e.gid, planName: e.plan || null, title: e.title });
+  };
+  /* 昨日やっていないタスクを今日に引き継ぐ（ids＝引き継ぐもの）。聞いたタスクは二度聞かない */
+  carryTasks = (ids) => {
+    const st = this.state, today = todayStr(), y = shiftDate(today, -1);
+    const pick = new Set(ids || []);
+    const tasks = [...(st.tasks || [])];
+    const have = new Set(tasks.map(t => t.srcId));
+    const add = [];
+    for (let k = 0; k < tasks.length; k++) {
+      const t = tasks[k];
+      if (t.date !== y || !t.title || t.done || t.carryAsked) continue;
+      tasks[k] = { ...t, carryAsked: true };
+      const nid = 'carry:' + t.srcId + ':' + today;
+      if (pick.has(t.srcId) && !have.has(nid)) {
+        const { srcId, date, done, carryAsked, ...rest } = t;
+        add.push({ ...rest, srcId: nid, date: today, done: false, carriedFrom: t.srcId });
+      }
+    }
+    this.set({ tasks: [...tasks, ...add] });
+    this.save();
+    if (add.length) this.toast(add.length + '件のタスクを今日に引き継ぎました');
+  };
 
   /* ================= 予定の時間進行（旧本番と統一） ================= */
   advancePlans() {
@@ -3390,6 +3428,11 @@ export default class App extends React.Component {
     if (lab !== this._stLabel) { if (this._stLabel) this.tickScreenTime(); this._stLabel = lab; }
     if (this.state.tutorial) this.checkTutorial(prevState);
     if (this.state.predictOpen && this.state.screen !== 'shaka') { this._pred = null; this.set({ predictOpen: false }); }
+    // 朝の「今日の予定」から開いた登録が終わったら（保存・やめる）、その画面に戻る
+    if (this._afterRecord && prevState.screen === 'record' && this.state.screen !== 'record') {
+      const to = this._afterRecord; this._afterRecord = null;
+      if (['home', 'shaka'].includes(this.state.screen)) this.set({ screen: to });
+    }
   }
   componentWillUnmount() {
     clearInterval(this._tick); clearInterval(this._planT); clearInterval(this._clockT); clearInterval(this._schedT);
@@ -4768,7 +4811,7 @@ export default class App extends React.Component {
       // 疲労度スライダーの「現在地」＝いまの山の個数（あとから前の日の就寝を記録するときは出さない）
       fatHere: (st.screen === 'wake1' || (st.screen === 'bed1' && !(st.bedDraft && st.bedDraft.hm != null))) ? Math.min(100, Math.max(0, this.pileCount())) : null,
       wakeFlow: st.wakeFlow && st.screen === 'shaka', goWake2: this.goWake2, goWake3: this.goWake3, backWake: this.backWake,
-      wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null,
+      wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null, carryTasks: this.carryTasks,
       wakeHeader: (() => {
         if (!st.screen.startsWith('wake') && !st.screen.startsWith('bed')) return '';
         const t = st.screen.startsWith('bed') ? (st.bedTarget || st.bedDay || this.bedDay()) : this.wakeDay(), d = strToDate(t);
