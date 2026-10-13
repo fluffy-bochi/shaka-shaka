@@ -147,7 +147,7 @@ function NoteBody({ isMonth, day, month, names, slotHours, diary, onDiary, footL
       <div style={{ fontSize: 11, fontWeight: 700, color: '#55554e', margin: '14px 0 8px' }}>絵文字のかず</div>
       <Chart chart={chart} />
       <div style={{ fontSize: 11, fontWeight: 700, color: '#55554e', margin: '14px 0 6px' }}>日記</div>
-      <textarea value={diary} onChange={onDiary} placeholder="この日のことをメモ" style={{ width: '100%', minHeight: 56, resize: 'vertical', background: '#fbfaf6', border: '1px solid #eee9dc', borderRadius: 10, padding: '8px 10px', fontFamily: 'inherit', fontSize: 12, lineHeight: 1.6, color: '#1b1b18', outline: 'none' }} />
+      <textarea value={diary} onChange={onDiary} placeholder="この日のことをメモ" rows={Math.max(3, (diary || '').split('\n').length + 1)} style={{ width: '100%', minHeight: 56, resize: 'vertical', background: '#fbfaf6', border: '1px solid #eee9dc', borderRadius: 10, padding: '8px 10px', fontFamily: 'inherit', fontSize: 12, lineHeight: 1.6, color: '#1b1b18', outline: 'none' }} />
     </div>
   </>);
 }
@@ -474,7 +474,8 @@ export default function Bookshelf({ v }) {
   const fusen = (day) => <Fusen on={!!fav[day.dateStr]} onClick={() => v.setBookFav(day.dateStr)} />;
   const noteProps = {
     isMonth, day: selDay, month: selMonth, names, slotHours,
-    diary: diaries[selKey] || '', onDiary: (e) => v.setBookDiary(selKey, e.target.value), footLabel,
+    // 自分で書いていない日は、その日に入れたコメントを自動で並べる（書きかえたらその文が残る）
+    diary: diaries[selKey] || (!isMonth && v.bookAutoDiary ? v.bookAutoDiary(selKey) : ''), onDiary: (e) => v.setBookDiary(selKey, e.target.value), footLabel,
     beforeSleepMap: v.bookBeforeSleep || null,
   };
 
