@@ -2388,7 +2388,8 @@ export default class App extends React.Component {
     const hmOf = (ts) => this.tsToHm(ts);
     const cart = this.cartFromList(done, r.name).map((c, i) => {
       const ss = segs.filter(s => s.uid === done[i].uid && s.b - s.a >= 1000);
-      const ranges = ss.map(s => ({ from: hmOf(s.a), to: hmOf(Math.max(s.b, s.a + 60000)) }));
+      // 終わりは「記録」を押した時刻のまま。1分に満たないときは始まりを前にずらして1分にする（終わりを後ろにずらさない）
+      const ranges = ss.map(s => ({ from: hmOf(Math.min(s.a, s.b - 60000)), to: hmOf(s.b) }));
       const min = Math.max(1, Math.round(ss.reduce((a, s) => a + (s.b - s.a), 0) / 60000));
       return { ...c, defMin: min, ranges };
     });
@@ -2399,7 +2400,7 @@ export default class App extends React.Component {
     this.setRun({ ...r, segs, doneUids: done.map(li => li.uid) });
     // 確認画面は所要時間モードで、終わり（記録を押した時刻）にそろえる。分を変えても終わりは変わらない
     const cartD = cart.map(({ ranges, ...c }) => c); // eslint-disable-line no-unused-vars
-    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cartD, searchTotalMin: total, searchFracs: cartD.map(c => c.defMin / total), confirmMode: 'duration', startTime: hmOf(start), endTime: hmOf(Math.max(end, start + 60000)), anchorEnd: hmOf(Math.max(end, start + 60000)), cart: {}, confirmOrigin: 'run', framePlan: null, recordDate: null });
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cartD, searchTotalMin: total, searchFracs: cartD.map(c => c.defMin / total), confirmMode: 'duration', startTime: hmOf(Math.min(start, end - 60000)), endTime: hmOf(end), anchorEnd: hmOf(end), cart: {}, confirmOrigin: 'run', framePlan: null, recordDate: null });
   };
   goRun = () => { if (this.state.run) this.set({ screen: 'run', runAdd: false }); };
   /* 実行中のタスクを記録せずに捨てる */
