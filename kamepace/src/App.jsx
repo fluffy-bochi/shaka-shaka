@@ -2498,13 +2498,37 @@ export default class App extends React.Component {
     const name = (pl.name || '').trim();
     if (!pl.items.length) return;
     if (!name) { this.toast('リストに名前をつけてください'); return; }
-    const tasks = pl.items.map(li => ({ name: li.name, glyph: li.glyph, min: li.min, fat: this.listItemVals(li).total || 1 }));
+    const tpls = this.state.templates || {};
     const k = normTitle(name);
+    // 読み込んだテンプレ（または同じ名前のテンプレ）があるときは、上書きか新しく保存かを聞く
+    const overKey = (pl.tplKey && tpls[pl.tplKey]) ? pl.tplKey : (tpls[k] ? k : null);
+    if (overKey) { this.set({ tplAsk: { name, over: overKey, newName: this.freeTplName(name) } }); return; }
+    this.tplWrite('new');
+  };
+  /* 同じ名前のテンプレがあれば「名前（2）」のように空いている名前にする */
+  freeTplName(name) {
+    const tpls = this.state.templates || {};
+    if (!tpls[normTitle(name)]) return name;
+    const base = name.replace(/（\d+）$/, '');
+    for (let n = 2; n < 100; n++) { const nm = base + '（' + n + '）'; if (!tpls[normTitle(nm)]) return nm; }
+    return base + '（' + Date.now() + '）';
+  }
+  tplAskClose = () => this.set({ tplAsk: null });
+  /* mode: 'over'＝読み込んだ（同じ名前の）テンプレを上書き／'new'＝別のテンプレとして保存 */
+  tplWrite = (mode) => {
+    const pl = this.state.pickList, ask = this.state.tplAsk;
+    const tasks = pl.items.map(li => ({ name: li.name, glyph: li.glyph, min: li.min, fat: this.listItemVals(li).total || 1 }));
     const templates = { ...(this.state.templates || {}) };
-    templates[k] = { ...(templates[k] || {}), act: guessAct(name) || '', delta: tasks.reduce((a, t) => a + t.fat, 0), tasks };
-    this.set({ templates, pickList: { ...pl, tplKey: k } });
+    let name = (pl.name || '').trim();
+    if (mode === 'new') name = (ask && ask.newName) || this.freeTplName(name);
+    const k = normTitle(name);
+    const old = mode === 'over' && ask ? ask.over : null;
+    const base = (old && templates[old]) || templates[k] || {};
+    if (old && old !== k) delete templates[old]; // 名前を変えて上書きしたときは、前の名前のテンプレを置きかえる
+    templates[k] = { ...base, act: guessAct(name) || '', delta: tasks.reduce((a, t) => a + t.fat, 0), tasks };
+    this.set({ templates, pickList: { ...pl, name, tplKey: k }, tplAsk: null });
     this.save();
-    this.toast('「' + name + '」をテンプレに保存しました');
+    this.toast('「' + name + '」を' + (mode === 'over' ? '上書き保存' : 'テンプレに保存') + 'しました');
   };
 
   /* ================= 予定 ================= */
@@ -5028,7 +5052,7 @@ export default class App extends React.Component {
         name: st.pickList.name, tplKey: st.pickList.tplKey, tick: st.pickListTick,
         rows: st.pickList.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.moveListItem(li.uid, -1), onDown: () => this.moveListItem(li.uid, 1), onRemove: () => this.removeListItem(li.uid) })),
       }) : null,
-      setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate,
+      setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate, tplAsk: st.tplAsk || null, tplWrite: this.tplWrite, tplAskClose: this.tplAskClose,
       startListRun: () => { const pl = st.pickList; if (pl.items.length) this.startRun(pl.items, (pl.name || '').trim(), true); },
       run: st.run ? (() => { try { return this.runVals(); } catch (e) { console.warn('[kamepace] run', e); return null; } })() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish, runDiscard: this.runDiscard, runRename: this.runRename, setRunAlarm: this.setRunAlarm,
       runAlarm: st.runAlarm, closeRunAlarm: this.closeRunAlarm, runAlarmNext: this.runAlarmNext,
