@@ -2084,6 +2084,24 @@ export default class App extends React.Component {
     if (bookFav[key]) delete bookFav[key]; else bookFav[key] = true;
     this.set({ bookFav }); this.save();
   };
+  /* 本棚のコメント（自分で書いていない日）: その日に自分で入れたコメントを、ホームの並び（時刻順）で1行ずつ空けて並べる
+     起床後の記録のひとこと → 記録・つぶやきのコメント（まとまりは1つ） → 就寝前の記録のひとこと */
+  bookAutoDiary(d) {
+    const st = this.state, out = [];
+    const wk = (st.wakeLog || []).find(w => w.date === d);
+    if (wk && (wk.note || '').trim()) out.push({ t: wk.up || tsToHmOn(d, wk.ts), s: wk.note.trim() });
+    const seen = new Set();
+    (st.entries || []).forEach(e => {
+      if (e.date !== d || e.exp || e._sample || !(e.note || '').trim()) return;
+      const k = e.gid || e;
+      if (seen.has(k)) return; seen.add(k);
+      out.push({ t: e.from || '', s: e.note.trim() });
+    });
+    out.sort((a, b) => a.t.localeCompare(b.t));
+    const bd = (st.bedLog || []).find(b => b.date === d);
+    if (bd && (bd.note || '').trim()) out.push({ t: '99', s: bd.note.trim() });
+    return out.map(x => x.s).join('\n\n');
+  }
   setBookDiary = (key, val) => {
     const bookDiary = { ...(this.state.bookDiary || {}) };
     if (val) bookDiary[key] = val; else delete bookDiary[key];
@@ -4896,7 +4914,7 @@ export default class App extends React.Component {
       bookDiary: st.sampleMode ? { ...this._sampleDiary, ...(st.bookDiary || {}) } : (st.bookDiary || {}),
       bookBeforeSleep: st.sampleMode ? this._sampleBalance : null, // 寝る前の疲労（繰り越し込み）
 
-      setBookFav: this.setBookFav, setBookDiary: this.setBookDiary,
+      setBookFav: this.setBookFav, setBookDiary: this.setBookDiary, bookAutoDiary: (d) => this.bookAutoDiary(d),
       navMypageColor: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
       navMypageFill: ['mypage', 'trash', 'slotTimes', 'catsManage', 'templates', 'sensitivity', 'help', 'buffLog'].includes(st.screen) ? 1 : 0,
       homeDate: this.homeDateStr(),
