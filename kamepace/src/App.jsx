@@ -3117,7 +3117,7 @@ export default class App extends React.Component {
       return;
     }
     const cal = this.calibNight(today, d.fat, !!d.seen);
-    const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts: now.getTime(), hm, cond: d.cond, mood: d.mood, fatigue: d.fat, note: (d.note || '').trim(), pred: cal.predicted, seen: !!d.seen }];
+    const bedLog = [...(this.state.bedLog || []).filter(b => b.date !== today), { date: today, ts: now.getTime(), hm, cond: d.cond, mood: d.mood, fatigue: d.fat, note: (d.note || '').trim(), pred: cal.predicted, seen: !!d.seen, ...(d.keep ? { keep: true } : {}) }];
     this.applyFatigue(d.fat, '就寝時の疲労', { bedLog, bedFlow: true, bedDay: today, ...cal.patch }, today);
   };
   /* 夜の申告で体感に合わせる（calib.js）: ずれ＝申告 − 現在地 と、その日の内訳を残し、係数と行動ごとの補正を少し動かす。
@@ -4852,6 +4852,7 @@ export default class App extends React.Component {
       wakeDraft: st.wakeDraft, setWakeDraft: this.setWakeDraft, finishWake1: this.finishWake1,
       seenBedHere: () => { if (!(st.bedDraft && st.bedDraft.seen)) this.setBedDraft('seen', true); },
       // 疲労度スライダーの「現在地」＝いまの山の個数（あとから前の日の就寝を記録するときは出さない）
+      fatNow: (st.screen === 'bed1' && !(st.bedDraft && st.bedDraft.hm != null)) ? Math.max(0, this.pileCount()) : null, // 就寝時「実感と同じ」用（100をこえてもそのまま）
       fatHere: (st.screen === 'wake1' || (st.screen === 'bed1' && !(st.bedDraft && st.bedDraft.hm != null))) ? Math.min(100, Math.max(0, this.pileCount())) : null,
       wakeFlow: st.wakeFlow && st.screen === 'shaka', goWake2: this.goWake2, goWake3: this.goWake3, backWake: this.backWake,
       wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null, carryTasks: this.carryTasks,
