@@ -2265,6 +2265,13 @@ export default class App extends React.Component {
     return { pickList: { ...s.pickList, items } };
   });
   removeListItem = (uid) => this.setState(s => ({ pickList: { ...s.pickList, items: s.pickList.items.filter(x => x.uid !== uid) } }));
+  /* 同じ行動を分けてやるとき（作業15分→休憩→作業20分…）用に、その行のすぐ下に同じ行動をもう1つ入れる */
+  copyListItem = (uid) => this.setState(s => {
+    const items = [...s.pickList.items], i = items.findIndex(x => x.uid === uid);
+    if (i < 0) return null;
+    items.splice(i + 1, 0, { ...items[i], uid: 'li' + Date.now() + Math.floor(Math.random() * 1000) });
+    return { pickList: { ...s.pickList, items } };
+  });
   setListName = (e) => {
     const name = e.target.value;
     if (this.state.runAdd && this.state.run) { this.setRun({ ...this.state.run, name }); return; }
@@ -2357,6 +2364,15 @@ export default class App extends React.Component {
     if (uid === curUid) return; // いま実行中の行は消さない
     const items = r.items.filter(x => x.uid !== uid);
     this.setRun({ ...r, items, segs: r.segs.filter(s => s.uid !== uid), cur: items.findIndex(x => x.uid === curUid) });
+  };
+  /* 実行中のリストで行をコピー（すぐ下に同じ行動。実行した時間は引き継がない） */
+  runCopy = (uid) => {
+    const r = this.state.run; if (!r) return;
+    const items = [...r.items], i = items.findIndex(x => x.uid === uid);
+    if (i < 0) return;
+    const curUid = r.items[r.cur].uid;
+    items.splice(i + 1, 0, { ...items[i], uid: 'li' + Date.now() + Math.floor(Math.random() * 1000) });
+    this.setRun({ ...r, items, cur: items.findIndex(x => x.uid === curUid) });
   };
   runMs(r, uid, now) { return r.segs.filter(s => s.uid === uid).reduce((a, s) => a + ((s.b == null ? now : s.b) - s.a), 0); }
   /* 実行中の行動は、記録する前から実行した時間に合わせて降らせる（食事 −8/時なら 7分30秒ごとに1個）。
@@ -2507,7 +2523,7 @@ export default class App extends React.Component {
         req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(cur.name, kind, val),
         history: (ym) => this.actHistory(cur.name, ym), goal: (st.actGoals || {})[normTitle(cur.name)] || 0, onGoal: () => this.cycleActGoal(cur.name), startAt: first ? first.a : null, ms: this.runMs(r, cur.uid, now), planMs: (cur.min || 30) * 60000 },
       rows: r.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), on: i === r.cur, ms: this.runMs(r, li.uid, now), segs: r.segs.filter(s => s.uid === li.uid),
-        onTap: () => this.runSelect(i), onUp: () => this.runMove(li.uid, -1), onDown: () => this.runMove(li.uid, 1), onRemove: () => this.runRemove(li.uid) })),
+        onTap: () => this.runSelect(i), onUp: () => this.runMove(li.uid, -1), onDown: () => this.runMove(li.uid, 1), onRemove: () => this.runRemove(li.uid), onCopy: () => this.runCopy(li.uid) })),
     };
   }
   /* リストをテンプレに保存（名前が必要）。同じ名前のテンプレは上書き */
@@ -5066,10 +5082,10 @@ export default class App extends React.Component {
       pickList: st.screen === 'record' ? (st.runAdd && st.run ? {
         // 実行画面の「＋」から来たとき: リストのカードには実行中のリストを出す（並べ替え・外すも実行中のリストに）
         runMode: true, name: st.run.name, tplKey: null, tick: st.pickListTick,
-        rows: st.run.items.map((li) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.runMove(li.uid, -1), onDown: () => this.runMove(li.uid, 1), onRemove: () => this.runRemove(li.uid) })),
+        rows: st.run.items.map((li) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.runMove(li.uid, -1), onDown: () => this.runMove(li.uid, 1), onRemove: () => this.runRemove(li.uid), onCopy: () => this.runCopy(li.uid) })),
       } : {
         name: st.pickList.name, tplKey: st.pickList.tplKey, tick: st.pickListTick,
-        rows: st.pickList.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.moveListItem(li.uid, -1), onDown: () => this.moveListItem(li.uid, 1), onRemove: () => this.removeListItem(li.uid) })),
+        rows: st.pickList.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.moveListItem(li.uid, -1), onDown: () => this.moveListItem(li.uid, 1), onRemove: () => this.removeListItem(li.uid), onCopy: () => this.copyListItem(li.uid) })),
       }) : null,
       setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate, tplAsk: st.tplAsk || null, tplWrite: this.tplWrite, tplAskClose: this.tplAskClose,
       startListRun: () => { const pl = st.pickList; if (pl.items.length) this.startRun(pl.items, (pl.name || '').trim(), true); },
