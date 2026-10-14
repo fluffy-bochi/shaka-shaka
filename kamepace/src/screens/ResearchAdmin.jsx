@@ -11,7 +11,19 @@ const mono = { fontFamily: "'Space Mono',monospace" };
 const card = { background: '#fff', borderRadius: 16, padding: '14px 16px', boxShadow: '0 1px 3px rgba(27,27,24,.05)' };
 const h3 = { fontSize: 14, fontWeight: 900, margin: '0 0 8px' };
 const pct = (r) => (r == null ? '—' : Math.round(r * 100) + '%');
-const md = (d) => Number(d.slice(5, 7)) + '/' + Number(d.slice(8));
+/* 「何日目」表示: 人ごとに最初の記録日を1日目にそろえる。日付の計算（抜けた日など）はそのまま使えるよう、
+   1日目＝2000-01-01 の仮の日付に置きかえる（md() が「N日目」と表示する） */
+const NTH0 = Date.UTC(2000, 0, 1);
+const dUTC = (d) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+const isNth = (d) => d < '2001';
+const toNth = (x) => {
+  const ds = Object.keys(x.days || {}).sort();
+  if (!ds.length) return x;
+  const b = dUTC(ds[0]), days = {};
+  ds.forEach(d => { days[new Date(NTH0 + dUTC(d) - b).toISOString().slice(0, 10)] = x.days[d]; });
+  return { ...x, days };
+};
+const md = (d) => (isNth(d) ? Math.round((dUTC(d) - NTH0) / 864e5) + 1 + '日目' : Number(d.slice(5, 7)) + '/' + Number(d.slice(8)));
 const btn = (main) => ({ border: main ? 'none' : '1.5px solid #e4e1d8', background: main ? INK : '#fff', color: main ? '#fff' : INK, borderRadius: 10, padding: '7px 12px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' });
 
 /* 画面ごとの利用時間のヒートマップ。cols=[{key,label,data:{画面:分}}]、最後に合計の列。濃いほど長い */
@@ -61,6 +73,75 @@ function Heat({ cols, totalLabel = '合計' }) {
 const heatDays = (days) => Object.keys(days || {}).sort().map(d => ({ key: d, label: md(d), data: days[d].screens || {} }));
 // 全員: 参加者ごとの合計
 const heatPeople = (parts) => parts.map(p => ({ key: p.code, label: p.code, data: Object.values(p.days || {}).reduce((acc, s) => { Object.entries(s.screens || {}).forEach(([k, m]) => { acc[k] = (acc[k] || 0) + m; }); return acc; }, {}) }));
+
+/* 画面の利用時間の推移: 日ごとの積み上げ棒（色＝画面）。days={日付:{screens:{画面:分}}} */
+const SCOL = ['#7a9a00', '#c4d84a', '#5b8fd4', '#9cc0ea', '#e8836f', '#ff5fa2', '#f2cf6b', '#6f6aa8', '#c58b3d', '#4fa88a', '#d98ba0', '#b8b4a8', '#d6d2c6'];
+const scol = (k) => { const i = SCREENS.indexOf(k); return i >= 0 ? SCOL[i % SCOL.length] : '#d6d2c6'; };
+function ScreenBars({ days, W = 320, H = 170 }) {
+  const ds = Object.keys(days || {}).sort().filter(d => Object.values(days[d].screens || {}).some(m => m > 0));
+  if (!ds.length) return <div style={{ fontSize: 12, color: MUTED, padding: '20px 0', textAlign: 'center' }}>データがありません</div>;
+  const keys = [...SCREENS, ...[...new Set(ds.flatMap(d => Object.keys(days[d].screens)))].filter(k => !SCREENS.includes(k))].filter(k => ds.some(d => days[d].screens[k] > 0));
+  const tot = (d) => keys.reduce((a, k) => a + (days[d].screens[k] || 0), 0);
+  const mx = Math.max(...ds.map(tot));
+  const unit = mx > 180 ? 60 : mx > 60 ? 30 : 10, top = Math.max(unit, Math.ceil(mx / unit) * unit);
+  const PX = 34, PT = 8, PB = 24, hh = H - PT - PB, bw = Math.max(4, Math.min(22, (W - PX - 14) / ds.length - 3));
+  const X = (i) => PX + (i + 0.5) * (W - PX - 14) / ds.length;
+  const step = Math.max(1, Math.ceil(ds.length / (W > 400 ? 10 : 6)));
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+        {[0, top / 2, top].map(v => <g key={v}><line x1={PX} x2={W - 14} y1={PT + (1 - v / top) * hh} y2={PT + (1 - v / top) * hh} stroke={LINE} /><text x={PX - 5} y={PT + (1 - v / top) * hh + 3} textAnchor="end" fontSize="8" fill={MUTED} style={mono}>{fmtM(v) || '0'}</text></g>)}
+        {ds.map((d, i) => {
+          let y = PT + hh;
+          return (
+            <g key={d}>
+              {keys.map(k => { const m = days[d].screens[k] || 0; if (!m) return null; const h = hh * m / top; y -= h; return <rect key={k} x={X(i) - bw / 2} y={y} width={bw} height={h} fill={scol(k)}><title>{md(d) + ' ' + k + ' ' + Math.round(m) + '分（計' + Math.round(tot(d)) + '分）'}</title></rect>; })}
+            </g>
+          );
+        })}
+        {ds.map((d, i) => ((i % step === 0 && i <= ds.length - 1 - step) || i === ds.length - 1) && <text key={d} x={X(i)} y={H - 8} textAnchor="middle" fontSize="8.5" fill={MUTED} style={mono}>{md(d)}</text>)}
+      </svg>
+      <div style={{ display: 'flex', gap: '4px 10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: 4, fontSize: 10.5, color: SUB, fontWeight: 700 }}>
+        {keys.map(k => <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: scol(k) }} />{k}</span>)}
+      </div>
+    </div>
+  );
+}
+// 全員: 日付ごとに全員ぶんを足す
+const sumDays = (parts) => { const out = {}; parts.forEach(p => Object.entries(p.days || {}).forEach(([d, s]) => { const o = (out[d] = out[d] || { screens: {} }); Object.entries(s.screens || {}).forEach(([k, m]) => { o.screens[k] = (o.screens[k] || 0) + m; }); })); return out; };
+/* 参加者の比較: 1日の合計利用時間の推移（人ごとの線） */
+function CompareScreen({ parts, sel, onSel, W = 620, H = 190 }) {
+  const all = [...new Set(parts.flatMap(p => Object.keys(p.days || {})))].sort();
+  const tot = (s) => Object.values((s && s.screens) || {}).reduce((a, m) => a + m, 0);
+  const mx = Math.max(0, ...parts.flatMap(p => Object.values(p.days || {}).map(tot)));
+  if (!all.length || !mx) return null;
+  const unit = mx > 180 ? 60 : mx > 60 ? 30 : 10, top = Math.ceil(mx / unit) * unit;
+  const PX = 34, PT = 10, PB = 24;
+  const X = (d) => (all.length === 1 ? W / 2 : PX + all.indexOf(d) * (W - PX - 14) / (all.length - 1));
+  const Y = (v) => PT + (1 - v / top) * (H - PT - PB);
+  const step = Math.max(1, Math.ceil(all.length / (W > 400 ? 12 : 6)));
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+        {[0, top / 2, top].map(v => <g key={v}><line x1={PX} x2={W - 14} y1={Y(v)} y2={Y(v)} stroke={LINE} /><text x={PX - 5} y={Y(v) + 3} textAnchor="end" fontSize="8" fill={MUTED} style={mono}>{fmtM(v) || '0'}</text></g>)}
+        {parts.map((p, i) => {
+          const pts = Object.keys(p.days || {}).sort().filter(d => tot(p.days[d]) > 0).map(d => [X(d), Y(tot(p.days[d])), d]);
+          const on = !sel || sel === p.code, c = PCOL[i % PCOL.length];
+          return (
+            <g key={p.code} opacity={on ? 1 : 0.25} onClick={() => onSel && onSel(p.code)} style={{ cursor: 'pointer' }}>
+              {pts.length > 1 && <path d={'M' + pts.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L')} fill="none" stroke={c} strokeWidth={sel === p.code ? 3 : 1.8} strokeLinejoin="round" />}
+              {pts.map(q => <circle key={q[2]} cx={q[0]} cy={q[1]} r="2.4" fill={c}><title>{p.code + ' ' + md(q[2]) + ' ' + Math.round(tot(p.days[q[2]])) + '分'}</title></circle>)}
+            </g>
+          );
+        })}
+        {all.map((d, i) => ((i % step === 0 && i <= all.length - 1 - step) || i === all.length - 1) && <text key={d} x={X(d)} y={H - 8} textAnchor="middle" fontSize="8.5" fill={MUTED} style={mono}>{md(d)}</text>)}
+      </svg>
+      <div style={{ display: 'flex', gap: '4px 10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: 4, fontSize: 10.5, color: SUB, fontWeight: 700 }}>
+        {parts.map((p, i) => <span key={p.code} onClick={() => onSel && onSel(p.code)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}><span style={{ width: 14, height: 0, borderTop: '2px solid ' + PCOL[i % PCOL.length] }} />{p.code}</span>)}
+      </div>
+    </div>
+  );
+}
 
 /* 全体の実行率: 行動ごとの実行率（100%で頭打ち）の平均。やりすぎた行動で、ほかの未達が隠れないように */
 function overallRate(days) {
@@ -426,6 +507,7 @@ export default function ResearchAdmin({ v }) {
   const [per, setPer] = React.useState(''); // 表示する期間（''＝すべて）
   const [editPer, setEditPer] = React.useState(false);
   const [mkAcc, setMkAcc] = React.useState(false); // 参加者アカウントを作る
+  const [nth, setNth] = React.useState(true); // 横軸を「何日目」にする（人ごとに開始日がちがっても並べて比べられる）
   React.useEffect(() => { loadResearchConfig().then(setCfg).catch(() => {}); }, []);
   // PC では画面いっぱいに（スマホ枠を外す）
   React.useEffect(() => { document.body.classList.toggle('kame-wide', wide); return () => document.body.classList.remove('kame-wide'); }, [wide]);
@@ -437,12 +519,13 @@ export default function ResearchAdmin({ v }) {
   // 参加者は、コードのアルファベットの期間の日だけを使う（期間が未設定なら全部）
   const clip = (x) => { const pp = periods[x.code[0]]; if (!pp) return x; const days = {}; Object.keys(x.days).forEach(d => { if ((!pp.start || d >= pp.start) && (!pp.end || d <= pp.end)) days[d] = x.days[d]; }); return { ...x, days }; };
   const allParts = (demo ? demoData.parts : real);
-  const parts = allParts && allParts.filter(x => !per || x.code[0] === per).map(clip);
+  const realParts = allParts && allParts.filter(x => !per || x.code[0] === per).map(clip); // CSV は本当の日付で
+  const parts = realParts && (nth ? realParts.map(toNth) : realParts);
   const letters = [...new Set([...Object.keys(periods), ...((allParts || []).map(x => x.code[0]))])].sort();
   const savePeriods = async (ps) => { try { await saveResearchConfig({ periods: ps }); setCfg({ periods: ps }); setEditPer(false); } catch (e) { setErr('期間を保存できませんでした（ルール・ログインを確認）'); } };
   const p = parts && (parts.find(x => x.code === sel) || (wide ? parts[0] : null));
-  const csvAll = () => { const f = csvFiles(parts); Object.entries(f).forEach(([n, t]) => downloadText((demo ? 'デモ_' : '') + (per ? '期間' + per + '_' : '全員_') + n, t)); };
-  const csvOne = (x) => { const f = csvFiles([x]); Object.entries(f).forEach(([n, t]) => downloadText((demo ? 'デモ_' : '') + x.code + '_' + n, t)); };
+  const csvAll = () => { const f = csvFiles(realParts); Object.entries(f).forEach(([n, t]) => downloadText((demo ? 'デモ_' : '') + (per ? '期間' + per + '_' : '全員_') + n, t)); };
+  const csvOne = (x) => { const f = csvFiles([realParts.find(r => r.code === x.code) || x]); Object.entries(f).forEach(([n, t]) => downloadText((demo ? 'デモ_' : '') + x.code + '_' + n, t)); };
   const pick = (c) => setSel(c);
 
   const header = (
@@ -458,8 +541,13 @@ export default function ResearchAdmin({ v }) {
   );
   // 期間の切り替え（すべて／A／B／C…）
   const fmtP = (pp) => (pp && (pp.start || pp.end) ? (pp.start ? md(pp.start) : '') + '〜' + (pp.end ? md(pp.end) : '') : '期間未設定');
+  const axisBar = (
+    <div style={{ display: 'inline-flex', background: '#fff', borderRadius: 10, padding: 3, marginBottom: 14, boxShadow: '0 1px 3px rgba(27,27,24,.06)' }}>
+      {[[true, '1日目・2日目…'], [false, '日付']].map(([v, n]) => <button key={n} onClick={() => setNth(v)} style={{ border: 'none', borderRadius: 8, background: nth === v ? INK : 'none', color: nth === v ? '#fff' : SUB, padding: '6px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{n}</button>)}
+    </div>
+  );
   const periodBar = (
-    <div className="nos" style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 14 }}>
+    <div className="nos" style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 10 }}>
       {['', ...letters].map(k => {
         const on = per === k, n = (allParts || []).filter(x => !k || x.code[0] === k).length, pp = periods[k];
         return (
@@ -474,6 +562,7 @@ export default function ResearchAdmin({ v }) {
   const status = (
     <>
       {periodBar}
+      {axisBar}
       {!demo && err && <div style={{ ...card, color: '#b4645a', fontSize: 12.5, fontWeight: 700, marginBottom: 12 }}>{err}</div>}
       {!demo && !err && !real && <div style={{ textAlign: 'center', color: MUTED, fontSize: 12.5, padding: 30 }}>読み込み中…</div>}
       {parts && !parts.length && <div style={{ ...card, fontSize: 12.5, color: MUTED }}>{per ? 'この期間の参加者はまだいません。' : 'まだ参加者がいません。「デモ」で見た目を確認できます。'}</div>}
@@ -482,7 +571,8 @@ export default function ResearchAdmin({ v }) {
     </>
   );
   const detailHead = (x) => {
-    const ds = Object.keys(x.days).sort();
+    const rx = (realParts || []).find(r => r.code === x.code) || x;
+    const ds = Object.keys(rx.days).sort();
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         {!wide && <button onClick={() => setSel(null)} style={{ border: 'none', background: 'none', fontSize: 19, color: MUTED, cursor: 'pointer' }}>‹</button>}
@@ -507,6 +597,10 @@ export default function ResearchAdmin({ v }) {
                 <div style={card}><div style={h3}>参加者（{parts.length}人）</div><PeopleTable parts={parts} sel={p && p.code} onSel={pick} /></div>
                 <div style={card}><div style={h3}>1日の最高疲労度の比較</div><CompareFatigue parts={parts} sel={p && p.code} onSel={pick} /></div>
                 <div style={card}><div style={h3}>全体の実行率</div><CompareRate parts={parts} sel={p && p.code} onSel={pick} /><div style={{ fontSize: 10.5, color: MUTED, marginTop: 8, lineHeight: 1.6 }}>行動ごとの実行率（100%で頭打ち）の平均</div></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, marginBottom: 16 }}>
+                <div style={card}><div style={h3}>1日の利用時間の比較 <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>人ごとの合計（分）</span></div><CompareScreen parts={parts} sel={p && p.code} onSel={pick} W={600} H={210} /></div>
+                <div style={card}><div style={h3}>画面ごとの利用時間の推移 <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>全員の合計・1日ごと</span></div><ScreenBars days={sumDays(parts)} W={600} H={210} /></div>
               </div>
               <div style={{ ...card, marginBottom: 16 }}><div style={h3}>画面ごとの利用時間（全員・期間の合計）</div><Heat cols={heatPeople(parts)} totalLabel="全員" /></div>
               {p && (
@@ -533,7 +627,9 @@ export default function ResearchAdmin({ v }) {
                       <Adherence days={p.days} />
                     </div>
                   </div>
-                  <div style={{ ...h3, marginTop: 20 }}>画面ごとの利用時間（日ごと）</div>
+                  <div style={{ ...h3, marginTop: 20 }}>画面ごとの利用時間の推移 <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>1日ごと</span></div>
+                  <ScreenBars days={p.days} W={1180} H={220} />
+                  <div style={{ ...h3, marginTop: 18 }}>画面ごとの利用時間（日ごと）</div>
                   <Heat cols={heatDays(p.days)} />
                 </div>
               )}
@@ -564,10 +660,13 @@ export default function ResearchAdmin({ v }) {
           <div style={{ ...card, marginBottom: 12 }}><div style={h3}>寝ているあいだの回復</div><SleepRecChart days={p.days} /></div>
           <div style={{ ...card, marginBottom: 12 }}><div style={h3}>寝た時刻・起きた時刻</div><SleepTimeChart days={p.days} /></div>
           <div style={{ ...card, marginBottom: 12 }}><div style={h3}>実行率（実施／目標）</div><Adherence days={p.days} /></div>
+          <div style={{ ...card, marginBottom: 12 }}><div style={h3}>画面ごとの利用時間の推移</div><ScreenBars days={p.days} /></div>
           <div style={card}><div style={h3}>画面ごとの利用時間（日ごと）</div><Heat cols={heatDays(p.days)} /></div>
         </> : (
           <>
             <div style={{ ...card, marginBottom: 12 }}><div style={h3}>参加者（{parts.length}人）</div><PeopleTable parts={parts} sel={null} onSel={pick} /></div>
+            <div style={{ ...card, marginBottom: 12 }}><div style={h3}>1日の利用時間の比較</div><CompareScreen parts={parts} onSel={pick} W={320} H={170} /></div>
+            <div style={{ ...card, marginBottom: 12 }}><div style={h3}>画面ごとの利用時間の推移（全員）</div><ScreenBars days={sumDays(parts)} /></div>
             <div style={card}><div style={h3}>画面ごとの利用時間（全員）</div><Heat cols={heatPeople(parts)} totalLabel="全員" /></div>
           </>
         ))}
