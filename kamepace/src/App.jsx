@@ -16,7 +16,7 @@ import {
 } from './model';
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout, loginCode, codeOfEmail, auth,
-  cloudSave, cloudSavePassive, setSaveErrorHandler, loadUserData, fetchGoogleData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
+  cloudSave, cloudSavePassive, setSaveErrorHandler, loadUserData, fetchGoogleData, disconnectGoogle, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
   loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete, loadResearchConfig,
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
@@ -4318,6 +4318,7 @@ export default class App extends React.Component {
      予定は時間どおりに進んで終了時刻で自動記録される（既存の planned/frame の仕組みに乗る） */
   async syncScheduleApp() {
     if (!this.state.user) return;
+    if ((this.state.prefs || {}).mlcOff) return; // マイページで mylifecore の連携を解除している
     try {
       const [items, projTasks, dailyTasks] = await Promise.all([
         fetchScheduleEvents().catch(() => []),
@@ -4456,6 +4457,29 @@ export default class App extends React.Component {
   };
 
   /* Googleカレンダー/ToDo 取り込み（旧本番と同一の entries 形式で追加） */
+  /* 連携の解除（マイページ）: kind＝'mlc'（mylifecore）／'google'（Googleカレンダー・ToDo）。
+     clear＝これから（今日以降）の取り込んだ予定・タスクのうち、まだ使っていないものも消す */
+  openLinkOff = (kind) => this.set({ linkOff: kind });
+  closeLinkOff = () => this.set({ linkOff: null });
+  doLinkOff = async (clear) => {
+    const kind = this.state.linkOff;
+    this.set({ linkOff: null });
+    if (!kind) return;
+    if (kind === 'mlc') this.set({ prefs: { ...(this.state.prefs || {}), mlcOff: true } });
+    else { try { await disconnectGoogle(); } catch (e) { /* ignore */ } }
+    if (clear) {
+      const t0 = todayStr();
+      const evRe = kind === 'mlc' ? /^sched:/ : /^cal:/, tkRe = kind === 'mlc' ? /^(ptask|daily):/ : /^task:/;
+      const entries = this.state.entries.map(e => (e.srcId && evRe.test(String(e.srcId)) && e.date >= t0 && !e.exp && (e.needsSetup || e.planned)) ? { ...e, exp: true, trashedAt: Date.now() } : e);
+      const gone = (this.state.tasks || []).filter(t => tkRe.test(String(t.srcId || '')) && !t.done && t.date >= t0).map(t => t.srcId);
+      const tasks = (this.state.tasks || []).filter(t => !gone.includes(t.srcId));
+      this.set({ entries, tasks, purgedTaskIds: Array.from(new Set([...(this.state.purgedTaskIds || []), ...gone])) });
+    }
+    this.save();
+    this.toast((kind === 'mlc' ? 'mylifecore' : 'Googleカレンダー') + 'の連携を解除しました');
+  };
+  /* mylifecore の連携を戻す */
+  mlcOn = () => { this.set({ prefs: { ...(this.state.prefs || {}), mlcOff: false } }); this.save(); setTimeout(() => this.syncMylifecore(), 0); };
   doCalendarSync = async () => {
     if (!this.state.user) { this.openAuth(); return; }
     this.toast('⏳ 取り込み中…', 6000);
@@ -5008,8 +5032,10 @@ export default class App extends React.Component {
       taskEditIsNew: !!st.taskEditIsNew,
       saveTaskEdit: this.saveTaskEdit, closeTaskEdit: this.closeTaskEdit, deleteTaskEdit: this.deleteTaskEdit,
       // mylifecore 連携（同じFirebaseなのでログインしていれば自動連携中）
-      mylifeConnected: !!st.user,
-      mylifeStatusText: st.user
+      mylifeConnected: !!st.user && !(st.prefs || {}).mlcOff, mylifeOff: !!st.user && !!(st.prefs || {}).mlcOff,
+      linkOff: st.linkOff || null, openLinkOff: this.openLinkOff, closeLinkOff: this.closeLinkOff, doLinkOff: this.doLinkOff, mlcOn: this.mlcOn,
+      mylifeStatusText: st.user && (st.prefs || {}).mlcOff ? '連携を解除しています'
+        : st.user
         ? '連携中 · ' + (st.lastSyncAt ? this.tsToHm(st.lastSyncAt) + ' に同期' : 'ログイン時＋5分ごとに自動取り込み')
         : 'ログインすると予定・タスクを自動で取り込みます',
       syncMylifecore: this.syncMylifecore,

@@ -5,7 +5,7 @@ import {
   getAuth, onAuthStateChanged, signOut as fbSignOut,
   GoogleAuthProvider, signInWithPopup,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  linkWithPopup, reauthenticateWithPopup,
+  linkWithPopup, reauthenticateWithPopup, unlink,
 } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, doc, getDoc, getDocFromServer, setDoc,
@@ -302,6 +302,20 @@ async function fetchTasksToday(token) {
       from: '00:00',
       to: '23:59', // 時刻が無いので終日扱い → 1日の終わりに自動記録
     }));
+}
+
+/* Googleカレンダー/ToDo の連携を解除: 許可（アクセス権）をGoogle側で取り消し、覚えていたトークンを捨てる。
+   メール＋パスワードでログインしていて、取り込みのためにGoogleをつないだ人は、そのつながりも外す（Googleでログインしている人はログインに使っているので外さない） */
+export async function disconnectGoogle() {
+  const token = googleAccessToken;
+  googleAccessToken = null;
+  if (token) { try { await fetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(token), { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }); } catch (e) { /* 取り消せなくても続ける */ } }
+  const u = auth.currentUser;
+  let unlinked = false;
+  if (u && u.providerData.some(p => p.providerId === 'google.com') && u.providerData.some(p => p.providerId === 'password')) {
+    try { await unlink(u, 'google.com'); unlinked = true; } catch (e) { /* ignore */ }
+  }
+  return { unlinked };
 }
 
 /* 取り込み実行。{cal, tasks} の生アイテムを返す（entriesへの反映は呼び出し側） */
