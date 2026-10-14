@@ -1,7 +1,7 @@
 /* 起床後記録: がんばりタイプの判定・セリフ・グラフ用データ。
    疲労度は 0〜100（山が100個で満杯）。0〜40=ゆったり / 41〜80=ほどほど / 81〜100=みちみち。
    1日の疲労の推移を滑らかな曲線にして、一番長く居たゾーンをその日のタイプにする。 */
-import { hmToTsOn, entryGlyph } from './model';
+import { hmToTsOn, entryGlyph, entryMin } from './model';
 import { REST_FROM, AFTER_RECORD_MIN, TAP_NO_REPEAT } from './serifu';
 import { lines as L, fill, restTip, faceKeyFor, faceSrc } from './ikoi'; // セリフはいこいさん編集で変えられる（初期値は serifu.js）
 
@@ -67,8 +67,9 @@ export function daySummary(entries, dateStr, startFat, range) {
   const rank = (sign) => {
     const by = {};
     list.filter(e => e.delta * sign > 0).forEach(e => {
-      const r = by[e.title] || (by[e.title] = { title: e.title, glyph: entryGlyph(e), pt: 0 });
+      const r = by[e.title] || (by[e.title] = { title: e.title, glyph: entryGlyph(e), pt: 0, min: 0 });
       r.pt += Math.abs(e.delta);
+      r.min += entryMin(e) || 0; // その行動にかけた時間（合計）
     });
     return Object.values(by).filter(r => r.pt >= 0.5).sort((a, b) => b.pt - a.pt).slice(0, 3).map(r => ({ ...r, pt: Math.round(r.pt) }));
   };

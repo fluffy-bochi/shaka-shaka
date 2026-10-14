@@ -338,7 +338,10 @@ function RankList({ title, rows, sign }) {
           <div key={r.title} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: big ? '14px 4px' : '10px 4px', borderTop: i === 0 ? '1px solid ' + INK : 'none', borderBottom: '1px solid ' + INK }}>
             <span style={{ fontFamily: "'Space Mono',monospace", fontSize: big ? 15 : 12, fontWeight: 700, color: '#55554e', minWidth: 16 }}>{i + 1}</span>
             <span style={{ flex: '0 0 auto', display: 'flex' }}><Emo e={r.glyph} size={big ? 32 : 22} /></span>
-            <span style={{ flex: 1, minWidth: 0, fontSize: big ? 18 : 14, fontWeight: big ? 900 : 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: big ? 18 : 14, fontWeight: big ? 900 : 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+              {r.min > 0 && <span style={{ fontFamily: "'Space Mono',monospace", fontSize: big ? 11.5 : 10.5, fontWeight: 700, color: '#8a8a82', marginTop: 1 }}>{r.min >= 60 ? Math.floor(r.min / 60) + '時間' + (r.min % 60 ? (r.min % 60) + '分' : '') : r.min + '分'}</span>}
+            </span>
             <span style={{ fontFamily: "'Space Mono',monospace", fontSize: big ? 22 : 15, fontWeight: 700 }}>{sign}{r.pt}</span>
           </div>
         );
