@@ -187,6 +187,7 @@ export default function Run({ v }) {
                 {/* 並べ替えの矢印と×は「編集」を押したときだけ */}
                 {edit && <button onClick={x.onUp} aria-label="上へ" style={arrowBtn(i > 0)}><span style={ms(20, INK)}>arrow_upward</span></button>}
                 {edit && <button onClick={x.onDown} aria-label="下へ" style={arrowBtn(i < r.rows.length - 1)}><span style={ms(20, INK)}>arrow_downward</span></button>}
+                {edit && <button onClick={x.onCopy} aria-label="同じ行動をコピー" style={arrowBtn(true)}><span style={ms(18, INK)}>content_copy</span></button>}
                 {edit && <button onClick={x.onRemove} aria-label="リストから外す" style={arrowBtn(!x.on && r.rows.length > 1)}><span style={ms(19, '#b4645a')}>delete</span></button>}
               </div>
             ); })}
