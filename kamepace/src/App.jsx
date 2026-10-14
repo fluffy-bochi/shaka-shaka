@@ -12,7 +12,7 @@ import {
 import {
   todayStr, shiftDate, strToDate, dateToStr, formatDateCaps, formatDateShort, pad2, hmToTsOn,
   entryToRecord, entryGlyph, entryMin, planUnitsDue, entryStartTs, entryEndTs, tsToHmOn, nightDayStr, setBedDatesSource, calendarTodayStr,
-  serialize, deserialize, freshState, sortEntries, normTitle, getTemplate, baseEntry,
+  serialize, deserialize, freshState, sortEntries, normTitle, getTemplate, baseEntry, weekMonday,
 } from './model';
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout, loginCode, codeOfEmail, auth,
@@ -58,6 +58,7 @@ const IS_IOS_DEVICE = typeof navigator !== 'undefined' && (
 // 操作チュートリアル: いったん誰にも出さない（自動でも、マイページからも始まらない）。戻すときは true に
 export const TUTORIAL_ON = false;
 const PICK_REMOVED_CATS = ['health'];
+const WEEK_GOAL_MAX = 20; // 今週の目標の文字数（ホームで1行に収まる長さ）
 const REMOVED_NAMES = new Set((CATS.find(c => c.id === 'health') || { items: [] }).items.map(t => t.name));
 
 export default class App extends React.Component {
@@ -262,7 +263,7 @@ export default class App extends React.Component {
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
       calibLog: s.calibLog, actCal: s.actCal, calibUndo: s.calibUndo, calibAnchor: s.calibAnchor,
-      bookFav: s.bookFav, bookDiary: s.bookDiary,
+      bookFav: s.bookFav, bookDiary: s.bookDiary, weekGoals: s.weekGoals,
       trashedPlans: s.trashedPlans, purgedPlanIds: s.purgedPlanIds,
       purgedTaskIds: s.purgedTaskIds,
     };
@@ -2109,6 +2110,13 @@ export default class App extends React.Component {
     if (val) bookDiary[key] = val; else delete bookDiary[key];
     this.set({ bookDiary }); this.save();
   };
+  /* 今週の目標（月曜の朝の「今日の予定」で決める・1行） */
+  setWeekGoal = (val) => {
+    const key = weekMonday(todayStr()), weekGoals = { ...(this.state.weekGoals || {}) };
+    const t = String(val || '').replace(/\s*\n\s*/g, ' ').slice(0, WEEK_GOAL_MAX);
+    if (t.trim()) weekGoals[key] = t; else delete weekGoals[key];
+    this.set({ weekGoals }); this.save();
+  };
   goSleep = () => {
     // 翌朝＝睡眠記録のタイミングで、続いている調子（バフ・デバフ）をまだ続いているか確認
     if (this.buffEntries().length && this.state.lastBuffCheck !== todayStr()) {
@@ -3290,7 +3298,8 @@ export default class App extends React.Component {
     // 昨日やっていないタスク（まだ引き継ぐか聞いていないもの）
     const carry = (st.tasks || []).filter(t => t.date === y && t.title && !t.done && !t.carryAsked);
     const chart = this.chartData([...new Set(recs.map(r => r.date))].sort()); // 朝は直近7回ぶんの日
-    return { recs, chart, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks, carry: carry.map(t => ({ id: t.srcId, title: t.title })) };
+    const isMonday = strToDate(today).getDay() === 1, weekGoal = (st.weekGoals || {})[weekMonday(today)] || '';
+    return { recs, chart, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks, carry: carry.map(t => ({ id: t.srcId, title: t.title })), isMonday, weekGoal, weekGoalMax: WEEK_GOAL_MAX };
   }
   /* 朝の「今日の予定」から予定を押したとき: 中身の登録へ。保存・やめるのあとは「今日の予定」に戻る */
   openPlanFromWake = (i) => {
@@ -4927,7 +4936,7 @@ export default class App extends React.Component {
       fatNow: (st.screen === 'bed1' && !(st.bedDraft && st.bedDraft.hm != null)) ? Math.max(0, this.pileCount()) : null, // 就寝時「実感と同じ」用（100をこえてもそのまま）
       fatHere: (st.screen === 'wake1' || (st.screen === 'bed1' && !(st.bedDraft && st.bedDraft.hm != null))) ? Math.min(100, Math.max(0, this.pileCount())) : null,
       wakeFlow: st.wakeFlow && st.screen === 'shaka', goWake2: this.goWake2, goWake3: this.goWake3, backWake: this.backWake,
-      wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null, carryTasks: this.carryTasks,
+      wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null, carryTasks: this.carryTasks, setWeekGoal: this.setWeekGoal,
       wakeHeader: (() => {
         if (!st.screen.startsWith('wake') && !st.screen.startsWith('bed')) return '';
         const t = st.screen.startsWith('bed') ? (st.bedTarget || st.bedDay || this.bedDay()) : this.wakeDay(), d = strToDate(t);
@@ -4997,6 +5006,7 @@ export default class App extends React.Component {
       homeDateY: strToDate(this.homeDateStr()).getFullYear(),
       homeDateM: strToDate(this.homeDateStr()).getMonth() + 1,
       homeDateD: strToDate(this.homeDateStr()).getDate(),
+      homeWeekGoal: (st.weekGoals || {})[weekMonday(this.homeDateStr())] || '',
       homeDateWd: ['日', '月', '火', '水', '木', '金', '土'][strToDate(this.homeDateStr()).getDay()],
       homeDateLabel: this.homeDateStr() === todayStr() ? '今日'
         : this.homeDateStr() === shiftDate(todayStr(), -1) ? '昨日'

@@ -157,6 +157,13 @@ export default function Home({ v }) {
             <button onClick={v.goMypage} style={{ width: 38, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#55554e', cursor: 'pointer' }}>person</button>
           </div>
         </div>
+        {/* 今週の目標（月曜の朝に決める）。1行だけ・はみ出したら…で切る */}
+        {v.homeWeekGoal && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '-2px 16px 4px', fontSize: 13, lineHeight: '20px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+            <span style={{ flex: '0 0 auto', fontSize: 10.5, fontWeight: 800, color: '#2f3a00', background: '#c4f000', borderRadius: 6, padding: '0 6px' }}>今週の目標</span>
+            <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: '#1b1b18', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.homeWeekGoal}</span>
+          </div>
+        )}
         <Speaker text={v.homeComment} size={140} onTap={v.tapCharacter} onEdit={v.editIkoiLine} />
       </div>
       <div ref={listRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 0 160px' }}>

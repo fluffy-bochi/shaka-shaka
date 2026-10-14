@@ -5,6 +5,8 @@ import { ACT_EMOJI, guessAct, slotOfEntry } from './data';
 /* ---- date helpers（旧本番と同一） ---- */
 export function pad2(n) { return String(n).padStart(2, '0'); }
 export function dateToStr(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+/* その日をふくむ週の月曜の日付（今週の目標のキー） */
+export function weekMonday(d) { return shiftDate(d, -((strToDate(d).getDay() + 6) % 7)); }
 export function strToDate(s) { const [y, m, dd] = s.split('-').map(Number); return new Date(y, m - 1, dd); }
 /* 1日の区切り: 就寝を押したとき か 朝5時 の早いほう。
    0時〜5時に就寝を押す前の記録は前日の 24時〜29時（例 01:30 → 前日の 25:30）。
@@ -124,6 +126,7 @@ export function serialize(st) {
     calibAnchor: st.calibAnchor || null, // 本人が設定した疲れやすさ（夜の調整の引きとめ先）
     bookFav: st.bookFav || {},      // 本棚: お気に入り（付箋） dateStr→true
     bookDiary: st.bookDiary || {},  // 本棚: 日記 dateStr→string
+    weekGoals: st.weekGoals || {},  // 今週の目標 { その週の月曜の日付: 文字列 }（月曜の朝の記録で決める）
     trashedPlans: st.trashedPlans || [],   // ゴミ箱の予定 [{plan,src,trashedAt}]
     purgedPlanIds: st.purgedPlanIds || [], // 完全削除した標準予定の id
     purgedTaskIds: st.purgedTaskIds || [], // 手動で消した取り込みタスクの srcId（再取り込みしない）
@@ -192,6 +195,7 @@ export function deserialize(data) {
     calibAnchor: (data.calibAnchor && typeof data.calibAnchor === 'object') ? data.calibAnchor : null,
     bookFav: (data.bookFav && typeof data.bookFav === 'object') ? data.bookFav : {},
     bookDiary: (data.bookDiary && typeof data.bookDiary === 'object') ? data.bookDiary : {},
+    weekGoals: (data.weekGoals && typeof data.weekGoals === 'object') ? data.weekGoals : {},
     trashedPlans: Array.isArray(data.trashedPlans) ? data.trashedPlans : [],
     purgedPlanIds: Array.isArray(data.purgedPlanIds) ? data.purgedPlanIds : [],
     purgedTaskIds: Array.isArray(data.purgedTaskIds) ? data.purgedTaskIds : [],
@@ -207,7 +211,7 @@ export function freshState() {
     slotHours: null, hiddenCats: [], hiddenActs: [],
     onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null, wakeLog: [], bedLog: [], mainScreen: null,
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1, calibLog: [], actCal: {}, calibUndo: null, calibAnchor: null,
-    bookFav: {}, bookDiary: {}, screenTime: {},
+    bookFav: {}, bookDiary: {}, weekGoals: {}, screenTime: {},
     trashedPlans: [], purgedPlanIds: [], purgedTaskIds: [],
   };
 }
