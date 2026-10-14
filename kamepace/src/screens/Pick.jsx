@@ -381,13 +381,14 @@ function ListCard({ v, onPick }) {
    カテゴリは細くして、閉じた状態でスクロールせずに一覧できるようにする */
 // 行動の行は細く（カテゴリの色・絵文字・名前だけ）。選択中だけ大きくして、上下の行に少し重ねて体・心も出す
 const ROW_H = 36, CAT_H = 32, CAT_H_DARK = 32, COPIES = 5;
+const SEL_PUSH = 13; // 選択中の行動（高さ56）が上下の行に重ならないよう、上下の行をずらす量
 // dark(枠): カテゴリは白地＋黒字＋カテゴリ色の枠、左にカテゴリ色の四角（▶）
 const hOfFor = (dark) => (r) => (r.type === 'item' ? ROW_H : dark ? CAT_H_DARK : CAT_H);
 let hOf = hOfFor(false);
-const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd, dark }) {
+const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd, dark, shift }) {
   const color = r.type === 'addcat' ? '#55554e' : r.cat.color;
   return (
-    <div onClick={() => onTap(r, i)} style={{ position: 'relative', zIndex: on ? 2 : undefined, height: hOf(r), display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
+    <div onClick={() => onTap(r, i)} style={{ position: 'relative', zIndex: on ? 2 : undefined, transform: shift ? 'translateY(' + shift + 'px)' : undefined, transition: 'transform .15s ease', height: hOf(r), display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
       {r.type === 'item' ? (
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: on ? 8 : 7, background: CREAM, borderRadius: on ? 10 : 8, height: on ? 56 : 30, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
           <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 48 : 26, height: on ? 48 : 26, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
@@ -614,9 +615,14 @@ export default function Pick({ v }) {
           <button onClick={v.togglePickHidden} aria-label={v.pickShowHidden ? '表示中の行動を見る' : '非表示の行動を見る'} style={side(v.pickShowHidden)}><span style={ms(20, v.pickShowHidden ? '#fff' : INK)}>{v.pickShowHidden ? 'visibility_off' : 'visibility'}</span></button>
         </div>
         <div ref={listRef} onScroll={onScroll} className="nos" style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory', overscrollBehavior: 'contain' }}>
-          {all.map(({ r, i }) => (
-            <Row key={i} r={r} i={i} on={i === idx} dark={dark} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={(onList || v.runAdd) && i === idx} />
-          ))}
+          {(() => {
+            // 選択中の行動は大きくなるので、上下の行を少し外へずらして重ならないようにする（行の高さは変えない＝スクロールの計算はそのまま）
+            const selItem = (all.find(x => x.i === idx) || {}).r;
+            const gap = selItem && selItem.type === 'item' ? SEL_PUSH : 0;
+            return all.map(({ r, i }) => (
+              <Row key={i} r={r} i={i} on={i === idx} shift={i < idx ? -gap : i > idx ? gap : 0} dark={dark} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={(onList || v.runAdd) && i === idx} />
+            ));
+          })()}
         </div>
       </div>
     </div>
