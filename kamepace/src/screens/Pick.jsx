@@ -379,27 +379,27 @@ function ListCard({ v, onPick }) {
 
 /* リストの1行（高さは行動 ROW_H・カテゴリ CAT_H で固定。選択中は横に広げて目立たせるだけで高さは変えない＝スクロール位置から選択行を計算できる）
    カテゴリは細くして、閉じた状態でスクロールせずに一覧できるようにする */
-const ROW_H = 60, CAT_H = 32, CAT_H_DARK = 32, COPIES = 5;
+// 行動の行は細く（カテゴリの色・絵文字・名前だけ）。選択中だけ大きくして、上下の行に少し重ねて体・心も出す
+const ROW_H = 36, CAT_H = 32, CAT_H_DARK = 32, COPIES = 5;
 // dark(枠): カテゴリは白地＋黒字＋カテゴリ色の枠、左にカテゴリ色の四角（▶）
 const hOfFor = (dark) => (r) => (r.type === 'item' ? ROW_H : dark ? CAT_H_DARK : CAT_H);
 let hOf = hOfFor(false);
 const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd, dark }) {
   const color = r.type === 'addcat' ? '#55554e' : r.cat.color;
   return (
-    <div onClick={() => onTap(r, i)} style={{ position: 'relative', height: hOf(r), display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
+    <div onClick={() => onTap(r, i)} style={{ position: 'relative', zIndex: on ? 2 : undefined, height: hOf(r), display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
       {r.type === 'item' ? (
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: CREAM, borderRadius: 10, height: on ? 58 : 48, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
-          <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 48 : 40, height: on ? 48 : 40, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
-          <span style={{ position: 'relative', flex: '0 0 auto', marginLeft: 6 }}><Emo e={r.item.glyph} size={on ? 32 : 26} /></span>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: on ? 8 : 7, background: CREAM, borderRadius: on ? 10 : 8, height: on ? 56 : 30, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
+          <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 48 : 26, height: on ? 48 : 26, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+          <span style={{ position: 'relative', flex: '0 0 auto', marginLeft: on ? 6 : 5 }}><Emo e={r.item.glyph} size={on ? 32 : 20} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: on ? 16.5 : 14.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.item.name}</div>
+            <div style={{ fontSize: on ? 16.5 : 13.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.item.name}</div>
             {on && <FatNums it={r.item} big />}
           </div>
           {/* リストのカードを見ているときは、選択中の行動からそのままリストに足せる */}
           {listAdd && r.item.onList && (
             <button onClick={(e) => { e.stopPropagation(); r.item.onList(); }} style={{ flex: '0 0 auto', border: '1.5px solid ' + INK, borderRadius: 999, background: CREAM, color: INK, fontSize: 11, fontWeight: 800, padding: '3px 9px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>リスト ＋</button>
           )}
-          {!on && <FatNums it={r.item} />}
         </div>
       ) : dark ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', height: on ? 30 : 26, borderRadius: 7, background: CREAM, border: '2px solid ' + color, overflow: 'hidden', boxSizing: 'border-box', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
