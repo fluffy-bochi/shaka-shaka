@@ -104,6 +104,27 @@ function CalendarBtn({ value, onChange, white }) {
   );
 }
 
+/* 今週の目標（月曜の朝に決める・ここでも直せる）。いつも1行。押すとその場で入力になる */
+function WeekGoalRow({ v }) {
+  const [edit, setEdit] = React.useState(false);
+  const [txt, setTxt] = React.useState('');
+  const open = () => { setTxt(v.homeWeekGoal || ''); setEdit(true); };
+  const done = () => { if (txt !== (v.homeWeekGoal || '')) v.setHomeWeekGoal(txt); setEdit(false); };
+  return (
+    <div onClick={edit ? undefined : open} style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '-2px 16px 4px', height: 24, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', cursor: edit ? 'default' : 'pointer' }}>
+      <span style={{ flex: '0 0 auto', fontSize: 10.5, fontWeight: 800, lineHeight: '18px', color: '#2f3a00', background: '#c4f000', borderRadius: 6, padding: '0 6px' }}>今週の目標</span>
+      {edit ? (
+        <input autoFocus value={txt} maxLength={v.weekGoalMax} onChange={(e) => setTxt(e.target.value)} onBlur={done}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) e.target.blur(); }}
+          style={{ flex: 1, minWidth: 0, height: 24, boxSizing: 'border-box', border: 'none', borderBottom: '1.5px solid #1b1b18', background: 'transparent', padding: '0 2px', fontSize: 16, fontWeight: 700, fontFamily: 'inherit', color: '#1b1b18', outline: 'none' }} />
+      ) : (
+        <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: v.homeWeekGoal ? '#1b1b18' : '#a5a39a', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.homeWeekGoal || 'まだ決めていません'}</span>
+      )}
+      {!edit && <span style={{ flex: '0 0 auto', fontFamily: 'Material Symbols Rounded', fontSize: 16, color: '#a5a39a' }}>edit</span>}
+    </div>
+  );
+}
+
 export default function Home({ v }) {
   // 時間帯カードのアコーディオン開閉（デフォルトは開）
   const [closedSlots, setClosedSlots] = React.useState({});
@@ -157,13 +178,7 @@ export default function Home({ v }) {
             <button onClick={v.goMypage} style={{ width: 38, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#55554e', cursor: 'pointer' }}>person</button>
           </div>
         </div>
-        {/* 今週の目標（月曜の朝に決める）。1行だけ・はみ出したら…で切る */}
-        {v.homeWeekGoal && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '-2px 16px 4px', fontSize: 13, lineHeight: '20px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-            <span style={{ flex: '0 0 auto', fontSize: 10.5, fontWeight: 800, color: '#2f3a00', background: '#c4f000', borderRadius: 6, padding: '0 6px' }}>今週の目標</span>
-            <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: '#1b1b18', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.homeWeekGoal}</span>
-          </div>
-        )}
+        <WeekGoalRow v={v} />
         <Speaker text={v.homeComment} size={140} onTap={v.tapCharacter} onEdit={v.editIkoiLine} />
       </div>
       <div ref={listRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 0 160px' }}>
