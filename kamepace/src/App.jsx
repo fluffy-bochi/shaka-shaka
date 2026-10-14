@@ -2111,8 +2111,8 @@ export default class App extends React.Component {
     this.set({ bookDiary }); this.save();
   };
   /* 今週の目標（月曜の朝の「今日の予定」で決める・1行） */
-  setWeekGoal = (val) => {
-    const key = weekMonday(todayStr()), weekGoals = { ...(this.state.weekGoals || {}) };
+  setWeekGoal = (val, day) => {
+    const key = weekMonday(day || todayStr()), weekGoals = { ...(this.state.weekGoals || {}) };
     const t = String(val || '').replace(/\s*\n\s*/g, ' ').slice(0, WEEK_GOAL_MAX);
     if (t.trim()) weekGoals[key] = t; else delete weekGoals[key];
     this.set({ weekGoals }); this.save();
@@ -5007,6 +5007,7 @@ export default class App extends React.Component {
       homeDateM: strToDate(this.homeDateStr()).getMonth() + 1,
       homeDateD: strToDate(this.homeDateStr()).getDate(),
       homeWeekGoal: (st.weekGoals || {})[weekMonday(this.homeDateStr())] || '',
+      setHomeWeekGoal: (val) => this.setWeekGoal(val, this.homeDateStr()), weekGoalMax: WEEK_GOAL_MAX,
       homeDateWd: ['日', '月', '火', '水', '木', '金', '土'][strToDate(this.homeDateStr()).getDay()],
       homeDateLabel: this.homeDateStr() === todayStr() ? '今日'
         : this.homeDateStr() === shiftDate(todayStr(), -1) ? '昨日'
