@@ -55,6 +55,8 @@ const IS_IOS_DEVICE = typeof navigator !== 'undefined' && (
 );
 
 // 行動選択・設定・検索から消したカテゴリ（体調・症状は💬つぶやきで記録）
+// 操作チュートリアル: いったん誰にも出さない（自動でも、マイページからも始まらない）。戻すときは true に
+export const TUTORIAL_ON = false;
 const PICK_REMOVED_CATS = ['health'];
 const REMOVED_NAMES = new Set((CATS.find(c => c.id === 'health') || { items: [] }).items.map(t => t.name));
 
@@ -2802,6 +2804,7 @@ export default class App extends React.Component {
   /* ================= 操作チュートリアル =================
      実データを退避 → 学生の1日サンプルで実際のUIを操作して学ぶ → 終了/スキップで復元 */
   startTutorial = () => {
+    if (!TUTORIAL_ON) return;
     this.stopPhysics(); // 先に止める（stopPhysics は _pileLayout を上書きするため）
     this._tutBackup = JSON.parse(JSON.stringify(this.dataState()));
     this._tutLayoutBackup = this._pileLayout || null;
@@ -4914,7 +4917,7 @@ export default class App extends React.Component {
         { icon: '🧠', label: '心の疲れやすさ', value: (st.obSel && st.obSel.mindFat) || 'ふつう' },
         { icon: '🧠', label: '心の回復しやすさ', value: (st.obSel && st.obSel.mindRec) || 'ふつう' },
       ],
-      tutorial: st.tutorial, tutFlags: st.tutFlags,
+      tutorial: st.tutorial, tutFlags: st.tutFlags, tutorialOn: TUTORIAL_ON,
       startTutorial: this.startTutorial, endTutorial: this.endTutorial, tutNext: this.tutNext,
       isCollect: st.screen === 'collect', collectedTotal: this.collectedTotal(),
       goCollect: this.goCollect, goRecordNow: this.goRecordNow,
