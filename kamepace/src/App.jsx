@@ -2685,9 +2685,10 @@ export default class App extends React.Component {
 
   /* ================= ゴミ箱 =================
      完全削除せず exp:true にする（旧本番も exp は疲労計算から除外＝同期互換）。 */
-  trashOriginal = () => {
+  trashOriginal = (asked) => {
     const idxs = this.state.editIdxs;
     if (!Array.isArray(idxs) || !idxs.length) return;
+    if (asked !== true && this._askTaskTrash(idxs, () => this.trashOriginal(true))) return;
     const set = new Set(idxs);
     const entries = this.state.entries.map((e, i) => set.has(i) ? { ...e, exp: true, trashedAt: Date.now() } : e);
     this.set({
@@ -2722,6 +2723,30 @@ export default class App extends React.Component {
     if (g && g.tweetIdx != null) { this.openMoodEdit(g.tweetIdx); return; }
     if (g) (g.isFrame ? this.openFrameFill(g) : this.openEditFlow(g));
   };
+  /* タスクを完了して記録したもの（taskrec）を消すときは、タスクを「未完了に戻す」か「削除」するかを選ぶ。
+     選ぶまで消さない（何も聞かずに消すと、タスクが未完了で元の場所に戻ってきて不快なため） */
+  _askTaskTrash(idxs, doTrash) {
+    const ids = [...new Set(idxs.map(i => this.state.entries[i]).filter(e => e && !e.exp && /^taskrec:/.test(String(e.srcId || ''))).map(e => String(e.srcId).slice(8)))];
+    if (!ids.length) return false;
+    this._pendingTrash = doTrash;
+    const titles = ids.map(id => ((this.state.tasks || []).find(t => t.srcId === id) || {}).title).filter(Boolean);
+    this.set({ taskTrashAsk: { ids, title: titles.join('・') } });
+    return true;
+  }
+  /* mode: 'undo'＝記録を消してタスクを未完了に戻す／'delete'＝記録もタスクも消す／null＝やめる */
+  taskTrashChoose = (mode) => {
+    const ask = this.state.taskTrashAsk, run = this._pendingTrash;
+    this._pendingTrash = null;
+    this.set({ taskTrashAsk: null });
+    if (!mode || !ask) return;
+    if (run) run();
+    if (mode === 'undo') {
+      const ids = new Set(ask.ids);
+      this.setState(prev => ({ tasks: (prev.tasks || []).map(t => (ids.has(t.srcId) ? { ...t, done: false } : t)) }), () => this.save());
+    } else {
+      ask.ids.forEach(id => this.deleteTask(id));
+    }
+  };
   recMenuTrash = () => {
     const g = this.state.recMenu;
     this.set({ recMenu: null });
@@ -2730,11 +2755,15 @@ export default class App extends React.Component {
     const idxs = g.idxs ? g.idxs : (g.idx != null ? [g.idx] : []);
     if (!idxs.length) return;
     const set = new Set(idxs);
-    // 完全削除せず exp:true でゴミ箱へ（きろくの編集画面の「ゴミ箱へ」と同じ）
-    const entries = this.state.entries.map((e, i) => set.has(i) ? { ...e, exp: true, trashedAt: Date.now() } : e);
-    this.set({ entries, consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)) });
-    this.save();
-    this.toast('ゴミ箱に移動しました');
+    const run = () => {
+      // 完全削除せず exp:true でゴミ箱へ（きろくの編集画面の「ゴミ箱へ」と同じ）
+      const entries = this.state.entries.map((e, i) => set.has(i) ? { ...e, exp: true, trashedAt: Date.now() } : e);
+      this.set({ entries, consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)) });
+      this.save();
+      this.toast('ゴミ箱に移動しました');
+    };
+    if (this._askTaskTrash(idxs, run)) return;
+    run();
   };
 
   /* ================= オンボーディング =================
@@ -5286,6 +5315,19 @@ export default class App extends React.Component {
               <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
                 <button onClick={v.dismissSymAdjust} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>そのまま</button>
                 <button onClick={v.applySymAdjust} style={{ flex: 1.5, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>合わせる</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {st0.taskTrashAsk && (
+          <div onClick={() => this.taskTrashChoose(null)} style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 320, background: '#fff', borderRadius: 18, padding: '18px 16px 14px', boxShadow: '0 12px 32px rgba(27,27,24,.25)' }}>
+              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 4 }}>タスクの記録を消す</div>
+              <div style={{ fontSize: 13, color: '#55554e', marginBottom: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{st0.taskTrashAsk.title}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button onClick={() => this.taskTrashChoose('undo')} style={{ border: 'none', borderRadius: 12, background: '#1b1b18', color: '#fff', fontSize: 14, fontWeight: 800, padding: '11px 0', cursor: 'pointer', fontFamily: 'inherit' }}>未完了に戻す</button>
+                <button onClick={() => this.taskTrashChoose('delete')} style={{ border: 'none', borderRadius: 12, background: '#fdeef0', color: '#c0395e', fontSize: 14, fontWeight: 800, padding: '11px 0', cursor: 'pointer', fontFamily: 'inherit' }}>削除</button>
+                <button onClick={() => this.taskTrashChoose(null)} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13.5, fontWeight: 800, padding: '9px 0', cursor: 'pointer', fontFamily: 'inherit' }}>やめる</button>
               </div>
             </div>
           </div>
