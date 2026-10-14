@@ -3,6 +3,7 @@ import React from 'react';
 const mono = { fontFamily: "'Space Mono',monospace" };
 const label = { ...mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a8a82', margin: '18px 6px 8px' };
 const card = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 3px rgba(27,27,24,.05)', overflow: 'hidden' };
+const linkOffBtn = { flex: '0 0 auto', marginLeft: 8, border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', color: '#8a8a82', fontSize: 10.5, fontWeight: 700, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit' };
 const row = (last) => ({ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px', borderBottom: last ? 'none' : '1px solid #f1efe8' });
 
 /* iOS風トグルスイッチ */
@@ -164,25 +165,44 @@ export default function MyPage({ v }) {
             <span style={{ ...mono, fontSize: 11.5, color: v.cycPhaseNow && v.cycPhaseNow !== 'normal' ? '#a33e6d' : '#8a8a82' }}>{v.cycleStatus}</span>
             <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
           </button>
-          <button onClick={v.doCalendarSync} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
-            <span style={{ fontSize: 16 }}>📅</span>
-            <span style={{ flex: 1, fontSize: 14 }}>Googleカレンダー / ToDo</span>
-            <span style={{ display: 'inline-flex', background: '#eef7cc', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#2f3a00' }}>今日の予定を取り込む</span>
-          </button>
+          <div style={{ ...row(true), background: '#fff' }}>
+            <button onClick={v.doCalendarSync} style={{ display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: 0, border: 'none', background: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', color: 'inherit' }}>
+              <span style={{ fontSize: 16 }}>📅</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 14 }}>Googleカレンダー・ToDo</span>
+              <span style={{ display: 'inline-flex', background: '#eef7cc', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#2f3a00', flex: '0 0 auto' }}>取り込む</span>
+            </button>
+            {v.user && <button onClick={() => v.openLinkOff('google')} style={linkOffBtn}>解除</button>}
+          </div>
         </div>
         <div style={label}>れんけい</div>
         <div style={card}>
-          <button onClick={v.syncMylifecore} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
-            <span style={{ fontSize: 16 }}>🗓️</span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 14 }}>mylifecore</span>
-              <span style={{ ...mono, fontSize: 10.5, color: '#9d9b91' }}>{v.mylifeStatusText}</span>
-            </span>
-            {v.mylifeConnected
-              ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#eef7cc', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#2f3a00', flex: '0 0 auto' }}>🟢 連携中 · いま同期</span>
-              : <span style={{ display: 'inline-flex', background: '#f1efe8', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#8a8a82', flex: '0 0 auto' }}>ログインで連携</span>}
-          </button>
+          <div style={{ ...row(true), background: '#fff' }}>
+            <button onClick={v.mylifeOff ? v.mlcOn : v.syncMylifecore} style={{ display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: 0, border: 'none', background: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', color: 'inherit' }}>
+              <span style={{ fontSize: 16 }}>🗓️</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 14 }}>mylifecore</span>
+                <span style={{ ...mono, fontSize: 10.5, color: '#9d9b91' }}>{v.mylifeStatusText}</span>
+              </span>
+              {v.mylifeConnected
+                ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#eef7cc', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#2f3a00', flex: '0 0 auto' }}>🟢 いま同期</span>
+                : <span style={{ display: 'inline-flex', background: '#f1efe8', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#8a8a82', flex: '0 0 auto' }}>{v.mylifeOff ? '連携する' : 'ログインで連携'}</span>}
+            </button>
+            {v.mylifeConnected && <button onClick={() => v.openLinkOff('mlc')} style={linkOffBtn}>解除</button>}
+          </div>
         </div>
+        {/* 連携の解除: 取り込んだものを残すか、これからの分も消すかを選ぶ */}
+        {v.linkOff && (
+          <div onClick={v.closeLinkOff} style={{ position: 'fixed', inset: 0, zIndex: 30, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 320, background: '#fff', borderRadius: 18, padding: '18px 16px 14px', boxShadow: '0 12px 32px rgba(27,27,24,.25)' }}>
+              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 14 }}>{v.linkOff === 'mlc' ? 'mylifecore' : 'Googleカレンダー / ToDo'}の連携を解除</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button onClick={() => v.doLinkOff(false)} style={{ border: 'none', borderRadius: 12, background: '#1b1b18', color: '#fff', fontSize: 14, fontWeight: 800, padding: '11px 0', cursor: 'pointer', fontFamily: 'inherit' }}>解除（取り込んだものは残す）</button>
+                <button onClick={() => v.doLinkOff(true)} style={{ border: 'none', borderRadius: 12, background: '#fdeef0', color: '#c0395e', fontSize: 14, fontWeight: 800, padding: '11px 0', cursor: 'pointer', fontFamily: 'inherit' }}>解除して、今日からの予定・タスクも消す</button>
+                <button onClick={v.closeLinkOff} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#55554e', fontSize: 13.5, fontWeight: 800, padding: '9px 0', cursor: 'pointer', fontFamily: 'inherit' }}>やめる</button>
+              </div>
+            </div>
+          </div>
+        )}
         <div style={label}>研究への協力</div>
         <ResearchCard v={v} onJoin={() => setJoin(true)} />
         <div style={label}>ヘルプ</div>
