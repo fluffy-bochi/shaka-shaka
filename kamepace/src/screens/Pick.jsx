@@ -100,7 +100,7 @@ function EditAct({ it, onClose }) {
   );
 }
 
-/* 頻度を決めるポップアップ（カードの上に出す）: [k] 日/週/月 に [n] 回。日/週/月 は きらい/ふつう/すき と同じ形の切り替え */
+/* 頻度を決めるポップアップ（カードの上に出す）: [k] 日/週/月 に [n] 回。日/週/月 は きつい/ふつう/らく と同じ形の切り替え */
 export function FreqPop({ label, value, onSave, onDelete, onClose }) {
   const [f, setF] = React.useState(() => (value ? { k: freqK(value), unit: value.unit, n: value.n } : { k: 1, unit: '日', n: 1 }));
   const numIn = (key) => (
@@ -291,7 +291,7 @@ function Card({ row, cat, v, hist, setHist }) {
       {isAct && (
         <div style={{ display: 'flex', alignItems: 'center', gap: fz(1.5, 2, 6), padding: `6px ${fz(3.6, 9, 14)} 0` }}>
           <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2, flex: '0 0 auto' }}>
-            {[['dislike', 'きらい'], ['normal', 'ふつう'], ['like', 'すき']].map(([k, t]) => (
+            {[['dislike', 'きつい'], ['normal', 'ふつう'], ['like', 'らく']].map(([k, t]) => (
               <button key={k} onClick={() => it.onPref(k)} style={{ border: 'none', borderRadius: 999, padding: `4px ${fz(2.1, 4, 8)}`, fontSize: fz(3, 10, 11.5), fontWeight: 700, cursor: 'pointer', background: it.pref === k ? INK : 'transparent', color: it.pref === k ? '#fff' : '#55554e', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>{t}</button>
             ))}
           </div>

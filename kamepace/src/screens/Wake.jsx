@@ -445,7 +445,10 @@ export function WakePlan({ v }) {
           <div key={'p' + i} onClick={p.onTap} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', borderRadius: 14, padding: '11px 14px', marginBottom: 8, cursor: 'pointer' }}>
             <span style={{ ...mono, fontSize: 11.5, fontWeight: 700, color: '#55554e', flex: '0 0 auto' }}>{p.from}</span>
             <span style={{ fontSize: 18, flex: '0 0 auto' }}>{p.glyph}</span>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+              {p.sub && <div style={{ fontSize: 10.5, color: '#8a8a82', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>{p.sub}</div>}
+            </div>
             {p.delta ? <span style={{ ...mono, fontSize: 12, fontWeight: 700, color: '#f5994e', flex: '0 0 auto' }}>{p.delta > 0 ? '+' + p.delta : p.delta}</span> : null}
             <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 18, color: '#a5a39a', flex: '0 0 auto' }}>chevron_right</span>
           </div>
