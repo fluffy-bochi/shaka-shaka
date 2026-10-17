@@ -52,6 +52,7 @@ export default function Run({ v }) {
   const [pop, setPop] = React.useState(null); // 頻度のポップアップ（'req' / 'fav'）
   const [hist, setHist] = React.useState(false); // りれき
   const [listOpen, setListOpen] = React.useState(false); // 下のリストを開いているか
+  const [tab, setTab] = React.useState('list'); // 下のシートのタブ（左＝リスト・右＝タスク）
   const [delAsk, setDelAsk] = React.useState(false); // 削除の確認
   const [nameDraft, setNameDraft] = React.useState(null); // リストの名前（入力中。null＝いまの名前）
   React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
@@ -149,15 +150,24 @@ export default function Run({ v }) {
         <div onClick={() => setListOpen(!listOpen)} style={{ flex: '0 0 auto', cursor: 'pointer', padding: '8px 14px 8px' }}>
           <div style={{ width: 120, height: 4, borderRadius: 2, background: '#e4e1d8', margin: '0 auto 8px' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 18, fontWeight: 900 }}>リスト</span>
-            {r.name && <span style={{ flex: '0 1 auto', minWidth: 0, fontSize: 13, fontWeight: 800, color: SUB, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>}
-            <span style={{ ...mono, fontSize: 11, color: MUTED }}>{r.rows.length}</span>
+            {/* タブ: 左＝リスト・右＝タスク。押すと開いてそのタブに */}
+            <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 3, flex: '0 0 auto' }}>
+              {[['list', 'リスト', r.rows.length], ['task', 'タスク', (v.runTasks || []).filter(t => !t.done).length]].map(([k, n, cnt]) => {
+                const on = tab === k;
+                return (
+                  <button key={k} onClick={(e) => { e.stopPropagation(); setTab(k); setListOpen(true); }} style={{ border: 'none', borderRadius: 999, background: on ? INK : 'transparent', color: on ? '#fff' : SUB, padding: '5px 14px', fontSize: 14, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'baseline', gap: 5 }}>
+                    {n}<span style={{ ...mono, fontSize: 10.5, fontWeight: 700, opacity: 0.7 }}>{cnt}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {tab === 'list' && r.name && <span style={{ flex: '0 1 auto', minWidth: 0, fontSize: 13, fontWeight: 800, color: SUB, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>}
             <span style={{ flex: 1 }} />
-            {listOpen && <button onClick={(e) => { e.stopPropagation(); setEdit(!edit); }} style={{ border: 'none', borderRadius: 999, background: edit ? LIME : INK, color: edit ? LIME_INK : '#fff', fontSize: 12.5, fontWeight: 800, padding: '6px 16px', cursor: 'pointer', fontFamily: 'inherit' }}>{edit ? '完了' : '編集'}</button>}
+            {listOpen && tab === 'list' && <button onClick={(e) => { e.stopPropagation(); setEdit(!edit); }} style={{ border: 'none', borderRadius: 999, background: edit ? LIME : INK, color: edit ? LIME_INK : '#fff', fontSize: 12.5, fontWeight: 800, padding: '6px 16px', cursor: 'pointer', fontFamily: 'inherit' }}>{edit ? '完了' : '編集'}</button>}
             <span style={ms(24, SUB)}>{listOpen ? 'expand_more' : 'expand_less'}</span>
           </div>
         </div>
-        {listOpen && (() => {
+        {listOpen && tab === 'list' && (() => {
           const nm = nameDraft == null ? (r.name || '') : nameDraft, dirty = nm !== (r.name || '');
           const ok = () => { v.runRename(nm); setNameDraft(null); };
           return (
@@ -168,7 +178,20 @@ export default function Run({ v }) {
             </div>
           );
         })()}
-        {listOpen && (
+        {listOpen && tab === 'task' && (
+          <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 12px' }}>
+            {!(v.runTasks || []).length && <div style={{ textAlign: 'center', fontSize: 12.5, color: '#a5a39a', padding: '24px 0' }}>今日のタスクはありません</div>}
+            {(v.runTasks || []).map(t => (
+              <div key={t.srcId} onClick={t.onToggle} style={{ display: 'flex', alignItems: 'center', gap: 8, height: 44, background: '#f3f0e8', borderRadius: 10, padding: '0 10px', marginBottom: 6, cursor: t.onToggle ? 'pointer' : 'default', userSelect: 'none' }}>
+                <span style={{ width: 22, height: 22, borderRadius: '50%', boxSizing: 'border-box', border: t.done ? 'none' : '2px solid #bab5a7', background: t.done ? LIME : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto', ...ms(14, LIME_INK, true) }}>{t.done ? 'check' : ''}</span>
+                {t.glyph && <span style={{ flex: '0 0 auto', display: 'inline-flex' }}><Emo e={t.glyph} size={22} /></span>}
+                <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 800, color: t.done ? MUTED : INK, textDecoration: t.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                <span style={{ ...mono, fontSize: 10.5, fontWeight: 700, color: MUTED, flex: '0 0 auto' }}>{t.minText}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {listOpen && tab === 'list' && (
           <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 12px' }}>
             {r.rows.map((x0, i) => { const x = { ...x0, ms: msOf(x0.segs, now) }; return (
               <div key={x.uid} style={{ display: 'flex', alignItems: 'center', gap: 2, height: 44, background: x.on ? '#fff' : '#f3f0e8', borderRadius: 10, padding: '0 4px 0 6px', marginBottom: 6, boxShadow: x.on ? 'inset 0 0 0 2px ' + INK : 'none' }}>
