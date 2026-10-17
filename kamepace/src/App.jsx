@@ -504,12 +504,21 @@ export default class App extends React.Component {
       return { ...it, name: e.name, body: e.body, mind: e.mind, defMin: e.defMin, recover, fh: recover ? -sum : sum, prevNames: e.prevNames || [], edited: true,
         last: '目安 ' + (recover ? '−' : '+') + est + '（' + this.fmtMin(e.defMin) + '）' };
     };
-    return [...CATS, ...(this.state.customCats || [])].map(c => {
+    const cats = [...CATS, ...(this.state.customCats || [])].map(c => {
       // 旧「課題・勉強」(study) は「勉強・学校」(school) にまとめた。そこへ追加した自作行動もこちらに出す
       const ex = c.id === 'school' ? [...(extra.school || []), ...(extra.study || [])] : extra[c.id];
       const items = ex && ex.length ? [...c.items, ...ex] : c.items;
       return { ...c, items: items.map(apply) };
     });
+    // 行動の編集でカテゴリを変えたもの（actEdits[id].cat）は、そのカテゴリへ移す（移し先がなくなっていたら元のまま）
+    const ids = new Set(cats.map(c => c.id));
+    const moved = {};
+    const out = cats.map(c => ({ ...c, items: c.items.filter(it => {
+      const to = ed[it.id] && ed[it.id].cat;
+      if (!to || to === c.id || !ids.has(to)) return true;
+      (moved[to] = moved[to] || []).push(it); return false;
+    }) }));
+    return out.map(c => (moved[c.id] ? { ...c, items: [...c.items, ...moved[c.id]] } : c));
   }
   /* 行動の編集の初期値: 標準時間ぶんの 体・心（回復はマイナス）と分 */
   actEditVals(it) {
@@ -526,7 +535,8 @@ export default class App extends React.Component {
     const body = Math.max(0, sgn * v.body) * 60 / min, mind = Math.max(0, sgn * v.mind) * 60 / min;
     const old = it.name, ed = { ...(this.state.actEdits || {}) };
     const prevNames = [...new Set([...(it.prevNames || []), ...(name !== old ? [old] : [])])].filter(n => n !== name);
-    ed[id] = { name, body, mind, defMin: min, recover, prevNames };
+    const cat = v.cat || (ed[id] && ed[id].cat) || null;
+    ed[id] = { name, body, mind, defMin: min, recover, prevNames, ...(cat ? { cat } : {}) };
     const patch = { actEdits: ed };
     if (name !== old) {
       const mv = (obj) => { const o = { ...(obj || {}) }, a = normTitle(old), b = normTitle(name); if (o[a] != null && o[b] == null) { o[b] = o[a]; } delete o[a]; return o; };
@@ -4724,7 +4734,7 @@ export default class App extends React.Component {
             const fq = (st.actFreq || {})[normTitle(t.name)] || {};
             const mk = (pf) => this.actFatParts(t, pf === 'normal' ? null : pf);
             return { hidden: hiddenActs0.has(normTitle(t.name)), onToggleHide: () => this.toggleActHidden(t.name),
-              key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onRun: () => this.startRun([this.listItemFromAct(t)], ''), editVals: this.actEditVals(t), onEdit: (vals) => this.editAct(t.id, vals), onReset: t.edited ? () => this.resetAct(t.id) : null, onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym, t.prevNames), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
+              key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onRun: () => this.startRun([this.listItemFromAct(t)], ''), editVals: { ...this.actEditVals(t), cat: c.id }, onEdit: (vals) => this.editAct(t.id, vals), onReset: t.edited ? () => this.resetAct(t.id) : null, onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym, t.prevNames), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
               // 生活必須行動・やりたいこと（両方あるときの目標は生活必須行動の頻度）
               req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(t.name, kind, val) };
           }),
@@ -5250,7 +5260,9 @@ export default class App extends React.Component {
       run: st.run ? (() => { try { return this.runVals(); } catch (e) { console.warn('[kamepace] run', e); return null; } })() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish, runDiscard: this.runDiscard, runRename: this.runRename, setRunAlarm: this.setRunAlarm,
       runAlarm: st.runAlarm, closeRunAlarm: this.closeRunAlarm, runAlarmNext: this.runAlarmNext,
       exitRun: () => this.set({ screen: 'record', runAdd: false }), minimizeRun: () => this.set({ screen: 'home', runAdd: false }), goRunAdd: this.goRunAdd, runAdd: !!st.runAdd && !!st.run,
-      pickCats, pickCatId: st.catId, pickShowHidden: !!st.pickShowHidden, togglePickHidden: () => this.set({ pickShowHidden: !st.pickShowHidden }), pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
+      pickCats, pickCatId: st.catId,
+      // 行動の編集で選べるカテゴリ（まとめて入力・体調は除く。非表示のカテゴリは名前のあとに印）
+      pickCatChoices: this.allCats().filter(c => !PICK_REMOVED_CATS.includes(c.id)).map(c => ({ id: c.id, name: c.name, hidden: (st.hiddenCats || []).includes(c.id) })), pickShowHidden: !!st.pickShowHidden, togglePickHidden: () => this.set({ pickShowHidden: !st.pickShowHidden }), pickMem: (this._pickMem = this._pickMem || {}), openCatAdd: this.openCatAdd,
       pickDateText: (() => { const d = strToDate(st.recordDate || this.homeDateStr()); return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日'; })(),
       subItems, subName: activeCat ? activeCat.name : '', subIcon: activeCat ? activeCat.icon : 'category', subColor: activeCat ? activeCat.color : '#8a8a82',
       degreeOpen: !!st.degreeItem,

@@ -61,8 +61,8 @@ export function HmInput({ value, onChange, size = 16 }) {
   );
 }
 
-/* 行動の編集（カードの上に重ねる）: 名前・体・心（その分数ぶん、マイナス＝回復）・分 */
-function EditAct({ it, onClose }) {
+/* 行動の編集（カードの上に重ねる）: 名前・カテゴリ・体・心（その分数ぶん、マイナス＝回復）・分 */
+function EditAct({ it, cats, onMoved, onClose }) {
   const [f, setF] = React.useState(() => ({ ...it.editVals }));
   const num = (key, w = 64) => (
     <input type="number" inputMode="numeric" value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value === '' || e.target.value === '-' ? e.target.value : parseInt(e.target.value, 10) || 0 })}
@@ -70,7 +70,12 @@ function EditAct({ it, onClose }) {
   );
   const lab = { fontSize: 11, fontWeight: 800, color: '#55554e' };
   const ok = (f.name || '').trim() && Number(f.min) > 0;
-  const save = () => { if (!ok) return; it.onEdit({ name: f.name, body: Number(f.body) || 0, mind: Number(f.mind) || 0, min: Number(f.min) }); onClose(); };
+  const save = () => {
+    if (!ok) return;
+    it.onEdit({ name: f.name, body: Number(f.body) || 0, mind: Number(f.mind) || 0, min: Number(f.min), cat: f.cat });
+    if (f.cat && f.cat !== it.editVals.cat && onMoved) onMoved(f.cat);
+    onClose();
+  };
   return (
     <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: CREAM, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 7, overflowY: 'auto', WebkitTapHighlightColor: 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -82,6 +87,12 @@ function EditAct({ it, onClose }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ ...lab, flex: '0 0 auto' }}>名前</div>
         <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', height: 38, border: '1.5px solid #e4e1d8', borderRadius: 9, fontSize: 15, fontWeight: 800, padding: '0 10px', fontFamily: 'inherit' }} />
+        {/* カテゴリ（変えると、その行動はそのカテゴリに移る） */}
+        {cats && cats.length > 0 && (
+          <select value={f.cat || ''} onChange={(e) => setF({ ...f, cat: e.target.value })} aria-label="カテゴリ" style={{ flex: '0 1 118px', minWidth: 0, boxSizing: 'border-box', height: 38, border: '1.5px solid #e4e1d8', borderRadius: 9, background: CREAM, color: INK, fontSize: 13, fontWeight: 800, padding: '0 4px', fontFamily: 'inherit' }}>
+            {cats.map(c => <option key={c.id} value={c.id}>{c.name}{c.hidden ? '（非表示）' : ''}</option>)}
+          </select>
+        )}
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
         <div><div style={lab}>体</div><div style={{ marginTop: 3 }}>{num('body')}</div></div>
@@ -205,11 +216,14 @@ export function History({ it, cat, onClose, closeX }) { // closeX: 右上を↩�
 }
 
 /* 上のカード */
-function Card({ row, cat, v, hist, setHist }) {
+function Card({ row, cat, v, hist, setHist, editReq, onMoved }) {
   // りれきを開く/閉じるときは、カードを裏返す（横に90度まわして中身を入れ替え、反対側から戻す）
   const ref = React.useRef(null);
   const [pop, setPop] = React.useState(null); // 頻度のポップアップ（'req'＝生活必須行動 / 'fav'＝やりたいこと）
-  const [editing, setEditing] = React.useState(false); // 行動・カテゴリの編集
+  // リストの行を長押し → この行動の編集を開く（スクロール中に選択が行き来してカードが作り直されても開いたままにするため、少しの間は有効）
+  const wantEdit = !!(editReq && row && editReq.key === row.key && Date.now() - editReq.n < 1500);
+  const [editing, setEditing] = React.useState(wantEdit); // 行動・カテゴリの編集
+  React.useEffect(() => { if (wantEdit) { if (hist) setHist(false); setEditing(true); } }, [editReq]); // eslint-disable-line react-hooks/exhaustive-deps
   const flip = (b) => {
     const el = ref.current;
     if (!el || !el.animate) { setHist(b); return; }
@@ -314,7 +328,7 @@ function Card({ row, cat, v, hist, setHist }) {
       </div>
       {/* 右上の「編集」 */}
       {isAct && it.onEdit && <button onClick={() => { setPop(null); setEditing(true); }} style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, border: '1.5px solid #e4e1d8', borderRadius: 999, background: CREAM, color: INK, fontSize: 11, fontWeight: 800, padding: '2px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
-      {isAct && editing && <EditAct it={it} onClose={() => setEditing(false)} />}
+      {isAct && editing && <EditAct it={it} cats={v.pickCatChoices} onMoved={(c) => onMoved && onMoved(it.key, c)} onClose={() => setEditing(false)} />}
       {isAct && pop && (
         <FreqPop key={pop} label={pop === 'req' ? '生活必須行動' : 'やりたいこと'} value={it[pop]}
           onSave={(f) => { it.onFreq(pop, f); setPop(null); }} onDelete={() => { it.onFreq(pop, null); setPop(null); }} onClose={() => setPop(null)} />
@@ -385,10 +399,20 @@ const SEL_PUSH = 13; // 選択中の行動（高さ56）が上下の行に重な
 // dark(枠): カテゴリは白地＋黒字＋カテゴリ色の枠、左にカテゴリ色の四角（▶）
 const hOfFor = (dark) => (r) => (r.type === 'item' ? ROW_H : dark ? CAT_H_DARK : CAT_H);
 let hOf = hOfFor(false);
-const Row = React.memo(function Row({ r, i, on, open, onTap, listAdd, dark, shift }) {
+const Row = React.memo(function Row({ r, i, on, open, onTap, onLong, listAdd, dark, shift }) {
   const color = r.type === 'addcat' ? '#55554e' : r.cat.color;
+  // 行動の行は長押しで編集（長押しのあとの click では START しない）
+  const lp = React.useRef({});
+  const canLong = r.type === 'item' && r.item.kind === 'act' && !!r.item.onEdit;
+  const lpEnd = () => { clearTimeout(lp.current.t); lp.current.t = null; };
+  const lpH = canLong ? {
+    onPointerDown: (e) => { lpEnd(); lp.current = { x: e.clientX, y: e.clientY, fired: false, t: setTimeout(() => { lp.current.fired = true; lp.current.t = null; onLong(r, i); }, 500) }; },
+    onPointerMove: (e) => { if (lp.current.t && Math.hypot(e.clientX - lp.current.x, e.clientY - lp.current.y) > 8) lpEnd(); },
+    onPointerUp: lpEnd, onPointerCancel: lpEnd, onPointerLeave: lpEnd,
+    onContextMenu: (e) => e.preventDefault(),
+  } : {};
   return (
-    <div onClick={() => onTap(r, i)} style={{ position: 'relative', zIndex: on ? 2 : undefined, transform: shift ? 'translateY(' + shift + 'px)' : undefined, transition: 'transform .15s ease', height: hOf(r), display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
+    <div {...lpH} onClick={() => { if (lp.current.fired) { lp.current.fired = false; return; } onTap(r, i); }} style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none', position: 'relative', zIndex: on ? 2 : undefined, transform: shift ? 'translateY(' + shift + 'px)' : undefined, transition: 'transform .15s ease', height: hOf(r), display: 'flex', alignItems: 'center', padding: on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
       {r.type === 'item' ? (
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: on ? 8 : 7, background: CREAM, borderRadius: on ? 10 : 8, height: on ? 56 : 30, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
           <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 48 : 26, height: on ? 48 : 26, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
@@ -516,6 +540,18 @@ export default function Pick({ v }) {
     r.item.onStart();
   };
   const tapRef = React.useRef(tap); tapRef.current = tap;
+  // 長押し: その行動を選んで、行動カードで編集を開く
+  const [editReq, setEditReq] = React.useState(null);
+  const long = (r, i) => {
+    if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) { /* ignore */ } }
+    if (i !== idx) scrollToIdx(i, true);
+    if (page !== 0) goPage(0, true);
+    setEditReq({ key: r.key, n: Date.now() });
+  };
+  const longRef = React.useRef(long); longRef.current = long;
+  const onLong = React.useCallback((r, i) => longRef.current(r, i), []);
+  // 編集でカテゴリを変えた: 移した先のカテゴリを開いて、その行動を選んだままにする
+  const onMoved = (key, catId) => { want.current = key; mem.sel = key; setOpen(o => ({ ...o, [catId]: true })); };
   const onTap = React.useCallback((r, i) => tapRef.current(r, i), []);
   const move = (d) => scrollToIdx(idx + d, true);
   const anyClosed = cats.some(c => !open[c.id]);
@@ -595,7 +631,7 @@ export default function Pick({ v }) {
         {PAGES.map((t, i) => (
           <div key={i} data-page={i} style={{ flex: '0 0 calc(100% - 52px)', minWidth: 0, marginLeft: i ? 10 : 0, scrollSnapAlign: 'center', scrollSnapStop: 'always' }}>
             {t === 'A'
-              ? <Card key={'a' + i + (selRow ? selRow.key : '')} row={selRow} cat={selRow && selRow.cat} v={v} hist={hist} setHist={setHist} />
+              ? <Card key={'a' + i + (selRow ? selRow.key : '')} row={selRow} cat={selRow && selRow.cat} v={v} hist={hist} setHist={setHist} editReq={editReq} onMoved={onMoved} />
               : (v.pickList ? <ListCard v={v} onPick={pickFromList} /> : null)}
           </div>
         ))}
@@ -620,7 +656,7 @@ export default function Pick({ v }) {
             const selItem = (all.find(x => x.i === idx) || {}).r;
             const gap = selItem && selItem.type === 'item' ? SEL_PUSH : 0;
             return all.map(({ r, i }) => (
-              <Row key={i} r={r} i={i} on={i === idx} shift={i < idx ? -gap : i > idx ? gap : 0} dark={dark} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} listAdd={(onList || v.runAdd) && i === idx} />
+              <Row key={i} r={r} i={i} on={i === idx} shift={i < idx ? -gap : i > idx ? gap : 0} dark={dark} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} onLong={onLong} listAdd={(onList || v.runAdd) && i === idx} />
             ));
           })()}
         </div>
