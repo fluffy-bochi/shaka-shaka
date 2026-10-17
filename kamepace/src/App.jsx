@@ -606,7 +606,7 @@ export default class App extends React.Component {
   effFh(item) {
     const qs = this.intensityQuestions(item); let m = 1;
     (item.picks || []).forEach((p, idx) => { if (qs[idx] && qs[idx].mult[p] != null) m *= qs[idx].mult[p]; });
-    // 好き嫌い（行動ごとに永続）: 嫌い=疲れやすい×1.3 / 好き=軽減×0.7。回復系は逆（好きな休憩ほどよく回復）
+    // きつい・らく（行動ごとに永続。データのキーは前の好き嫌いのまま dislike/like）: きつい=疲れやすい×1.3 / らく=軽減×0.7。回復系は逆（らくな休憩ほどよく回復）
     const pref = (this.state.prefs || {})[normTitle(item.name)];
     if (pref) {
       const mult = item.fh >= 0 ? { dislike: 1.3, like: 0.7 } : { dislike: 0.7, like: 1.3 };
@@ -1423,6 +1423,9 @@ export default class App extends React.Component {
     const endAnchor = (!timeMode && !frameFill && !isEdit && isToday)
       ? (this.state.anchorEnd ? hmToTsOn(recDate, this.state.anchorEnd) : (slotId === this.slotNow() ? Math.floor(now / 60000) * 60000 : null)) : null;
     let backCursor = endAnchor != null ? endAnchor - durMins.reduce((a, b) => a + b, 0) * 60000 : null;
+    // 編集（所要時間モード）: 元の記録の始まりの時刻から順にならべる（時間帯の空きに詰め直すと、時刻がずれてしまう）
+    const editOrig = isEdit ? (this.state.editIdxs || []).map(i => this.state.entries[i]).filter(e => e && e.from).sort((a, b) => a.from.localeCompare(b.from))[0] : null;
+    let editCursor = editOrig ? editOrig.from : null;
     // 通常記録の配置位置: 同スロットの使用済み分（編集中は元の記録を除いて数える）
     let slotOffset = baseEntries
       .filter(e => e.date === recDate && !e.exp && !e.planned && this.slotOf(e) === slotId)
@@ -1480,7 +1483,8 @@ export default class App extends React.Component {
         const min = durMins[i];
         const e = mkEntry(t, min, null, null, false, taskKey);
         e.slot = slotId;
-        if (backCursor != null) { e.from = this.tsToHm(backCursor); e.to = this.tsToHm(backCursor + min * 60000); backCursor += min * 60000; }
+        if (editCursor != null) { e.from = editCursor; e.to = this.addHm(editCursor, min); editCursor = e.to; e.slot = editOrig.slot || this.slotOf({ from: e.from }); }
+        else if (backCursor != null) { e.from = this.tsToHm(backCursor); e.to = this.tsToHm(backCursor + min * 60000); backCursor += min * 60000; }
         else { e.from = this.slotHm(slot, slotOffset); e.to = this.slotHm(slot, slotOffset + min); slotOffset += min; }
         if (isFuture) { e.planned = true; e.dropped = 0; e._new = false; }
         newEntries.push(e); learnMin[i] = min;
@@ -1508,6 +1512,25 @@ export default class App extends React.Component {
     const recNote = (this.state.recNote || '').trim();
     const recTitle = (this.state.recTitle || '').trim();
     newEntries.forEach((e, k) => { e.gid = gid; if (k === 0 && recNote) e.note = recNote; else delete e.note; if (k === 0 && recTitle) e.postTitle = recTitle; else delete e.postTitle; });
+    // 編集: タスクの記録とのつながり（taskrec の srcId・まとめたタスク）を引き継ぐ。切れるとタスクが未完了に戻ってしまう
+    if (isEdit && newEntries.length) {
+      const origs = (this.state.editIdxs || []).map(i => this.state.entries[i]).filter(Boolean);
+      const tr = origs.find(e => /^taskrec:/.test(String(e.srcId || '')));
+      if (tr) newEntries[0].srcId = tr.srcId;
+      const tids = [...new Set(origs.flatMap(e => e.taskIds || []))];
+      if (tids.length) newEntries[0].taskIds = tids;
+    }
+    // 実行画面から: 実行中にまとめたタスクを、その行動の記録に付ける（コメントにタスク名）
+    if (this.state.confirmOrigin === 'run' && this.state.run && (this.state.run.tasks || []).length) {
+      const rr = this.state.run;
+      rr.tasks.forEach(x => {
+        const nm = (rr.items.find(li => li.uid === x.uid) || {}).name;
+        const e = newEntries.find(en => en.title === nm) || newEntries[0];
+        if (!e) return;
+        e.taskIds = [...(e.taskIds || []), x.srcId];
+        e.note = (e.note ? e.note + '\n' : '') + '✅ ' + x.title;
+      });
+    }
     // 体調・症状を記録したら、自動デバフをオン＋その日の後続時間帯にも同じ症状を入れる
     const sym = this.applySymptomEffects(newEntries, recDate, slotId);
     if (sym.extraEntries.length) newEntries.push(...sym.extraEntries);
@@ -2448,6 +2471,19 @@ export default class App extends React.Component {
     this.set({ screen: 'record', searchStep: 'confirm', searchCart: cartD, searchTotalMin: total, searchFracs: cartD.map(c => c.defMin / total), confirmMode: 'duration', startTime: hmOf(Math.min(start, end - 60000)), endTime: hmOf(end), anchorEnd: hmOf(end), cart: {}, confirmOrigin: 'run', framePlan: null, recordDate: null });
   };
   goRun = () => { if (this.state.run) this.set({ screen: 'run', runAdd: false }); };
+  /* 実行中のタスクのタブ: チェックしたタスクは、いま実行中の行動の記録にまとめる（タスクの行動として別に記録しない＝がんばりを二重にしない）。
+     もう一度押すと取り消し。記録すると、その行動の記録にタスク名（コメント）と taskIds が付く */
+  runTaskToggle = (srcId) => {
+    const r = this.state.run; if (!r) return;
+    const t = (this.state.tasks || []).find(x => x.srcId === srcId); if (!t) return;
+    const has = (r.tasks || []).some(x => x.srcId === srcId);
+    const cur = r.items[r.cur] || r.items[0];
+    const run = { ...r, tasks: has ? r.tasks.filter(x => x.srcId !== srcId) : [...(r.tasks || []), { srcId, uid: cur.uid, title: t.title }] };
+    this.setRun(run);
+    this.set({ tasks: (this.state.tasks || []).map(x => (x.srcId === srcId ? { ...x, done: !has } : x)) });
+    this.save();
+    if (!has) this.toast('✅ ' + t.title + ' を「' + cur.name + '」にまとめました');
+  };
   /* 実行中のタスクを記録せずに捨てる */
   runRename = (name) => { const r = this.state.run; if (r) this.setRun({ ...r, name: (name || '').trim() }); };
   runDiscard = () => {
@@ -2455,6 +2491,9 @@ export default class App extends React.Component {
     // 降らせた回復のうち、まだ降っていない・落ちている途中のものは消す（ぶつかっても消さない）
     this._pendingNeg = (this._pendingNeg || []).filter(x => !(x && x.run === id));
     this.setRun(null);
+    // 実行中にまとめたタスクは未完了に戻す
+    const rt = new Set(((r && r.tasks) || []).map(x => x.srcId));
+    if (rt.size) { this.set({ tasks: (this.state.tasks || []).map(t => (rt.has(t.srcId) ? { ...t, done: false } : t)) }); this.save(); }
     // 回復で消したぶんは戻す（ためた回復からも外す）。プラスは run が消えれば山から消える
     this.set({ screen: 'record', runAdd: false, runAlarm: null,
       ...(hit ? { consumed: Math.max(0, (this.state.consumed || 0) - hit), collected: (this.state.collected || []).filter(c => c.run !== id) } : null) });
@@ -2735,7 +2774,7 @@ export default class App extends React.Component {
   /* タスクを完了して記録したもの（taskrec）を消すときは、タスクを「未完了に戻す」か「削除」するかを選ぶ。
      選ぶまで消さない（何も聞かずに消すと、タスクが未完了で元の場所に戻ってきて不快なため） */
   _askTaskTrash(idxs, doTrash) {
-    const ids = [...new Set(idxs.map(i => this.state.entries[i]).filter(e => e && !e.exp && /^taskrec:/.test(String(e.srcId || ''))).map(e => String(e.srcId).slice(8)))];
+    const ids = [...new Set(idxs.map(i => this.state.entries[i]).filter(e => e && !e.exp).flatMap(e => [...(/^taskrec:/.test(String(e.srcId || '')) ? [String(e.srcId).slice(8)] : []), ...(e.taskIds || [])]))];
     if (!ids.length) return false;
     this._pendingTrash = doTrash;
     const titles = ids.map(id => ((this.state.tasks || []).find(t => t.srcId === id) || {}).title).filter(Boolean);
@@ -3289,12 +3328,24 @@ export default class App extends React.Component {
     const yBed = (st.bedLog || []).find(b => b.date === y);
     const sum = daySummary(st.entries, y, yRec ? yRec.fatigue : 0, { from: yRec ? yRec.ts : null, to: yBed ? yBed.ts : null });
     // 今日の予定: 押すと中身の登録（枠なら行動を入れる・それ以外は編集）へ。終わったらこの画面に戻る
-    const plans = st.entries.map((e, i) => ({ e, i })).filter(({ e }) => e.date === today && this.isPlanLike(e))
-      .sort((a, b) => (a.e.from || '').localeCompare(b.e.from || ''))
-      .map(({ e, i }) => ({
-        title: e.title, from: e.from, to: e.to, glyph: entryGlyph(e), delta: e.delta,
-        onTap: () => this.openPlanFromWake(i),
-      }));
+    // 予定（plan）ごとに1行にまとめる（ホームのタイムラインと同じ）。見出し＝予定名、中の行動は下に小さく
+    const rows = st.entries.map((e, i) => ({ e, i })).filter(({ e }) => e.date === today && this.isPlanLike(e))
+      .sort((a, b) => (a.e.from || '').localeCompare(b.e.from || ''));
+    const plans = [], byPlan = {};
+    rows.forEach(({ e, i }) => {
+      const g = e.plan ? byPlan[e.plan] : null;
+      if (g) { g.idxs.push(i); g.delta += e.delta || 0; g.acts.push(e); if ((e.to || '') > (g.to || '')) g.to = e.to; return; }
+      const row = { title: e.plan || e.title, from: e.from, to: e.to, delta: e.delta || 0, idxs: [i], acts: [e], plan: e.plan || null };
+      plans.push(row); if (e.plan) byPlan[e.plan] = row;
+    });
+    plans.forEach(p => {
+      const longest = p.acts.reduce((a, e) => (entryMin(e) > entryMin(a) ? e : a), p.acts[0]);
+      p.glyph = entryGlyph(longest);
+      p.sub = p.plan && !(p.acts.length === 1 && (p.acts[0].needsSetup || p.acts[0].title === p.plan)) ? p.acts.map(e => e.title).join('・') : '';
+      const idxs = p.idxs;
+      p.onTap = () => this.openPlanFromWake(idxs[0], p.plan && idxs.length > 1 ? idxs : null);
+      delete p.acts; delete p.idxs;
+    });
     const tasks = (st.tasks || []).filter(t => t.date === today && t.title);
     // 昨日やっていないタスク（まだ引き継ぐか聞いていないもの）
     const carry = (st.tasks || []).filter(t => t.date === y && t.title && !t.done && !t.carryAsked);
@@ -3303,11 +3354,12 @@ export default class App extends React.Component {
     return { recs, chart, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks, carry: carry.map(t => ({ id: t.srcId, title: t.title })), isMonday, weekGoal, weekGoalMax: WEEK_GOAL_MAX };
   }
   /* 朝の「今日の予定」から予定を押したとき: 中身の登録へ。保存・やめるのあとは「今日の予定」に戻る */
-  openPlanFromWake = (i) => {
+  openPlanFromWake = (i, planIdxs) => {
     const e = this.state.entries[i];
     if (!e) return;
     this._afterRecord = 'wake3';
     if (e.needsSetup) { this.openFrameFill({ idxs: [i] }); return; }
+    if (planIdxs) { this.openEditFlow({ idxs: planIdxs, isPlan: true, planName: e.plan, title: e.plan }); return; }
     const idxs = e.gid ? this.state.entries.map((x, k) => (x.gid === e.gid && x.date === e.date ? k : -1)).filter(k => k >= 0) : [i];
     this.openEditFlow({ idxs, isPlan: !!e.plan && !e.gid, planName: e.plan || null, title: e.title });
   };
@@ -4365,7 +4417,11 @@ export default class App extends React.Component {
   /* ホームのタスク（夜の下）: チェックで完了。
      完了時は「押した時刻」で終わる記録にして、その時刻の時間帯へ移す（タスク欄からは消える）。
      タイトルは紐づけた行動（なければタスク名）、紐づけたときはタスク名をコメントに。mylifecore由来は本家側にも完了を書き戻す */
-  taskRecLive = (srcId) => this.state.entries.some(e => e.srcId === 'taskrec:' + srcId && !e.exp);
+  // タスクの記録: 自分の記録（srcId=taskrec:…）か、実行中にまとめた行動の記録（taskIds）。実行中のリストにまとめたものも完了あつかい
+  taskRecHit = (e, srcId) => e.srcId === 'taskrec:' + srcId || (Array.isArray(e.taskIds) && e.taskIds.includes(srcId));
+  taskRecLive = (srcId) => this.state.entries.some(e => !e.exp && this.taskRecHit(e, srcId)) || !!(this.state.run && (this.state.run.tasks || []).some(x => x.srcId === srcId));
+  // 完了に見せるか: 記録がゴミ箱に入っているときだけ未完了に見せる（以前の編集で記録とのつながりが切れたものも完了のまま）
+  taskShownDone = (t) => !!t.done && (this.taskRecLive(t.srcId) || !this.state.entries.some(e => e.exp && this.taskRecHit(e, t.srcId)));
   toggleHomeTask = (srcId) => {
     const t0 = (this.state.tasks || []).find(x => x.srcId === srcId);
     // 記録がゴミ箱に行ったタスクは「未完了」に見せているので、押したら完了にし直す
@@ -4768,7 +4824,7 @@ export default class App extends React.Component {
     // 好き嫌い（行動ごとに永続・強度ポップアップで設定）
     const curPref = intItem ? ((st.prefs || {})[normTitle(intItem.name)] || 'normal') : 'normal';
     const prefOpts = intItem ? [
-      { key: 'dislike', text: '嫌い' }, { key: 'normal', text: 'ふつう' }, { key: 'like', text: '好き' },
+      { key: 'dislike', text: 'きつい' }, { key: 'normal', text: 'ふつう' }, { key: 'like', text: 'らく' },
     ].map(o => {
       const on = curPref === o.key;
       return { text: o.text, onPick: () => this.setPref(intItem.name, o.key), border: on ? '#1b1b18' : '#e4e1d8', bg: on ? '#fbfdf0' : '#fff', color: on ? '#1b1b18' : '#55554e', weight: on ? '900' : '700' };
@@ -4930,7 +4986,7 @@ export default class App extends React.Component {
         const next = sortEntries(st.entries.filter(e => e.date === d && this.isPlanLike(e) && e.from && (d !== todayStr() || e.from > nowHm)))[0];
         const timed = d === todayStr() ? this.timeOfDayLine() : '';
         if (timed && !(st.lastRec && Date.now() - st.lastRec.ts < 3 * 60000)) return timed; // 記録した直後はそのひとことを優先
-        return homeLine(Math.min(100, this.pileCount()), next && { ...next, ...this.entryBodyMind(next) }, d, st.lastRec, Date.now());
+        return homeLine(Math.min(100, this.pileCount()), next && { ...next, ...this.entryBodyMind(next), title: next.plan || next.title }, d, st.lastRec, Date.now());
       })()) : '',
       tapCharacter: this.tapCharacter,
       predict: st.screen === 'shaka' ? (() => {
@@ -5029,7 +5085,7 @@ export default class App extends React.Component {
       setHomeDate: this.setHomeDate, goToday: this.goToday,
       // 時間軸の下に出すタスク（mylifecore / GoogleのToDo / かめペースで手動追加）
       // 完了して記録に移ったタスクはタスク欄に出さない（記録をゴミ箱に入れたら未完了として戻る）
-      homeTasks: (st.tasks || []).filter(t => t.date === this.homeDateStr() && !(t.done && this.taskRecLive(t.srcId))).map(t => ({
+      homeTasks: (st.tasks || []).filter(t => t.date === this.homeDateStr() && !this.taskShownDone(t)).map(t => ({
         srcId: t.srcId, title: t.title, done: false,
         glyph: t.linkGlyph || null, linkName: t.linkName || '',
         srcLabel: /^(ptask:|daily:)/.test(String(t.srcId || '')) ? 'mylifecore'
@@ -5041,8 +5097,10 @@ export default class App extends React.Component {
       onAddTask: this.addLocalTask,
       // 実行中の画面の「タスク」タブ: 今日のタスク（チェックで記録・ホームと同じ）
       runTasks: (st.tasks || []).filter(t => t.date === todayStr() && t.title).map(t => {
-        const done = !!(t.done && this.taskRecLive(t.srcId));
-        return { srcId: t.srcId, title: t.title, done, glyph: t.linkGlyph || null, linkName: t.linkName || '', minText: this.fmtMin(t.min || t.linkMin || 30), onToggle: done ? undefined : () => this.toggleHomeTask(t.srcId) };
+        const inRun = st.run && (st.run.tasks || []).find(x => x.srcId === t.srcId);
+        const done = !!inRun || this.taskShownDone(t);
+        const into = inRun && (st.run.items.find(li => li.uid === inRun.uid) || {}).name;
+        return { srcId: t.srcId, title: t.title, done, glyph: t.linkGlyph || null, linkName: t.linkName || '', minText: into ? into + 'にまとめた' : this.fmtMin(t.min || t.linkMin || 30), onToggle: inRun || !done ? () => this.runTaskToggle(t.srcId) : undefined };
       }),
       // タスク編集ポップアップ
       taskEditOpen: !!st.taskEdit,

@@ -281,7 +281,7 @@ function Confirm({ v }) {
                   <button onClick={r.onRemove} aria-label="外す" style={{ width: 22, height: 22, border: 'none', background: 'none', fontSize: 14, color: '#b4b2a8', cursor: 'pointer', padding: 0, flex: '0 0 auto' }}>✕</button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8, paddingLeft: 26 }}>
-                  {seg([['dislike', 'きらい'], ['normal', 'ふつう'], ['like', 'すき']], r.pref, r.onPref)}
+                  {seg([['dislike', 'きつい'], ['normal', 'ふつう'], ['like', 'らく']], r.pref, r.onPref)}
                   {seg([['time', '時刻'], ['dur', '時間']], v.isTimeMode ? 'time' : 'dur', (k) => (k === 'time' ? v.setTimeMode() : v.setDurationMode()))}
                   {r.hasIntensity && <button onClick={r.onIntensity} style={{ border: '1px solid #1b1b18', background: '#fcfaf3', borderRadius: 14, padding: '3px 9px', fontSize: 11, fontWeight: 700, color: '#1b1b18', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{r.intensityText}</button>}
                   {!a.timeMode && a.minText && <span style={{ marginLeft: 'auto' }}><HmInput value={a.rawMin} onChange={(n) => n > 0 && a.onSetMin(n)} size={13} /></span>}
@@ -703,14 +703,14 @@ function IntensityPopup({ v }) {
             </div>
           </React.Fragment>
         ))}
-        {/* 好き嫌い: 行動ごとに保存され、いつも疲労に反映される */}
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>すき・きらい</div>
+        {/* きつい・ふつう・らく（前のすき・きらい）: 行動ごとに保存され、いつも疲労に反映される */}
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, color: '#55554e' }}>きつい・らく</div>
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           {v.prefOpts.map((o, oi) => (
             <button key={oi} onClick={o.onPick} style={{ flex: 1, textAlign: 'center', border: `1.5px solid ${o.border}`, background: o.bg, color: o.color, borderRadius: 12, padding: '11px 0', fontSize: 12.5, fontWeight: o.weight, cursor: 'pointer' }}>{o.text}</button>
           ))}
         </div>
-        <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 7, lineHeight: 1.6 }}>この行動にいつも反映されます。嫌いだと疲れやすく、好きだと軽くなります</div>
+        <div style={{ fontSize: 11, color: '#b4b2a8', marginTop: 7, lineHeight: 1.6 }}>この行動にいつも反映されます。きついと疲れやすく、らくだと軽くなります</div>
         <button onClick={v.closeIntensity} style={{ width: '100%', marginTop: 18, border: 'none', borderRadius: 13, background: '#1b1b18', color: '#fff', fontWeight: 700, fontSize: 15, padding: '14px 0', cursor: 'pointer' }}>OK</button>
       </div>
     </div>
