@@ -253,6 +253,7 @@ function RecordMenu({ v }) {
 }
 
 /* タスクの編集: 名前の変更＋行動との紐づけ（チェック時にその行動として記録される） */
+const stepBtn = (on) => ({ width: 34, height: 34, borderRadius: 10, border: '1.5px solid #e4e1d8', background: '#fff', fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#1b1b18', cursor: on ? 'pointer' : 'default', opacity: on ? 1 : 0.3, padding: 0, flex: '0 0 auto' });
 function TaskEditPopup({ v }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 9, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
@@ -283,6 +284,13 @@ function TaskEditPopup({ v }) {
             </div>
           </>
         )}
+        {/* 時間（チェックしたとき、この長さの記録になる。紐づけた行動があれば絵文字の数も） */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#55554e', flex: 1 }}>時間</span>
+          <button onClick={v.taskMinDec} aria-label="短く" style={stepBtn(v.taskMinCanDec)}>remove</button>
+          <span style={{ minWidth: 84, textAlign: 'center', fontSize: 15, fontWeight: 800, color: '#1b1b18' }}>{v.taskEditMinText}{v.taskEditFat && <span style={{ ...mono, fontSize: 12, fontWeight: 700, color: '#f5994e', marginLeft: 6 }}>{v.taskEditFat}</span>}</span>
+          <button onClick={v.taskMinInc} aria-label="長く" style={stepBtn(v.taskMinCanInc)}>add</button>
+        </div>
         <button onClick={v.saveTaskEdit} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 700, fontSize: 15, padding: 14, cursor: 'pointer' }}>{v.taskEditIsNew ? '追加する' : 'ほぞんする'}</button>
         {!v.taskEditIsNew && (
           <button onClick={v.deleteTaskEdit} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, border: '1.5px solid #e4e1d8', borderRadius: 12, background: '#fff', color: '#b4645a', fontWeight: 700, fontSize: 13, padding: '11px 0', cursor: 'pointer' }}>

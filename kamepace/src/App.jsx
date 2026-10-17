@@ -58,6 +58,7 @@ const IS_IOS_DEVICE = typeof navigator !== 'undefined' && (
 // 操作チュートリアル: いったん誰にも出さない（自動でも、マイページからも始まらない）。戻すときは true に
 export const TUTORIAL_ON = false;
 const PICK_REMOVED_CATS = ['health'];
+const TASK_MINS = [5, 10, 15, 20, 30, 45, 60, 75, 90, 120, 150, 180, 240, 300]; // タスクの時間の選択肢（分）
 const WEEK_GOAL_MAX = 20; // 今週の目標の文字数（ホームで1行に収まる長さ）
 const REMOVED_NAMES = new Set((CATS.find(c => c.id === 'health') || { items: [] }).items.map(t => t.name));
 
@@ -4375,7 +4376,7 @@ export default class App extends React.Component {
     if (t && t.done && !this.taskRecLive(srcId)) {
       // 二重記録防止（ゴミ箱に入れた記録は数えない）
       const recId = 'taskrec:' + srcId;
-      const min = t.linkMin || 30;
+      const min = t.min || t.linkMin || 30; // タスクで決めた時間（なければ紐づけた行動の標準）
       const now = Date.now(), today = todayStr();
       const startTs = Math.max(hmToTsOn(today, '00:00'), now - min * 60000);
       const slotId = this.slotOf({ from: this.tsToHm(now) });
@@ -4459,12 +4460,24 @@ export default class App extends React.Component {
     const tasks = (this.state.tasks || []).map(t => {
       if (t.srcId !== srcId) return t;
       if (!item) { const { linkName, linkGlyph, linkFh, linkMin, linkAct, ...rest } = t; return rest; }
-      return { ...t, linkName: item.name, linkGlyph: item.glyph, linkFh: item.fh, linkMin: item.defMin || 30, linkAct: guessAct(item.name) };
+      return { ...t, linkName: item.name, linkGlyph: item.glyph, linkFh: item.fh, linkMin: item.defMin || 30, linkAct: guessAct(item.name), min: item.defMin || 30 };
     });
     this.set({ tasks, taskEditLinkName: item ? item.name : '' });
     this.save();
   };
 
+  /* タスクの時間（チェックしたとき、この長さの記録になる）。dir=±1 で TASK_MINS を1段ずつ */
+  stepTaskMin = (dir) => {
+    const srcId = this.state.taskEdit;
+    const tasks = (this.state.tasks || []).map(t => {
+      if (t.srcId !== srcId) return t;
+      const cur = t.min || t.linkMin || 30;
+      const lower = TASK_MINS.filter(m => m < cur);
+      const next = dir > 0 ? (TASK_MINS.find(m => m > cur) || cur) : (lower.length ? lower[lower.length - 1] : cur);
+      return { ...t, min: next };
+    });
+    this.set({ tasks }); this.save();
+  };
   /* Googleカレンダー/ToDo 取り込み（旧本番と同一の entries 形式で追加） */
   /* 連携の解除（マイページ）: kind＝'mlc'（mylifecore）／'google'（Googleカレンダー・ToDo）。
      clear＝これから（今日以降）の取り込んだ予定・タスクのうち、まだ使っていないものも消す */
@@ -5026,6 +5039,11 @@ export default class App extends React.Component {
         onDelete: () => this.deleteTask(t.srcId),
       })),
       onAddTask: this.addLocalTask,
+      // 実行中の画面の「タスク」タブ: 今日のタスク（チェックで記録・ホームと同じ）
+      runTasks: (st.tasks || []).filter(t => t.date === todayStr() && t.title).map(t => {
+        const done = !!(t.done && this.taskRecLive(t.srcId));
+        return { srcId: t.srcId, title: t.title, done, glyph: t.linkGlyph || null, linkName: t.linkName || '', minText: this.fmtMin(t.min || t.linkMin || 30), onToggle: done ? undefined : () => this.toggleHomeTask(t.srcId) };
+      }),
       // タスク編集ポップアップ
       taskEditOpen: !!st.taskEdit,
       taskEditTitle: st.taskEditTitle || '',
@@ -5040,6 +5058,16 @@ export default class App extends React.Component {
           }))
         : [],
       clearTaskLink: () => this.linkTaskAct(null),
+      ...(() => {
+        const t = st.taskEdit && (st.tasks || []).find(x => x.srcId === st.taskEdit);
+        const min = t ? (t.min || t.linkMin || 30) : 30;
+        return {
+          taskEditMinText: this.fmtMin(min),
+          taskEditFat: t && t.linkFh != null ? '+' + Math.max(1, Math.round(t.linkFh * min / 60)) : '',
+          taskMinDec: () => this.stepTaskMin(-1), taskMinInc: () => this.stepTaskMin(1),
+          taskMinCanDec: min > TASK_MINS[0], taskMinCanInc: min < TASK_MINS[TASK_MINS.length - 1],
+        };
+      })(),
       taskEditIsNew: !!st.taskEditIsNew,
       saveTaskEdit: this.saveTaskEdit, closeTaskEdit: this.closeTaskEdit, deleteTaskEdit: this.deleteTaskEdit,
       // mylifecore 連携（同じFirebaseなのでログインしていれば自動連携中）
