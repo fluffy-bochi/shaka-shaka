@@ -1337,7 +1337,7 @@ export default class App extends React.Component {
   mylifeTaskKeyFor(title, date) {
     const k = normTitle(title);
     if (!k) return null;
-    const has = (this.state.tasks || []).some(t => t.date === date && normTitle(t.title) === k && /^(ptask:|daily:)/.test(String(t.srcId || '')));
+    const has = (this.state.tasks || []).some(t => t.date === date && normTitle(t.title) === k && /^(ptask:|daily:)/.test(this.taskOrigin(t.srcId)));
     return has ? ('mlt:' + k) : null;
   }
   /* mylifecoreタスクの累計: newEntries の taskKey ごとに、同じ taskKey の
@@ -3363,6 +3363,8 @@ export default class App extends React.Component {
     const idxs = e.gid ? this.state.entries.map((x, k) => (x.gid === e.gid && x.date === e.date ? k : -1)).filter(k => k >= 0) : [i];
     this.openEditFlow({ idxs, isPlan: !!e.plan && !e.gid, planName: e.plan || null, title: e.title });
   };
+  /* 引き継いだタスク（carry:元のid:日付）の元のid。取り込み元（mylifecore・Google・手動）の判定に使う */
+  taskOrigin = (srcId) => String(srcId || '').replace(/^(carry:)+/, '');
   /* 昨日やっていないタスクを今日に引き継ぐ（ids＝引き継ぐもの）。聞いたタスクは二度聞かない */
   carryTasks = (ids) => {
     const st = this.state, today = todayStr(), y = shiftDate(today, -1);
@@ -4441,7 +4443,7 @@ export default class App extends React.Component {
       const fh = (t.linkFh != null) ? t.linkFh : null;
       const delta = fh != null ? Math.max(1, Math.round(fh * min / 60)) : IMPORT_DEFAULT_DELTA;
       const glyph = t.linkGlyph || ACT_EMOJI[guessAct(t.title)] || '📝';
-      const isMylife = /^(ptask:|daily:)/.test(String(srcId || ''));
+      const isMylife = /^(ptask:|daily:)/.test(this.taskOrigin(srcId));
       const title = t.linkName || t.title;
       entries = sortEntries([...entries, {
         ...baseEntry(title, delta, today),
@@ -4454,10 +4456,11 @@ export default class App extends React.Component {
     }
     this.set({ tasks, entries });
     this.save();
-    if (t && t.done && String(srcId).startsWith('ptask:')) {
-      completeScheduleTask(String(srcId).slice(6)).catch(e => console.warn('[kamepace] task complete sync failed', e));
+    const orig = t ? this.taskOrigin(t.carriedFrom || srcId) : '';
+    if (t && t.done && orig.startsWith('ptask:')) {
+      completeScheduleTask(orig.slice(6)).catch(e => console.warn('[kamepace] task complete sync failed', e));
     }
-    const dm = t && t.done ? String(srcId).match(/^daily:(\d{4}-\d{2}-\d{2}):(.+)$/) : null;
+    const dm = t && t.done ? orig.match(/^daily:(\d{4}-\d{2}-\d{2}):(.+)$/) : null;
     if (dm) completeDailyTask(dm[1], dm[2]).catch(e => console.warn('[kamepace] daily task complete sync failed', e));
   };
 
@@ -5088,8 +5091,8 @@ export default class App extends React.Component {
       homeTasks: (st.tasks || []).filter(t => t.date === this.homeDateStr() && !this.taskShownDone(t)).map(t => ({
         srcId: t.srcId, title: t.title, done: false,
         glyph: t.linkGlyph || null, linkName: t.linkName || '',
-        srcLabel: /^(ptask:|daily:)/.test(String(t.srcId || '')) ? 'mylifecore'
-          : /^local:/.test(String(t.srcId || '')) ? '' : 'Google',
+        srcLabel: /^(ptask:|daily:)/.test(this.taskOrigin(t.srcId)) ? 'mylifecore'
+          : /^local:/.test(this.taskOrigin(t.srcId)) ? '' : 'Google',
         onToggle: () => this.toggleHomeTask(t.srcId),
         onEdit: () => this.openTaskEdit(t.srcId),
         onDelete: () => this.deleteTask(t.srcId),
