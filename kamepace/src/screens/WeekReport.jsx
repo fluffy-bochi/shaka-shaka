@@ -16,7 +16,7 @@ const ttl = { fontSize: 14, fontWeight: 900, marginBottom: 10 };
 /* いこいさんのひと言（各項目の下） */
 function Say({ text, v }) {
   if (!text) return null;
-  return <div style={{ margin: '10px -20px -14px' }}><Speaker text={text} size={64} onEdit={v.editIkoiLine} /></div>;
+  return <div style={{ margin: '10px -16px -14px' }}><Speaker text={text} size={64} onEdit={v.editIkoiLine} /></div>;
 }
 
 function smoothPath(pts) {
@@ -222,7 +222,7 @@ export default function WeekReport({ v }) {
           <div style={{ ...mono, fontSize: 11, fontWeight: 700, color: '#8a8a82' }}>{r.label}</div>
         </div>
       </div>
-      <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 8 }}>
+      <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingBottom: 8 }}>
         <GoalThis r={r} v={v} />
         <Types r={r} v={v} />
         <Cond r={r} v={v} />
