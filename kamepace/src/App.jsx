@@ -1549,11 +1549,20 @@ export default class App extends React.Component {
     const entries = sortEntries([...baseEntries, ...newEntries]);
     const anyImmediate = newEntries.some(r => !r.planned);
     const toastMsg = isEdit ? 'へんこうしました' : (anyImmediate ? 'きろくしました' : '予定を追加した（時間どおりに記録）');
-    // マイナス（回復）の記録は山から引かず、そのぶんの絵文字をシャカで降らせて衝突で消す
+    // マイナス（回復）の記録は山から引かず、そのぶんの絵文字をシャカで降らせて衝突で消す。
+    // 降らせた回復には記録ごとの印（nk）をつけ、編集したときに、その記録で消したぶんを戻せるようにする
     const negGlyphs = [];
-    newEntries.forEach(e => {
-      if (!e.planned && e.delta < 0) { for (let i = 0; i < -e.delta; i++) negGlyphs.push(e.glyph || entryGlyph(e)); }
+    newEntries.forEach((e, k) => {
+      if (!(e.delta < 0)) return;
+      e.nk = 'n' + Date.now().toString(36) + k;
+      if (!e.planned) { for (let i = 0; i < -e.delta; i++) negGlyphs.push({ g: e.glyph || entryGlyph(e), nk: e.nk }); }
     });
+    // 編集: 元の回復の記録で消したぶんを山に戻し、ためた回復からも外す（このあと編集後のぶんを降らせなおす）
+    let editRestore = 0, collected = this.state.collected || [];
+    if (isEdit) {
+      const r = this.undoRecovery((this.state.editIdxs || []).map(i => this.state.entries[i]).filter(Boolean), collected);
+      editRestore = r.restore; collected = r.collected;
+    }
     // ★ 物理の組み直しは setState のコールバック（state 反映後）で行う。
     // set は非同期のため、直後に startPhysics すると「新しい記録が入る前の古い山」で組んでしまい、
     // 記録した絵文字が降ってこない（何度かシャカに移動すると降る）不具合になっていた。
@@ -1572,9 +1581,11 @@ export default class App extends React.Component {
       const negTotal = negGlyphs.length;
       negGlyphs.splice(0, Math.min(n0, negTotal));
       if (n0 > negTotal) runRestore = Math.min(rd.negHit || 0, n0 - negTotal);
-      // まだ降っていない・落ちている途中の回復は、記録した回復としてそのまま消せるようにする
-      this._pendingNeg = (this._pendingNeg || []).map(x => (x && typeof x === 'object' && x.run === rd.startAt ? x.g : x));
-      (this.negBodies || []).forEach(n => { if (n.run === rd.startAt) n.run = null; });
+      // まだ降っていない・落ちている途中の回復は、記録した回復としてそのまま消せるようにする（記録の印 nk に付けかえ）
+      const nk0 = (newEntries.find(e => e.nk) || {}).nk || null;
+      this._pendingNeg = (this._pendingNeg || []).map(x => (x && typeof x === 'object' && x.run === rd.startAt ? { g: x.g, nk: nk0 } : x));
+      (this.negBodies || []).forEach(n => { if (n.run === rd.startAt) { n.run = null; n.nk = nk0; } });
+      if (nk0) collected = collected.map(c => { if (c.run !== rd.startAt) return c; const { run, ...rest } = c; return { ...rest, nk: nk0 }; }); // eslint-disable-line no-unused-vars
     }
     this.setState({
       run: fromRun ? null : this.state.run,
@@ -1587,7 +1598,8 @@ export default class App extends React.Component {
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
       // 編集で山が縮んだ場合に consumed が超過しないように
-      consumed: Math.min(Math.max(0, (this.state.consumed || 0) - runRestore), this.pilePositiveTotal(entries)),
+      consumed: Math.min(Math.max(0, (this.state.consumed || 0) - runRestore - editRestore), this.pilePositiveTotal(entries)),
+      collected,
       // 症状のつらさが変わったら、デバフの強さも合わせるか確認
       symAdjust: symLevelChange,
     }, () => {
@@ -2794,6 +2806,36 @@ export default class App extends React.Component {
     });
   };
 
+  /* 回復の記録を取り消す（編集で置きかえるとき）: その記録で降らせた回復が消したぶん（山に戻す数）と、ためた回復から外したあとの一覧。
+     印（nk）のある記録は、ぶつかって消えた数をそのまま戻す。まだ降っていない・落ちている途中のぶんも止める。
+     印のない前からの記録は、降らせた数を消したものとして戻し、ためた回復の新しいほうから同じ絵文字の組を外す */
+  undoRecovery(olds, collected) {
+    let restore = 0, out = [...(collected || [])];
+    olds.forEach(o => {
+      if (o.exp || !(o.delta < 0)) return;
+      if (o.nk) {
+        restore += Math.floor(out.filter(c => c.nk === o.nk).length / 2);
+        out = out.filter(c => c.nk !== o.nk);
+        this._pendingNeg = (this._pendingNeg || []).filter(x => !(x && x.nk === o.nk));
+        (this.negBodies || []).forEach(n => {
+          if (n.nk !== o.nk || n.consumed) return;
+          n.consumed = true;
+          try { if (this.engine) Matter.World.remove(this.engine.world, n.body); } catch (e) { /* noop */ }
+          n.el.remove();
+        });
+        this.negBodies = (this.negBodies || []).filter(n => !n.consumed);
+        return;
+      }
+      const fell = o.planned ? (o.dropped || 0) : -o.delta, g = entryGlyph(o);
+      restore += fell;
+      for (let i = out.length - 2, h = 0; i >= 0 && h < fell; i--) {
+        const c = out[i];
+        if (c.glyph === g && !c.nk && !c.run) { out.splice(i, 2); h++; }
+      }
+    });
+    return { restore, collected: out };
+  }
+
   /* ================= ゴミ箱 =================
      完全削除せず exp:true にする（旧本番も exp は疲労計算から除外＝同期互換）。 */
   trashOriginal = (asked) => {
@@ -3468,7 +3510,7 @@ export default class App extends React.Component {
       if (due > (e.dropped || 0)) {
         const add = due - (e.dropped || 0);
         if (e.delta > 0) { for (let i = 0; i < add; i++) drops.push(entryGlyph(e)); }
-        else { for (let i = 0; i < add; i++) negDrops.push(entryGlyph(e)); }
+        else { for (let i = 0; i < add; i++) negDrops.push(e.nk ? { g: entryGlyph(e), nk: e.nk } : entryGlyph(e)); }
         ne = { ...e, dropped: due, _new: true }; changed = true;
       }
       if ((ne.dropped || 0) >= N) { ne = { ...ne, planned: false, dropped: N }; changed = true; }
@@ -4100,7 +4142,7 @@ export default class App extends React.Component {
     this.resumeMotion();
     glyphs.slice(0, 160).forEach(g0 => {
       // { g, run }: 実行中の行動が降らせた回復（削除したら戻せるように印をつける）
-      const g = typeof g0 === 'string' ? g0 : g0.g, runId = typeof g0 === 'string' ? null : g0.run;
+      const g = typeof g0 === 'string' ? g0 : g0.g, runId = typeof g0 === 'string' ? null : g0.run, nk = typeof g0 === 'string' ? null : (g0.nk || null);
       const x = r + Math.random() * (W - 2 * r);
       // シミュレーションと、傾きモードで箱が閉じているとき（シャカを見ている最中に降る実行中・予定の回復）は
       // 箱の中（画面の上のほう）から落とす。蓋の上に出すと蓋に乗ったまま山に届かない
@@ -4117,7 +4159,7 @@ export default class App extends React.Component {
       d.style.fontSize = Math.round(r * 1.6) + 'px';
       appendGlyph(d, g, Math.round(r * 1.9));
       el.appendChild(d);
-      const neg = { body, el: d, consumed: false, glyph: g, sim: !!sim, run: runId };
+      const neg = { body, el: d, consumed: false, glyph: g, sim: !!sim, run: runId, nk };
       this.negBodies.push(neg);
       // 30秒ぶつからなければフェードアウト（旧本番と同じ）
       setTimeout(() => {
@@ -4166,7 +4208,7 @@ export default class App extends React.Component {
             break;
           }
           this.bodies.splice(pi, 1);
-          collectedAdd.push({ g: neg.glyph, run: neg.run }, { g: pos.glyph || pos.el.textContent, run: neg.run }); // 使った回復＋消えたプラスの記録
+          collectedAdd.push({ g: neg.glyph, run: neg.run, nk: neg.nk }, { g: pos.glyph || pos.el.textContent, run: neg.run, nk: neg.nk }); // 使った回復＋消えたプラスの記録（nk: どの回復の記録で消したか）
           hits++;
           if (neg.run) runHits++;
           // パッと消える＋リングのポップエフェクト
@@ -4188,7 +4230,7 @@ export default class App extends React.Component {
     this.negBodies = this.negBodies.filter(n => !n.consumed);
     if (hits) {
       const now = Date.now();
-      const add = collectedAdd.map(({ g, run }) => ({ act: EMOJI_ACT[g] || '', glyph: g, amount: 1, ts: now, ...(run ? { run } : null) }));
+      const add = collectedAdd.map(({ g, run, nk }) => ({ act: EMOJI_ACT[g] || '', glyph: g, amount: 1, ts: now, ...(run ? { run } : null), ...(nk ? { nk } : null) }));
       const cap = this.pilePositiveTotal();
       // 関数型 setState で確実に累積する。毎フレーム呼ばれるため this.state を直接読むと
       // 非同期バッチで古い値のまま上書きされ、消したぶん(consumed)が数個しか永続化されない不具合になる。
