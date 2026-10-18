@@ -107,10 +107,11 @@ export function buildWeek(st, key, o) {
   /* いこいさんのひと言（項目ごと） */
   const say = {};
   const ln = (k, vals) => fill(pick(key + k, L(k)), vals || {});
-  // 今週の目標: 関連する行動の回数 → 自己評価（まだなら問いかけ）
+  // できなかったこと・低かった数値より、できたこと・楽しかったことに触れる
+  // 今週の目標: 関連する行動ができていれば回数 → 自己評価（まだなら問いかけ）
   if (goal.text) {
     const g = [];
-    if (goal.row) g.push(goal.row.weekCount ? ln('TPL_WEEK_GOAL_ACT', { 行動: goal.row.name, 回数: goal.row.weekCount }) : ln('TPL_WEEK_GOAL_ACT_ZERO', { 行動: goal.row.name }));
+    if (goal.row && goal.row.weekCount) g.push(ln('TPL_WEEK_GOAL_ACT', { 行動: goal.row.name, 回数: goal.row.weekCount }));
     g.push(ln(goal.eval ? 'WEEK_GOAL_' + goal.eval : 'WEEK_GOAL_ASK'));
     say.goal = g.join('');
   }
@@ -121,28 +122,35 @@ export function buildWeek(st, key, o) {
     say.types = ln(rested * 2 >= pairs.length ? 'WEEK_TYPE_RECOVER' : 'WEEK_TYPE_HARD');
   } else if (top && prevTop) say.types = ln('WEEK_CMP_' + prevTop.id + '_' + top.id);
   else say.types = ln('WEEK_BASE_' + (top ? top.id : 'none'), { 日数: top ? top.n : 0 });
-  // 体調と心の調子: 先週とくらべて＋しんどかった曜日
+  // 体調と心の調子: 先週より上向きならそれを、あとはいちばん調子がよかった曜日（その日のやりたいこと）
   if (pts.length) {
     const ds = SER_KEYS.map(([a, b]) => (cond[a] != null && cond[b] != null ? cond[a] - cond[b] : null)).filter(x => x != null);
     const c = [];
-    if (ds.length) { const d = ds.reduce((x, y) => x + y, 0) / ds.length; c.push(ln(d >= 0.3 ? 'WEEK_COND_UP' : d <= -0.3 ? 'WEEK_COND_DOWN' : 'WEEK_COND_FLAT')); }
-    let low = null;
+    if (ds.length && ds.reduce((x, y) => x + y, 0) / ds.length >= 0.3) c.push(ln('WEEK_COND_UP'));
+    let best = null;
     typeDays.forEach((x, i) => {
       const v = pts.filter(p => Math.floor(p.x) === i).flatMap(p => [p.cond, p.mood]).filter(v => v != null);
       const m = v.length ? v.reduce((s, y) => s + y, 0) / v.length : null;
-      if (m != null && m <= 2.5 && (!low || m < low.m)) low = { m, wd: x.wd };
+      if (m != null && m >= 3.5 && (!best || m > best.m)) best = { m, i, wd: x.wd };
     });
-    if (low) c.push(ln('TPL_WEEK_COND_LOW', { 曜日: low.wd }));
+    if (best) {
+      const f = fav.find(r => r.dots[best.i]);
+      c.push(f ? ln('TPL_WEEK_COND_BEST_FAV', { 曜日: best.wd, 行動: f.name }) : ln('TPL_WEEK_COND_BEST', { 曜日: best.wd }));
+    }
     if (c.length) say.cond = c.join('');
   }
-  // 必須・やりたいこと
+  // 必須: 全部できた／目標まで届いた行動の名前／いちばんできた行動
   if (req.length) {
-    const ok = req.filter(r => r.ok).length;
-    say.req = ok === req.length ? ln('WEEK_REQ_ALL') : ok === 0 ? ln('WEEK_REQ_NONE') : ln('TPL_WEEK_REQ', { 件数: req.length, 達成: ok });
+    const ok = req.filter(r => r.ok);
+    const most = req.slice().sort((a, b) => b.weekCount - a.weekCount)[0];
+    if (ok.length === req.length) say.req = ln('WEEK_REQ_ALL');
+    else if (ok.length) say.req = ln('TPL_WEEK_REQ_OK', { 行動: ok.slice(0, 2).map(r => r.name).join('と') });
+    else if (most.weekCount) say.req = ln('TPL_WEEK_REQ_MOST', { 行動: most.name, 回数: most.weekCount });
   }
+  // やりたいこと: いちばん楽しめた行動
   if (fav.length) {
-    const n = fav.reduce((s, r) => s + r.weekCount, 0);
-    say.fav = n ? ln('TPL_WEEK_FAV', { 回数: n }) : ln('WEEK_FAV_ZERO');
+    const most = fav.slice().sort((a, b) => b.weekCount - a.weekCount)[0];
+    say.fav = most.weekCount ? ln('TPL_WEEK_FAV', { 行動: most.name, 回数: most.weekCount }) : ln('WEEK_FAV_ZERO');
   }
   say.next = ln('WEEK_CLOSER');
 
