@@ -4,7 +4,7 @@ import { Speaker } from './Wake';
 import { GoalActButton, GoalActPicker } from './GoalAct';
 
 /* 週間レポート（日曜の夜の就寝記録のあと・月曜の朝・本棚の週の段から）。
-   上から いこいさん → がんばりタイプ（7日分と1日の割合） → 体調と心の調子 → 必須 → やりたいこと → 今週の目標・来週の目標 */
+   上から いこいさん → 今週の目標 → がんばりタイプ（7日分と1日の割合） → 体調と心の調子 → 必須 → やりたいこと → 来週の目標 */
 const mono = { fontFamily: "'Space Mono',monospace" };
 const INK = '#1b1b18', LIME = '#c4f000', LIME_INK = '#2f3a00';
 const ZCOL = { yuttari: '#bfe0a3', hodohodo: '#f2cf6b', michimichi: '#e8836f' }; // 研究データと同じ色
@@ -155,29 +155,35 @@ function Freq({ title, rows, fav }) {
 }
 
 const EVALS = [['done', 'できた'], ['half', '半分くらい'], ['not', 'できなかった']];
-function Goals({ r, v }) {
+function GoalThis({ r, v }) {
+  const g = r.goal;
+  return (
+    <div style={card}>
+      <div style={ttl}>今週の目標</div>
+      {g.text ? (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 800 }}>
+            {g.act && <Emo e={g.act.glyph} size={26} />}<span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.text}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+            {EVALS.map(([k, lb]) => (
+              <button key={k} onClick={() => v.setWeekEval(r.key, k)} style={{ flex: 1, border: g.eval === k ? 'none' : '1.5px solid #e4e1d8', borderRadius: 12, background: g.eval === k ? INK : '#fff', color: g.eval === k ? '#fff' : '#55554e', fontSize: 13, fontWeight: 800, padding: '9px 0', cursor: 'pointer', fontFamily: 'inherit' }}>{lb}</button>
+            ))}
+          </div>
+        </>
+      ) : <div style={{ fontSize: 12.5, color: '#a5a39a' }}>決めていませんでした</div>}
+    </div>
+  );
+}
+
+function GoalNext({ r, v }) {
   const [pick, setPick] = React.useState(false);
-  const g = r.goal, n = r.next;
+  const n = r.next;
   const [txt, setTxt] = React.useState(n.text);
   React.useEffect(() => { setTxt(n.text); }, [n.key]); // eslint-disable-line react-hooks/exhaustive-deps
   const save = () => { if (txt !== n.text) v.setWeekGoal(txt, n.key); };
   return (
     <>
-      <div style={card}>
-        <div style={ttl}>今週の目標</div>
-        {g.text ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 800 }}>
-              {g.act && <Emo e={g.act.glyph} size={26} />}<span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.text}</span>
-            </div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
-              {EVALS.map(([k, lb]) => (
-                <button key={k} onClick={() => v.setWeekEval(r.key, k)} style={{ flex: 1, border: g.eval === k ? 'none' : '1.5px solid #e4e1d8', borderRadius: 12, background: g.eval === k ? INK : '#fff', color: g.eval === k ? '#fff' : '#55554e', fontSize: 13, fontWeight: 800, padding: '9px 0', cursor: 'pointer', fontFamily: 'inherit' }}>{lb}</button>
-              ))}
-            </div>
-          </>
-        ) : <div style={{ fontSize: 12.5, color: '#a5a39a' }}>決めていませんでした</div>}
-      </div>
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 8 }}>
           <span style={{ ...ttl, marginBottom: 0, flex: 1 }}>{n.isThisWeek ? '今週の目標' : '来週の目標'}</span>
@@ -209,11 +215,12 @@ export default function WeekReport({ v }) {
       </div>
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 8 }}>
         <Speaker text={r.ikoi} size={110} onEdit={v.editIkoiLine} />
+        <GoalThis r={r} v={v} />
         <Types r={r} />
         <Cond r={r} />
         <Freq title="必須にした行動" rows={r.req} />
         <Freq title="やりたいこと" rows={r.fav} fav />
-        <Goals r={r} v={v} />
+        <GoalNext r={r} v={v} />
         <div style={{ borderTop: LINE }} />
       </div>
       <div style={{ flex: '0 0 auto', display: 'flex', gap: 12, padding: '10px 20px calc(16px + env(safe-area-inset-bottom))' }}>
