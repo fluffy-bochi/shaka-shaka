@@ -61,6 +61,7 @@ const GROUPS = [
   { id: 'week', label: '週間レポート', size: 130, items: [
     ...[['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].map(([k, n]) => ({ key: 'WEEK_BASE_' + k, label: n + 'が多い週', vars: ['日数'] })),
     { key: 'WEEK_BASE_none', label: '記録が少ない週' },
+    ...[['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].flatMap(([a, an]) => [['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].map(([b, bn]) => ({ key: 'WEEK_CMP_' + a + '_' + b, label: '先週' + an + '→今週' + bn }))),
     { key: 'TPL_WEEK_REQ', label: '必須にした行動', vars: ['件数', '達成'] },
     { key: 'WEEK_CLOSER', label: 'しめの一言' },
   ] },

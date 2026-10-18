@@ -47,6 +47,16 @@ const TPL = {
   WEEK_BASE_hodohodo: ['今週はほどほどの日が{日数}日。ちょうどいいペースで過ごせた1週間でしたね。'],
   WEEK_BASE_michimichi: ['今週はみちみちの日が{日数}日ありました。たくさん頑張った1週間、おつかれさまでした。'],
   WEEK_BASE_none: ['今週はあまり記録がありませんでした。忙しかったでしょうか？'],
+  // 先週いちばん多かったタイプ → 今週いちばん多かったタイプ
+  WEEK_CMP_michimichi_yuttari: ['先週はみちみちだったけど、今週はゆったり。先週のぶん、しっかり休めましたね。'],
+  WEEK_CMP_michimichi_hodohodo: ['先週のみちみちから、今週はほどほどに。うまくペースを落とせましたね。'],
+  WEEK_CMP_michimichi_michimichi: ['先週に続いてみちみちの週でした。体を休める日もつくってあげてくださいね。'],
+  WEEK_CMP_hodohodo_yuttari: ['先週よりもゆったり過ごせて、よかったです。'],
+  WEEK_CMP_hodohodo_hodohodo: ['先週と同じほどほどのペース。安定していますね。'],
+  WEEK_CMP_hodohodo_michimichi: ['先週よりいそがしい週でしたね。疲れがたまっていないか、気にかけてあげてください。'],
+  WEEK_CMP_yuttari_yuttari: ['先週に続いてゆったりの週。自分のペースを守れていますね。'],
+  WEEK_CMP_yuttari_hodohodo: ['先週しっかり休めたぶん、今週は少しがんばれましたね。'],
+  WEEK_CMP_yuttari_michimichi: ['先週ゆったりできたぶん、今週はたくさんがんばりましたね。'],
   TPL_WEEK_REQ: ['必須にした行動は{件数}つのうち{達成}つ、目標の回数までできました。'],
   WEEK_CLOSER: ['来週も無理せず、自分のペースでいきましょう。', '来週もいっしょにゆっくり進んでいきましょうね。'],
 };

@@ -36,6 +36,8 @@ function Types({ r }) {
           {r.top.id === 'michimichi' ? <img src="/wake/fireball.svg" alt="" style={{ width: 34, height: 34 }} /> : <Emo e={r.top.glyph} size={32} />}
           <span style={{ fontSize: 18, fontWeight: 900 }}>{r.top.name}</span>
           <span style={{ fontSize: 13, fontWeight: 800, color: '#55554e' }}><span style={{ ...mono, fontSize: 16 }}>{r.top.n}</span>日</span>
+          <span style={{ flex: 1 }} />
+          {r.prevTop && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 800, color: '#8a8a82' }}>先週{r.prevTop.id === 'michimichi' ? <img src="/wake/fireball.svg" alt="" style={{ width: 19, height: 19 }} /> : <Emo e={r.prevTop.glyph} size={18} />}{r.prevTop.name.replace('タイプ', '')}</span>}
         </div>
       )}
       <div style={{ display: 'flex', gap: 6 }}>
@@ -63,15 +65,6 @@ function Types({ r }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
         {['yuttari', 'hodohodo', 'michimichi'].map(k => <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, color: '#55554e' }}><span style={{ width: 10, height: 10, borderRadius: 3, background: ZCOL[k] }} />{ZNAME[k]}</span>)}
       </div>
-      {r.typeCount.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-          {r.typeCount.map(t => (
-            <span key={t.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px 2px 0', fontSize: 12, fontWeight: 800 }}>
-              <Emo e={t.glyph} size={18} />{t.name.replace('タイプ', '')}<span style={{ ...mono, fontSize: 12 }}>{t.n}</span>日
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -28,9 +28,9 @@ export function buildWeek(st, key, o) {
   const entries = st.entries || [];
   const bedOn = (d) => (st.bedLog || []).find(b => b.date === d) || null;
 
-  /* ① がんばりタイプ・ゾーンの割合（1日ごと） */
-  const typeDays = days.map(d => {
-    const wk = o.wakeOn(d), bd = bedOn(d);
+  /* ① がんばりタイプ・ゾーンの割合（1日ごと）。先週ぶんも、いちばん多かったタイプを比べるのに使う */
+  const typeDaysOf = (from) => [0, 1, 2, 3, 4, 5, 6].map(i => {
+    const d = shiftDate(from, i), wk = o.wakeOn(d), bd = bedOn(d);
     const future = d > today;
     const curve = future ? [] : fatigueCurve(entries, d, wk ? wk.fatigue : 0, { from: wk ? wk.ts : null, to: bd ? bd.ts : null });
     const zone = { yuttari: 0, hodohodo: 0, michimichi: 0 };
@@ -38,7 +38,12 @@ export function buildWeek(st, key, o) {
     const type = curve.length ? typeOfCurve(curve) : NO_TYPE;
     return { d, wd: WD[strToDate(d).getDay()], md: md(d), type, zone, has: curve.length > 0, future, today: d === today };
   });
-  const typeCount = WAKE_TYPES.map(t => ({ ...t, n: typeDays.filter(x => x.type.id === t.id).length })).filter(t => t.n > 0);
+  const countOf = (tds) => WAKE_TYPES.map(t => ({ ...t, n: tds.filter(x => x.type.id === t.id).length })).filter(t => t.n > 0);
+  // いちばん多かったタイプ（同じ日数なら、がんばった方）
+  const topOf = (tc) => tc.slice().sort((a, b) => b.n - a.n || WAKE_TYPES.findIndex(t => t.id === b.id) - WAKE_TYPES.findIndex(t => t.id === a.id))[0] || null;
+  const typeDays = typeDaysOf(key);
+  const typeCount = countOf(typeDays);
+  const top = topOf(typeCount), prevTop = topOf(countOf(typeDaysOf(shiftDate(key, -7))));
 
   /* ② 体調・気分（1〜5）: 起床・就寝・つぶやき。x＝その週の何日目か（5時〜翌5時を1日に） */
   const condPts = (from) => {
@@ -98,12 +103,12 @@ export function buildWeek(st, key, o) {
   const goal = { text: (st.weekGoals || {})[key] || '', act: gAct, row: gAct ? rowOf(normTitle(gAct.name), gFreq.req || gFreq.fav || null) : null, eval: ((st.weekReports || {})[key] || {}).eval || null };
   const next = { key: nextKey, text: (st.weekGoals || {})[nextKey] || '', act: goalAct(nextKey), isThisWeek: today >= nextKey };
 
-  /* いこいさん: いちばん多かったタイプ → 必須の達成 → しめ */
-  const top = typeCount.slice().sort((a, b) => b.n - a.n || WAKE_TYPES.findIndex(t => t.id === b.id) - WAKE_TYPES.findIndex(t => t.id === a.id))[0];
+  /* いこいさん: いちばん多かったタイプ → 先週とくらべて → 必須の達成 → しめ */
   const tid = top ? top.id : 'none';
   const parts = [fill(pick(key + 'b', L('WEEK_BASE_' + tid)), { 日数: top ? top.n : 0 })];
+  if (top && prevTop) parts.push(pick(key + 'p', L('WEEK_CMP_' + prevTop.id + '_' + top.id)));
   if (req.length) parts.push(fill(pick(key + 'r', L('TPL_WEEK_REQ')), { 件数: req.length, 達成: req.filter(r => r.ok).length }));
   parts.push(pick(key + 'c', L('WEEK_CLOSER')));
 
-  return { key, label: weekLabel(key), days: typeDays, typeCount, cond, req, fav, goal, next, top: top || null, ikoi: parts.join(''), done: today > weekEnd };
+  return { key, label: weekLabel(key), days: typeDays, typeCount, cond, req, fav, goal, next, top, prevTop, ikoi: parts.join(''), done: today > weekEnd };
 }
