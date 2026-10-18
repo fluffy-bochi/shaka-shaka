@@ -100,5 +100,5 @@ export function buildWeek(st, key, o) {
   if (req.length) parts.push(fill(pick(key + 'r', L('TPL_WEEK_REQ')), { 件数: req.length, 達成: req.filter(r => r.ok).length }));
   parts.push(pick(key + 'c', L('WEEK_CLOSER')));
 
-  return { key, label: weekLabel(key), days: typeDays, typeCount, cond, req, fav, goal, next, ikoi: parts.join(''), done: today > weekEnd };
+  return { key, label: weekLabel(key), days: typeDays, typeCount, cond, req, fav, goal, next, top: top || null, ikoi: parts.join(''), done: today > weekEnd };
 }

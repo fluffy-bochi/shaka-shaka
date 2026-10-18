@@ -9,7 +9,8 @@ const mono = { fontFamily: "'Space Mono',monospace" };
 const INK = '#1b1b18', LIME = '#c4f000', LIME_INK = '#2f3a00';
 const ZCOL = { yuttari: '#bfe0a3', hodohodo: '#f2cf6b', michimichi: '#e8836f' }; // 研究データと同じ色
 const ZNAME = { yuttari: 'ゆったり', hodohodo: 'ほどほど', michimichi: 'みちみち' };
-const card = { background: '#fff', borderRadius: 18, padding: '14px 14px 12px', margin: '0 16px 12px', boxShadow: '0 2px 10px rgba(27,27,24,.05)' };
+const LINE = '1px solid #bab5a7';
+const card = { borderTop: LINE, padding: '14px 16px 16px' }; // ホームと同じく線で区切る
 const ttl = { fontSize: 14, fontWeight: 900, marginBottom: 10 };
 
 function smoothPath(pts) {
@@ -30,6 +31,13 @@ function Types({ r }) {
   return (
     <div style={card}>
       <div style={ttl}>がんばりタイプ</div>
+      {r.top && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          {r.top.id === 'michimichi' ? <img src="/wake/fireball.svg" alt="" style={{ width: 34, height: 34 }} /> : <Emo e={r.top.glyph} size={32} />}
+          <span style={{ fontSize: 18, fontWeight: 900 }}>{r.top.name}</span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: '#55554e' }}><span style={{ ...mono, fontSize: 16 }}>{r.top.n}</span>日</span>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 6 }}>
         {r.days.map(d => {
           const z = d.zone, tot = z.yuttari + z.hodohodo + z.michimichi;
@@ -38,7 +46,7 @@ function Types({ r }) {
               <div style={{ height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {d.has ? (d.type.id === 'michimichi' ? <img src="/wake/fireball.svg" alt="" style={{ width: 26, height: 26 }} /> : <Emo e={d.type.glyph} size={24} />) : <span style={{ fontSize: 13, color: '#c9c5b8', fontWeight: 800 }}>—</span>}
               </div>
-              <div style={{ width: '100%', height: BH, marginTop: 4, borderRadius: 7, overflow: 'hidden', background: '#f1efe8', display: 'flex', flexDirection: 'column-reverse' }}>
+              <div style={{ width: '100%', height: BH, marginTop: 4, borderRadius: 7, overflow: 'hidden', background: '#e9e6dc', display: 'flex', flexDirection: 'column-reverse' }}>
                 {tot > 0 && ['yuttari', 'hodohodo', 'michimichi'].map(k => {
                   const p = z[k] / tot, h = BH * p;
                   return h > 0 ? (
@@ -60,7 +68,7 @@ function Types({ r }) {
       {r.typeCount.length > 0 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
           {r.typeCount.map(t => (
-            <span key={t.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#f7f4ec', borderRadius: 999, padding: '4px 10px 4px 6px', fontSize: 12, fontWeight: 800 }}>
+            <span key={t.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px 2px 0', fontSize: 12, fontWeight: 800 }}>
               <Emo e={t.glyph} size={18} />{t.name.replace('タイプ', '')}<span style={{ ...mono, fontSize: 12 }}>{t.n}</span>日
             </span>
           ))}
@@ -81,7 +89,7 @@ function Cond({ r }) {
       <div style={ttl}>体調と心の調子</div>
       {!c.pts.length ? <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#a5a39a' }}>記録なし</div> : (
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
-          {r.days.map((d, i) => <rect key={i} x={X(i)} y={PT - 4} width={X(1) - X(0)} height={H - PT - PB + 8} fill={i % 2 ? '#fff' : '#f7f4ec'} />)}
+          {r.days.map((d, i) => <rect key={i} x={X(i)} y={PT - 4} width={X(1) - X(0)} height={H - PT - PB + 8} fill={i % 2 ? '#efece3' : 'transparent'} />)}
           {[1, 3, 5].map(v => <g key={v}><line x1={PL} x2={W - PR} y1={Y(v)} y2={Y(v)} stroke="#e9e6dc" strokeWidth="1" /><text x={PL - 5} y={Y(v) + 3} textAnchor="end" fontSize="8" fill="#a5a39a" style={mono}>{v}</text></g>)}
           {r.days.map((d, i) => <text key={'l' + i} x={X(i + 0.5)} y={H - 7} textAnchor="middle" fontSize="9.5" fontWeight="700" fill={d.today ? '#7a9a00' : '#55554e'}>{d.wd}</text>)}
           {SER.map(s => {
@@ -102,7 +110,7 @@ function Cond({ r }) {
         {SER.map(s => {
           const a = c[s.avg], d = diff(a, c[s.prev]);
           return (
-            <div key={s.k} style={{ flex: 1, background: '#f7f4ec', borderRadius: 12, padding: '8px 10px' }}>
+            <div key={s.k} style={{ flex: 1, padding: '2px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 800, color: '#55554e' }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: s.color }} />{s.name}の平均</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
                 <span style={{ ...mono, fontSize: 20, fontWeight: 700 }}>{a == null ? '—' : a.toFixed(1)}</span>
@@ -123,7 +131,7 @@ function Freq({ title, rows, fav }) {
       <div style={ttl}>{title}</div>
       {!rows.length && <div style={{ fontSize: 12, color: '#a5a39a', padding: '4px 0 2px' }}>登録なし</div>}
       {rows.map(x => (
-        <div key={x.k} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid #f1efe8' }}>
+        <div key={x.k} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid #e4e1d8' }}>
           <Emo e={x.glyph} size={28} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
@@ -206,6 +214,7 @@ export default function WeekReport({ v }) {
         <Freq title="必須にした行動" rows={r.req} />
         <Freq title="やりたいこと" rows={r.fav} fav />
         <Goals r={r} v={v} />
+        <div style={{ borderTop: LINE }} />
       </div>
       <div style={{ flex: '0 0 auto', display: 'flex', gap: 12, padding: '10px 20px calc(16px + env(safe-area-inset-bottom))' }}>
         <button onClick={v.closeWeekReport} style={{ flex: 1, border: 'none', borderRadius: 16, background: LIME, color: LIME_INK, fontWeight: 800, fontSize: 16, padding: '16px 0', cursor: 'pointer', boxShadow: '0 6px 18px rgba(122,154,0,.3)', fontFamily: 'inherit' }}>{from === 'wake' ? 'つぎへ' : from === 'bookshelf' ? '本棚へ' : 'ホームへ'}</button>
