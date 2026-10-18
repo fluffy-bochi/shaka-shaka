@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import Emo from '../fluent';
-import { todayStr, strToDate, dateToStr, pad2 } from '../model';
+import { todayStr, strToDate, dateToStr, pad2, weekMonday } from '../model';
 import {
   buildDay, buildMonth, monthsWithData, nameMap, daySlots, dayChart,
   placeMain, placeSplit, placeNet, GEO_PORT, GEO_LAND,
@@ -414,7 +414,10 @@ export default function Bookshelf({ v }) {
     const net = split ? null : placeNet(day);
     return (
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', paddingBottom: 16 }} onClick={() => selectDay(day)}>
-        {day.isMon && sort === 'date' && <div style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)', fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: '#e8b23a', whiteSpace: 'nowrap', zIndex: 3 }}>{day.wk}</div>}
+        {/* 月曜の下: 週の番号（その週が始まっていれば、かわりに週間レポートの入口） */}
+        {day.isMon && sort === 'date' && (day.dateStr <= today && v.openWeekReport
+          ? <ReportTag mon={day.dateStr} style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 3 }} />
+          : <div style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)', fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: '#e8b23a', whiteSpace: 'nowrap', zIndex: 3 }}>{day.wk}</div>)}
         {day.today && <div data-today="1" style={{ position: 'absolute', top: 2, left: '50%', transform: 'translateX(-50%)', fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 999, padding: '1px 7px', whiteSpace: 'nowrap', zIndex: 5 }}>今日</div>}
         <div style={{ position: 'relative', width: 66, height: 250, marginTop: 20, background: 'rgba(255,255,255,.16)', border: '1px solid rgba(27,27,24,.18)', borderRadius: '4px 4px 2px 2px', overflow: 'hidden', boxShadow: '0 3px 6px rgba(27,27,24,.12)' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.08))', boxShadow: 'inset -4px 0 6px rgba(27,27,24,.07),inset 2px 0 0 rgba(255,255,255,.45)', zIndex: 2, pointerEvents: 'none' }} />
@@ -451,9 +454,16 @@ export default function Bookshelf({ v }) {
     </div>
   );
 
-  const shelfBoard = (wk) => (
+  // 週の段の板: 右に「週間レポート」（その週の月曜が今日以前のとき）
+  const ReportTag = ({ mon, style }) => (
+    <div onClick={(e) => { e.stopPropagation(); v.openWeekReport(mon, 'bookshelf'); }} style={{ cursor: 'pointer', userSelect: 'none', display: 'inline-flex', alignItems: 'center', gap: 2, whiteSpace: 'nowrap', fontSize: 9.5, fontWeight: 800, color: '#2f3a00', background: '#c4f000', borderRadius: 999, padding: '1px 8px 1px 5px', boxShadow: '0 1px 3px rgba(0,0,0,.25)', ...style }}>
+      <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 12 }}>summarize</span>週間レポート
+    </div>
+  );
+  const shelfBoard = (wk, mon) => (
     <div style={{ height: 13, background: 'linear-gradient(180deg,#4a3120,#2a190f)', boxShadow: '0 5px 9px rgba(27,27,24,.22)', position: 'relative', zIndex: 1 }}>
       {wk && <div style={{ position: 'absolute', left: 10, top: 1, fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: '#e8b23a', letterSpacing: '.04em' }}>{wk}</div>}
+      {mon && mon <= today && v.openWeekReport && <ReportTag mon={mon} style={{ position: 'absolute', right: 10, top: -2 }} />}
     </div>
   );
 
@@ -500,7 +510,7 @@ export default function Bookshelf({ v }) {
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-start', gap: 6, padding: `16px 8px 0 ${week.padPx}px`, position: 'relative', zIndex: 1 }}>
                   {week.days.map((d) => <PortBook key={d.dateStr} day={d} />)}
                 </div>
-                {shelfBoard(week.wk)}
+                {shelfBoard(week.wk, sort === 'date' && week.days.length ? weekMonday(week.days[0].dateStr) : null)}
               </div>
             )) : (() => {
               const rows = []; for (let i = 0; i < monthObjs.length; i += 2) rows.push(monthObjs.slice(i, i + 2));

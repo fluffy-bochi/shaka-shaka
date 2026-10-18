@@ -33,6 +33,8 @@ import Record from './screens/Record';
 import { WakeCheck, WakeReview, WakePlan, BedCheck, BedReview } from './screens/Wake';
 import { predictUnits, pastHide, consumedToday } from './predict';
 import { daySummary, reviewLine, planLine, homeLine, tapLine } from './wake';
+import { buildWeek } from './weekly';
+import WeekReport from './screens/WeekReport';
 import { TAP_ANNOY_FROM, TAP_ANNOY_WINDOW_SEC } from './serifu';
 import Shaka from './screens/Shaka';
 import Collect from './screens/Collect';
@@ -264,7 +266,7 @@ export default class App extends React.Component {
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
       calibLog: s.calibLog, actCal: s.actCal, calibUndo: s.calibUndo, calibAnchor: s.calibAnchor,
-      bookFav: s.bookFav, bookDiary: s.bookDiary, weekGoals: s.weekGoals,
+      bookFav: s.bookFav, bookDiary: s.bookDiary, weekGoals: s.weekGoals, weekGoalActs: s.weekGoalActs, weekReports: s.weekReports,
       trashedPlans: s.trashedPlans, purgedPlanIds: s.purgedPlanIds,
       purgedTaskIds: s.purgedTaskIds,
     };
@@ -2151,6 +2153,57 @@ export default class App extends React.Component {
     if (t.trim()) weekGoals[key] = t; else delete weekGoals[key];
     this.set({ weekGoals }); this.save();
   };
+  /* 今週の目標に関連する行動（目標の先頭にアイコン）。id=null で外す */
+  setWeekGoalAct = (id, day) => {
+    const key = weekMonday(day || todayStr()), weekGoalActs = { ...(this.state.weekGoalActs || {}) };
+    if (id) weekGoalActs[key] = id; else delete weekGoalActs[key];
+    this.set({ weekGoalActs }); this.save();
+  };
+  weekGoalGlyph(day) {
+    const id = (this.state.weekGoalActs || {})[weekMonday(day || todayStr())];
+    const it = id ? this.itemById(id) : null;
+    return it ? it.glyph : null;
+  }
+  /* 目標に関連づける行動の候補（カテゴリごと。体調・非表示のカテゴリ・プロフィールで外した行動は出さない） */
+  goalActCats() {
+    const hc = this.state.hiddenCats || [], excl = this.profileExcl();
+    return this.allCats().filter(c => !PICK_REMOVED_CATS.includes(c.id) && !hc.includes(c.id)).map(c => ({
+      id: c.id, name: c.name, color: this.catColor(c.color),
+      items: c.items.filter(t => !excl.has(normTitle(t.name))).map(t => ({ id: t.id, name: t.name, glyph: t.glyph })),
+    })).filter(c => c.items.length);
+  }
+  /* その日の起床記録（サンプルモードではサンプルの起床も） */
+  wakeOn(d) {
+    const w = (this.state.wakeLog || []).find(x => x.date === d);
+    if (w) return w;
+    const sw = this.state.sampleMode ? (this._sampleWake || {})[d] : null;
+    return sw ? { date: d, ts: hmToTsOn(d, '00:00') + sw.min * 60000, cond: sw.cond, mood: sw.mood, fatigue: sw.fatigue } : null;
+  }
+  /* 週間レポート: key＝その週の月曜。from＝閉じたら戻る先（'bed'→ホーム / 'wake'→今日の予定 / 'bookshelf'） */
+  openWeekReport = (key, from) => {
+    const weekReports = { ...(this.state.weekReports || {}) };
+    if (!(weekReports[key] && weekReports[key].seen)) { weekReports[key] = { ...(weekReports[key] || {}), seen: true }; }
+    this.set({ screen: 'weekReport', weekReportKey: key, weekReportFrom: from || 'home', weekReports });
+    this.save();
+  };
+  closeWeekReport = () => {
+    const from = this.state.weekReportFrom;
+    this.set({ screen: from === 'wake' ? 'wake3' : from === 'bookshelf' ? 'bookshelf' : 'home' });
+  };
+  setWeekEval = (key, val) => {
+    const weekReports = { ...(this.state.weekReports || {}) }, cur = { ...(weekReports[key] || {}) };
+    if (cur.eval === val) delete cur.eval; else cur.eval = val;
+    weekReports[key] = cur;
+    this.set({ weekReports }); this.save();
+    // 研究への協力: その週の日曜の集計に自己評価が入る。前の週を本棚からつけたときも送りなおす
+    const r = this.state.research, sun = shiftDate(key, 6);
+    if (r && r.on && r.code && this.state.user && this.inResearchPeriod(r.code, sun) && sun < shiftDate(todayStr(), -1)) {
+      setTimeout(() => {
+        const all = summarizeDays(this.state, [shiftDate(sun, -1), sun]);
+        researchPutDays(r.code, { [sun]: all[sun] }).catch(() => { /* 通信できないときはそのまま */ });
+      }, 0);
+    }
+  };
   goSleep = () => {
     // 翌朝＝睡眠記録のタイミングで、続いている調子（バフ・デバフ）をまだ続いているか確認
     if (this.buffEntries().length && this.state.lastBuffCheck !== todayStr()) {
@@ -3282,7 +3335,14 @@ export default class App extends React.Component {
     requestAnimationFrame(() => { const el = document.getElementById('shakacase'); if (el) this.startPhysics(el); });
   }
   goWake2 = () => { this.settleFatigue(); this.stopPhysics(); this.set({ screen: 'wake2', wakeFlow: false }); };
-  goWake3 = () => this.set({ screen: 'wake3' });
+  goWake3 = () => {
+    // 月曜の朝: 先週のレポートをまだ見ていなければ、今週の目標を決める前に見せる（日曜の夜に見ていれば出さない）
+    const today = todayStr(), prev = shiftDate(weekMonday(today), -7);
+    const seen = ((this.state.weekReports || {})[prev] || {}).seen;
+    const had = (this.state.entries || []).some(e => !e.exp && e.date >= prev && e.date < weekMonday(today));
+    if (strToDate(today).getDay() === 1 && !seen && had) { this.openWeekReport(prev, 'wake'); return; }
+    this.set({ screen: 'wake3' });
+  };
   backWake = (to) => () => this.set({ screen: to });
   /* 起床後記録の記録一覧（実記録＋サンプル）。日付ごとに1件・新しい7件 */
   wakeRecords() {
@@ -3361,7 +3421,8 @@ export default class App extends React.Component {
     const carry = (st.tasks || []).filter(t => t.date === y && t.title && !t.done && !t.carryAsked);
     const chart = this.chartData([...new Set(recs.map(r => r.date))].sort()); // 朝は直近7回ぶんの日
     const isMonday = strToDate(today).getDay() === 1, weekGoal = (st.weekGoals || {})[weekMonday(today)] || '';
-    return { recs, chart, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks, carry: carry.map(t => ({ id: t.srcId, title: t.title })), isMonday, weekGoal, weekGoalMax: WEEK_GOAL_MAX };
+    const weekGoalAct = (st.weekGoalActs || {})[weekMonday(today)] || null, weekGoalGlyph = this.weekGoalGlyph(today);
+    return { recs, chart, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks, carry: carry.map(t => ({ id: t.srcId, title: t.title })), isMonday, weekGoal, weekGoalAct, weekGoalGlyph, weekGoalMax: WEEK_GOAL_MAX };
   }
   /* 朝の「今日の予定」から予定を押したとき: 中身の登録へ。保存・やめるのあとは「今日の予定」に戻る */
   openPlanFromWake = (i, planIdxs) => {
@@ -3455,7 +3516,7 @@ export default class App extends React.Component {
     if (st.moodOpen) return 'つぶやき';
     const s = st.screen;
     if (s === 'record') return st.searchStep === 'confirm' ? '登録確認' : '行動選択';
-    const map = { shaka: 'シャカ', home: 'ホーム', run: '実行中', mypage: 'マイページ', bookshelf: '本棚', collect: 'ためた回復', onboard: 'オンボーディング', cycle: 'マイページ', ikoiEdit: '開発', researchAdmin: '開発' };
+    const map = { shaka: 'シャカ', home: 'ホーム', run: '実行中', mypage: 'マイページ', bookshelf: '本棚', weekReport: '週間レポート', collect: 'ためた回復', onboard: 'オンボーディング', cycle: 'マイページ', ikoiEdit: '開発', researchAdmin: '開発' };
     if (map[s]) return map[s];
     if (/^wake/.test(s)) return '起床の記録';
     if (/^bed/.test(s)) return '就寝の記録';
@@ -3569,6 +3630,7 @@ export default class App extends React.Component {
       case 'bed2': this.set({ screen: 'shaka' }); return true;
       case 'wake2': this.set({ screen: 'shaka' }); return true;
       case 'wake3': this.set({ screen: 'wake2' }); return true;
+      case 'weekReport': this.closeWeekReport(); return true;
       case 'collect': this.goShaka(); return true;
       case 'trash': case 'buffLog': case 'slotTimes': case 'catsManage':
       case 'run': this.set({ screen: 'home', runAdd: false }); return true; // 実行画面は小さくしてホームへ（下に実施中のバー）
@@ -4994,6 +5056,8 @@ export default class App extends React.Component {
       isBed1: st.screen === 'bed1', isBed2: st.screen === 'bed2', isBed: ['bed1', 'bed2'].includes(st.screen),
       bedDraft: st.bedDraft, setBedDraft: this.setBedDraft, finishBed1: this.finishBed1, goBed: this.goBed, goBed2: this.goBed2,
       bedFlow: st.bedFlow && st.screen === 'shaka', backBed: () => this.set({ screen: 'shaka' }), wakeRecs: st.screen === 'bed2' ? this.chartData([st.bedDay || this.bedDay()]) : null /* 夜はその日のぶんだけ */, bed: st.screen === 'bed2' ? this.bedVals() : null,
+      // 日曜の夜の就寝記録: 最後に今週の週間レポートへ
+      bedWeekKey: st.screen === 'bed2' && strToDate(st.bedDay || this.bedDay()).getDay() === 0 ? weekMonday(st.bedDay || this.bedDay()) : null,
       homeComment: st.screen === 'home' ? (st.tapLine || (() => {
         const d = this.homeDateStr(), nowHm = this.tsToHm(Date.now());
         const next = sortEntries(st.entries.filter(e => e.date === d && this.isPlanLike(e) && e.from && (d !== todayStr() || e.from > nowHm)))[0];
@@ -5033,6 +5097,11 @@ export default class App extends React.Component {
       research: st.research, joinResearch: this.joinResearch, stopResearch: this.stopResearch, deleteResearch: this.deleteResearch,
       isTrash: st.screen === 'trash', isBuffLog: st.screen === 'buffLog',
       isBookshelf: st.screen === 'bookshelf',
+      isWeekReport: st.screen === 'weekReport',
+      weekReport: st.screen === 'weekReport' && st.weekReportKey ? buildWeek(st, st.weekReportKey, { wakeOn: (d) => this.wakeOn(d), items: this.allItems(), today: todayStr() }) : null,
+      weekReportFrom: st.weekReportFrom, closeWeekReport: this.closeWeekReport, setWeekEval: this.setWeekEval,
+      openWeekReport: this.openWeekReport, setWeekGoalAct: this.setWeekGoalAct,
+      goalActCats: ['weekReport', 'home', 'wake3'].includes(st.screen) ? this.goalActCats() : [],
       isSlotTimes: st.screen === 'slotTimes', isCatsManage: st.screen === 'catsManage',
       isTemplates: st.screen === 'templates', isSensitivity: st.screen === 'sensitivity',
       isHelp: st.screen === 'help', helpPersona: st.helpPersona || 0,
@@ -5089,6 +5158,8 @@ export default class App extends React.Component {
       homeDateM: strToDate(this.homeDateStr()).getMonth() + 1,
       homeDateD: strToDate(this.homeDateStr()).getDate(),
       homeWeekGoal: (st.weekGoals || {})[weekMonday(this.homeDateStr())] || '',
+      homeWeekGoalAct: (st.weekGoalActs || {})[weekMonday(this.homeDateStr())] || null, homeWeekGoalGlyph: this.weekGoalGlyph(this.homeDateStr()),
+      setHomeWeekGoalAct: (id) => this.setWeekGoalAct(id, this.homeDateStr()),
       setHomeWeekGoal: (val) => this.setWeekGoal(val, this.homeDateStr()), weekGoalMax: WEEK_GOAL_MAX,
       homeDateWd: ['日', '月', '火', '水', '木', '金', '土'][strToDate(this.homeDateStr()).getDay()],
       homeDateLabel: this.homeDateStr() === todayStr() ? '今日'
@@ -5444,6 +5515,7 @@ export default class App extends React.Component {
         {v.isSensitivity && <Sensitivity v={v} />}
         {v.isHelp && <Help v={v} />}
         {v.isBookshelf && <Bookshelf v={v} />}
+        {v.isWeekReport && v.weekReport && <WeekReport v={v} />}
         {v.tutorial > 0 && <Tutorial v={v} />}
         {v.symAdjustOpen && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 11, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
@@ -5500,7 +5572,7 @@ export default class App extends React.Component {
         )}
         {/* 実施中のバー（ホーム・行動選択画面の下） */}
         {v.run && !v.isRun && (v.isHome || v.isPickScreen) && <MiniRun v={v} />}
-        {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && !v.isResearchAdmin && <Nav v={v} />}
+        {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && !v.isResearchAdmin && !v.isWeekReport && <Nav v={v} />}
         </>}
       </div>
     );

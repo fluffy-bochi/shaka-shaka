@@ -127,6 +127,8 @@ export function serialize(st) {
     bookFav: st.bookFav || {},      // 本棚: お気に入り（付箋） dateStr→true
     bookDiary: st.bookDiary || {},  // 本棚: 日記 dateStr→string
     weekGoals: st.weekGoals || {},  // 今週の目標 { その週の月曜の日付: 文字列 }（月曜の朝の記録で決める）
+    weekGoalActs: st.weekGoalActs || {}, // 今週の目標に関連する行動 { 月曜の日付: 行動id }（目標の先頭にアイコン）
+    weekReports: st.weekReports || {},   // 週間レポート { 月曜の日付: { eval: 'done'|'half'|'not', seen: true } }（数字は記録から毎回計算）
     trashedPlans: st.trashedPlans || [],   // ゴミ箱の予定 [{plan,src,trashedAt}]
     purgedPlanIds: st.purgedPlanIds || [], // 完全削除した標準予定の id
     purgedTaskIds: st.purgedTaskIds || [], // 手動で消した取り込みタスクの srcId（再取り込みしない）
@@ -196,6 +198,8 @@ export function deserialize(data) {
     bookFav: (data.bookFav && typeof data.bookFav === 'object') ? data.bookFav : {},
     bookDiary: (data.bookDiary && typeof data.bookDiary === 'object') ? data.bookDiary : {},
     weekGoals: (data.weekGoals && typeof data.weekGoals === 'object') ? data.weekGoals : {},
+    weekGoalActs: (data.weekGoalActs && typeof data.weekGoalActs === 'object') ? data.weekGoalActs : {},
+    weekReports: (data.weekReports && typeof data.weekReports === 'object') ? data.weekReports : {},
     trashedPlans: Array.isArray(data.trashedPlans) ? data.trashedPlans : [],
     purgedPlanIds: Array.isArray(data.purgedPlanIds) ? data.purgedPlanIds : [],
     purgedTaskIds: Array.isArray(data.purgedTaskIds) ? data.purgedTaskIds : [],
@@ -211,7 +215,7 @@ export function freshState() {
     slotHours: null, hiddenCats: [], hiddenActs: [],
     onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null, wakeLog: [], bedLog: [], mainScreen: null,
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1, calibLog: [], actCal: {}, calibUndo: null, calibAnchor: null,
-    bookFav: {}, bookDiary: {}, weekGoals: {}, screenTime: {},
+    bookFav: {}, bookDiary: {}, weekGoals: {}, weekGoalActs: {}, weekReports: {}, screenTime: {},
     trashedPlans: [], purgedPlanIds: [], purgedTaskIds: [],
   };
 }

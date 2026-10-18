@@ -58,10 +58,30 @@ const GROUPS = [
     { key: 'TPL_PLAN_TASKS', label: 'タスクの件数', vars: ['件数'] },
     { key: 'PLAN_CLOSER', label: 'しめの一言' },
   ] },
+  { id: 'week', label: '週間レポート', size: 130, items: [
+    { key: 'TPL_WEEK_GOAL_ACT', label: '目標・関連する行動の回数', vars: ['行動', '回数'] },
+    { key: 'WEEK_GOAL_ASK', label: '目標・自己評価の前' },
+    ...[['done', 'できた'], ['half', '半分くらい'], ['not', 'できなかった']].map(([k, n]) => ({ key: 'WEEK_GOAL_' + k, label: '目標・' + n })),
+    { key: 'WEEK_TYPE_RECOVER', label: 'タイプ・みちみちの翌日に休めた' },
+    { key: 'WEEK_TYPE_HARD', label: 'タイプ・休めなかった' },
+    ...[['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].flatMap(([a, an]) => [['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].map(([b, bn]) => ({ key: 'WEEK_CMP_' + a + '_' + b, label: 'タイプ・先週' + an + '→今週' + bn }))),
+    ...[['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].map(([k, n]) => ({ key: 'WEEK_BASE_' + k, label: 'タイプ・' + n + '（先週の記録なし）', vars: ['日数'] })),
+    { key: 'WEEK_BASE_none', label: 'タイプ・記録が少ない週' },
+    { key: 'WEEK_COND_UP', label: '調子・先週より上向き' },
+    { key: 'TPL_WEEK_COND_BEST', label: '調子・いちばん元気だった曜日', vars: ['曜日'] },
+    { key: 'TPL_WEEK_COND_BEST_FAV', label: '調子・元気だった曜日とやりたいこと', vars: ['曜日', '行動'] },
+    { key: 'WEEK_REQ_ALL', label: '必須・全部できた' },
+    { key: 'TPL_WEEK_REQ_OK', label: '必須・目標まで届いた行動', vars: ['行動'] },
+    { key: 'TPL_WEEK_REQ_MOST', label: '必須・いちばんできた行動', vars: ['行動', '回数'] },
+    ...[['michimichi', 'みちみち'], ['hodohodo', 'ほどほど'], ['yuttari', 'ゆったり']].map(([k, n]) => ({ key: 'WEEK_REQ_ZERO_' + k, label: '必須・ひとつもできなかった（' + n + 'が多い週）' })),
+    { key: 'TPL_WEEK_FAV', label: 'やりたいこと・いちばん楽しめた行動', vars: ['行動', '回数'] },
+    { key: 'WEEK_FAV_ZERO', label: 'やりたいこと・0回' },
+    { key: 'WEEK_CLOSER', label: '来週の目標・しめの一言' },
+  ] },
 ];
 
 /* プレビュー用: 選んだセリフを、実際の画面と同じつなぎ方で1つの吹き出しにする（例の値を差し込む） */
-const EX = { 行動: 'レポート・課題', 回復: '入浴', 予定: '1限 デザイン史', 時刻: '14:00', 件数: 3, 最初の予定: '1限 デザイン史' };
+const EX = { 行動: 'レポート・課題', 回復: '入浴', 予定: '1限 デザイン史', 時刻: '14:00', 件数: 3, 最初の予定: '1限 デザイン史', 日数: 3, 達成: 2, 回数: 3, 曜日: '木' };
 function compose(key, line, L) {
   const f0 = (k, vals) => fill(L(k)[0] || '', vals || {});
   const tip = (t) => restTip(L('TPL_REST_TIP')[0] || '', t);
@@ -86,7 +106,7 @@ function compose(key, line, L) {
     case 'TPL_PLAN_NONE': return plan(line, '', L('PLAN_CLOSER')[0] || '');
     case 'TPL_PLAN_TASKS': return plan(f0('TPL_PLAN_HAS', EX), fill(line, { 件数: 2 }), L('PLAN_CLOSER')[0] || '');
     case 'PLAN_CLOSER': return plan(f0('TPL_PLAN_HAS', EX), f0('TPL_PLAN_TASKS', { 件数: 2 }), line);
-    default: return line;
+    default: return fill(line, EX);
   }
 }
 
