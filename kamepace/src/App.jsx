@@ -2842,16 +2842,19 @@ export default class App extends React.Component {
     const idxs = this.state.editIdxs;
     if (!Array.isArray(idxs) || !idxs.length) return;
     if (asked !== true && this._askTaskTrash(idxs, () => this.trashOriginal(true))) return;
-    const set = new Set(idxs);
-    const entries = this.state.entries.map((e, i) => set.has(i) ? { ...e, exp: true, trashedAt: Date.now() } : e);
-    this.set({
-      entries, searchStep: null, screen: 'home', editIdxs: null, confirmOrigin: 'search',
-      confirmMode: 'duration', searchCart: [], framePlan: null,
-      consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)),
-    });
+    this.set({ ...this.trashPatch(idxs), searchStep: null, screen: 'home', editIdxs: null, confirmOrigin: 'search',
+      confirmMode: 'duration', searchCart: [], framePlan: null });
     this.save();
     this.toast('ゴミ箱に移動しました');
   };
+  /* ゴミ箱へ移すときの変更: 回復の記録なら、その回復で消したぶんを山に戻す（ためた回復からも外す） */
+  trashPatch(idxs) {
+    const set = new Set(idxs);
+    const r = this.undoRecovery(idxs.map(i => this.state.entries[i]).filter(Boolean), this.state.collected);
+    const entries = this.state.entries.map((e, i) => set.has(i) ? { ...e, exp: true, trashedAt: Date.now() } : e);
+    if (r.restore) this._pileLayout = null;
+    return { entries, collected: r.collected, consumed: Math.min(Math.max(0, (this.state.consumed || 0) - r.restore), this.pilePositiveTotal(entries)) };
+  }
   goTrash = () => this.set({ screen: 'trash' });
   goBuffLog = () => this.set({ screen: 'buffLog' });
 
@@ -2907,11 +2910,9 @@ export default class App extends React.Component {
     if (g.logKind) { this.deleteDayLog(g.logKind, g.logDate); return; }
     const idxs = g.idxs ? g.idxs : (g.idx != null ? [g.idx] : []);
     if (!idxs.length) return;
-    const set = new Set(idxs);
     const run = () => {
       // 完全削除せず exp:true でゴミ箱へ（きろくの編集画面の「ゴミ箱へ」と同じ）
-      const entries = this.state.entries.map((e, i) => set.has(i) ? { ...e, exp: true, trashedAt: Date.now() } : e);
-      this.set({ entries, consumed: Math.min(this.state.consumed || 0, this.pilePositiveTotal(entries)) });
+      this.set(this.trashPatch(idxs));
       this.save();
       this.toast('ゴミ箱に移動しました');
     };
@@ -3153,7 +3154,13 @@ export default class App extends React.Component {
   // 自分で選んだ疲れやすさは、夜の調整の引きとめ先にもなる
   setAxisCoef = (key, v) => { this.set({ [key]: v, calibAnchor: { ...(this.state.calibAnchor || { bodyFatCoef: this.state.bodyFatCoef || 1, mindFatCoef: this.state.mindFatCoef || 1, bodyRecCoef: this.state.bodyRecCoef || 1, mindRecCoef: this.state.mindRecCoef || 1 }), [key]: v } }); this.save(); };
   restoreTrash = (idx) => {
-    const entries = this.state.entries.map((e, i) => i === idx ? { ...e, exp: false, trashedAt: null } : e);
+    // 回復の記録をもどしたら、そのぶんの回復をまた降らせる（ゴミ箱へ移したときに山へ戻しているので）
+    const o = this.state.entries[idx], nk = o && o.delta < 0 ? 'n' + Date.now().toString(36) : null;
+    const entries = this.state.entries.map((e, i) => i === idx ? { ...e, exp: false, trashedAt: null, ...(nk ? { nk } : null) } : e);
+    if (nk) {
+      const n = o.planned ? (o.dropped || 0) : -o.delta, g = entryGlyph(o);
+      if (n > 0) this._pendingNeg = [...(this._pendingNeg || []), ...Array.from({ length: Math.min(n, 160) }, () => ({ g, nk }))];
+    }
     this.set({ entries });
     this.save();
     this.toast('もどしました');
