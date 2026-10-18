@@ -50,7 +50,7 @@ function Types({ r }) {
                 {tot > 0 && ['yuttari', 'hodohodo', 'michimichi'].map(k => {
                   const p = z[k] / tot, h = BH * p;
                   return h > 0 ? (
-                    <div key={k} style={{ height: h, background: ZCOL[k], display: 'flex', alignItems: 'center', justifyContent: 'center', ...mono, fontSize: 8.5, fontWeight: 700, color: '#55554e' }}>{h >= 15 ? Math.round(p * 100) : ''}</div>
+                    <div key={k} style={{ height: h, background: ZCOL[k] }} />
                   ) : null;
                 })}
               </div>
@@ -62,8 +62,6 @@ function Types({ r }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
         {['yuttari', 'hodohodo', 'michimichi'].map(k => <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, color: '#55554e' }}><span style={{ width: 10, height: 10, borderRadius: 3, background: ZCOL[k] }} />{ZNAME[k]}</span>)}
-        <span style={{ flex: 1 }} />
-        <span style={{ ...mono, fontSize: 9, color: '#a5a39a' }}>%</span>
       </div>
       {r.typeCount.length > 0 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
