@@ -58,10 +58,16 @@ const GROUPS = [
     { key: 'TPL_PLAN_TASKS', label: 'タスクの件数', vars: ['件数'] },
     { key: 'PLAN_CLOSER', label: 'しめの一言' },
   ] },
+  { id: 'week', label: '週間レポート', size: 130, items: [
+    ...[['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].map(([k, n]) => ({ key: 'WEEK_BASE_' + k, label: n + 'が多い週', vars: ['日数'] })),
+    { key: 'WEEK_BASE_none', label: '記録が少ない週' },
+    { key: 'TPL_WEEK_REQ', label: '必須にした行動', vars: ['件数', '達成'] },
+    { key: 'WEEK_CLOSER', label: 'しめの一言' },
+  ] },
 ];
 
 /* プレビュー用: 選んだセリフを、実際の画面と同じつなぎ方で1つの吹き出しにする（例の値を差し込む） */
-const EX = { 行動: 'レポート・課題', 回復: '入浴', 予定: '1限 デザイン史', 時刻: '14:00', 件数: 3, 最初の予定: '1限 デザイン史' };
+const EX = { 行動: 'レポート・課題', 回復: '入浴', 予定: '1限 デザイン史', 時刻: '14:00', 件数: 3, 最初の予定: '1限 デザイン史', 日数: 3, 達成: 2 };
 function compose(key, line, L) {
   const f0 = (k, vals) => fill(L(k)[0] || '', vals || {});
   const tip = (t) => restTip(L('TPL_REST_TIP')[0] || '', t);
@@ -86,7 +92,7 @@ function compose(key, line, L) {
     case 'TPL_PLAN_NONE': return plan(line, '', L('PLAN_CLOSER')[0] || '');
     case 'TPL_PLAN_TASKS': return plan(f0('TPL_PLAN_HAS', EX), fill(line, { 件数: 2 }), L('PLAN_CLOSER')[0] || '');
     case 'PLAN_CLOSER': return plan(f0('TPL_PLAN_HAS', EX), f0('TPL_PLAN_TASKS', { 件数: 2 }), line);
-    default: return line;
+    default: return fill(line, EX);
   }
 }
 

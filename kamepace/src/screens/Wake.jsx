@@ -2,6 +2,7 @@ import React from 'react';
 import { nurseSrc } from '../wake';
 import * as Ikoi from '../ikoi';
 import Emo from '../fluent';
+import { GoalActButton, GoalActPicker } from './GoalAct';
 
 /* 起床後記録（ホームの睡眠カードから）: 1 入力 → シャカで🌙 → 2 昨日のふりかえり → 3 今日の予定。
    体調・気分は今は数字の1〜5（あとでイラストに差し替える予定）。背景はホームと同じ #f7f4ec。 */
@@ -368,7 +369,9 @@ export function BedReview({ v }) {
       </div>
       <div style={foot}>
         <button onClick={v.backBed} style={btnSub}>もどる</button>
-        <button onClick={v.goHome} style={btnMain()}>ホームへ</button>
+        {v.bedWeekKey
+          ? <button onClick={() => v.openWeekReport(v.bedWeekKey, 'bed')} style={btnMain()}>週間レポートへ</button>
+          : <button onClick={v.goHome} style={btnMain()}>ホームへ</button>}
       </div>
     </div>
   );
@@ -417,15 +420,20 @@ function CarryTasks({ list, onCarry }) {
 }
 
 /* 月曜の朝だけ: 今週の目標（1行・文字数に上限）。ホームの日付の下に1週間出る */
-function WeekGoal({ value, max, onChange }) {
+function WeekGoal({ value, max, onChange, glyph, act, cats, onAct }) {
+  const [pick, setPick] = React.useState(false);
   return (
     <div style={{ background: '#fff', borderRadius: 14, padding: '12px 14px', marginBottom: 12 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 6 }}>
         <span style={{ flex: 1, fontSize: 13, fontWeight: 800 }}>今週の目標</span>
         <span style={{ ...mono, fontSize: 11, color: '#a5a39a' }}>{[...value].length}/{max}</span>
       </div>
+      {pick && <GoalActPicker cats={cats} value={act} onPick={onAct} onClose={() => setPick(false)} />}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <GoalActButton glyph={glyph} onClick={() => setPick(true)} />
       <input value={value} maxLength={max} onChange={(e) => onChange(e.target.value)} placeholder="例: 夜は0時までにねる"
-        style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 10, padding: '9px 12px', fontSize: 16, fontWeight: 700, fontFamily: 'inherit', color: INK, background: '#fff', outline: 'none' }} />
+        style={{ flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 10, padding: '9px 12px', fontSize: 16, fontWeight: 700, fontFamily: 'inherit', color: INK, background: '#fff', outline: 'none' }} />
+      </div>
     </div>
   );
 }
@@ -438,7 +446,7 @@ export function WakePlan({ v }) {
       <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, margin: '4px 0 10px' }}>今日の予定</div>
       <Speaker text={w.planText} onEdit={v.editIkoiLine} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: '#efece3', borderRadius: '22px 22px 0 0', padding: '16px 20px 8px' }}>
-        {w.isMonday && <WeekGoal value={w.weekGoal} max={w.weekGoalMax} onChange={v.setWeekGoal} />}
+        {w.isMonday && <WeekGoal value={w.weekGoal} max={w.weekGoalMax} onChange={v.setWeekGoal} glyph={w.weekGoalGlyph} act={w.weekGoalAct} cats={v.goalActCats} onAct={(id) => v.setWeekGoalAct(id)} />}
         <CarryTasks list={w.carry} onCarry={v.carryTasks} />
         {w.plans.length === 0 && w.tasks.length === 0 && <div style={{ textAlign: 'center', fontSize: 12.5, color: '#a5a39a', padding: '30px 0' }}>予定もタスクもありません</div>}
         {w.plans.map((p, i) => (

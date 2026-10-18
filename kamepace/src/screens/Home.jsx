@@ -2,6 +2,7 @@ import React from 'react';
 import Emo from '../fluent';
 import { Speaker } from './Wake';
 import { MoodPopup } from './Record';
+import { GoalActButton, GoalActPicker } from './GoalAct';
 
 const mono = { fontFamily: "'Space Mono',monospace" };
 const ndBtn = { width: 30, height: 30, background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#55554e', cursor: 'pointer', flex: '0 0 auto', padding: 0 };
@@ -108,13 +109,18 @@ function CalendarBtn({ value, onChange, white }) {
 function WeekGoalRow({ v }) {
   const [edit, setEdit] = React.useState(false);
   const [txt, setTxt] = React.useState('');
+  const [pick, setPick] = React.useState(false); // 関連する行動を選ぶ
+  const inRef = React.useRef(null);
   const open = () => { setTxt(v.homeWeekGoal || ''); setEdit(true); };
   const done = () => { if (txt !== (v.homeWeekGoal || '')) v.setHomeWeekGoal(txt); setEdit(false); };
   return (
     <div onClick={edit ? undefined : open} style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '-2px 16px 4px', height: 24, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', cursor: edit ? 'default' : 'pointer' }}>
       <span style={{ flex: '0 0 auto', fontSize: 10.5, fontWeight: 800, lineHeight: '18px', color: '#2f3a00', background: '#c4f000', borderRadius: 6, padding: '0 6px' }}>今週の目標</span>
+      {edit && <GoalActButton glyph={v.homeWeekGoalGlyph} size={24} onClick={() => setPick(true)} />}
+      {!edit && v.homeWeekGoalGlyph && <Emo e={v.homeWeekGoalGlyph} size={18} />}
+      {pick && <GoalActPicker cats={v.goalActCats} value={v.homeWeekGoalAct} onPick={v.setHomeWeekGoalAct} onClose={() => { setPick(false); setTimeout(() => inRef.current && inRef.current.focus(), 0); }} />}
       {edit ? (
-        <input autoFocus value={txt} maxLength={v.weekGoalMax} onChange={(e) => setTxt(e.target.value)} onBlur={done}
+        <input ref={inRef} autoFocus value={txt} maxLength={v.weekGoalMax} onChange={(e) => setTxt(e.target.value)} onBlur={() => { if (!pick) done(); }}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) e.target.blur(); }}
           style={{ flex: 1, minWidth: 0, height: 24, boxSizing: 'border-box', border: 'none', borderBottom: '1.5px solid #1b1b18', background: 'transparent', padding: '0 2px', fontSize: 16, fontWeight: 700, fontFamily: 'inherit', color: '#1b1b18', outline: 'none' }} />
       ) : (
