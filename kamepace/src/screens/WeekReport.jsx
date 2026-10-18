@@ -124,32 +124,38 @@ function Cond({ r }) {
   );
 }
 
-/* ③④ 必須・やりたいこと（fav は「あと〇回」を出さない） */
+/* ③④ 必須・やりたいこと（今週の目標の関連する行動も同じ行で出す）*/
+function FreqRow({ x, fav, first }) {
+  const hasT = !fav && x.target != null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: first ? 'none' : '1px solid #e4e1d8' }}>
+      <Emo e={x.glyph} size={28} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span style={{ fontSize: 13.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.name}</span>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: '#8a8a82', whiteSpace: 'nowrap' }}>{x.freq}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          {x.dots.map((on, i) => <span key={i} style={{ width: 11, height: 11, borderRadius: '50%', background: on ? (fav ? '#ff5fa2' : '#7a9a00') : '#e9e6dc' }} />)}
+        </div>
+      </div>
+      <div style={{ flex: '0 0 auto', textAlign: 'right' }}>
+        <div style={{ ...mono, fontSize: 15, fontWeight: 700 }}>{x.scope === 'month' ? <span style={{ fontSize: 10, fontWeight: 700, color: '#8a8a82', marginRight: 3, fontFamily: 'inherit' }}>今月</span> : null}{x.count}{hasT && <span style={{ fontSize: 11, color: '#8a8a82' }}>/{x.target}</span>}<span style={{ fontSize: 10.5, fontFamily: 'inherit', fontWeight: 700 }}>回</span></div>
+        {hasT && (x.ok
+          ? <span style={{ display: 'inline-block', marginTop: 2, fontSize: 10.5, fontWeight: 800, color: LIME_INK, background: LIME, borderRadius: 6, padding: '1px 7px' }}>達成</span>
+          : <span style={{ display: 'inline-block', marginTop: 2, fontSize: 10.5, fontWeight: 800, color: '#b86a1e' }}>あと{x.target - x.count}回</span>)}
+      </div>
+    </div>
+  );
+}
+
+/* 必須・やりたいこと（fav は「あと〇回」を出さない） */
 function Freq({ title, rows, fav }) {
   return (
     <div style={card}>
       <div style={ttl}>{title}</div>
       {!rows.length && <div style={{ fontSize: 12, color: '#a5a39a', padding: '4px 0 2px' }}>登録なし</div>}
-      {rows.map(x => (
-        <div key={x.k} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid #e4e1d8' }}>
-          <Emo e={x.glyph} size={28} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontSize: 13.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.name}</span>
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: '#8a8a82', whiteSpace: 'nowrap' }}>{x.freq}</span>
-            </div>
-            <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-              {x.dots.map((on, i) => <span key={i} style={{ width: 11, height: 11, borderRadius: '50%', background: on ? (fav ? '#ff5fa2' : '#7a9a00') : '#e9e6dc' }} />)}
-            </div>
-          </div>
-          <div style={{ flex: '0 0 auto', textAlign: 'right' }}>
-            <div style={{ ...mono, fontSize: 15, fontWeight: 700 }}>{x.scope === 'month' ? <span style={{ fontSize: 10, fontWeight: 700, color: '#8a8a82', marginRight: 3, fontFamily: 'inherit' }}>今月</span> : null}{x.count}{!fav && <span style={{ fontSize: 11, color: '#8a8a82' }}>/{x.target}</span>}<span style={{ fontSize: 10.5, fontFamily: 'inherit', fontWeight: 700 }}>回</span></div>
-            {!fav && (x.ok
-              ? <span style={{ display: 'inline-block', marginTop: 2, fontSize: 10.5, fontWeight: 800, color: LIME_INK, background: LIME, borderRadius: 6, padding: '1px 7px' }}>達成</span>
-              : <span style={{ display: 'inline-block', marginTop: 2, fontSize: 10.5, fontWeight: 800, color: '#b86a1e' }}>あと{x.target - x.count}回</span>)}
-          </div>
-        </div>
-      ))}
+      {rows.map(x => <FreqRow key={x.k} x={x} fav={fav} />)}
     </div>
   );
 }
@@ -165,6 +171,7 @@ function GoalThis({ r, v }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 800 }}>
             {g.act && <Emo e={g.act.glyph} size={26} />}<span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.text}</span>
           </div>
+          {g.row && <div style={{ marginTop: 6 }}><FreqRow x={g.row} first /></div>}
           <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
             {EVALS.map(([k, lb]) => (
               <button key={k} onClick={() => v.setWeekEval(r.key, k)} style={{ flex: 1, border: g.eval === k ? 'none' : '1.5px solid #e4e1d8', borderRadius: 12, background: g.eval === k ? INK : '#fff', color: g.eval === k ? '#fff' : '#55554e', fontSize: 13, fontWeight: 800, padding: '9px 0', cursor: 'pointer', fontFamily: 'inherit' }}>{lb}</button>

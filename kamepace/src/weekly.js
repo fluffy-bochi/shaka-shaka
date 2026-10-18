@@ -67,30 +67,35 @@ export function buildWeek(st, key, o) {
   const doneIn = (k, keyOf, a, b) => entries.filter(e => !e.exp && !e.wakeAdd && e.date && e.date >= a && e.date <= b && e.date <= today
     && !(e.planned && !(e.dropped > 0)) && keyOf(e.title) === k);
   const weekEnd = days[6];
-  const freqRows = (kind) => Object.entries(st.actFreq || {}).filter(([, f]) => f && f[kind]).map(([k, f]) => {
-    const it = byName[k] || {}, fq = f[kind], kk = freqK(fq), keyOf = keyOfFor(k, it.prevNames);
+  // 1行ぶん: 登録した頻度（なければ回数だけ）に対して、この週にできた回数（できた日に●）
+  const rowOf = (k, fq) => {
+    const it = byName[k] || {}, keyOf = keyOfFor(k, it.prevNames);
     const list = doneIn(k, keyOf, key, weekEnd);
     const doneDays = new Set(list.map(e => e.date));
-    let count = list.length, target, scope = 'week';
-    if (fq.unit === '月') {
+    let count = list.length, target = null, scope = 'week';
+    if (fq && fq.unit === '月') {
       // 月の頻度: その月の1日〜この週の終わり（今日まで）でできた回数
       scope = 'month';
       const m0 = weekEnd.slice(0, 7) + '-01';
       count = doneIn(k, keyOf, m0, weekEnd).length;
-      target = Math.max(1, Math.round(fq.n / kk));
-    } else {
-      target = Math.max(1, Math.round(fq.n * (fq.unit === '日' ? 7 / kk : 1 / kk)));
+      target = Math.max(1, Math.round(fq.n / freqK(fq)));
+    } else if (fq) {
+      target = Math.max(1, Math.round(fq.n * (fq.unit === '日' ? 7 / freqK(fq) : 1 / freqK(fq))));
     }
     // 行動の一覧にない名前（サンプル・取り込みなど）は、記録の絵文字を使う
     const lastE = it.glyph ? null : entries.filter(e => !e.exp && keyOf(e.title) === k).slice(-1)[0];
-    return { k, name: it.name || (lastE && lastE.title) || k, glyph: it.glyph || (lastE && entryGlyph(lastE)) || '⭐', freq: freqText(fq), count, target, scope, ok: count >= target, dots: days.map(d => doneDays.has(d)) };
-  }).sort((a, b) => (a.ok === b.ok ? 0 : a.ok ? 1 : -1));
+    return { k, name: it.name || (lastE && lastE.title) || k, glyph: it.glyph || (lastE && entryGlyph(lastE)) || '⭐', freq: freqText(fq), count, target, scope, ok: target != null && count >= target, dots: days.map(d => doneDays.has(d)) };
+  };
+  const freqRows = (kind) => Object.entries(st.actFreq || {}).filter(([, f]) => f && f[kind]).map(([k, f]) => rowOf(k, f[kind]))
+    .sort((a, b) => (a.ok === b.ok ? 0 : a.ok ? 1 : -1));
   const req = freqRows('req'), fav = freqRows('fav');
 
   /* ⑤ 今週の目標 */
   const goalAct = (k) => { const id = (st.weekGoalActs || {})[k]; return id ? (o.items || []).find(it => it.id === id) || null : null; };
   const nextKey = shiftDate(key, 7);
-  const goal = { text: (st.weekGoals || {})[key] || '', act: goalAct(key), eval: ((st.weekReports || {})[key] || {}).eval || null };
+  const gAct = goalAct(key);
+  const gFreq = gAct ? (st.actFreq || {})[normTitle(gAct.name)] || {} : {};
+  const goal = { text: (st.weekGoals || {})[key] || '', act: gAct, row: gAct ? rowOf(normTitle(gAct.name), gFreq.req || gFreq.fav || null) : null, eval: ((st.weekReports || {})[key] || {}).eval || null };
   const next = { key: nextKey, text: (st.weekGoals || {})[nextKey] || '', act: goalAct(nextKey), isThisWeek: today >= nextKey };
 
   /* いこいさん: いちばん多かったタイプ → 必須の達成 → しめ */
