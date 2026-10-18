@@ -122,11 +122,14 @@ export function buildWeek(st, key, o) {
     say.types = ln(rested * 2 >= pairs.length ? 'WEEK_TYPE_RECOVER' : 'WEEK_TYPE_HARD');
   } else if (top && prevTop) say.types = ln('WEEK_CMP_' + prevTop.id + '_' + top.id);
   else say.types = ln('WEEK_BASE_' + (top ? top.id : 'none'), { 日数: top ? top.n : 0 });
-  // 体調と心の調子: 先週より上向きならそれを、あとはいちばん調子がよかった曜日（その日のやりたいこと）
-  if (pts.length) {
+  // 体調と心の調子: 先週とくらべて（下がったときは気づかう）、いちばん調子がよかった曜日（その日のやりたいこと）
+  if (!pts.length) say.cond = ln('WEEK_COND_NONE');
+  else {
     const ds = SER_KEYS.map(([a, b]) => (cond[a] != null && cond[b] != null ? cond[a] - cond[b] : null)).filter(x => x != null);
+    const dd = ds.length ? ds.reduce((x, y) => x + y, 0) / ds.length : null;
     const c = [];
-    if (ds.length && ds.reduce((x, y) => x + y, 0) / ds.length >= 0.3) c.push(ln('WEEK_COND_UP'));
+    if (dd != null && dd >= 0.3) c.push(ln('WEEK_COND_UP'));
+    else if (dd != null && dd <= -0.3) c.push(ln('WEEK_COND_DOWN'));
     let best = null;
     typeDays.forEach((x, i) => {
       const v = pts.filter(p => Math.floor(p.x) === i).flatMap(p => [p.cond, p.mood]).filter(v => v != null);
@@ -137,7 +140,8 @@ export function buildWeek(st, key, o) {
       const f = fav.find(r => r.dots[best.i]);
       c.push(f ? ln('TPL_WEEK_COND_BEST_FAV', { 曜日: best.wd, 行動: f.name }) : ln('TPL_WEEK_COND_BEST', { 曜日: best.wd }));
     }
-    if (c.length) say.cond = c.join('');
+    if (!c.length) c.push(ln('WEEK_COND_STEADY'));
+    say.cond = c.join('');
   }
   // 必須: 全部できた／目標まで届いた行動の名前／いちばんできた行動
   if (req.length) {
