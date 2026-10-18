@@ -18,6 +18,7 @@ export const freqText = (f) => {
 };
 
 function hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0); }
+const SER_KEYS = [['avgCond', 'prevCond'], ['avgMood', 'prevMood']];
 const pick = (seed, arr) => (arr && arr.length ? arr[hash(seed) % arr.length] : '');
 
 /* st: アプリの state / key: その週の月曜 / o: { wakeOn(d), items（全行動）, today } */
@@ -89,7 +90,7 @@ export function buildWeek(st, key, o) {
     }
     // 行動の一覧にない名前（サンプル・取り込みなど）は、記録の絵文字を使う
     const lastE = it.glyph ? null : entries.filter(e => !e.exp && keyOf(e.title) === k).slice(-1)[0];
-    return { k, name: it.name || (lastE && lastE.title) || k, glyph: it.glyph || (lastE && entryGlyph(lastE)) || '⭐', freq: freqText(fq), count, target, scope, ok: target != null && count >= target, dots: days.map(d => doneDays.has(d)) };
+    return { k, name: it.name || (lastE && lastE.title) || k, glyph: it.glyph || (lastE && entryGlyph(lastE)) || '⭐', freq: freqText(fq), count, weekCount: list.length, target, scope, ok: target != null && count >= target, dots: days.map(d => doneDays.has(d)) };
   };
   const freqRows = (kind) => Object.entries(st.actFreq || {}).filter(([, f]) => f && f[kind]).map(([k, f]) => rowOf(k, f[kind]))
     .sort((a, b) => (a.ok === b.ok ? 0 : a.ok ? 1 : -1));
@@ -103,12 +104,47 @@ export function buildWeek(st, key, o) {
   const goal = { text: (st.weekGoals || {})[key] || '', act: gAct, row: gAct ? rowOf(normTitle(gAct.name), gFreq.req || gFreq.fav || null) : null, eval: ((st.weekReports || {})[key] || {}).eval || null };
   const next = { key: nextKey, text: (st.weekGoals || {})[nextKey] || '', act: goalAct(nextKey), isThisWeek: today >= nextKey };
 
-  /* いこいさん: いちばん多かったタイプ → 先週とくらべて → 必須の達成 → しめ */
-  const tid = top ? top.id : 'none';
-  const parts = [fill(pick(key + 'b', L('WEEK_BASE_' + tid)), { 日数: top ? top.n : 0 })];
-  if (top && prevTop) parts.push(pick(key + 'p', L('WEEK_CMP_' + prevTop.id + '_' + top.id)));
-  if (req.length) parts.push(fill(pick(key + 'r', L('TPL_WEEK_REQ')), { 件数: req.length, 達成: req.filter(r => r.ok).length }));
-  parts.push(pick(key + 'c', L('WEEK_CLOSER')));
+  /* いこいさんのひと言（項目ごと） */
+  const say = {};
+  const ln = (k, vals) => fill(pick(key + k, L(k)), vals || {});
+  // 今週の目標: 関連する行動の回数 → 自己評価（まだなら問いかけ）
+  if (goal.text) {
+    const g = [];
+    if (goal.row) g.push(goal.row.weekCount ? ln('TPL_WEEK_GOAL_ACT', { 行動: goal.row.name, 回数: goal.row.weekCount }) : ln('TPL_WEEK_GOAL_ACT_ZERO', { 行動: goal.row.name }));
+    g.push(ln(goal.eval ? 'WEEK_GOAL_' + goal.eval : 'WEEK_GOAL_ASK'));
+    say.goal = g.join('');
+  }
+  // がんばりタイプ: みちみちの次の日に休めたか（ゆったり・ほどほど）。みちみちがなければ先週とくらべる
+  const pairs = typeDays.slice(0, 6).map((x, i) => [x, typeDays[i + 1]]).filter(([x, y]) => x.type.id === 'michimichi' && y.has);
+  if (pairs.length) {
+    const rested = pairs.filter(([, y]) => y.type.id !== 'michimichi').length;
+    say.types = ln(rested * 2 >= pairs.length ? 'WEEK_TYPE_RECOVER' : 'WEEK_TYPE_HARD');
+  } else if (top && prevTop) say.types = ln('WEEK_CMP_' + prevTop.id + '_' + top.id);
+  else say.types = ln('WEEK_BASE_' + (top ? top.id : 'none'), { 日数: top ? top.n : 0 });
+  // 体調と心の調子: 先週とくらべて＋しんどかった曜日
+  if (pts.length) {
+    const ds = SER_KEYS.map(([a, b]) => (cond[a] != null && cond[b] != null ? cond[a] - cond[b] : null)).filter(x => x != null);
+    const c = [];
+    if (ds.length) { const d = ds.reduce((x, y) => x + y, 0) / ds.length; c.push(ln(d >= 0.3 ? 'WEEK_COND_UP' : d <= -0.3 ? 'WEEK_COND_DOWN' : 'WEEK_COND_FLAT')); }
+    let low = null;
+    typeDays.forEach((x, i) => {
+      const v = pts.filter(p => Math.floor(p.x) === i).flatMap(p => [p.cond, p.mood]).filter(v => v != null);
+      const m = v.length ? v.reduce((s, y) => s + y, 0) / v.length : null;
+      if (m != null && m <= 2.5 && (!low || m < low.m)) low = { m, wd: x.wd };
+    });
+    if (low) c.push(ln('TPL_WEEK_COND_LOW', { 曜日: low.wd }));
+    if (c.length) say.cond = c.join('');
+  }
+  // 必須・やりたいこと
+  if (req.length) {
+    const ok = req.filter(r => r.ok).length;
+    say.req = ok === req.length ? ln('WEEK_REQ_ALL') : ok === 0 ? ln('WEEK_REQ_NONE') : ln('TPL_WEEK_REQ', { 件数: req.length, 達成: ok });
+  }
+  if (fav.length) {
+    const n = fav.reduce((s, r) => s + r.weekCount, 0);
+    say.fav = n ? ln('TPL_WEEK_FAV', { 回数: n }) : ln('WEEK_FAV_ZERO');
+  }
+  say.next = ln('WEEK_CLOSER');
 
-  return { key, label: weekLabel(key), days: typeDays, typeCount, cond, req, fav, goal, next, top, prevTop, ikoi: parts.join(''), done: today > weekEnd };
+  return { key, label: weekLabel(key), days: typeDays, typeCount, cond, req, fav, goal, next, top, prevTop, say, done: today > weekEnd };
 }

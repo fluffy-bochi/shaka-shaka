@@ -59,16 +59,30 @@ const GROUPS = [
     { key: 'PLAN_CLOSER', label: 'しめの一言' },
   ] },
   { id: 'week', label: '週間レポート', size: 130, items: [
-    ...[['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].map(([k, n]) => ({ key: 'WEEK_BASE_' + k, label: n + 'が多い週', vars: ['日数'] })),
-    { key: 'WEEK_BASE_none', label: '記録が少ない週' },
-    ...[['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].flatMap(([a, an]) => [['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].map(([b, bn]) => ({ key: 'WEEK_CMP_' + a + '_' + b, label: '先週' + an + '→今週' + bn }))),
-    { key: 'TPL_WEEK_REQ', label: '必須にした行動', vars: ['件数', '達成'] },
-    { key: 'WEEK_CLOSER', label: 'しめの一言' },
+    { key: 'TPL_WEEK_GOAL_ACT', label: '目標・関連する行動の回数', vars: ['行動', '回数'] },
+    { key: 'TPL_WEEK_GOAL_ACT_ZERO', label: '目標・関連する行動が0回', vars: ['行動'] },
+    { key: 'WEEK_GOAL_ASK', label: '目標・自己評価の前' },
+    ...[['done', 'できた'], ['half', '半分くらい'], ['not', 'できなかった']].map(([k, n]) => ({ key: 'WEEK_GOAL_' + k, label: '目標・' + n })),
+    { key: 'WEEK_TYPE_RECOVER', label: 'タイプ・みちみちの翌日に休めた' },
+    { key: 'WEEK_TYPE_HARD', label: 'タイプ・休めなかった' },
+    ...[['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].flatMap(([a, an]) => [['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].map(([b, bn]) => ({ key: 'WEEK_CMP_' + a + '_' + b, label: 'タイプ・先週' + an + '→今週' + bn }))),
+    ...[['yuttari', 'ゆったり'], ['hodohodo', 'ほどほど'], ['michimichi', 'みちみち']].map(([k, n]) => ({ key: 'WEEK_BASE_' + k, label: 'タイプ・' + n + '（先週の記録なし）', vars: ['日数'] })),
+    { key: 'WEEK_BASE_none', label: 'タイプ・記録が少ない週' },
+    { key: 'WEEK_COND_UP', label: '調子・先週より上向き' },
+    { key: 'WEEK_COND_DOWN', label: '調子・先週より下向き' },
+    { key: 'WEEK_COND_FLAT', label: '調子・先週と同じくらい' },
+    { key: 'TPL_WEEK_COND_LOW', label: '調子・しんどかった曜日', vars: ['曜日'] },
+    { key: 'WEEK_REQ_ALL', label: '必須・全部できた' },
+    { key: 'TPL_WEEK_REQ', label: '必須・一部できた', vars: ['件数', '達成'] },
+    { key: 'WEEK_REQ_NONE', label: '必須・できなかった' },
+    { key: 'TPL_WEEK_FAV', label: 'やりたいこと・できた', vars: ['回数'] },
+    { key: 'WEEK_FAV_ZERO', label: 'やりたいこと・0回' },
+    { key: 'WEEK_CLOSER', label: '来週の目標・しめの一言' },
   ] },
 ];
 
 /* プレビュー用: 選んだセリフを、実際の画面と同じつなぎ方で1つの吹き出しにする（例の値を差し込む） */
-const EX = { 行動: 'レポート・課題', 回復: '入浴', 予定: '1限 デザイン史', 時刻: '14:00', 件数: 3, 最初の予定: '1限 デザイン史', 日数: 3, 達成: 2 };
+const EX = { 行動: 'レポート・課題', 回復: '入浴', 予定: '1限 デザイン史', 時刻: '14:00', 件数: 3, 最初の予定: '1限 デザイン史', 日数: 3, 達成: 2, 回数: 3, 曜日: '木' };
 function compose(key, line, L) {
   const f0 = (k, vals) => fill(L(k)[0] || '', vals || {});
   const tip = (t) => restTip(L('TPL_REST_TIP')[0] || '', t);

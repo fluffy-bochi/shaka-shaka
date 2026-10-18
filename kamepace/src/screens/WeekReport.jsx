@@ -13,6 +13,12 @@ const LINE = '1px solid #bab5a7';
 const card = { borderTop: LINE, padding: '14px 16px 16px' }; // ホームと同じく線で区切る
 const ttl = { fontSize: 14, fontWeight: 900, marginBottom: 10 };
 
+/* いこいさんのひと言（各項目の下） */
+function Say({ text, v }) {
+  if (!text) return null;
+  return <div style={{ margin: '10px -20px -14px' }}><Speaker text={text} size={64} onEdit={v.editIkoiLine} /></div>;
+}
+
 function smoothPath(pts) {
   if (pts.length < 2) return '';
   let d = 'M' + pts[0][0] + ',' + pts[0][1];
@@ -26,7 +32,7 @@ function smoothPath(pts) {
 }
 
 /* ① がんばりタイプ: 上にその日のタイプ、下に1日の中のゆったり・ほどほど・みちみちの割合（積み上げ棒） */
-function Types({ r }) {
+function Types({ r, v }) {
   const BH = 120;
   return (
     <div style={card}>
@@ -65,13 +71,14 @@ function Types({ r }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
         {['yuttari', 'hodohodo', 'michimichi'].map(k => <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, color: '#55554e' }}><span style={{ width: 10, height: 10, borderRadius: 3, background: ZCOL[k] }} />{ZNAME[k]}</span>)}
       </div>
+      <Say text={r.say.types} v={v} />
     </div>
   );
 }
 
 /* ② 体調と心の調子（1〜5）: 7日分の折れ線。起床・就寝は丸、つぶやきは小さい点 */
 const SER = [{ k: 'cond', name: '体調', color: INK, avg: 'avgCond', prev: 'prevCond' }, { k: 'mood', name: '気分', color: '#ff5fa2', avg: 'avgMood', prev: 'prevMood' }];
-function Cond({ r }) {
+function Cond({ r, v }) {
   const c = r.cond, W = 320, H = 150, PL = 18, PR = 8, PT = 10, PB = 22;
   const X = (x) => PL + (x / 7) * (W - PL - PR), Y = (v) => PT + (1 - (v - 1) / 4) * (H - PT - PB);
   const diff = (a, b) => (a == null || b == null ? null : Math.round((a - b) * 10) / 10);
@@ -111,6 +118,7 @@ function Cond({ r }) {
           );
         })}
       </div>
+      <Say text={r.say.cond} v={v} />
     </div>
   );
 }
@@ -141,12 +149,13 @@ function FreqRow({ x, fav, first }) {
 }
 
 /* 必須・やりたいこと（fav は「あと〇回」を出さない） */
-function Freq({ title, rows, fav }) {
+function Freq({ title, rows, fav, say, v }) {
   return (
     <div style={card}>
       <div style={ttl}>{title}</div>
       {!rows.length && <div style={{ fontSize: 12, color: '#a5a39a', padding: '4px 0 2px' }}>登録なし</div>}
       {rows.map(x => <FreqRow key={x.k} x={x} fav={fav} />)}
+      <Say text={say} v={v} />
     </div>
   );
 }
@@ -170,6 +179,7 @@ function GoalThis({ r, v }) {
           </div>
         </>
       ) : <div style={{ fontSize: 12.5, color: '#a5a39a' }}>決めていませんでした</div>}
+      <Say text={r.say.goal} v={v} />
     </div>
   );
 }
@@ -193,6 +203,7 @@ function GoalNext({ r, v }) {
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) e.target.blur(); }}
             style={{ flex: 1, minWidth: 0, height: 38, boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 10, padding: '0 12px', fontSize: 16, fontWeight: 700, fontFamily: 'inherit', color: INK, background: '#fff', outline: 'none' }} />
         </div>
+        <Say text={r.say.next} v={v} />
       </div>
       {pick && <GoalActPicker cats={v.goalActCats} value={n.act && n.act.id} onPick={(id) => v.setWeekGoalAct(id, n.key)} onClose={() => setPick(false)} />}
     </>
@@ -212,12 +223,11 @@ export default function WeekReport({ v }) {
         </div>
       </div>
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 8 }}>
-        <Speaker text={r.ikoi} size={110} onEdit={v.editIkoiLine} />
         <GoalThis r={r} v={v} />
-        <Types r={r} />
-        <Cond r={r} />
-        <Freq title="必須にした行動" rows={r.req} />
-        <Freq title="やりたいこと" rows={r.fav} fav />
+        <Types r={r} v={v} />
+        <Cond r={r} v={v} />
+        <Freq title="必須にした行動" rows={r.req} say={r.say.req} v={v} />
+        <Freq title="やりたいこと" rows={r.fav} fav say={r.say.fav} v={v} />
         <GoalNext r={r} v={v} />
         <div style={{ borderTop: LINE }} />
       </div>
