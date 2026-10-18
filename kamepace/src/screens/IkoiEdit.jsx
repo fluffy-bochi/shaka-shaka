@@ -73,6 +73,7 @@ const GROUPS = [
     { key: 'WEEK_REQ_ALL', label: '必須・全部できた' },
     { key: 'TPL_WEEK_REQ_OK', label: '必須・目標まで届いた行動', vars: ['行動'] },
     { key: 'TPL_WEEK_REQ_MOST', label: '必須・いちばんできた行動', vars: ['行動', '回数'] },
+    ...[['michimichi', 'みちみち'], ['hodohodo', 'ほどほど'], ['yuttari', 'ゆったり']].map(([k, n]) => ({ key: 'WEEK_REQ_ZERO_' + k, label: '必須・ひとつもできなかった（' + n + 'が多い週）' })),
     { key: 'TPL_WEEK_FAV', label: 'やりたいこと・いちばん楽しめた行動', vars: ['行動', '回数'] },
     { key: 'WEEK_FAV_ZERO', label: 'やりたいこと・0回' },
     { key: 'WEEK_CLOSER', label: '来週の目標・しめの一言' },

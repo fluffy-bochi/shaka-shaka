@@ -146,6 +146,8 @@ export function buildWeek(st, key, o) {
     if (ok.length === req.length) say.req = ln('WEEK_REQ_ALL');
     else if (ok.length) say.req = ln('TPL_WEEK_REQ_OK', { 行動: ok.slice(0, 2).map(r => r.name).join('と') });
     else if (most.weekCount) say.req = ln('TPL_WEEK_REQ_MOST', { 行動: most.name, 回数: most.weekCount });
+    // ひとつもできていない週: みちみちが多ければ「ほかのことに追われていた」、ゆったりが多ければ「回復できたか」
+    else if (top) say.req = ln('WEEK_REQ_ZERO_' + top.id);
   }
   // やりたいこと: いちばん楽しめた行動
   if (fav.length) {
