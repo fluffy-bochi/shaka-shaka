@@ -16,7 +16,7 @@ function Toggle({ on, onClick }) {
 }
 
 /* 研究への協力: 参加中・停止中・未参加の表示と操作 */
-function ResearchCard({ v, onJoin }) {
+function ResearchCard({ v, onJoin, onChange }) {
   const r = v.research;
   const [del, setDel] = React.useState(false); // 削除の確認
   const hm = (ts) => { const d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
@@ -46,15 +46,18 @@ function ResearchCard({ v, onJoin }) {
         {del ? <>
           <button onClick={() => setDel(false)} style={btn(false)}>やめる</button>
           <button onClick={() => { setDel(false); v.deleteResearch(); }} style={{ ...btn(false), borderColor: '#b4645a', color: '#b4645a' }}>本当に削除する</button>
-        </> : <button onClick={() => setDel(true)} style={{ ...btn(false), borderColor: '#e8c9c4', color: '#b4645a' }}>送ったデータを削除</button>}
+        </> : <>
+          <button onClick={onChange} style={btn(false)}>番号を変える</button>
+          <button onClick={() => setDel(true)} style={{ ...btn(false), borderColor: '#e8c9c4', color: '#b4645a' }}>送ったデータを削除</button>
+        </>}
       </div>
     </div>
   );
 }
 
 /* 参加の同意（参加者コードを入れて始める） */
-function ResearchJoin({ v, onClose }) {
-  const [code, setCode] = React.useState((v.research && v.research.code) || '');
+function ResearchJoin({ v, onClose, change }) {
+  const [code, setCode] = React.useState(change ? '' : (v.research && v.research.code) || '');
   const [err, setErr] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const go = async () => { setBusy(true); const e = await v.joinResearch(code); setBusy(false); if (e) setErr(e); else onClose(); };
@@ -71,7 +74,7 @@ function ResearchJoin({ v, onClose }) {
         {!v.user ? (
           <button onClick={v.openAuth} style={{ width: '100%', marginTop: 16, border: 'none', borderRadius: 14, background: '#1b1b18', color: '#fff', fontWeight: 800, fontSize: 14, padding: '14px 0', cursor: 'pointer' }}>ログインして参加する</button>
         ) : <>
-          <input value={code} onChange={(e) => { setCode(e.target.value); setErr(''); }} placeholder="参加者コード（例: A01）" autoCapitalize="characters"
+          <input value={code} onChange={(e) => { setCode(e.target.value); setErr(''); }} placeholder={change ? "新しい参加者コード（例: C01）" : "参加者コード（例: A01）"} autoCapitalize="characters"
             style={{ width: '100%', boxSizing: 'border-box', marginTop: 16, height: 46, borderRadius: 12, border: '1.5px solid #e4e1d8', fontSize: 16, fontWeight: 800, padding: '0 14px', fontFamily: "'Space Mono',monospace" }} />
           {err && <div style={{ fontSize: 12, color: '#b4645a', fontWeight: 700, marginTop: 6 }}>{err}</div>}
           <button onClick={busy || !code.trim() ? undefined : go} style={{ width: '100%', marginTop: 12, border: 'none', borderRadius: 14, background: code.trim() && !busy ? '#c4f000' : '#e4e1d8', color: code.trim() && !busy ? '#2f3a00' : '#a5a39a', fontWeight: 900, fontSize: 15, padding: '14px 0', cursor: 'pointer' }}>{busy ? '送信中…' : '同意して始める'}</button>
@@ -204,7 +207,7 @@ export default function MyPage({ v }) {
           </div>
         )}
         <div style={label}>研究への協力</div>
-        <ResearchCard v={v} onJoin={() => setJoin(true)} />
+        <ResearchCard v={v} onJoin={() => setJoin(true)} onChange={() => setJoin('change')} />
         <div style={label}>ヘルプ</div>
         <div style={card}>
           {v.tutorialOn && <button onClick={v.startTutorial} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
@@ -291,7 +294,7 @@ export default function MyPage({ v }) {
         )}
       </div>
       {v.authOpen && <AuthGate v={v} />}
-      {join && <ResearchJoin v={v} onClose={() => setJoin(false)} />}
+      {join && <ResearchJoin v={v} change={join === 'change'} onClose={() => setJoin(false)} />}
     </div>
   );
 }
