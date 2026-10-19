@@ -398,7 +398,8 @@ export default class App extends React.Component {
       const data = await loadUserData();
       // 実験番号でログインした人は、その番号で研究への協力を自動で始める（まだなら）
       const code = codeOfEmail(auth.currentUser && auth.currentUser.email);
-      if (code) setTimeout(() => { const r = this.state.research; if (!r || !r.on || r.code !== code) this.joinResearch(code).then(err => { if (err) this.toast(err); }); }, 1500);
+      // （ほかの番号に変えた人は、ログインの番号に戻さない）
+      if (code) setTimeout(() => { const r = this.state.research; if ((r && (r.prev || []).includes(code)) || (r && r.code && r.code !== code)) return; if (!r || !r.on || r.code !== code) this.joinResearch(code).then(err => { if (err) this.toast(err); }); }, 1500);
       // ゲストの山の散らばりを持ち込まない
       this._pileLayout = null;
       // オンボ判定は「読み込んだデータ」で行う（this.set は非同期で this.state に即反映されないため）
@@ -2059,6 +2060,8 @@ export default class App extends React.Component {
   /* 参加者コードの頭のアルファベット＝実験の期間。その期間の収集期間（start〜end、空なら制限なし） */
   researchPeriod(code) { const ps = (this._resCfg && this._resCfg.periods) || {}; return ps[(code || '')[0]] || null; }
   inResearchPeriod(code, d) { const p = this.researchPeriod(code); if (!p) return true; return (!p.start || d >= p.start) && (!p.end || d <= p.end); }
+  // 送る日: 期間内で、番号を変えた人は新しい番号で使い始めた日（start）から
+  researchSendable(r, d) { return this.inResearchPeriod(r.code, d) && (!r.start || d >= r.start); }
   joinResearch = async (raw) => {
     const code = (raw || '').trim().toUpperCase();
     if (!/^[A-Z][0-9]{2}$/.test(code)) return '参加者コードはアルファベット1文字＋数字2桁です（例: A01）';
@@ -2067,14 +2070,22 @@ export default class App extends React.Component {
     const per = this.researchPeriod(code);
     if (!per) return '「' + code[0] + '」の期間はまだ設定されていません';
     if (per.end && todayStr() > per.end) return '「' + code[0] + '」の期間は終わっています';
+    // 番号を変える（B02 → C01 など）: 前の番号の送ったデータは残して止め、新しい番号で使い始めた日（期間の開始より前なら開始日）を1日目にする
+    const old = this.state.research;
+    const moving = !!(old && old.code && old.code !== code);
+    const extra = moving
+      ? { start: [todayStr(), per.start || ''].sort().pop(), prev: [...new Set([...(old.prev || []), old.code])].filter(c => c !== code) }
+      : { ...(old && old.code === code && old.start ? { start: old.start } : {}), ...(old && old.prev ? { prev: old.prev } : {}) };
     try {
       await researchJoin(code);
-      this.set({ research: { on: true, code, since: Date.now() } }); this.save();
+      if (moving && old.on) { try { await researchStop(old.code); } catch (e) { /* 前の番号はそのまま */ } }
+      const r = { on: true, code, since: Date.now(), ...extra };
+      this.set({ research: r }); this.save();
       // それまでの記録からも集計して送る（その期間の日だけ）
-      const days = summarizeDays(this.state, researchDates(this.state).filter(d => this.inResearchPeriod(code, d)));
-      await researchPutDays(code, days);
-      this.set({ research: { on: true, code, since: Date.now(), lastSent: Date.now() } }); this.save();
-      this.toast('研究への協力を始めました');
+      const days = summarizeDays(this.state, researchDates(this.state).filter(d => this.researchSendable(r, d)));
+      if (Object.keys(days).length) await researchPutDays(code, days);
+      this.set({ research: { ...r, lastSent: Date.now() } }); this.save();
+      this.toast(moving ? old.code + ' から ' + code + ' に変えました' : '研究への協力を始めました');
       return '';
     } catch (e) {
       return e && e.code === 'permission-denied' ? 'このコードは使えません（ほかの人が使っているか、まだ準備ができていません）' : '送信できませんでした';
@@ -2089,7 +2100,7 @@ export default class App extends React.Component {
       const t = todayStr(), dates = [shiftDate(t, -2), shiftDate(t, -1), t];
       const all = summarizeDays(this.state, dates);
       // 収集期間の日だけ送る
-      const send = {}; [dates[1], dates[2]].forEach(d => { if (this.inResearchPeriod(r.code, d)) send[d] = all[d]; });
+      const send = {}; [dates[1], dates[2]].forEach(d => { if (this.researchSendable(r, d)) send[d] = all[d]; });
       if (!Object.keys(send).length) return;
       try {
         await researchPutDays(r.code, send);
@@ -2209,7 +2220,7 @@ export default class App extends React.Component {
     this.set({ weekReports }); this.save();
     // 研究への協力: その週の日曜の集計に自己評価が入る。前の週を本棚からつけたときも送りなおす
     const r = this.state.research, sun = shiftDate(key, 6);
-    if (r && r.on && r.code && this.state.user && this.inResearchPeriod(r.code, sun) && sun < shiftDate(todayStr(), -1)) {
+    if (r && r.on && r.code && this.state.user && this.researchSendable(r, sun) && sun < shiftDate(todayStr(), -1)) {
       setTimeout(() => {
         const all = summarizeDays(this.state, [shiftDate(sun, -1), sun]);
         researchPutDays(r.code, { [sun]: all[sun] }).catch(() => { /* 通信できないときはそのまま */ });
@@ -5136,7 +5147,9 @@ export default class App extends React.Component {
         if (!st.screen.startsWith('wake') && !st.screen.startsWith('bed')) return '';
         const t = st.screen.startsWith('bed') ? (st.bedTarget || st.bedDay || this.bedDay()) : this.wakeDay(), d = strToDate(t);
         const firsts = [...st.entries.filter(e => !e._sample).map(e => e.date), ...(st.wakeLog || []).map(w => w.date)].filter(Boolean).sort();
-        const n = firsts.length ? Math.round((d - strToDate(firsts[0])) / 86400000) + 1 : 1;
+        // 研究の番号を変えた人は、新しい番号で使い始めた日を1日目に
+        const rs = st.research && st.research.start && t >= st.research.start ? st.research.start : null;
+        const n = rs ? Math.round((d - strToDate(rs)) / 86400000) + 1 : firsts.length ? Math.round((d - strToDate(firsts[0])) / 86400000) + 1 : 1;
         return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + '日月火水木金土'[d.getDay()] + '曜日 ' + Math.max(1, n) + '日目';
       })(),
       isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
