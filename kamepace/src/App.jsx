@@ -522,7 +522,13 @@ export default class App extends React.Component {
       if (!to || to === c.id || !ids.has(to)) return true;
       (moved[to] = moved[to] || []).push(it); return false;
     }) }));
-    return out.map(c => (moved[c.id] ? { ...c, items: [...c.items, ...moved[c.id]] } : c));
+    const placed = out.map(c => (moved[c.id] ? { ...c, items: [...c.items, ...moved[c.id]] } : c)).map(c => ({ ...c, items: c.items.map(it => ({ ...it, homeCat: c.id })) }));
+    // ほかのカテゴリにも入れた行動（actEdits[id].also）: 同じ行動を、そのカテゴリにも並べる（alsoIn＝コピー。allItems では数えない）
+    const extraIn = {};
+    placed.forEach(c => c.items.forEach(it => {
+      ((ed[it.id] && ed[it.id].also) || []).forEach(to => { if (to !== c.id && ids.has(to)) (extraIn[to] = extraIn[to] || []).push({ ...it, alsoIn: true }); });
+    }));
+    return placed.map(c => (extraIn[c.id] ? { ...c, items: [...c.items, ...extraIn[c.id].filter(x => !c.items.some(y => y.id === x.id))] } : c));
   }
   /* 行動の編集の初期値: 標準時間ぶんの 体・心（回復はマイナス）と分 */
   actEditVals(it) {
@@ -540,7 +546,8 @@ export default class App extends React.Component {
     const old = it.name, ed = { ...(this.state.actEdits || {}) };
     const prevNames = [...new Set([...(it.prevNames || []), ...(name !== old ? [old] : [])])].filter(n => n !== name);
     const cat = v.cat || (ed[id] && ed[id].cat) || null;
-    ed[id] = { name, body, mind, defMin: min, recover, prevNames, ...(cat ? { cat } : {}) };
+    const also = (v.also || (ed[id] && ed[id].also) || []).filter(c => c && c !== (cat || it.homeCat)); // ほかにも入れるカテゴリ
+    ed[id] = { name, body, mind, defMin: min, recover, prevNames, ...(cat ? { cat } : {}), ...(also.length ? { also } : {}) };
     const patch = { actEdits: ed };
     if (name !== old) {
       const mv = (obj) => { const o = { ...(obj || {}) }, a = normTitle(old), b = normTitle(name); if (o[a] != null && o[b] == null) { o[b] = o[a]; } delete o[a]; return o; };
@@ -555,7 +562,7 @@ export default class App extends React.Component {
   };
   allItems() {
     const out = [];
-    this.allCats().forEach(c => c.items.forEach(it => out.push({ ...it, color: c.color, catId: c.id })));
+    this.allCats().forEach(c => c.items.forEach(it => { if (!it.alsoIn) out.push({ ...it, color: c.color, catId: c.id }); }));
     return out;
   }
   itemById(id) { return this.allItems().find(t => t.id === id); }
@@ -4857,7 +4864,7 @@ export default class App extends React.Component {
             const fq = (st.actFreq || {})[normTitle(t.name)] || {};
             const mk = (pf) => this.actFatParts(t, pf === 'normal' ? null : pf);
             return { hidden: hiddenActs0.has(normTitle(t.name)), onToggleHide: () => this.toggleActHidden(t.name),
-              key: 'act:' + t.id, kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onRun: () => this.startRun([this.listItemFromAct(t)], ''), editVals: { ...this.actEditVals(t), cat: c.id }, onEdit: (vals) => this.editAct(t.id, vals), onReset: t.edited ? () => this.resetAct(t.id) : null, onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym, t.prevNames), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
+              key: 'act:' + t.id + (t.alsoIn ? '@' + c.id : ''), kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onRun: () => this.startRun([this.listItemFromAct(t)], ''), editVals: { ...this.actEditVals(t), cat: t.homeCat || c.id, also: ((st.actEdits || {})[t.id] || {}).also || [] }, onEdit: (vals) => this.editAct(t.id, vals), onReset: t.edited ? () => this.resetAct(t.id) : null, onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym, t.prevNames), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
               // 生活必須行動・やりたいこと（両方あるときの目標は生活必須行動の頻度）
               req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(t.name, kind, val) };
           }),
