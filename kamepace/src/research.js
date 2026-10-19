@@ -1,6 +1,6 @@
-/* 研究への協力（参加者コードで匿名）: 1日ごとの集計を作る・研究者用の分析と CSV。
+/* 研究への協力（協力者IDで匿名）: 1日ごとの集計を作る・研究者用の分析と CSV。
    送るのは数値の集計だけ。予定名・自由入力の文は送らない（行動は最初からある行動の名前だけ。自作は「自作」＋短いID）。
-   保存先: research/{参加者コード}/days/{日付}（firebase.js） */
+   保存先: research/{協力者ID}/days/{日付}（firebase.js） */
 import { CATS } from './data';
 import { entryEndTs, entryMin, normTitle, shiftDate, weekMonday } from './model';
 import { fatigueCurve, typeOfCurve, zoneOf } from './wake';

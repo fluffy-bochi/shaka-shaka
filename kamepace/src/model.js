@@ -101,7 +101,7 @@ export function serialize(st) {
     prefs: st.prefs || {},
     actGoals: st.actGoals || {}, // 行動ごとの目標頻度 { normTitle: 週あたり回数 }（旧・頻度が未設定のときだけ使う）
     research: st.research || null,
-    actEdits: st.actEdits || {}, // 行動の編集 { 行動id: { name, body, mind, defMin, recover, prevNames: [] } }（最初からある行動にも上書きで効く） // 研究への協力 { on, code, since }（参加者コードで匿名の集計を送る）
+    actEdits: st.actEdits || {}, // 行動の編集 { 行動id: { name, body, mind, defMin, recover, prevNames: [] } }（最初からある行動にも上書きで効く） // 研究への協力 { on, code, since }（協力者IDで匿名の集計を送る）
     actFreq: st.actFreq || {}, // 生活必須行動(req)・やりたいこと(fav)と頻度 { normTitle: { req: {k, unit:'日'|'週'|'月', n}＝k日にn回, fav: {...} } }
     slotHours: st.slotHours || null,
     hiddenCats: st.hiddenCats || [],

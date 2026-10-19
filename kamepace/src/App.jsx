@@ -2056,21 +2056,21 @@ export default class App extends React.Component {
   openIkoiAt = (m) => { this._ikoiBack = this.state.screen; this.set({ ikoiPick: null, screen: 'ikoiEdit', ikoiTarget: m ? { key: m.key, idx: m.idx } : null }); };
   closeIkoiEdit = () => this.set({ screen: this._ikoiBack || 'mypage', ikoiTarget: null });
   goResearchAdmin = () => this.set({ screen: 'researchAdmin' });
-  /* ---- 研究への協力（参加者コード） ---- */
-  /* 参加者コードの頭のアルファベット＝実験の期間。その期間の収集期間（start〜end、空なら制限なし） */
+  /* ---- 研究への協力（協力者ID） ---- */
+  /* 協力者IDの頭のアルファベット＝実験の期間。その期間の収集期間（start〜end、空なら制限なし） */
   researchPeriod(code) { const ps = (this._resCfg && this._resCfg.periods) || {}; return ps[(code || '')[0]] || null; }
   inResearchPeriod(code, d) { const p = this.researchPeriod(code); if (!p) return true; return (!p.start || d >= p.start) && (!p.end || d <= p.end); }
   // 送る日: 期間内で、番号を変えた人は新しい番号で使い始めた日（start）から
   researchSendable(r, d) { return this.inResearchPeriod(r.code, d) && (!r.start || d >= r.start); }
   joinResearch = async (raw) => {
     const code = (raw || '').trim().toUpperCase();
-    if (!/^[A-Z][0-9]{2}$/.test(code)) return '参加者コードはアルファベット1文字＋数字2桁です（例: A01）';
+    if (!/^[A-Z][0-9]{2}$/.test(code)) return '協力者IDはアルファベット1文字＋数字2桁です（例: A01）';
     if (!this.state.user) return 'ログインが必要です';
     try { this._resCfg = await loadResearchConfig(); } catch (e) { /* そのまま */ }
     const per = this.researchPeriod(code);
     if (!per) return '「' + code[0] + '」の期間はまだ設定されていません';
     if (per.end && todayStr() > per.end) return '「' + code[0] + '」の期間は終わっています';
-    // 番号を変える（B02 → C01 など）: 前の番号の送ったデータは残して止め、新しい番号で使い始めた日（期間の開始より前なら開始日）を1日目にする
+    // 協力者IDを変える（B02 → C01 など）: 前の番号の送ったデータは残して止め、新しい番号で使い始めた日（期間の開始より前なら開始日）を1日目にする
     const old = this.state.research;
     const moving = !!(old && old.code && old.code !== code);
     const extra = moving
@@ -2088,7 +2088,7 @@ export default class App extends React.Component {
       this.toast(moving ? old.code + ' から ' + code + ' に変えました' : '研究への協力を始めました');
       return '';
     } catch (e) {
-      return e && e.code === 'permission-denied' ? 'このコードは使えません（ほかの人が使っているか、まだ準備ができていません）' : '送信できませんでした';
+      return e && e.code === 'permission-denied' ? 'このIDは使えません（ほかの人が使っているか、まだ準備ができていません）' : '送信できませんでした';
     }
   };
   /* 保存のたびに（少し待ってから）直近3日を集計して、最近2日ぶんを送る */
@@ -3611,7 +3611,7 @@ export default class App extends React.Component {
     // いこいさんのセリフ・表情（みんなに反映された版）を読み、変わったら描き直す
     this._unIkoi = Ikoi.subscribe(() => this.forceUpdate());
     loadIkoi().then(d => { if (d) Ikoi.setPublished(d); }).catch(() => { /* 読めなければ serifu.js の初期値 */ });
-    // 研究の期間（参加者コードのアルファベットごとの収集期間）
+    // 研究の期間（協力者IDのアルファベットごとの収集期間）
     loadResearchConfig().then(c => { this._resCfg = c; }).catch(() => { /* 読めなければ期間の制限なし */ });
     // 保存に失敗したら知らせる（黙って失敗すると、リロードで記録が消えるまで気づけない）
     setSaveErrorHandler(() => { clearTimeout(this._saveErrT); this._saveErrT = setTimeout(() => this.toast('保存できませんでした。通信を確かめてください'), 300); });

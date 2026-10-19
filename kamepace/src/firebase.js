@@ -370,7 +370,7 @@ export async function revertIkoi() {
   return true;
 }
 
-/* ---- 研究への協力（参加者コード）: research/{code} と research/{code}/days/{日付} ----
+/* ---- 研究への協力（協力者ID）: research/{code} と research/{code}/days/{日付} ----
    本人（uid が一致）だけが書ける・研究者（開発者）だけが読める（Firestore のルール） */
 const rDoc = (code) => doc(db, 'research', code);
 /* 参加する。同じコードを別の人が使っていれば permission-denied になる */
@@ -409,7 +409,7 @@ export async function researchLoadAll() {
   }));
 }
 
-/* 研究の期間（参加者コードの頭のアルファベットごと）: config/research = { periods: { A: { label, start, end }, ... } }。
+/* 研究の期間（協力者IDの頭のアルファベットごと）: config/research = { periods: { A: { label, start, end }, ... } }。
    誰でも読める・書けるのは開発者だけ（config のルール） */
 export async function loadResearchConfig() {
   const s = await getDoc(doc(db, 'config', 'research'));
