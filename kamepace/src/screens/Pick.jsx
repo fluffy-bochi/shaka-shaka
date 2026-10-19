@@ -63,8 +63,10 @@ export function HmInput({ value, onChange, size = 16 }) {
 
 /* 行動の編集（カードの上に重ねる）: 名前・カテゴリ・体・心（その分数ぶん、マイナス＝回復）・分 */
 function EditAct({ it, cats, onMoved, onClose }) {
-  const [f, setF] = React.useState(() => ({ ...it.editVals }));
-  const num = (key, w = 64) => (
+  const [f, setF] = React.useState(() => ({ ...it.editVals, also: it.editVals.also || [] }));
+  const [first] = React.useState(() => it.editVals.also || []); // 開いたときに入れてあるカテゴリを先頭に（押しても並びは動かさない）
+  const togAlso = (id) => setF({ ...f, also: f.also.includes(id) ? f.also.filter(x => x !== id) : [...f.also, id] });
+  const num = (key, w = 54) => (
     <input type="number" inputMode="numeric" value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value === '' || e.target.value === '-' ? e.target.value : parseInt(e.target.value, 10) || 0 })}
       style={{ width: w, height: 36, boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 9, textAlign: 'center', fontSize: 16, fontWeight: 900, fontFamily: "'Space Mono',monospace", color: INK, padding: 0 }} />
   );
@@ -72,39 +74,46 @@ function EditAct({ it, cats, onMoved, onClose }) {
   const ok = (f.name || '').trim() && Number(f.min) > 0;
   const save = () => {
     if (!ok) return;
-    it.onEdit({ name: f.name, body: Number(f.body) || 0, mind: Number(f.mind) || 0, min: Number(f.min), cat: f.cat });
+    it.onEdit({ name: f.name, body: Number(f.body) || 0, mind: Number(f.mind) || 0, min: Number(f.min), cat: f.cat, also: f.also.filter(c => c !== f.cat) });
     if (f.cat && f.cat !== it.editVals.cat && onMoved) onMoved(f.cat);
     onClose();
   };
   return (
-    <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: CREAM, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 7, overflowY: 'auto', WebkitTapHighlightColor: 'transparent' }}>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <span style={{ fontSize: 14, fontWeight: 900, flex: 1 }}>行動を編集</span>
-        {/* 表示・非表示（非表示にした行動は、右の目のボタンで「非表示の行動」を見ると出てくる） */}
-        {it.onToggleHide && <button onClick={() => { it.onToggleHide(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: CREAM, color: '#55554e', fontSize: 11.5, fontWeight: 800, padding: '4px 10px 4px 7px', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', marginRight: 8 }}><span style={ms(16, '#55554e')}>{it.hidden ? 'visibility' : 'visibility_off'}</span>{it.hidden ? '表示する' : '非表示にする'}</button>}
-        <button onClick={onClose} aria-label="閉じる" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(22, INK)}>close</span></button>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ ...lab, flex: '0 0 auto' }}>名前</div>
-        <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', height: 38, border: '1.5px solid #e4e1d8', borderRadius: 9, fontSize: 15, fontWeight: 800, padding: '0 10px', fontFamily: 'inherit' }} />
-        {/* カテゴリ（変えると、その行動はそのカテゴリに移る） */}
+    <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', inset: 0, zIndex: 6, background: CREAM, padding: '9px 14px', display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', WebkitTapHighlightColor: 'transparent' }}>
+      {/* 名前・カテゴリ（変えると、その行動はそのカテゴリに移る）・閉じる */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input value={f.name} aria-label="名前" onChange={(e) => setF({ ...f, name: e.target.value })} style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', height: 38, border: '1.5px solid #e4e1d8', borderRadius: 9, fontSize: 15, fontWeight: 800, padding: '0 10px', fontFamily: 'inherit' }} />
         {cats && cats.length > 0 && (
           <select value={f.cat || ''} onChange={(e) => setF({ ...f, cat: e.target.value })} aria-label="カテゴリ" style={{ flex: '0 1 118px', minWidth: 0, boxSizing: 'border-box', height: 38, border: '1.5px solid #e4e1d8', borderRadius: 9, background: CREAM, color: INK, fontSize: 13, fontWeight: 800, padding: '0 4px', fontFamily: 'inherit' }}>
             {cats.map(c => <option key={c.id} value={c.id}>{c.name}{c.hidden ? '（非表示）' : ''}</option>)}
           </select>
         )}
+        <button onClick={onClose} aria-label="閉じる" style={{ flex: '0 0 auto', border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}><span style={ms(22, INK)}>close</span></button>
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-        <div><div style={lab}>体</div><div style={{ marginTop: 3 }}>{num('body')}</div></div>
-        <div><div style={lab}>心</div><div style={{ marginTop: 3 }}>{num('mind')}</div></div>
-        <span style={{ fontSize: 14, fontWeight: 800, paddingBottom: 8 }}>/</span>
-        <div><div style={lab}>時間（時:分）</div><div style={{ marginTop: 3 }}><HmInput value={f.min} onChange={(n) => setF({ ...f, min: n })} /></div></div>
+      {/* ほかのカテゴリにも入れる（例: ストレッチを「運動」にも「回復」にも） */}
+      {cats && cats.length > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ ...lab, flex: '0 0 auto' }}>ほかにも</div>
+          <div className="nos" style={{ flex: 1, minWidth: 0, display: 'flex', gap: 5, overflowX: 'auto' }}>
+            {[...cats.filter(c => first.includes(c.id)), ...cats.filter(c => !first.includes(c.id))].filter(c => c.id !== f.cat).map(c => {
+              const on = f.also.includes(c.id);
+              return <button key={c.id} onClick={() => togAlso(c.id)} style={{ flex: '0 0 auto', border: on ? 'none' : '1.5px solid #e4e1d8', borderRadius: 999, background: on ? INK : CREAM, color: on ? '#fff' : '#55554e', fontSize: 11.5, fontWeight: 800, padding: on ? '5px 10px' : '3.5px 8.5px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{c.name}</button>;
+            })}
+          </div>
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span style={lab}>体</span>{num('body')}
+        <span style={{ ...lab, marginLeft: 3 }}>心</span>{num('mind')}
+        <span style={{ fontSize: 14, fontWeight: 800, margin: '0 2px' }}>/</span>
+        <HmInput value={f.min} onChange={(n) => setF({ ...f, min: n })} />
       </div>
       <div style={{ flex: 1 }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* 表示・非表示（非表示にした行動は、右の目のボタンで「非表示の行動」を見ると出てくる） */}
+        {it.onToggleHide && <button onClick={() => { it.onToggleHide(); onClose(); }} aria-label={it.hidden ? '表示する' : '非表示にする'} style={{ flex: '0 0 auto', width: 34, height: 34, boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 12, background: CREAM, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(18, '#55554e')}>{it.hidden ? 'visibility' : 'visibility_off'}</span></button>}
         {it.onReset && <button onClick={() => { it.onReset(); onClose(); }} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: CREAM, color: '#55554e', fontSize: 13, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>元に戻す</button>}
         <span style={{ flex: 1, fontSize: 10.5, color: '#8a8a82', fontWeight: 700 }}>マイナスで回復</span>
-        <button onClick={onClose} style={{ border: '1.5px solid #e4e1d8', borderRadius: 12, background: CREAM, color: '#55554e', fontSize: 13, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>キャンセル</button>
         <button onClick={save} style={{ border: 'none', borderRadius: 12, background: ok ? '#c4f000' : '#e4e1d8', color: ok ? '#2f3a00' : '#a5a39a', fontSize: 14, fontWeight: 900, padding: '7px 20px', cursor: ok ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>保存</button>
       </div>
     </div>
