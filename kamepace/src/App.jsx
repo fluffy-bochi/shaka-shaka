@@ -23,6 +23,7 @@ import { summarizeDays, researchDates } from './research';
 import { dayParts, calibrate } from './calib';
 import { dripRate, sleepSpans, awakeMs } from './drip';
 import ResearchAdmin from './screens/ResearchAdmin';
+import Install from './Install';
 import Run, { MiniRun } from './screens/Run';
 import * as Ikoi from './ikoi';
 import IkoiEdit from './screens/IkoiEdit';
@@ -5636,6 +5637,7 @@ export default class App extends React.Component {
         {v.run && !v.isRun && (v.isHome || v.isPickScreen) && <MiniRun v={v} />}
         {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && !v.isResearchAdmin && !v.isWeekReport && <Nav v={v} />}
         </>}
+        {!v.isOnboard && !st0.tutorial && <Install />}
       </div>
     );
   }
