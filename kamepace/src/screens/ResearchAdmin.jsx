@@ -455,7 +455,7 @@ function AccountMaker({ onClose }) {
   );
 }
 
-/* 期間の設定（参加者コードの頭のアルファベットごと: 名前・開始日・終了日） */
+/* 期間の設定（協力者IDの頭のアルファベットごと: 名前・開始日・終了日） */
 function PeriodEditor({ periods, onSave, onClose, readOnly }) {
   const [rows, setRows] = React.useState(() => {
     const ks = Object.keys(periods || {}).sort();
@@ -472,7 +472,7 @@ function PeriodEditor({ periods, onSave, onClose, readOnly }) {
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: '#fff', borderRadius: 18, padding: '18px 18px 16px', boxShadow: '0 20px 50px rgba(27,27,24,.3)' }}>
         <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>期間の設定</div>
-        <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 12, lineHeight: 1.6 }}>参加者コードの頭のアルファベットが期間です（例: A01）。期間の外の日は送られません。</div>
+        <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 12, lineHeight: 1.6 }}>協力者IDの頭のアルファベットが期間です（例: A01）。期間の外の日は送られません。</div>
         <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 130px 28px', gap: 8, alignItems: 'center', fontSize: 10.5, color: MUTED, fontWeight: 700, marginBottom: 6 }}>
           <span /><span>名前</span><span>開始日</span><span>終了日</span><span />
         </div>
