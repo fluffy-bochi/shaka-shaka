@@ -61,4 +61,8 @@ setAppVH();
 window.addEventListener('resize', setAppVH);
 window.addEventListener('orientationchange', () => setTimeout(setAppVH, 250));
 
+/* ホーム画面に追加: ブラウザの「インストールできます」の合図を、画面ができる前に来ても取っておく（Install.jsx が使う） */
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window.__installEvt = e; window.dispatchEvent(new Event('kame-installable')); });
+if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => { /* なくても使える */ }); });
+
 createRoot(document.getElementById('root')).render(<Shell />);
