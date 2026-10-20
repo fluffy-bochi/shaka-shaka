@@ -4645,9 +4645,10 @@ export default class App extends React.Component {
 
   /* かめペース内でタスクを追加（mylifecore/Google と同じ「タスク」欄に出る・行動と紐づけ可）。
      作ってすぐ編集ポップアップを開き、名前を付けずに閉じたら破棄する。 */
-  addLocalTask = () => {
+  // day: 入れる日（実行中の画面からは今日。ふだんはホームで見ている日）
+  addLocalTask = (day) => {
     const srcId = 'local:' + Date.now();
-    const tasks = [...(this.state.tasks || []), { srcId, title: '', done: false, date: this.homeDateStr() }];
+    const tasks = [...(this.state.tasks || []), { srcId, title: '', done: false, date: typeof day === 'string' ? day : this.homeDateStr() }];
     this.set({ tasks, taskEdit: srcId, taskEditTitle: '', taskEditKw: '', taskEditLinkName: '', taskEditIsNew: true });
   };
   /* タスクの編集（名前・行動との紐づけ） */
@@ -5288,7 +5289,7 @@ export default class App extends React.Component {
         onEdit: () => this.openTaskEdit(t.srcId),
         onDelete: () => this.deleteTask(t.srcId),
       })),
-      onAddTask: this.addLocalTask,
+      onAddTask: this.addLocalTask, onAddRunTask: () => this.addLocalTask(todayStr()),
       // 実行中の画面の「タスク」タブ: 今日のタスク（チェックで記録・ホームと同じ）
       runTasks: (st.tasks || []).filter(t => t.date === todayStr() && t.title).map(t => {
         const inRun = st.run && (st.run.tasks || []).find(x => x.srcId === t.srcId);

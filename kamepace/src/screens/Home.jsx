@@ -260,7 +260,7 @@ function RecordMenu({ v }) {
 
 /* タスクの編集: 名前の変更＋行動との紐づけ（チェック時にその行動として記録される） */
 const stepBtn = (on) => ({ width: 34, height: 34, borderRadius: 10, border: '1.5px solid #e4e1d8', background: '#fff', fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#1b1b18', cursor: on ? 'pointer' : 'default', opacity: on ? 1 : 0.3, padding: 0, flex: '0 0 auto' });
-function TaskEditPopup({ v }) {
+export function TaskEditPopup({ v }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 9, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
       <div style={{ width: '100%', background: '#fff', borderRadius: 22, padding: '16px 20px 20px', boxShadow: '0 24px 60px rgba(27,27,24,.35)' }}>
