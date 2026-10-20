@@ -71,15 +71,30 @@ let lastStamp = 0;
 // 保存に失敗したときの知らせ先（画面にトーストを出す）。黙って失敗すると、リロードで記録が消えるまで気づけない
 let onSaveError = null;
 export function setSaveErrorHandler(fn) { onSaveError = fn; }
+// ほかの端末（開きっぱなしの別の画面も）があとから保存していたときの受け手。上書きせずに、まぜてから保存しなおしてもらう
+let onConflict = null;
+export function setConflictHandler(fn) { onConflict = fn; }
+// 最後にクラウドと合わせた時刻（読み込み・保存・確認）。続けて操作している間は確かめない（毎回読むと通信が重い）
+let syncedAt = 0, wasHidden = false;
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.hidden) wasHidden = true; });
 export function cloudSave(st) {
   if (!auth.currentUser) return;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
+  saveTimer = setTimeout(async () => {
     // ユーザーごと（users/{uid}）に「日にち→予定・行動／task」の親子構造で保存
     const fail = (err) => { console.warn('[kamepace] save failed', err); if (onSaveError) onSaveError(err); };
+    // 2026-10-20: 開きっぱなしの古い画面の保存で、別の画面で入れた朝の記録が消えた。書く前にクラウドのほうが新しくないか確かめる
+    if (onConflict && (wasHidden || Date.now() - syncedAt > 2 * 60000)) {
+      try {
+        const snap = await getDocFromServer(userDoc());
+        const remote = snap.exists() ? (snap.data().updatedAt || 0) : 0;
+        wasHidden = false; syncedAt = Date.now();
+        if (remote > lastStamp) { lastStamp = remote; onConflict(snap.data()); return; }
+      } catch (e) { /* 確かめられないとき（通信がないなど）は今までどおり書く */ }
+    }
     try {
       const data = serialize(st);
-      setDoc(userDoc(), data).then(() => { lastStamp = Math.max(lastStamp, data.updatedAt || 0); }).catch(fail);
+      setDoc(userDoc(), data).then(() => { lastStamp = Math.max(lastStamp, data.updatedAt || 0); syncedAt = Date.now(); }).catch(fail);
     } catch (err) { fail(err); } // 中身がおかしいときは setDoc がその場で例外を投げる
   }, 600);
 }
@@ -95,10 +110,17 @@ export async function cloudSavePassive(st, onNewer) {
   cloudSave(st);
 }
 
+/* クラウドに、この端末が読んだあとでほかの端末が書いた版があるか */
+export async function cloudIsNewer() {
+  if (!auth.currentUser) return false;
+  try { const snap = await getDocFromServer(userDoc()); wasHidden = false; syncedAt = Date.now(); return (snap.exists() ? (snap.data().updatedAt || 0) : 0) > lastStamp; } catch (e) { return false; }
+}
+
 export async function loadUserData() {
   const snap = await getDoc(userDoc());
   const data = snap.exists() ? snap.data() : null;
   if (data) lastStamp = Math.max(lastStamp, data.updatedAt || 0);
+  syncedAt = Date.now(); wasHidden = false;
   return data;
 }
 

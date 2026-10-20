@@ -16,7 +16,7 @@ import {
 } from './model';
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout, loginCode, codeOfEmail, auth,
-  cloudSave, cloudSavePassive, setSaveErrorHandler, loadUserData, fetchGoogleData, disconnectGoogle, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
+  cloudSave, cloudSavePassive, setSaveErrorHandler, setConflictHandler, cloudIsNewer, loadUserData, fetchGoogleData, disconnectGoogle, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
   loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete, loadResearchConfig,
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
@@ -1095,7 +1095,10 @@ export default class App extends React.Component {
       // いまの分の割り当てを初期の時間範囲に（枠がある時は枠の開始から・無ければ現在時刻から連続配置）
       const fr = (this.state.searchFracs && this.state.searchFracs.length === n) ? this.state.searchFracs : Array(n).fill(n ? 1 / n : 0);
       const total = (frameFill ? this.timeSpanMin() : this.state.searchTotalMin) || (n * 30) || 30;
-      const startHm = frameFill ? this.state.startTime : this.tsToHm((() => { const d = new Date(); d.setSeconds(0, 0); return d.getTime(); })());
+      // 「記録」から来たときは終わりがいまになるように、合計ぶん前から
+      const nowTs = (() => { const d = new Date(); d.setSeconds(0, 0); return d.getTime(); })();
+      const endNow = this.state.confirmAnchor === 'end' && !this.state.anchorEnd;
+      const startHm = frameFill ? this.state.startTime : this.tsToHm(endNow ? nowTs - total * 60000 : nowTs);
       let curMin = 0;
       const withRanges = items.map((it, i) => {
         const min = Math.max(1, Math.round((fr[i] || (n ? 1 / n : 1)) * total));
@@ -1175,7 +1178,7 @@ export default class App extends React.Component {
         const lastEnd = prev.length ? (((prev[prev.length - 1].ranges || []).slice(-1)[0] || {}).to) : this.state.startTime;
         const from = lastEnd || this.state.startTime;
         newItem.ranges = [{ from, to: this.addHm(from, newMin) }];
-      } else { const f = this.tsToHm(Date.now()); newItem.ranges = [{ from: f, to: this.addHm(f, newMin) }]; } // 現在時刻から defMin ぶん
+      } else { const f = this.tsToHm(Date.now() - (this.state.confirmAnchor === 'end' ? newMin * 60000 : 0)); newItem.ranges = [{ from: f, to: this.addHm(f, newMin) }]; } // 現在時刻から defMin ぶん（「記録」から来たときは、いまで終わるように）
     }
     const cart = [...prev, newItem];
     const resolved = kwIndex == null ? this.state.resolvedIdx : [...this.state.resolvedIdx, kwIndex];
@@ -1441,9 +1444,12 @@ export default class App extends React.Component {
     if (durMins.length) { const d = durTotal - durMins.reduce((a, b) => a + b, 0); durMins[n - 1] = Math.max(1, durMins[n - 1] + d); }
     // 記録した時＝終わった時: 所要時間モードの記録は、終わりの時刻から逆にならべる。
     // 終わり＝実行画面の「記録」から来たときはその時刻（anchorEnd）、ふだんは今日のいまの枠ならいま。予定・編集・ほかの枠/日は従来どおり
+    // 行動選択の「記録」＝終わりがいま、「予定」＝始まりがいま（いまより先のぶんは予定になり、時間どおりに降る）
+    const anchor = (!timeMode && !frameFill && !isEdit && isToday && !this.state.anchorEnd) ? this.state.confirmAnchor : null;
+    const nowMin = Math.floor(now / 60000) * 60000;
     const endAnchor = (!timeMode && !frameFill && !isEdit && isToday)
-      ? (this.state.anchorEnd ? hmToTsOn(recDate, this.state.anchorEnd) : (slotId === this.slotNow() ? Math.floor(now / 60000) * 60000 : null)) : null;
-    let backCursor = endAnchor != null ? endAnchor - durMins.reduce((a, b) => a + b, 0) * 60000 : null;
+      ? (this.state.anchorEnd ? hmToTsOn(recDate, this.state.anchorEnd) : (anchor === 'end' || (!anchor && slotId === this.slotNow()) ? nowMin : null)) : null;
+    let backCursor = anchor === 'start' ? nowMin : endAnchor != null ? endAnchor - durMins.reduce((a, b) => a + b, 0) * 60000 : null;
     // 編集（所要時間モード）: 元の記録の始まりの時刻から順にならべる（時間帯の空きに詰め直すと、時刻がずれてしまう）
     const editOrig = isEdit ? (this.state.editIdxs || []).map(i => this.state.entries[i]).filter(e => e && e.from).sort((a, b) => a.from.localeCompare(b.from))[0] : null;
     let editCursor = editOrig ? editOrig.from : null;
@@ -1505,7 +1511,12 @@ export default class App extends React.Component {
         const e = mkEntry(t, min, null, null, false, taskKey);
         e.slot = slotId;
         if (editCursor != null) { e.from = editCursor; e.to = this.addHm(editCursor, min); editCursor = e.to; e.slot = editOrig.slot || this.slotOf({ from: e.from }); }
-        else if (backCursor != null) { e.from = this.tsToHm(backCursor); e.to = this.tsToHm(backCursor + min * 60000); backCursor += min * 60000; }
+        else if (backCursor != null) {
+          e.from = this.tsToHm(backCursor); e.to = this.tsToHm(backCursor + min * 60000);
+          if (anchor) e.slot = this.slotOf({ from: e.from });
+          if (anchor === 'start' && backCursor + min * 60000 > now) { e.planned = true; e.dropped = planUnitsDue(e, now); e._new = e.dropped > 0; }
+          backCursor += min * 60000;
+        }
         else { e.from = this.slotHm(slot, slotOffset); e.to = this.slotHm(slot, slotOffset + min); slotOffset += min; }
         if (isFuture) { e.planned = true; e.dropped = 0; e._new = false; }
         newEntries.push(e); learnMin[i] = min;
@@ -1603,7 +1614,7 @@ export default class App extends React.Component {
         : (this.state.confirmOrigin === 'run' && this.state.run && this.state.run.fromList)
           ? (() => { const done = new Set(this.state.run.doneUids || []), items = this.state.pickList.items.filter(x => !done.has(x.uid)); return { ...this.state.pickList, items, ...(items.length ? null : { name: '', tplKey: null }) }; })()
           : this.state.pickList,
-      entries, lastMins, tapLine: isEdit ? this.state.tapLine : null, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null, anchorEnd: null, recNote: '', recTitle: '', editGid: null,
+      entries, lastMins, tapLine: isEdit ? this.state.tapLine : null, lastRec: isEdit ? this.state.lastRec : { ts: Date.now(), rec: newEntries.length > 0 && newEntries.every(e => (e.delta || 0) < 0) }, screen: anyImmediate ? 'shaka' : 'home', dayOffset: 0, searchStep: null, searchCart: [], keywords: [''], resolvedIdx: [], cart: {}, catId: null, confirmMode: 'duration', editIdxs: null, confirmOrigin: 'search', framePlan: null, recordDate: null, anchorEnd: null, confirmAnchor: null, recNote: '', recTitle: '', editGid: null,
       toast: sym.buffAdded ? '記録＋「' + sym.buffAdded + '」を今の調子に追加' : toastMsg,
       activeBuffs: sym.activeBuffs,
       // 編集で山が縮んだ場合に consumed が超過しないように
@@ -2289,7 +2300,7 @@ export default class App extends React.Component {
     this.toast('「' + sa.name + '」のデバフも調整しました');
   };
   dismissSymAdjust = () => this.set({ symAdjust: null });
-  openRecord(id) { this._pickMem = {}; this.set({ recNote: '', recTitle: '', editGid: null, runAdd: false, anchorEnd: null, slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
+  openRecord(id) { this._pickMem = {}; this.set({ recNote: '', recTitle: '', editGid: null, runAdd: false, anchorEnd: null, confirmAnchor: null, slotMenuOpen: false, screen: 'record', slotId: id, catId: null, cart: {}, degreeItem: null, planDetailId: null, planAddOpen: false, searchStep: null, keywords: [''], searchCart: [], resolvedIdx: [], moreKw: null, intensityId: null, editIdxs: null, confirmOrigin: 'search', framePlan: null }); }
   toggleSlotMenu = () => this.set({ slotMenuOpen: !this.state.slotMenuOpen });
   pickSlot = (id) => this.set({ slotId: id, slotMenuOpen: false });
   selectCat = (id) => this.set({ catId: id });
@@ -2430,13 +2441,14 @@ export default class App extends React.Component {
       return { ...base, fh: li.min ? (li.fat * 60 / li.min) : li.fat, kw: [name, li.name].filter(Boolean), picks: [] };
     });
   }
-  listToConfirm = () => {
+  // anchor: 「記録」＝いちばん下の行動の終わりがいま／「予定」＝いちばん上の行動の始まりがいま
+  listToConfirm = (anchor) => {
     const pl = this.state.pickList;
     if (!pl.items.length) return;
     const name = (pl.name || '').trim();
     const cart = this.cartFromList(pl.items, name);
     const total = cart.reduce((a, c) => a + (c.defMin || 30), 0) || 30;
-    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: total, searchFracs: cart.map(c => (c.defMin || 30) / total), confirmMode: 'duration', cart: {}, confirmOrigin: 'list' });
+    this.set({ screen: 'record', searchStep: 'confirm', searchCart: cart, searchTotalMin: total, searchFracs: cart.map(c => (c.defMin || 30) / total), confirmMode: 'duration', cart: {}, confirmOrigin: 'list', confirmAnchor: anchor === 'start' || anchor === 'end' ? anchor : null });
   };
   /* ================= タスク実行（START） =================
      run = { items: リストの行と同じ形, cur: いまの行, segs: [{ uid, a, b }]（行ごとの実行区間・b=null は実行中）, name, fromList }。
@@ -3464,7 +3476,10 @@ export default class App extends React.Component {
     const recs = this.wakeRecords();
     const yRec = recs.find(w => w.date === y);
     const yBed = (st.bedLog || []).find(b => b.date === y);
-    const sum = daySummary(st.entries, y, yRec ? yRec.fatigue : 0, { from: yRec ? yRec.ts : null, to: yBed ? yBed.ts : null });
+    // 就寝の記録がない夜は、今朝の起床の記録に入れた就寝時刻までを昨日にする
+    const tw = (st.wakeLog || []).find(w => w.date === today), tb = tw && tw.bed;
+    const yEnd = yBed ? yBed.ts : (tb ? hmToTsOn(y, tb < '05:00' ? this.addHm(tb, 1440) : tb) : null);
+    const sum = daySummary(st.entries, y, yRec ? yRec.fatigue : 0, { from: yRec ? yRec.ts : null, to: yEnd });
     // 今日の予定: 押すと中身の登録（枠なら行動を入れる・それ以外は編集）へ。終わったらこの画面に戻る
     // 予定（plan）ごとに1行にまとめる（ホームのタイムラインと同じ）。見出し＝予定名、中の行動は下に小さく
     const rows = st.entries.map((e, i) => ({ e, i })).filter(({ e }) => e.date === today && this.isPlanLike(e))
@@ -3490,7 +3505,7 @@ export default class App extends React.Component {
     const chart = this.chartData([...new Set(recs.map(r => r.date))].sort()); // 朝は直近7回ぶんの日
     const isMonday = strToDate(today).getDay() === 1, weekGoal = (st.weekGoals || {})[weekMonday(today)] || '';
     const weekGoalAct = (st.weekGoalActs || {})[weekMonday(today)] || null, weekGoalGlyph = this.weekGoalGlyph(today);
-    return { recs, chart, sum, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks, carry: carry.map(t => ({ id: t.srcId, title: t.title })), isMonday, weekGoal, weekGoalAct, weekGoalGlyph, weekGoalMax: WEEK_GOAL_MAX };
+    return { recs, chart, sum, noBed: !yBed && sum.has, reviewText: reviewLine(sum, y), planText: planLine(plans, tasks, sum, today), plans, tasks, carry: carry.map(t => ({ id: t.srcId, title: t.title })), isMonday, weekGoal, weekGoalAct, weekGoalGlyph, weekGoalMax: WEEK_GOAL_MAX };
   }
   /* 朝の「今日の予定」から予定を押したとき: 中身の登録へ。保存・やめるのあとは「今日の予定」に戻る */
   openPlanFromWake = (i, planIdxs) => {
@@ -3590,6 +3605,25 @@ export default class App extends React.Component {
     if (/^bed/.test(s)) return '就寝の記録';
     return 'その他';
   }
+  /* 保存しようとしたら、ほかの端末（開きっぱなしの別の画面も）があとから保存していたとき: 上書きせずに、両方の記録を残してから保存する。
+     記録は同じまとまり（gid）・同じ日の体調の記録、起床・就寝は同じ日、タスクは同じもの、がこの端末にあればこの端末のほうを使う */
+  mergeRemote = (raw) => {
+    const r = deserialize(raw), st = this.state;
+    const gids = new Set(st.entries.map(e => e.gid).filter(Boolean));
+    const key = (e) => (e.drip ? 'd:' + e.date + ':' + e.drip : 'e:' + e.date + ':' + e.title + ':' + (e.from || '') + ':' + (e.to || ''));
+    const keys = new Set(st.entries.map(key));
+    const addE = (r.entries || []).filter(e => (e.gid ? !gids.has(e.gid) : !keys.has(key(e))));
+    const byDate = (mine, theirs) => [...mine, ...(theirs || []).filter(x => !mine.some(m => m.date === x.date))].sort((a, b) => a.date.localeCompare(b.date));
+    const tkey = (t) => t.srcId || t.date + ':' + t.title;
+    const tk = new Set((st.tasks || []).map(tkey));
+    const patch = {
+      wakeLog: byDate(st.wakeLog || [], r.wakeLog), bedLog: byDate(st.bedLog || [], r.bedLog),
+      tasks: [...(st.tasks || []), ...(r.tasks || []).filter(t => !tk.has(tkey(t)))],
+    };
+    if (addE.length) { patch.entries = sortEntries([...st.entries, ...addE]); this._pileLayout = null; }
+    this.set(patch);
+    this.save();
+  };
   tickScreenTime = () => {
     const now = Date.now(), last = this._stLast || now;
     this._stLast = now;
@@ -3606,7 +3640,11 @@ export default class App extends React.Component {
   };
   componentDidMount() {
     this._stTimer = setInterval(this.tickScreenTime, 15000);
-    document.addEventListener('visibilitychange', () => { this.tickScreenTime(); this._stLast = Date.now(); });
+    document.addEventListener('visibilitychange', () => {
+      this.tickScreenTime(); this._stLast = Date.now();
+      // 画面に戻ってきたとき、ほかの端末で記録が増えていたら読み込みなおす（記録の途中の画面では読み込まない。保存のときにまぜる）
+      if (!document.hidden && this.state.user && ['shaka', 'home', 'mypage', 'bookshelf'].includes(this.state.screen)) cloudIsNewer().then(n => { if (n && ['shaka', 'home', 'mypage', 'bookshelf'].includes(this.state.screen)) this.loadCloud(true); });
+    });
     initShakaSound();
     // 前回の山の散らばり（振って変わった形）を復元
     try {
@@ -3622,6 +3660,7 @@ export default class App extends React.Component {
     // 研究の期間（協力者IDのアルファベットごとの収集期間）
     loadResearchConfig().then(c => { this._resCfg = c; }).catch(() => { /* 読めなければ期間の制限なし */ });
     // 保存に失敗したら知らせる（黙って失敗すると、リロードで記録が消えるまで気づけない）
+    setConflictHandler(this.mergeRemote);
     setSaveErrorHandler(() => { clearTimeout(this._saveErrT); this._saveErrT = setTimeout(() => this.toast('保存できませんでした。通信を確かめてください'), 300); });
     this._unwatch = watchAuth((user) => {
       this.set({ user, authOpen: false, authPass: '' });
@@ -4832,9 +4871,10 @@ export default class App extends React.Component {
     // 非表示カテゴリはリストから隠すだけ（検索・既存記録からは到達可能）
     const cats = this.allCats().filter(c => !hiddenCats.includes(c.id)).map(c => ({ id: c.id, name: c.name, sub: c.sub, icon: c.icon, color: c.color, onSelect: () => this.selectCat(c.id) }));
     /* ---- 行動選択画面（カテゴリ＋行動のリスト）。予定・きもちもリストの一部として並べる ---- */
-    const startWith = (t) => () => {
-      if (t.degree) { this.set({ degreeItem: t.id, degreeIdx: 1, cart: {} }); return; }
-      this.setState({ cart: { [t.id]: { degIdx: null } } }, () => this.goConfirm());
+    // anchor: 「記録」＝終わりがいま／「予定」＝始まりがいま（確認画面の時刻の初期値）
+    const startWith = (t, anchor) => () => {
+      if (t.degree) { this.set({ degreeItem: t.id, degreeIdx: 1, cart: {}, confirmAnchor: anchor || null }); return; }
+      this.setState({ cart: { [t.id]: { degIdx: null } }, confirmAnchor: anchor || null }, () => this.goConfirm());
     };
     const hiddenActs0 = this.hiddenActSet();
     const excl0 = this.profileExcl();
@@ -4864,7 +4904,7 @@ export default class App extends React.Component {
             const fq = (st.actFreq || {})[normTitle(t.name)] || {};
             const mk = (pf) => this.actFatParts(t, pf === 'normal' ? null : pf);
             return { hidden: hiddenActs0.has(normTitle(t.name)), onToggleHide: () => this.toggleActHidden(t.name),
-              key: 'act:' + t.id + (t.alsoIn ? '@' + c.id : ''), kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onRun: () => this.startRun([this.listItemFromAct(t)], ''), editVals: { ...this.actEditVals(t), cat: t.homeCat || c.id, also: ((st.actEdits || {})[t.id] || {}).also || [] }, onEdit: (vals) => this.editAct(t.id, vals), onReset: t.edited ? () => this.resetAct(t.id) : null, onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym, t.prevNames), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
+              key: 'act:' + t.id + (t.alsoIn ? '@' + c.id : ''), kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onRec: startWith(t, 'end'), onPlan: startWith(t, 'start'), onRun: () => this.startRun([this.listItemFromAct(t)], ''), editVals: { ...this.actEditVals(t), cat: t.homeCat || c.id, also: ((st.actEdits || {})[t.id] || {}).also || [] }, onEdit: (vals) => this.editAct(t.id, vals), onReset: t.edited ? () => this.resetAct(t.id) : null, onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym, t.prevNames), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
               // 生活必須行動・やりたいこと（両方あるときの目標は生活必須行動の頻度）
               req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(t.name, kind, val) };
           }),
@@ -5396,7 +5436,7 @@ export default class App extends React.Component {
         name: st.pickList.name, tplKey: st.pickList.tplKey, tick: st.pickListTick,
         rows: st.pickList.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), onUp: () => this.moveListItem(li.uid, -1), onDown: () => this.moveListItem(li.uid, 1), onRemove: () => this.removeListItem(li.uid), onCopy: () => this.copyListItem(li.uid) })),
       }) : null,
-      setListName: this.setListName, listToConfirm: this.listToConfirm, saveListTemplate: this.saveListTemplate, tplAsk: st.tplAsk || null, tplWrite: this.tplWrite, tplAskClose: this.tplAskClose,
+      setListName: this.setListName, listToConfirm: this.listToConfirm, listToRec: () => this.listToConfirm('end'), listToPlan: () => this.listToConfirm('start'), saveListTemplate: this.saveListTemplate, tplAsk: st.tplAsk || null, tplWrite: this.tplWrite, tplAskClose: this.tplAskClose,
       startListRun: () => { const pl = st.pickList; if (pl.items.length) this.startRun(pl.items, (pl.name || '').trim(), true); },
       run: st.run ? (() => { try { return this.runVals(); } catch (e) { console.warn('[kamepace] run', e); return null; } })() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish, runDiscard: this.runDiscard, runRename: this.runRename, setRunAlarm: this.setRunAlarm,
       runAlarm: st.runAlarm, closeRunAlarm: this.closeRunAlarm, runAlarmNext: this.runAlarmNext,
