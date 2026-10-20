@@ -377,15 +377,19 @@ export function BedReview({ v }) {
   );
 }
 
-/* 起床 2: 推移グラフ（タイプ診断は就寝記録で行う） */
+/* 起床 2: 推移グラフ（タイプ診断は就寝記録で行う。昨日の就寝の記録がないときは、ここで昨日のタイプ・ランキングも） */
 export function WakeReview({ v }) {
   const w = v.wake;
   return (
     <div style={wrap}>
       <Head v={v} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingTop: 10 }}>
+        {/* 昨日の就寝の記録がないときは、就寝の記録の代わりに昨日のがんばりタイプ・ランキングも出す */}
+        {w.noBed && <TypeBlock sum={w.sum} label="昨日のがんばりタイプ" />}
         <Chart data={w.chart} />
         <div style={{ height: 8 }} />
+        {w.noBed && <RankList title="がんばりポイント" rows={w.sum.ups} sign="+" />}
+        {w.noBed && <RankList title="回復" rows={w.sum.recs} sign="−" />}
       </div>
       <div style={foot}>
         <button onClick={v.backWake('shaka')} style={btnSub}>もどる</button>

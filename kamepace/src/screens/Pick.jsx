@@ -328,8 +328,8 @@ function Card({ row, cat, v, hist, setHist, editReq, onMoved }) {
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px 12px' }}>
         {it.kind === 'act' && <>
-          <button onClick={it.onStart} style={gray}>予定</button>
-          <button onClick={it.onStart} style={gray}>記録</button>
+          <button onClick={it.onPlan || it.onStart} style={gray}>予定</button>
+          <button onClick={it.onRec || it.onStart} style={gray}>記録</button>
           <button onClick={it.onList} style={{ ...btn, flex: 1, minWidth: 0, border: '1.5px solid #e4e1d8', background: CREAM, color: INK, padding: '5px 0' }}>リスト＋</button>
         </>}
         {it.onTrash && <button onClick={it.onTrash} aria-label="ゴミ箱へ" style={{ ...gray, padding: '4px 10px' }}><span style={ms(18, '#b4645a')}>delete</span></button>}
@@ -391,8 +391,8 @@ function ListCard({ v, onPick }) {
         </div>
       ) :
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px 14px' }}>
-        <button onClick={empty ? undefined : v.listToConfirm} style={gray}>予定</button>
-        <button onClick={empty ? undefined : v.listToConfirm} style={gray}>記録</button>
+        <button onClick={empty ? undefined : v.listToPlan} style={gray}>予定</button>
+        <button onClick={empty ? undefined : v.listToRec} style={gray}>記録</button>
         <span style={{ flex: 1 }} />
         <button onClick={empty ? undefined : v.startListRun} style={{ flex: '0 0 44%', border: 'none', borderRadius: 12, background: empty ? '#e4e1d8' : '#c4f000', color: empty ? '#a5a39a' : '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: empty ? 'default' : 'pointer', letterSpacing: '.04em', boxShadow: empty ? 'none' : '0 4px 12px rgba(122,154,0,.3)' }}>START</button>
       </div>}
