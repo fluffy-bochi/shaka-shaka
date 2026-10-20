@@ -1,10 +1,11 @@
 import React from 'react';
 import Emo from '../fluent';
 import { FreqPop, History, HmInput } from './Pick';
+import { TaskEditPopup } from './Home';
 
 /* タスク実行（START）: いまの行動を大きく、開始時刻・いまの時刻と、経過／予定の時間のバー。
    ▶／⏸の左に 必・♡、右に りれき。その下に 全体／実施中 の アラーム（時刻）・タイマー（時間）を切り替えて設定。
-   いちばん下にリスト（タップで開く・閉じる。行をタップでその行動に切り替え・編集で↑↓と×・＋で追加）。右上の「記録」で終えて確認画面へ。 */
+   いちばん下にリスト（タップで開く・閉じる。行をタップでその行動に切り替え・編集で↑↓と×・＋で追加）とタスク（＋で追加）。右上の「記録」で終えて確認画面へ。 */
 const INK = '#1b1b18', SUB = '#55554e', MUTED = '#8a8a82', LIME = '#c4f000', LIME_INK = '#2f3a00';
 const mono = { fontFamily: "'Space Mono',monospace" };
 const ms = (size, color, fill = false) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: fill ? "'FILL' 1" : "'FILL' 0", fontSize: size, color, lineHeight: 1 });
@@ -189,6 +190,7 @@ export default function Run({ v }) {
                 <span style={{ ...mono, fontSize: 10.5, fontWeight: 700, color: MUTED, flex: '0 0 auto' }}>{t.minText}</span>
               </div>
             ))}
+            <button onClick={v.onAddRunTask} aria-label="タスクを追加" style={{ width: '100%', height: 40, border: '1.5px dashed #c9c7bf', borderRadius: 10, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(24, SUB)}>add</span></button>
           </div>
         )}
         {listOpen && tab === 'list' && (
@@ -218,6 +220,7 @@ export default function Run({ v }) {
           </div>
         )}
       </div>
+      {v.taskEditOpen && <TaskEditPopup v={v} />}
     </div>
   );
 }
