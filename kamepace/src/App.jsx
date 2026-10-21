@@ -752,6 +752,18 @@ export default class App extends React.Component {
     else this.save();
     if (st.screen === 'shaka' && drops.length) this.addFallingBodies(drops);
   }
+  /* ホームのバッジに出す1つ: いちばん強いもの（つらさ／強さ 0軽い・1ふつう・2強い）。
+     同じなら「いまの調子」で上にあるもの（体調 → デバフ → バフ、それぞれ並び順） */
+  topBuffGlyph() {
+    const rows = this.buffEntries().map((en, i) => {
+      const bi = BUFFS.findIndex(b => b.id === en.id), b = BUFFS[bi] || {};
+      const lv = en.level != null ? en.level : en.lv != null ? en.lv : 1;
+      const order = en.symptom ? i : 1000 + (b.kind === 'buff' ? 1000 : 0) + bi;
+      return { glyph: en.glyph || b.glyph, lv, order };
+    }).filter(r => r.glyph);
+    rows.sort((a, b) => b.lv - a.lv || a.order - b.order);
+    return rows.length ? rows[0].glyph : null;
+  }
   buffMult() {
     const out = { bodyFat: 1, mindFat: 1, bodyRec: 1, mindRec: 1 };
     this.buffEntries().forEach(en => {
@@ -5290,13 +5302,10 @@ export default class App extends React.Component {
         onDelete: () => this.deleteTask(t.srcId),
       })),
       onAddTask: this.addLocalTask, onAddRunTask: () => this.addLocalTask(todayStr()),
-      // 実行中の画面の「タスク」タブ: 今日のタスク（チェックで記録・ホームと同じ）
-      runTasks: (st.tasks || []).filter(t => t.date === todayStr() && t.title).map(t => {
-        const inRun = st.run && (st.run.tasks || []).find(x => x.srcId === t.srcId);
-        const done = !!inRun || this.taskShownDone(t);
-        const into = inRun && (st.run.items.find(li => li.uid === inRun.uid) || {}).name;
-        return { srcId: t.srcId, title: t.title, done, glyph: t.linkGlyph || null, linkName: t.linkName || '', minText: into ? into + 'にまとめた' : this.fmtMin(t.min || t.linkMin || 30), onToggle: inRun || !done ? () => this.runTaskToggle(t.srcId) : undefined };
-      }),
+      // 実行中の画面の「タスク」タブ: 今日のまだのタスク（チェックで記録・済んだものは出さない＝ホームと同じ）
+      runTasks: (st.tasks || []).filter(t => t.date === todayStr() && t.title && !this.taskShownDone(t) && !(st.run && (st.run.tasks || []).some(x => x.srcId === t.srcId))).map(t => (
+        { srcId: t.srcId, title: t.title, done: false, glyph: t.linkGlyph || null, linkName: t.linkName || '', minText: this.fmtMin(t.min || t.linkMin || 30), onToggle: () => this.runTaskToggle(t.srcId) }
+      )),
       // タスク編集ポップアップ
       taskEditOpen: !!st.taskEdit,
       taskEditTitle: st.taskEditTitle || '',
@@ -5496,7 +5505,7 @@ export default class App extends React.Component {
       moodPicked: !!st.moodId || !!st.moodSym || (st.tweetSyms || []).some(id => this.buffEntries().some(x => x.id === id)), moodIdPicked: !!st.moodId,
       /* バフ・デバフ */
       buffOpen: !!st.buffOpen, openBuffs: this.openBuffs, closeBuffs: this.closeBuffs,
-      activeBuffGlyphs: this.buffEntries().map(en => (BUFFS.find(b => b.id === en.id) || {}).glyph).filter(Boolean),
+      activeBuffGlyphs: this.topBuffGlyph() ? [this.topBuffGlyph()] : [],
       buffChoices: BUFFS.filter(b => (!b.legacy || this.buffEntries().some(x => x.id === b.id)) && !this.profileExcl().has(normTitle(b.name))).map(b => {
         const eff = [];
         if (b.kind === 'debuff') eff.push('1時間に約' + (Math.round(dripRate({ id: b.id }, b, st) * 10) / 10) + '個');
