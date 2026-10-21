@@ -178,7 +178,7 @@ export default function Home({ v }) {
             {/* いまの調子（バフ・デバフ）バッジ */}
             <button onClick={v.openBuffs} style={{ display: 'flex', alignItems: 'center', gap: 3, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, padding: '0 9px', cursor: 'pointer' }}>
               {v.activeBuffGlyphs.length > 0
-                ? v.activeBuffGlyphs.slice(0, 3).map((g, i) => <Emo key={i} e={g} size={20} />)
+                ? v.activeBuffGlyphs.slice(0, 1).map((g, i) => <Emo key={i} e={g} size={20} />)
                 : <span style={{ fontSize: 15 }}>🎭</span>}
             </button>
             <button onClick={v.goMypage} style={{ width: 38, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#55554e', cursor: 'pointer' }}>person</button>
