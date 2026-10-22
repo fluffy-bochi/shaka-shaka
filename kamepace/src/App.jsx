@@ -16,7 +16,7 @@ import {
 } from './model';
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout, loginCode, codeOfEmail, auth,
-  cloudSave, cloudSavePassive, setSaveErrorHandler, setConflictHandler, cloudIsNewer, loadUserData, fetchGoogleData, disconnectGoogle, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
+  cloudSave, cloudSavePassive, hasUnsaved, takeUnsavedBackup, setSaveErrorHandler, setConflictHandler, cloudIsNewer, loadUserData, fetchGoogleData, disconnectGoogle, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
   loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete, loadResearchConfig,
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
@@ -405,6 +405,8 @@ export default class App extends React.Component {
       this._pileLayout = null;
       // オンボ判定は「読み込んだデータ」で行う（this.set は非同期で this.state に即反映されないため）
       let onboardDone, hadData = false;
+      // 読み込み直し（soft）のとき、まだクラウドに届いていない記録があれば、置きかえずにまぜる（置きかえると、その記録が消える）
+      if (soft && data && hasUnsaved()) { this.mergeRemote(data); return; }
       if (data) {
         const fixed = this.repairDayCut(deserialize(data)), dd = fixed.data;
         if (fixed.changed) setTimeout(() => this.save(), 500);
@@ -412,6 +414,9 @@ export default class App extends React.Component {
         onboardDone = dd.onboardDone;
         hadData = (dd.entries || []).some(e => !e.sample && !e._sample) || (dd.collected || []).length > 0;
         this.restoreSampleMode(dd);
+        // 前回、クラウドに届く前にアプリが閉じた記録があれば、まぜて保存しなおす
+        const bk = !soft && takeUnsavedBackup();
+        if (bk) setTimeout(() => this.mergeRemote(bk), 300); // 控えは届いたら消すので、残っていれば届いていない
       } else {
         // 新規ユーザー（初めての登録）: ゲストのデータ（サンプル含む）は引き継がず、まっさらで開始
         this.set({ ...freshState(), booted: true, screen: 'shaka', dayOffset: 0 });

@@ -77,9 +77,21 @@ export function setConflictHandler(fn) { onConflict = fn; }
 // 最後にクラウドと合わせた時刻（読み込み・保存・確認）。続けて操作している間は確かめない（毎回読むと通信が重い）
 let syncedAt = 0, wasHidden = false;
 if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.hidden) wasHidden = true; });
+// まだクラウドに届いていない保存があるか（saveSeq＝頼んだ回数・ackSeq＝届いた回数）。
+// 2026-10-22: 実行中から記録した直後に、クラウドの版で画面を置きかえて記録が消えた。届くまでは置きかえずにまぜる
+let saveSeq = 0, ackSeq = 0;
+export const hasUnsaved = () => saveSeq > ackSeq;
+// 届くまでの控え（アプリが落ちても次の起動でまぜて戻す）
+const bkKey = () => 'kame_unsaved_' + auth.currentUser.uid;
+export function takeUnsavedBackup() {
+  if (!auth.currentUser) return null;
+  try { const s = localStorage.getItem(bkKey()); return s ? JSON.parse(s) : null; } catch (e) { return null; }
+}
 export function cloudSave(st) {
   if (!auth.currentUser) return;
   clearTimeout(saveTimer);
+  const seq = ++saveSeq;
+  try { localStorage.setItem(bkKey(), JSON.stringify(serialize(st))); } catch (e) { /* 入らなければ控えなし */ }
   saveTimer = setTimeout(async () => {
     // ユーザーごと（users/{uid}）に「日にち→予定・行動／task」の親子構造で保存
     const fail = (err) => { console.warn('[kamepace] save failed', err); if (onSaveError) onSaveError(err); };
@@ -94,7 +106,11 @@ export function cloudSave(st) {
     }
     try {
       const data = serialize(st);
-      setDoc(userDoc(), data).then(() => { lastStamp = Math.max(lastStamp, data.updatedAt || 0); syncedAt = Date.now(); }).catch(fail);
+      setDoc(userDoc(), data).then(() => {
+        lastStamp = Math.max(lastStamp, data.updatedAt || 0); syncedAt = Date.now();
+        ackSeq = Math.max(ackSeq, seq);
+        if (!hasUnsaved()) { try { localStorage.removeItem(bkKey()); } catch (e) { /* ignore */ } }
+      }).catch(fail);
     } catch (err) { fail(err); } // 中身がおかしいときは setDoc がその場で例外を投げる
   }, 600);
 }
