@@ -169,12 +169,15 @@ export default function MyPage({ v }) {
             <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
           </button>
           <div style={{ ...row(true), background: '#fff' }}>
-            <button onClick={v.doCalendarSync} style={{ display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: 0, border: 'none', background: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', color: 'inherit' }}>
+            <button onClick={v.gcalAutoOn} style={{ display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: 0, border: 'none', background: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', color: 'inherit' }}>
               <span style={{ fontSize: 16 }}>📅</span>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 14 }}>Googleカレンダー・ToDo</span>
-              <span style={{ display: 'inline-flex', background: '#eef7cc', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: '#2f3a00', flex: '0 0 auto' }}>取り込む</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 14 }}>Googleカレンダー</span>
+                {v.gcalStatusText && <span style={{ ...mono, fontSize: 10.5, color: '#9d9b91' }}>{v.gcalStatusText}</span>}
+              </span>
+              <span style={{ display: 'inline-flex', background: v.user && !v.gcalOff ? '#eef7cc' : '#f1efe8', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: v.user && !v.gcalOff ? '#2f3a00' : '#8a8a82', flex: '0 0 auto' }}>{!v.user ? 'ログインで連携' : v.gcalOff ? '連携する' : '🟢 いま取り込む'}</span>
             </button>
-            {v.user && <button onClick={() => v.openLinkOff('google')} style={linkOffBtn}>解除</button>}
+            {v.user && !v.gcalOff && <button onClick={() => v.openLinkOff('google')} style={linkOffBtn}>解除</button>}
           </div>
         </div>
         <div style={label}>れんけい</div>
