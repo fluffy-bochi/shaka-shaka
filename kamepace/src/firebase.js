@@ -144,7 +144,8 @@ export async function loadUserData() {
    同じFirebaseプロジェクトなので、Firestoreの users/{uid}/events を直接読む。
    取り込んだ予定は既存の importEvents 経由で「予定」になり、終了時刻で自動記録される */
 const tsToDate = (v) => (v && typeof v.toDate === 'function') ? v.toDate() : (v ? new Date(v) : null);
-export async function fetchScheduleEvents(dayCount = 2) {
+// googleOnly: Googleカレンダーの予定（mylifecore のサーバーが5分ごとに入れる google_〜）だけ。mylifecore の連携を切っていても使う
+export async function fetchScheduleEvents(dayCount = 2, googleOnly = false) {
   if (!auth.currentUser) return [];
   const start = new Date(); start.setHours(0, 0, 0, 0);
   const end = new Date(start); end.setDate(end.getDate() + dayCount); // 今日+明日
@@ -158,6 +159,7 @@ export async function fetchScheduleEvents(dayCount = 2) {
     if (!s) return;
     // 睡眠ブロック・時報・予測は取り込まない（記録の対象にならないもの）
     if (ev.blockType === 'sleep' || ev.blockType === 'chime' || ev.isPredicted) return;
+    if (googleOnly && !d.id.startsWith('google_')) return;
     out.push({
       srcId: 'sched:' + d.id,
       title: ev.title || '(無題の予定)',

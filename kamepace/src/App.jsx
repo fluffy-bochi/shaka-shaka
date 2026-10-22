@@ -4583,7 +4583,17 @@ export default class App extends React.Component {
      予定は時間どおりに進んで終了時刻で自動記録される（既存の planned/frame の仕組みに乗る） */
   async syncScheduleApp() {
     if (!this.state.user) return;
-    if ((this.state.prefs || {}).mlcOff) return; // マイページで mylifecore の連携を解除している
+    const pf = this.state.prefs || {};
+    // mylifecore の連携を解除していても、Googleカレンダーの予定だけは自動で取り込む（Googleの連携を解除していなければ）
+    if (pf.mlcOff) {
+      if (pf.gcalOff) return;
+      try {
+        const n = this.importEvents(await fetchScheduleEvents(2, true));
+        this.set({ lastGcalAt: Date.now() });
+        if (n > 0) this.toast('📅 Googleカレンダーから予定' + n + '件をとりこみました');
+      } catch (e) { console.warn('[kamepace] gcal sync failed', e); }
+      return;
+    }
     try {
       const [items, projTasks, dailyTasks] = await Promise.all([
         fetchScheduleEvents().catch(() => []),
@@ -4749,10 +4759,10 @@ export default class App extends React.Component {
     this.set({ linkOff: null });
     if (!kind) return;
     if (kind === 'mlc') this.set({ prefs: { ...(this.state.prefs || {}), mlcOff: true } });
-    else { try { await disconnectGoogle(); } catch (e) { /* ignore */ } }
+    else { this.set({ prefs: { ...(this.state.prefs || {}), gcalOff: true } }); try { await disconnectGoogle(); } catch (e) { /* ignore */ } }
     if (clear) {
       const t0 = todayStr();
-      const evRe = kind === 'mlc' ? /^sched:/ : /^cal:/, tkRe = kind === 'mlc' ? /^(ptask|daily):/ : /^task:/;
+      const evRe = kind === 'mlc' ? /^sched:/ : /^(cal:|sched:google_)/, tkRe = kind === 'mlc' ? /^(ptask|daily):/ : /^task:/;
       const entries = this.state.entries.map(e => (e.srcId && evRe.test(String(e.srcId)) && e.date >= t0 && !e.exp && (e.needsSetup || e.planned)) ? { ...e, exp: true, trashedAt: Date.now() } : e);
       const gone = (this.state.tasks || []).filter(t => tkRe.test(String(t.srcId || '')) && !t.done && t.date >= t0).map(t => t.srcId);
       const tasks = (this.state.tasks || []).filter(t => !gone.includes(t.srcId));
@@ -4763,6 +4773,16 @@ export default class App extends React.Component {
   };
   /* mylifecore の連携を戻す */
   mlcOn = () => { this.set({ prefs: { ...(this.state.prefs || {}), mlcOff: false } }); this.save(); setTimeout(() => this.syncMylifecore(), 0); };
+  /* Googleカレンダー: 自動の取り込みをオンにして、いま取り込む（ログインし直しはいらない） */
+  gcalAutoOn = async () => {
+    if (!this.state.user) { this.openAuth(); return; }
+    this.set({ prefs: { ...(this.state.prefs || {}), gcalOff: false } }); this.save();
+    try {
+      const n = this.importEvents(await fetchScheduleEvents(2, true));
+      this.set({ lastGcalAt: Date.now() });
+      this.toast(n > 0 ? '📅 Googleカレンダーから予定' + n + '件をとりこみました' : '📅 Googleカレンダーの新しい予定はなし');
+    } catch (e) { this.toast('⚠️ 取り込み失敗: ' + jpError((e && e.code) || '')); }
+  };
   doCalendarSync = async () => {
     if (!this.state.user) { this.openAuth(); return; }
     this.toast('⏳ 取り込み中…', 6000);
@@ -4789,13 +4809,15 @@ export default class App extends React.Component {
      - 初めてのタイトルは行動待ちの枠として置く（ホームでタップして行動を入れる → テンプレ保存） */
   importEvents(items) {
     if (!Array.isArray(items)) return 0;
-    // srcId は「cal:<id>#<タスク番号>」にもなるため、基部で重複判定
-    const existing = new Set(this.state.entries.filter(e => e.srcId).map(e => String(e.srcId).split('#')[0]));
+    // srcId は「cal:<id>#<タスク番号>」にもなるため、基部で重複判定。
+    // Googleの予定は手動の取り込み（cal:<id>）と自動（sched:google_<id>）で同じものとみなす
+    const base = (id) => String(id).split('#')[0].replace(/^sched:google_/, 'cal:');
+    const existing = new Set(this.state.entries.filter(e => e.srcId).map(e => base(e.srcId)));
     let added = 0;
     const newEntries = [];
     const now = Date.now();
     items.forEach(it => {
-      if (!it || !it.srcId || existing.has(it.srcId)) return; // 重複防止
+      if (!it || !it.srcId || existing.has(base(it.srcId))) return; // 重複防止
       const title = it.title || '(無題)';
       let date = it.date || todayStr();
       let from = it.from || '00:00';
@@ -5349,7 +5371,9 @@ export default class App extends React.Component {
         : st.user
         ? '連携中 · ' + (st.lastSyncAt ? this.tsToHm(st.lastSyncAt) + ' に同期' : 'ログイン時＋5分ごとに自動取り込み')
         : 'ログインすると予定・タスクを自動で取り込みます',
-      syncMylifecore: this.syncMylifecore,
+      syncMylifecore: this.syncMylifecore, gcalAutoOn: this.gcalAutoOn,
+      gcalOff: !!(st.prefs || {}).gcalOff,
+      gcalStatusText: !st.user ? '' : (st.prefs || {}).gcalOff ? '連携を解除しています' : '5分ごとに自動 · ' + (st.lastGcalAt ? this.tsToHm(st.lastGcalAt) + ' に取り込み' : '予定を自動で取り込みます'),
       // 睡眠カードに出す、その日の睡眠回復量（ためた回復の🌙を日別集計）
       sleepRecText: (() => {
         const dd = this.homeDateStr();
