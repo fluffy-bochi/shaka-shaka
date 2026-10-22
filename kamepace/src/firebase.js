@@ -431,11 +431,12 @@ export async function researchLoadAll() {
   }));
 }
 
-/* 研究の期間（協力者IDの頭のアルファベットごと）: config/research = { periods: { A: { label, start, end }, ... } }。
+/* 研究の期間（協力者IDの頭のアルファベットごと）: config/research = { periods: { A: { label, start, end }, ... }, people: { C01: { start, end }, ... } }。
+   people は人ごとの開始日・終了日（あればアルファベットの期間より優先）。
    誰でも読める・書けるのは開発者だけ（config のルール） */
 export async function loadResearchConfig() {
   const s = await getDoc(doc(db, 'config', 'research'));
-  return s.exists() ? s.data() : { periods: {} };
+  return s.exists() ? s.data() : { periods: {}, people: {} };
 }
 export async function saveResearchConfig(cfg) { await setDoc(doc(db, 'config', 'research'), { ...cfg, updatedAt: Date.now() }); }
 

@@ -2089,7 +2089,12 @@ export default class App extends React.Component {
   goResearchAdmin = () => this.set({ screen: 'researchAdmin' });
   /* ---- 研究への協力（協力者ID） ---- */
   /* 協力者IDの頭のアルファベット＝実験の期間。その期間の収集期間（start〜end、空なら制限なし） */
-  researchPeriod(code) { const ps = (this._resCfg && this._resCfg.periods) || {}; return ps[(code || '')[0]] || null; }
+  // 人ごとの開始日・終了日（config/research の people）があれば、そちらを優先
+  researchPeriod(code) {
+    const c = this._resCfg || {}, a = (c.periods || {})[(code || '')[0]] || null, o = (c.people || {})[code];
+    if (!o) return a;
+    return { ...(a || {}), ...(o.start ? { start: o.start } : {}), ...(o.end ? { end: o.end } : {}) };
+  }
   inResearchPeriod(code, d) { const p = this.researchPeriod(code); if (!p) return true; return (!p.start || d >= p.start) && (!p.end || d <= p.end); }
   // 送る日: 期間内で、番号を変えた人は新しい番号で使い始めた日（start）から
   researchSendable(r, d) { return this.inResearchPeriod(r.code, d) && (!r.start || d >= r.start); }

@@ -16,10 +16,10 @@ const pct = (r) => (r == null ? '—' : Math.round(r * 100) + '%');
 const NTH0 = Date.UTC(2000, 0, 1);
 const dUTC = (d) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
 const isNth = (d) => d < '2001';
-const toNth = (x) => {
+const toNth = (x, start) => {
   const ds = Object.keys(x.days || {}).sort();
   if (!ds.length) return x;
-  const b = dUTC(ds[0]), days = {};
+  const b = dUTC(start || ds[0]), days = {};
   ds.forEach(d => { days[new Date(NTH0 + dUTC(d) - b).toISOString().slice(0, 10)] = x.days[d]; });
   return { ...x, days };
 };
@@ -455,22 +455,29 @@ function AccountMaker({ onClose }) {
   );
 }
 
-/* 期間の設定（協力者IDの頭のアルファベットごと: 名前・開始日・終了日） */
-function PeriodEditor({ periods, onSave, onClose, readOnly }) {
+/* 期間の設定（協力者IDの頭のアルファベットごと: 名前・開始日・終了日）＋人ごとの開始日・終了日（空ならアルファベットの期間） */
+function PeriodEditor({ periods, people, codes, onSave, onClose, readOnly }) {
   const [rows, setRows] = React.useState(() => {
     const ks = Object.keys(periods || {}).sort();
     const base = ks.length ? ks : ['A', 'B', 'C'];
     const def = { A: '自分', B: '身近な人', C: '本番' };
     return base.map(k => ({ k, label: (periods[k] && periods[k].label) || def[k] || '', start: (periods[k] && periods[k].start) || '', end: (periods[k] && periods[k].end) || '' }));
   });
+  const [ppl, setPpl] = React.useState(() => Object.fromEntries(codes.map(c => [c, { start: (people[c] && people[c].start) || '', end: (people[c] && people[c].end) || '' }])));
   const [busy, setBusy] = React.useState(false);
+  const setP = (c, patch) => setPpl(o => ({ ...o, [c]: { ...o[c], ...patch } }));
   const setRow = (i, patch) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const nextK = () => { for (let c = 65; c <= 90; c++) { const k = String.fromCharCode(c); if (!rows.some(r => r.k === k)) return k; } return null; };
   const inp = { height: 34, border: '1.5px solid #e4e1d8', borderRadius: 8, fontSize: 13, fontWeight: 700, padding: '0 8px', fontFamily: 'inherit', boxSizing: 'border-box' };
-  const save = async () => { setBusy(true); const ps = {}; rows.forEach(r => { ps[r.k] = { label: r.label, start: r.start, end: r.end }; }); await onSave(ps); setBusy(false); };
+  const save = async () => {
+    setBusy(true);
+    const ps = {}; rows.forEach(r => { ps[r.k] = { label: r.label, start: r.start, end: r.end }; });
+    const pe = { ...people }; Object.entries(ppl).forEach(([c, v]) => { if (v.start || v.end) pe[c] = v; else delete pe[c]; });
+    await onSave(ps, pe); setBusy(false);
+  };
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: '#fff', borderRadius: 18, padding: '18px 18px 16px', boxShadow: '0 20px 50px rgba(27,27,24,.3)' }}>
+      <div onClick={(e) => e.stopPropagation()} className="nos" style={{ width: '100%', maxWidth: 560, maxHeight: '90%', overflowY: 'auto', boxSizing: 'border-box', background: '#fff', borderRadius: 18, padding: '18px 18px 16px', boxShadow: '0 20px 50px rgba(27,27,24,.3)' }}>
         <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>期間の設定</div>
         <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 12, lineHeight: 1.6 }}>協力者IDの頭のアルファベットが期間です（例: A01）。期間の外の日は送られません。</div>
         <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 130px 28px', gap: 8, alignItems: 'center', fontSize: 10.5, color: MUTED, fontWeight: 700, marginBottom: 6 }}>
@@ -486,6 +493,20 @@ function PeriodEditor({ periods, onSave, onClose, readOnly }) {
           </div>
         ))}
         {!readOnly && nextK() && <button onClick={() => setRows(rs => [...rs, { k: nextK(), label: '', start: '', end: '' }])} style={{ ...btn(false), marginTop: 2 }}>＋ 期間を追加</button>}
+        {codes.length > 0 && <>
+          <div style={{ fontSize: 14, fontWeight: 900, margin: '18px 0 8px' }}>人ごとの開始日・終了日</div>
+          {codes.map(c => {
+            const pp = rows.find(r => r.k === c[0]) || {}, v = ppl[c];
+            return (
+              <div key={c} style={{ display: 'grid', gridTemplateColumns: '1fr 130px 130px 28px', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ ...mono, fontSize: 15, fontWeight: 900 }}>{c}</span>
+                <input type="date" value={v.start} disabled={readOnly} onChange={(e) => setP(c, { start: e.target.value })} style={{ ...inp, color: v.start ? INK : MUTED }} title={pp.start || ''} />
+                <input type="date" value={v.end} disabled={readOnly} onChange={(e) => setP(c, { end: e.target.value })} style={{ ...inp, color: v.end ? INK : MUTED }} title={pp.end || ''} />
+                {!readOnly && (v.start || v.end) ? <button onClick={() => setP(c, { start: '', end: '' })} aria-label="期間どおりに戻す" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontFamily: 'Material Symbols Rounded', fontSize: 19, color: MUTED }}>undo</button> : <span />}
+              </div>
+            );
+          })}
+        </>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
           <button onClick={onClose} style={btn(false)}>{readOnly ? '閉じる' : 'キャンセル'}</button>
           {!readOnly && <button onClick={busy ? undefined : save} style={btn(true)}>{busy ? '保存中…' : '保存'}</button>}
@@ -503,7 +524,7 @@ export default function ResearchAdmin({ v }) {
   const [demo, setDemo] = React.useState(false);
   const [sel, setSel] = React.useState(null);
   const demoData = React.useMemo(() => demoParticipants(), []);
-  const [cfg, setCfg] = React.useState({ periods: {} }); // 期間（config/research）
+  const [cfg, setCfg] = React.useState({ periods: {}, people: {} }); // 期間（config/research）
   const [per, setPer] = React.useState(''); // 表示する期間（''＝すべて）
   const [editPer, setEditPer] = React.useState(false);
   const [mkAcc, setMkAcc] = React.useState(false); // 参加者アカウントを作る
@@ -516,13 +537,16 @@ export default function ResearchAdmin({ v }) {
   const load = () => { setErr(''); setReal(null); src().then(ps => setReal(ps.sort((a, b) => a.code.localeCompare(b.code)))).catch(e => setErr(e && e.code === 'permission-denied' ? '読み取りの権限がありません（Firestore のルールと、開発者アカウントでのログインを確認）' : '読み込めませんでした')); };
   React.useEffect(load, []);
   const periods = (demo ? demoData.periods : cfg.periods) || {};
-  // 参加者は、コードのアルファベットの期間の日だけを使う（期間が未設定なら全部）
-  const clip = (x) => { const pp = periods[x.code[0]]; if (!pp) return x; const days = {}; Object.keys(x.days).forEach(d => { if ((!pp.start || d >= pp.start) && (!pp.end || d <= pp.end)) days[d] = x.days[d]; }); return { ...x, days }; };
+  const people = (demo ? demoData.people : cfg.people) || {};
+  // その人の期間: 人ごとの開始日・終了日があればそれ、なければコードのアルファベットの期間
+  const perOf = (code) => { const a = periods[code[0]], o = people[code]; if (!o) return a || null; return { ...(a || {}), ...(o.start ? { start: o.start } : {}), ...(o.end ? { end: o.end } : {}) }; };
+  // 参加者は、その人の期間の日だけを使う（期間が未設定なら全部）。集めたデータはそのまま残し、表示で切り出すだけ
+  const clip = (x) => { const pp = perOf(x.code); if (!pp) return x; const days = {}; Object.keys(x.days).forEach(d => { if ((!pp.start || d >= pp.start) && (!pp.end || d <= pp.end)) days[d] = x.days[d]; }); return { ...x, days }; };
   const allParts = (demo ? demoData.parts : real);
   const realParts = allParts && allParts.filter(x => !per || x.code[0] === per).map(clip); // CSV は本当の日付で
-  const parts = realParts && (nth ? realParts.map(toNth) : realParts);
+  const parts = realParts && (nth ? realParts.map(x => toNth(x, people[x.code] && people[x.code].start)) : realParts);
   const letters = [...new Set([...Object.keys(periods), ...((allParts || []).map(x => x.code[0]))])].sort();
-  const savePeriods = async (ps) => { try { await saveResearchConfig({ periods: ps }); setCfg({ periods: ps }); setEditPer(false); } catch (e) { setErr('期間を保存できませんでした（ルール・ログインを確認）'); } };
+  const savePeriods = async (ps, pe) => { try { await saveResearchConfig({ periods: ps, people: pe }); setCfg({ periods: ps, people: pe }); setEditPer(false); } catch (e) { setErr('期間を保存できませんでした（ルール・ログインを確認）'); } };
   const p = parts && (parts.find(x => x.code === sel) || (wide ? parts[0] : null));
   const csvAll = () => { const f = csvFiles(realParts); Object.entries(f).forEach(([n, t]) => downloadText((demo ? 'デモ_' : '') + (per ? '期間' + per + '_' : '全員_') + n, t)); };
   const csvOne = (x) => { const f = csvFiles([realParts.find(r => r.code === x.code) || x]); Object.entries(f).forEach(([n, t]) => downloadText((demo ? 'デモ_' : '') + x.code + '_' + n, t)); };
@@ -566,7 +590,7 @@ export default function ResearchAdmin({ v }) {
       {!demo && err && <div style={{ ...card, color: '#b4645a', fontSize: 12.5, fontWeight: 700, marginBottom: 12 }}>{err}</div>}
       {!demo && !err && !real && <div style={{ textAlign: 'center', color: MUTED, fontSize: 12.5, padding: 30 }}>読み込み中…</div>}
       {parts && !parts.length && <div style={{ ...card, fontSize: 12.5, color: MUTED }}>{per ? 'この期間の参加者はまだいません。' : 'まだ参加者がいません。「デモ」で見た目を確認できます。'}</div>}
-      {editPer && <PeriodEditor periods={periods} readOnly={demo} onSave={savePeriods} onClose={() => setEditPer(false)} />}
+      {editPer && <PeriodEditor periods={periods} people={people} codes={(allParts || []).map(x => x.code).filter(c => !per || c[0] === per)} readOnly={demo} onSave={savePeriods} onClose={() => setEditPer(false)} />}
       {mkAcc && <AccountMaker onClose={() => setMkAcc(false)} />}
     </>
   );
