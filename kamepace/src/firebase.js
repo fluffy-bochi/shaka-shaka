@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, doc, getDoc, getDocFromServer, setDoc,
-  collection, query, where, getDocs, Timestamp, writeBatch, deleteDoc, updateDoc,
+  collection, query, where, getDocs, Timestamp, writeBatch, deleteDoc, updateDoc, runTransaction,
 } from 'firebase/firestore';
 import { serialize } from './model';
 
@@ -65,18 +65,17 @@ export async function logout() { googleAccessToken = null; await fbSignOut(auth)
    カレンダーアプリは users/{uid}/ 配下のサブコレクション(events, projectTasks, dailyData…)を使うので、
    かめペースのデータは users/{uid}/apps/kamepace に置いて衝突を避ける */
 function userDoc() { return doc(db, 'users', auth.currentUser.uid, 'apps', 'kamepace'); }
-let saveTimer = null;
-// この端末が最後に読んだ／書いたクラウドの updatedAt（ほかの端末があとから書いたかを見分ける）
+let saveTimer = null, saveChain = Promise.resolve();
+// この端末が最後に読んだ／書いたクラウドの版（updatedAt）。クラウドの版がこれと違えば、ほかの端末があとから書いている
+// （端末ごとに時計がずれるので、大小ではなく同じかどうかで見る）
 let lastStamp = 0;
+const stampOf = (snap) => (snap.exists() ? (snap.data().updatedAt || 0) : 0);
 // 保存に失敗したときの知らせ先（画面にトーストを出す）。黙って失敗すると、リロードで記録が消えるまで気づけない
 let onSaveError = null;
 export function setSaveErrorHandler(fn) { onSaveError = fn; }
 // ほかの端末（開きっぱなしの別の画面も）があとから保存していたときの受け手。上書きせずに、まぜてから保存しなおしてもらう
 let onConflict = null;
 export function setConflictHandler(fn) { onConflict = fn; }
-// 最後にクラウドと合わせた時刻（読み込み・保存・確認）。続けて操作している間は確かめない（毎回読むと通信が重い）
-let syncedAt = 0, wasHidden = false;
-if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.hidden) wasHidden = true; });
 // まだクラウドに届いていない保存があるか（saveSeq＝頼んだ回数・ackSeq＝届いた回数）。
 // 2026-10-22: 実行中から記録した直後に、クラウドの版で画面を置きかえて記録が消えた。届くまでは置きかえずにまぜる
 let saveSeq = 0, ackSeq = 0;
@@ -87,32 +86,44 @@ export function takeUnsavedBackup() {
   if (!auth.currentUser) return null;
   try { const s = localStorage.getItem(bkKey()); return s ? JSON.parse(s) : null; } catch (e) { return null; }
 }
+/* 保存: クラウドの版を読んで、この端末が知っている版のままなら書く（読む〜書くを1つのトランザクションで）。
+   ほかの端末があとから書いていたら、書かずに onConflict でまぜてもらう（まぜたあとの保存で書く）。
+   2026-10-26: PCで開いたままの画面が、予定の取り込みなどの保存で古い中身を丸ごと書き、スマホの実行中の記録・タスクの完了が消えた。
+   以前は「画面を離れたあと・2分以上ぶり」のときだけ確かめていて、PCは自分の保存のたびに確かめなくなっていた */
 export function cloudSave(st) {
   if (!auth.currentUser) return;
   clearTimeout(saveTimer);
   const seq = ++saveSeq;
   try { localStorage.setItem(bkKey(), JSON.stringify(serialize(st))); } catch (e) { /* 入らなければ控えなし */ }
-  saveTimer = setTimeout(async () => {
-    // ユーザーごと（users/{uid}）に「日にち→予定・行動／task」の親子構造で保存
-    const fail = (err) => { console.warn('[kamepace] save failed', err); if (onSaveError) onSaveError(err); };
-    // 2026-10-20: 開きっぱなしの古い画面の保存で、別の画面で入れた朝の記録が消えた。書く前にクラウドのほうが新しくないか確かめる
-    if (onConflict && (wasHidden || Date.now() - syncedAt > 2 * 60000)) {
-      try {
-        const snap = await getDocFromServer(userDoc());
-        const remote = snap.exists() ? (snap.data().updatedAt || 0) : 0;
-        wasHidden = false; syncedAt = Date.now();
-        if (remote > lastStamp) { lastStamp = remote; onConflict(snap.data()); return; }
-      } catch (e) { /* 確かめられないとき（通信がないなど）は今までどおり書く */ }
+  saveTimer = setTimeout(() => { saveChain = saveChain.then(() => writeSave(st, seq)); }, 600);
+}
+async function writeSave(st, seq) {
+  const fail = (err) => { console.warn('[kamepace] save failed', err); if (onSaveError) onSaveError(err); };
+  const done = (data) => {
+    lastStamp = data.updatedAt || 0;
+    ackSeq = Math.max(ackSeq, seq);
+    if (!hasUnsaved()) { try { localStorage.removeItem(bkKey()); } catch (e) { /* ignore */ } }
+  };
+  let data;
+  try { data = serialize(st); } catch (err) { fail(err); return; }
+  try {
+    const ref = userDoc();
+    const theirs = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (onConflict && snap.exists() && stampOf(snap) !== lastStamp) return snap.data();
+      tx.set(ref, data);
+      return null;
+    });
+    if (theirs) { lastStamp = theirs.updatedAt || 0; onConflict(theirs); return; }
+    done(data);
+  } catch (err) {
+    // 通信がないときはトランザクションができないので、今までどおり書いておく（つながったら送られる）
+    if (err && (err.code === 'unavailable' || err.code === 'deadline-exceeded')) {
+      try { await setDoc(userDoc(), data); done(data); } catch (e) { fail(e); }
+      return;
     }
-    try {
-      const data = serialize(st);
-      setDoc(userDoc(), data).then(() => {
-        lastStamp = Math.max(lastStamp, data.updatedAt || 0); syncedAt = Date.now();
-        ackSeq = Math.max(ackSeq, seq);
-        if (!hasUnsaved()) { try { localStorage.removeItem(bkKey()); } catch (e) { /* ignore */ } }
-      }).catch(fail);
-    } catch (err) { fail(err); } // 中身がおかしいときは setDoc がその場で例外を投げる
-  }, 600);
+    fail(err);
+  }
 }
 /* 自動で起きた変更（体調のアイコンが降った など）の保存。開きっぱなしの古い端末が、ほかの端末の新しい記録を上書きしないように、
    クラウドのほうが新しければ保存せず onNewer（読み込み直し）を呼ぶ */
@@ -120,8 +131,7 @@ export async function cloudSavePassive(st, onNewer) {
   if (!auth.currentUser) return;
   try {
     const snap = await getDocFromServer(userDoc());
-    const remote = snap.exists() ? (snap.data().updatedAt || 0) : 0;
-    if (remote > lastStamp) { onNewer(); return; }
+    if (snap.exists() && stampOf(snap) !== lastStamp) { onNewer(); return; }
   } catch (e) { return; } // 確かめられないときは書かない（次の機会に）
   cloudSave(st);
 }
@@ -129,14 +139,13 @@ export async function cloudSavePassive(st, onNewer) {
 /* クラウドに、この端末が読んだあとでほかの端末が書いた版があるか */
 export async function cloudIsNewer() {
   if (!auth.currentUser) return false;
-  try { const snap = await getDocFromServer(userDoc()); wasHidden = false; syncedAt = Date.now(); return (snap.exists() ? (snap.data().updatedAt || 0) : 0) > lastStamp; } catch (e) { return false; }
+  try { const snap = await getDocFromServer(userDoc()); return snap.exists() && stampOf(snap) !== lastStamp; } catch (e) { return false; }
 }
 
 export async function loadUserData() {
   const snap = await getDoc(userDoc());
   const data = snap.exists() ? snap.data() : null;
-  if (data) lastStamp = Math.max(lastStamp, data.updatedAt || 0);
-  syncedAt = Date.now(); wasHidden = false;
+  if (data) lastStamp = data.updatedAt || 0;
   return data;
 }
 

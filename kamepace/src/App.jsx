@@ -3638,9 +3638,11 @@ export default class App extends React.Component {
     const byDate = (mine, theirs) => [...mine, ...(theirs || []).filter(x => !mine.some(m => m.date === x.date))].sort((a, b) => a.date.localeCompare(b.date));
     const tkey = (t) => t.srcId || t.date + ':' + t.title;
     const tk = new Set((st.tasks || []).map(tkey));
+    // 同じタスクは、どちらかで完了していれば完了（開いたままの古い画面の「未完了」で、ほかの端末の完了を戻さない。2026-10-26）
+    const doneR = new Set((r.tasks || []).filter(t => t.done).map(tkey));
     const patch = {
       wakeLog: byDate(st.wakeLog || [], r.wakeLog), bedLog: byDate(st.bedLog || [], r.bedLog),
-      tasks: [...(st.tasks || []), ...(r.tasks || []).filter(t => !tk.has(tkey(t)))],
+      tasks: [...(st.tasks || []).map(t => (!t.done && doneR.has(tkey(t)) ? { ...t, done: true } : t)), ...(r.tasks || []).filter(t => !tk.has(tkey(t)))],
     };
     if (addE.length) { patch.entries = sortEntries([...st.entries, ...addE]); this._pileLayout = null; }
     this.set(patch);
