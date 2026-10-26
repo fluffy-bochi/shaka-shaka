@@ -51,6 +51,8 @@ const GROUPS = [
     { key: 'TPL_REVIEW_UP', label: '力を入れた行動', vars: ['行動'] },
     { key: 'TPL_REVIEW_REC', label: '一番回復した行動', vars: ['行動'] },
     { key: 'TPL_REVIEW_YUTTARI_REC', label: 'ゆったりの日の回復', vars: ['行動'] },
+    { key: 'TPL_REVIEW_BURDEN', label: '1位が不調のとき', vars: ['不調'] },
+    { key: 'TPL_REVIEW_BURDEN_DID', label: '1位が不調のとき・できたこと', vars: ['行動'] },
   ] },
   { id: 'wake', label: '起床記録', size: 130, items: [
     { key: 'TPL_PLAN_HAS', label: '予定がある日', vars: ['件数', '最初の予定'] },
@@ -84,7 +86,7 @@ const GROUPS = [
 ];
 
 /* プレビュー用: 選んだセリフを、実際の画面と同じつなぎ方で1つの吹き出しにする（例の値を差し込む） */
-const EX = { 行動: 'レポート・課題', 回復: '入浴', 予定: '1限 デザイン史', 時刻: '14:00', 件数: 3, 最初の予定: '1限 デザイン史', 日数: 3, 達成: 2, 回数: 3, 曜日: '木' };
+const EX = { 不調: '心がつかれ気味', 行動: 'レポート・課題', 回復: '入浴', 予定: '1限 デザイン史', 時刻: '14:00', 件数: 3, 最初の予定: '1限 デザイン史', 日数: 3, 達成: 2, 回数: 3, 曜日: '木' };
 function compose(key, line, L) {
   const f0 = (k, vals) => fill(L(k)[0] || '', vals || {});
   const tip = (t) => restTip(L('TPL_REST_TIP')[0] || '', t);
@@ -104,6 +106,8 @@ function compose(key, line, L) {
     case 'TPL_REST_TIP': return (L('REST_INTRO')[0] || '') + restTip(line, L('REST_TIPS')[0] || '');
     case 'TPL_REVIEW_UP': return (L('REVIEW_BASE_hodohodo')[0] || '') + fill(line, EX) + f0('TPL_REVIEW_REC', { 行動: EX.回復 }) + (L('REVIEW_CLOSER_hodohodo')[0] || '');
     case 'TPL_REVIEW_REC': return (L('REVIEW_BASE_hodohodo')[0] || '') + f0('TPL_REVIEW_UP', { 行動: EX.行動 }) + fill(line, { 行動: EX.回復 }) + (L('REVIEW_CLOSER_hodohodo')[0] || '');
+    case 'TPL_REVIEW_BURDEN': return (L('REVIEW_BASE_hodohodo')[0] || '') + fill(line, EX) + f0('TPL_REVIEW_BURDEN_DID', EX) + (L('REVIEW_CLOSER_hodohodo')[0] || '');
+    case 'TPL_REVIEW_BURDEN_DID': return (L('REVIEW_BASE_hodohodo')[0] || '') + f0('TPL_REVIEW_BURDEN', EX) + fill(line, EX) + (L('REVIEW_CLOSER_hodohodo')[0] || '');
     case 'TPL_REVIEW_YUTTARI_REC': return (L('REVIEW_BASE_yuttari')[0] || '') + fill(line, { 行動: EX.回復 }) + (L('REVIEW_CLOSER_yuttari')[0] || '');
     case 'TPL_PLAN_HAS': return plan(fill(line, EX), f0('TPL_PLAN_TASKS', { 件数: 2 }), L('PLAN_CLOSER')[0] || '');
     case 'TPL_PLAN_NONE': return plan(line, '', L('PLAN_CLOSER')[0] || '');
