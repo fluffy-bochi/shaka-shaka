@@ -39,6 +39,8 @@ const TPL = {
   TPL_REVIEW_UP: ['{行動}に力を入れましたね。'],
   TPL_REVIEW_REC: ['{行動}で一番回復しましたね。'],
   TPL_REVIEW_YUTTARI_REC: ['{行動}で休憩できましたか？'],
+  TPL_REVIEW_BURDEN: ['{不調}の負担が多かったようです。'],
+  TPL_REVIEW_BURDEN_DID: ['今日は{行動}ができましたね。'],
   TPL_PLAN_HAS: ['今日の予定は{件数}件。{最初の予定}から始まります。'],
   TPL_PLAN_NONE: ['今日は予定が入っていません。'],
   TPL_PLAN_TASKS: ['タスクは{件数}件あります。'],

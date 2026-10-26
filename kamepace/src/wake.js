@@ -59,29 +59,39 @@ export function typeOfCurve(curve) {
   return WAKE_TYPES[best];
 }
 
+// 体調の不調の記録（症状・デバフのアイコン・自動の症状）。がんばった行動としては言わない
+const isCond = (e) => !!(e.drip || e.symptom || e.autoSym);
 /* 昨日のまとめ: タイプ・一番力を入れた行動・一番回復した行動 */
 export function daySummary(entries, dateStr, startFat, range) {
   const curve = fatigueCurve(entries, dateStr, startFat, range); // 起床〜就寝で一番長く居たゾーン
   const list = (entries || []).filter(e => e.date === dateStr && !e.exp && !e.wakeAdd && e.delta && e.title);
   // 行動ごとに合計して、がんばりポイント（＋）・回復（−）の多い順に3位まで。いこいさんの「〇〇に力を入れましたね」は1位の行動
-  const rank = (sign) => {
+  const rank = (sign, rows = list) => {
     const by = {};
-    list.filter(e => e.delta * sign > 0).forEach(e => {
-      const r = by[e.title] || (by[e.title] = { title: e.title, glyph: entryGlyph(e), pt: 0, min: 0 });
+    rows.filter(e => e.delta * sign > 0).forEach(e => {
+      const r = by[e.title] || (by[e.title] = { title: e.title, glyph: entryGlyph(e), pt: 0, min: 0, cond: isCond(e) });
       r.pt += Math.abs(e.delta);
       r.min += entryMin(e) || 0; // その行動にかけた時間（合計）
     });
-    return Object.values(by).filter(r => r.pt >= 0.5).sort((a, b) => b.pt - a.pt).slice(0, 3).map(r => ({ ...r, pt: Math.round(r.pt) }));
+    return Object.values(by).filter(r => r.pt >= 0.5).sort((a, b) => b.pt - a.pt).map(r => ({ ...r, pt: Math.round(r.pt) }));
   };
-  const ups = rank(1), recs = rank(-1), up = ups[0], rec = recs[0];
-  return { type: typeOfCurve(curve), up: up && up.title, rec: rec && rec.title, upGlyph: up && up.glyph, recGlyph: rec && rec.glyph, ups, recs, has: list.length > 0 };
+  const upAll = rank(1), recAll = rank(-1), ups = upAll.slice(0, 3), recs = recAll.slice(0, 3), up = ups[0], rec = recs[0];
+  // 1位が体調の不調（症状・デバフのアイコン）のとき、いこいさんは「〇〇の負担が多かった」と言い、できたこと（不調でない行動の上位、なければ日中にとった休み）に触れる
+  const did = up && up.cond ? (upAll.find(r => !r.cond) || rank(-1, list.filter(e => !isCond(e) && e.from && e.from >= '06:00' && e.from < '18:00'))[0] || null) : null;
+  return { type: typeOfCurve(curve), up: up && up.title, rec: rec && rec.title, upGlyph: up && up.glyph, recGlyph: rec && rec.glyph, ups, recs, has: list.length > 0,
+    burden: up && up.cond ? up.title : null, did: did && did.title, didRest: !!(did && did.pt && !upAll.includes(did)) };
 }
 
 /* 画面3: 昨日のふりかえりのセリフ */
 export function reviewLine(sum, dateStr) {
   const id = sum.type.id;
   const parts = [pick(dateStr + 'b', L('REVIEW_BASE_' + id))];
-  if (id === 'yuttari') {
+  if (sum.burden) {
+    // 1位が不調: 「〇〇の負担が多かったようです。今日は△△ができましたね。」（△△を日中の休みからとったときは、回復の一言は重ねない）
+    parts.push(fill(pick(dateStr + 'u', L('TPL_REVIEW_BURDEN')), { 不調: sum.burden }));
+    if (sum.did) parts.push(fill(pick(dateStr + 'd', L('TPL_REVIEW_BURDEN_DID')), { 行動: sum.did }));
+    if (sum.rec && !sum.didRest && id !== 'yuttari') parts.push(fill(pick(dateStr + 'r', L('TPL_REVIEW_REC')), { 行動: sum.rec }));
+  } else if (id === 'yuttari') {
     // ゆったりの日は「何もしていない」前提にせず、回復の記録（休憩・睡眠など）で山が減ったときだけ休憩できたかを聞く
     if (sum.rec) parts.push(fill(pick(dateStr + 'r', L('TPL_REVIEW_YUTTARI_REC')), { 行動: sum.rec }));
   } else {
