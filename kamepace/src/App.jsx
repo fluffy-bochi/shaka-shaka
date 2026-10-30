@@ -152,6 +152,7 @@ export default class App extends React.Component {
     /* いまの調子（バフ・デバフ）シート */
     buffOpen: false,
     buffCheckOpen: false,
+    wakeTarget: null, // 入力中の起床後の記録の日（goSleep で決める）
     symAdjust: null,
     buffCfgId: null,
     buffCfgTitle: '',
@@ -1826,7 +1827,8 @@ export default class App extends React.Component {
       key: 'wake', kind: 'wake', sortHm: wakeHm || '00:00', slot: 'asa', glyph: '🌅',
       head: '起床後の記録', time: hmText(wakeHm), main: wk ? (wk.note || '') : '', empty: !wk, isNote: !!(wk && wk.note),
       sumText: wk && moon ? '−' + moon : '', past: !!wk, cond: wk ? condOf({ ts: wk.ts, cond: wk.cond, mood: wk.mood }) : null,
-      onTap: this.goSleep, onMenu: wk ? () => this.openRecMenu({ logKind: 'wake', logDate: d, title: '起床後の記録', glyph: '🌅' }) : this.goSleep,
+      // 今日の枠は wakeDay（就寝を押し忘れて朝5時前に起きたら次の日の起床）。前の日の枠ならその日
+      onTap: () => this.goSleep(d === today ? null : d), onMenu: wk ? () => this.openRecMenu({ logKind: 'wake', logDate: d, title: '起床後の記録', glyph: '🌅' }) : () => this.goSleep(d === today ? null : d),
     });
     posts.push({
       key: 'bed', kind: 'bed', sortHm: bedHm || '99:99', slot: 'yoru', glyph: '🌙',
@@ -2268,24 +2270,38 @@ export default class App extends React.Component {
       }, 0);
     }
   };
-  goSleep = () => {
+  // day: どの日の起床か（ホームで日を見て押したらその日。ふだんは wakeDay）
+  goSleep = (day) => {
+    const d = typeof day === 'string' && day <= calendarTodayStr() ? day : this.wakeDay();
+    this.set({ wakeTarget: d });
     // 翌朝＝睡眠記録のタイミングで、続いている調子（バフ・デバフ）をまだ続いているか確認
     if (this.buffEntries().length && this.state.lastBuffCheck !== todayStr()) {
       this.set({ buffCheckOpen: true });
       return;
     }
-    this._enterWake();
+    this._enterWake(d);
   };
   /* 起床後記録: 1) 体調・気分・残りの疲労を入力 → 2) シャカで🌙が降って残りの量まで減る → 3) 昨日のふりかえり → 4) 今日の予定 */
-  // 起床記録の日: 就寝を押し忘れて朝5時前に起きたときも、カレンダーの今日にする
-  // 起床はいつもカレンダーの今日（就寝の記録が遅れて入っても、起床の日がずれないように）
-  wakeDay() { return calendarTodayStr(); }
-  _enterWake() {
+  // 起床記録の日: アプリの「今日」（0時を過ぎてもまだ就寝していなければ前の日なので、その日の起床後の記録になる）。
+  // 就寝を押し忘れて朝5時前に起きたとき（その日の起床はもう記録済み）は、カレンダーの今日
+  wakeDay() {
+    const t = todayStr(), c = calendarTodayStr();
+    return t < c && (this.state.wakeLog || []).some(w => w.date === t) ? c : t;
+  }
+  // いま入力している起床後の記録の日（goSleep で決めた日）
+  wakeTargetDay() { return this.state.wakeTarget || this.wakeDay(); }
+  // カレンダーの今日より前の日の起床をあとから記録している（0時を過ぎて前の日の朝の分を入れる など）
+  wakeIsLate(day) { return (day || this.wakeTargetDay()) < calendarTodayStr(); }
+  _enterWake(dayIn) {
     // 今日すでに記録していれば、入力した内容をそのまま出す。起床時刻の初期値は「いま（この画面を開いた時刻）」、就寝は前回の就寝時刻（なければ23:00）
-    const w = (this.state.wakeLog || []).find(x => x.date === this.wakeDay());
-    const lastBed = [...(this.state.bedLog || [])].reverse().find(x => x.hm && Date.now() - x.ts < 30 * 3600000); // 前夜の就寝記録
+    const day = dayIn || this.wakeTargetDay(), late = this.wakeIsLate(day);
+    const w = (this.state.wakeLog || []).find(x => x.date === day);
+    const lastBed = late ? (this.state.bedLog || []).find(x => x.date === shiftDate(day, -1) && x.hm) // あとから: その前の夜の就寝
+      : [...(this.state.bedLog || [])].reverse().find(x => x.hm && Date.now() - x.ts < 30 * 3600000); // 前夜の就寝記録
     const last = lastBed ? { bed: lastBed.hm } : [...(this.state.wakeLog || [])].reverse().find(x => x.bed);
-    const nowHm = pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes()); // 起床時刻の入力欄は実際の時計
+    const lastUp = [...(this.state.wakeLog || [])].reverse().find(x => x.up && x.date < day);
+    const nowHm = late ? ((lastUp && lastUp.up) || '08:00') // あとから記録するときは、いまの時刻ではなく前の起床時刻（なければ8時）
+      : pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes()); // 起床時刻の入力欄は実際の時計
     const draft = w
       ? { note: w.note || '', cond: w.cond, mood: w.mood, fat: w.fatigue, bed: w.bed || (last && last.bed) || '23:00', up: w.up || this.tsToHm(w.ts) }
       : { cond: null, mood: null, fat: null, bed: (last && last.bed) || '23:00', up: nowHm };
@@ -2928,7 +2944,7 @@ export default class App extends React.Component {
   recMenuEdit = () => {
     const g = this.state.recMenu;
     this.set({ recMenu: null });
-    if (g && g.logKind) { if (g.logKind === 'wake') this.goSleep(); else this.goBed(g.logDate); return; }
+    if (g && g.logKind) { if (g.logKind === 'wake') this.goSleep(g.logDate); else this.goBed(g.logDate); return; }
     if (g && g.tweetIdx != null) { this.openMoodEdit(g.tweetIdx); return; }
     if (g) (g.isFrame ? this.openFrameFill(g) : this.openEditFlow(g));
   };
@@ -3312,11 +3328,13 @@ export default class App extends React.Component {
   finishWake1 = () => {
     const d = this.state.wakeDraft;
     if (d.fat == null) return;
-    const today = this.wakeDay();
+    const today = this.wakeTargetDay();
     const up = d.up || (pad2(new Date().getHours()) + ':' + pad2(new Date().getMinutes()));
     // ts=起床時刻（予測バーの左端になる）。bed=就寝時刻(HH:MM)。就寝〜起床の時間は bed/up から出せる
     const wakeLog = [...(this.state.wakeLog || []).filter(w => w.date !== today), { date: today, ts: hmToTsOn(today, up), bed: d.bed || null, up, cond: d.cond, mood: d.mood, fatigue: d.fat, note: (d.note || '').trim() }];
     // 体調（症状）が付いていれば、ホームに戻ったときにいこいさんが声をかける
+    // 前の日の起床をあとから記録: いまの山は動かさず、ふりかえりへ（前の日の就寝をあとから入れるときと同じ）
+    if (this.wakeIsLate(today)) { this.set({ wakeLog, wakeFlow: false, screen: 'wake2' }); this.save(); return; }
     const tsym = this.topSymptom(); const care = tsym ? this.careLine(tsym.id, null) : '';
     this.applyFatigue(d.fat, '起床時の疲労', { wakeLog, wakeFlow: true, ...(care ? { tapLine: care } : null) });
   };
@@ -3439,7 +3457,7 @@ export default class App extends React.Component {
   goWake2 = () => { this.settleFatigue(); this.stopPhysics(); this.set({ screen: 'wake2', wakeFlow: false }); };
   goWake3 = () => {
     // 月曜の朝: 先週のレポートをまだ見ていなければ、今週の目標を決める前に見せる（日曜の夜に見ていれば出さない）
-    const today = todayStr(), prev = shiftDate(weekMonday(today), -7);
+    const today = this.wakeTargetDay(), prev = shiftDate(weekMonday(today), -7);
     const seen = ((this.state.weekReports || {})[prev] || {}).seen;
     const had = (this.state.entries || []).some(e => !e.exp && e.date >= prev && e.date < weekMonday(today));
     if (strToDate(today).getDay() === 1 && !seen && had) { this.openWeekReport(prev, 'wake'); return; }
@@ -3494,7 +3512,7 @@ export default class App extends React.Component {
   }
   /* 画面3・4に出す値 */
   wakeVals() {
-    const st = this.state, today = todayStr(), y = shiftDate(today, -1);
+    const st = this.state, today = this.wakeTargetDay(), y = shiftDate(today, -1);
     const recs = this.wakeRecords();
     const yRec = recs.find(w => w.date === y);
     const yBed = (st.bedLog || []).find(b => b.date === y);
@@ -5235,12 +5253,12 @@ export default class App extends React.Component {
       seenBedHere: () => { if (!(st.bedDraft && st.bedDraft.seen)) this.setBedDraft('seen', true); },
       // 疲労度スライダーの「現在地」＝いまの山の個数（あとから前の日の就寝を記録するときは出さない）
       fatNow: (st.screen === 'bed1' && !(st.bedDraft && st.bedDraft.hm != null)) ? Math.max(0, this.pileCount()) : null, // 就寝時「実感と同じ」用（100をこえてもそのまま）
-      fatHere: (st.screen === 'wake1' || (st.screen === 'bed1' && !(st.bedDraft && st.bedDraft.hm != null))) ? Math.min(100, Math.max(0, this.pileCount())) : null,
+      fatHere: ((st.screen === 'wake1' && !this.wakeIsLate()) || (st.screen === 'bed1' && !(st.bedDraft && st.bedDraft.hm != null))) ? Math.min(100, Math.max(0, this.pileCount())) : null,
       wakeFlow: st.wakeFlow && st.screen === 'shaka', goWake2: this.goWake2, goWake3: this.goWake3, backWake: this.backWake,
       wake: ['wake2', 'wake3'].includes(st.screen) ? this.wakeVals() : null, carryTasks: this.carryTasks, setWeekGoal: this.setWeekGoal,
       wakeHeader: (() => {
         if (!st.screen.startsWith('wake') && !st.screen.startsWith('bed')) return '';
-        const t = st.screen.startsWith('bed') ? (st.bedTarget || st.bedDay || this.bedDay()) : this.wakeDay(), d = strToDate(t);
+        const t = st.screen.startsWith('bed') ? (st.bedTarget || st.bedDay || this.bedDay()) : this.wakeTargetDay(), d = strToDate(t);
         const firsts = [...st.entries.filter(e => !e._sample).map(e => e.date), ...(st.wakeLog || []).map(w => w.date)].filter(Boolean).sort();
         // 研究の番号を変えた人は、新しい番号で使い始めた日を1日目に
         const rs = st.research && st.research.start && t >= st.research.start ? st.research.start : null;
