@@ -50,6 +50,7 @@ import Tutorial from './screens/Tutorial';
 import Onboard from './screens/Onboard';
 import Cycle from './screens/Cycle';
 import Bookshelf from './screens/Bookshelf';
+import IpadTest from './screens/IpadTest';
 import { buildAcademicYear, academicYearOf } from './sample';
 
 // iOSとAndroidで加速度センサーの符号が違うため、傾き（ジャイロ）重力の向き補正に使う
@@ -3814,6 +3815,7 @@ export default class App extends React.Component {
       case 'weekReport': this.closeWeekReport(); return true;
       case 'collect': this.goShaka(); return true;
       case 'trash': case 'buffLog': case 'slotTimes': case 'catsManage':
+      case 'ipadTest': this.set({ screen: 'mypage' }); return true;
       case 'run': this.set({ screen: 'home', runAdd: false }); return true; // 実行画面は小さくしてホームへ（下に実施中のバー）
       case 'ikoiEdit': this.closeIkoiEdit(); return true; // 開いた元の画面へ
       case 'templates': case 'sensitivity': case 'help': case 'researchAdmin':
@@ -5301,7 +5303,8 @@ export default class App extends React.Component {
       isShaka: this.isShakaView(st), isMypage: st.screen === 'mypage',
       // Galaxy Z Flip 用（開発者モードだけ）
       foldSplit: this.isFoldSplit(st), flipKind: (this._flip && this._flip.kind) || null, flip: this._flip || {},
-      flipCfg: getFlip(), setFlip, tabletOn: !!(this._tablet && this._tablet.on), coverNav: this._flip && this._flip.kind === 'cover' ? getFlip() : null,
+      flipCfg: getFlip(), setFlip, tabletOn: !!(this._tablet && this._tablet.on),
+      isIpadTest: st.screen === 'ipadTest', goIpadTest: () => this.set({ screen: 'ipadTest' }), closeIpadTest: () => this.set({ screen: 'mypage' }), coverNav: this._flip && this._flip.kind === 'cover' ? getFlip() : null,
       shakaBottom: this.isFoldSplit(st) ? 0 : this.navH(),
       editIkoiLine: this.editIkoiLine, ikoiTarget: st.ikoiTarget, closeIkoiEdit: this.closeIkoiEdit,
       isIkoiEdit: st.screen === 'ikoiEdit', devMode: Ikoi.isDev(), goIkoiEdit: this.goIkoiEdit, tapDevSecret: this.tapDevSecret,
@@ -5733,6 +5736,7 @@ export default class App extends React.Component {
         {v.isSensitivity && <Sensitivity v={v} />}
         {v.isHelp && <Help v={v} />}
         {v.isBookshelf && <Bookshelf v={v} />}
+        {v.isIpadTest && <IpadTest v={v} />}
         {v.isWeekReport && v.weekReport && <WeekReport v={v} />}
         {v.tutorial > 0 && <Tutorial v={v} />}
         {v.symAdjustOpen && (
@@ -5790,7 +5794,7 @@ export default class App extends React.Component {
         )}
         {/* 実施中のバー（ホーム・行動選択画面の下） */}
         {v.run && !v.isRun && (v.isHome || v.isPickScreen) && <MiniRun v={v} />}
-        {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && !v.isResearchAdmin && !v.isWeekReport && <Nav v={v} />}
+        {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && !v.isResearchAdmin && !v.isWeekReport && !v.isIpadTest && <Nav v={v} />}
         {/* Z Flip のサブディスプレイ: ナビのない画面でも、カメラにかかる下の帯は空けておく */}
         {v.coverNav && !v.isBookshelf && (v.isWake || v.isBed || v.isIkoiEdit || v.isResearchAdmin || v.isWeekReport) && <div style={{ flex: '0 0 auto', height: v.coverNav.navH }} />}
         </>}
