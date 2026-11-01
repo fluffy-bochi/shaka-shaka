@@ -5,7 +5,7 @@
    設定は端末ごと（localStorage）。開発者モードがオフなら何もしない。 */
 
 const KEY = 'kame_flip';
-const DEF = { on: false, mode: 'auto', navSide: 'left', navW: 46, navH: 64, baseW: 375, foldAdj: 0 };
+const DEF = { tab: false, on: false, mode: 'auto', navSide: 'left', navW: 46, navH: 64, baseW: 375, foldAdj: 0 };
 
 let cfg = { ...DEF };
 try { cfg = { ...DEF, ...(JSON.parse(localStorage.getItem(KEY) || '{}') || {}) }; } catch (e) { /* ignore */ }
@@ -75,4 +75,14 @@ export function watchFlipEnv(f) {
     window.removeEventListener('orientationchange', on);
     try { if (dp && dp.removeEventListener) dp.removeEventListener('change', on); } catch (e) { /* ignore */ }
   };
+}
+
+/* iPad などのタブレット: 縦はスマホ枠をやめて画面いっぱい（横幅に合わせる）。横は本棚だけ横向きの画面、ほかは縦の幅で真ん中に */
+export function computeTablet(enabled) {
+  const w = window.innerWidth || 0, h = window.innerHeight || 0;
+  if (!enabled || !cfg.tab) return { on: false, land: false };
+  let touch = false;
+  try { touch = (navigator.maxTouchPoints || 0) > 0 || window.matchMedia('(pointer: coarse)').matches; } catch (e) { /* ignore */ }
+  if (!touch || Math.min(w, h) < 600) return { on: false, land: false };
+  return { on: true, land: w > h };
 }

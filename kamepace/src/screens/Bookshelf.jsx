@@ -160,7 +160,8 @@ export default function Bookshelf({ v }) {
   const [autoLand, setAutoLand] = useState(false);   // 端末の向き（実寸 w>h）
   const [manualOrient, setManualOrient] = useState(null); // 手動: null=自動 / 'land' / 'port'
   // PC用スマホ枠が出ているか（枠の形を変える方式で横にする）。スマホは画面ごと90°回転で横にする
-  const [frameMode, setFrameMode] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width:768px) and (min-height:600px)').matches);
+  const [frameMode0, setFrameMode] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width:768px) and (min-height:600px)').matches);
+  const frameMode = frameMode0 && !v.tabletOn; // iPad（開発者モード）はスマホ枠なし＝スマホと同じく実際の向きで
   useEffect(() => {
     const mq = window.matchMedia('(min-width:768px) and (min-height:600px)');
     const on = () => setFrameMode(mq.matches);
@@ -190,11 +191,11 @@ export default function Bookshelf({ v }) {
   /* 向き＝本棚の実寸で判定（縦フレーム=縦持ち, 横に広い=横持ち） */
   useLayoutEffect(() => {
     // 端末の物理的な向きはビューポートで判定（90°回転表示中の要素サイズに引きずられないように）
-    const update = () => setAutoLand(window.innerWidth > window.innerHeight && !window.matchMedia('(min-width:768px) and (min-height:600px)').matches);
+    const update = () => setAutoLand(window.innerWidth > window.innerHeight && (!!v.tabletOn || !window.matchMedia('(min-width:768px) and (min-height:600px)').matches));
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
-  }, []);
+  }, [v.tabletOn]);
 
   const RotateBtn = () => (
     <div onClick={() => setManualOrient(land ? 'port' : 'land')} title="むきを変える" style={{ cursor: 'pointer', userSelect: 'none', width: 26, height: 26, flex: '0 0 auto', borderRadius: '50%', background: '#fff', border: '1px solid #e3e0d5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
