@@ -399,6 +399,7 @@ function FlipSettings({ v }) {
           {slider('ナビの高さ', 'navH', 40, 140, 2, 'px')}
           {slider('画面の幅', 'baseW', 300, 430, 5, 'px')}
           {slider('折り目', 'foldAdj', -120, 120, 2, 'px')}
+          {slider('折り目の余白', 'foldGap', 0, 80, 2, 'px')}
         </div>
       )}
     </>

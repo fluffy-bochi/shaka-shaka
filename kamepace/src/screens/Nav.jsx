@@ -10,6 +10,15 @@ export default function Nav({ v }) {
     { on: v.goShaka, color: v.navShakaColor, fill: v.navShakaFill, icon: 'blur_on', label: 'シャカ' },
     { on: v.goMypage, color: v.navMypageColor, fill: v.navMypageFill, icon: 'person', label: 'マイページ' },
   ];
+  /* Galaxy Z Flip を縦に折っている時: 折り目より下の右端に縦に（左下は端末の戻る・ホーム） */
+  const f = v.foldNav;
+  if (f) {
+    return (
+      <div style={{ position: 'fixed', zIndex: 6, right: 0, top: f.top, bottom: 0, width: f.w, display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'center', gap: 4, background: '#fff', borderLeft: '1px solid #efece3', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {items.map(it => <button key={it.icon} onClick={it.on} aria-label={it.label} style={{ ...btn(it.color), flex: '0 1 64px', fontSize: 9, padding: 0 }}><span style={ms(it.fill)}>{it.icon}</span>{it.label}</button>)}
+      </div>
+    );
+  }
   /* Galaxy Z Flip のサブディスプレイ: カメラのない側の下（ぴょこっと出ている所）にアイコンだけ。反対側はカメラで見えない */
   const c = v.coverNav;
   if (c) {
