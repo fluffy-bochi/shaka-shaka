@@ -166,3 +166,13 @@ body.kame-cover .app-screen { zoom: var(--kame-zoom, 1); height: calc(var(--app-
 body.kame-cover .app-status-spacer { height: env(safe-area-inset-top); }
 /* 縦に折っている時: 上の余白はステータスバーぶんだけ（折り目の位置に合わせるため） */
 body.kame-fold .app-status-spacer { height: env(safe-area-inset-top); }
+
+/* iPad（開発者モードだけ・flip.js computeTablet）: スマホ枠・ロゴ・QRをやめて画面いっぱい。
+   縦は横幅に合わせて全面。横は本棚だけ横向きで全面、ほかの画面は縦の幅のまま真ん中に */
+body.kame-tablet { background: #f7f4ec; }
+body.kame-tablet .shell { padding: 0; min-height: var(--app-vh, 100dvh); }
+body.kame-tablet .shell-head, body.kame-tablet .shell-side { display: none; }
+body.kame-tablet .phone { width: 100vw; padding: 0; border-radius: 0; background: none; box-shadow: none; }
+body.kame-tablet .phone .app-screen, body.kame-tablet .app-screen { width: 100vw; max-width: none; height: var(--app-vh, 100dvh); border-radius: 0; }
+body.kame-tablet-land:not(.kame-book-land) .phone .app-screen, body.kame-tablet-land:not(.kame-book-land) .app-screen { width: min(100vw, 600px); margin: 0 auto; }
+body.kame-tablet.kame-book-land .phone, body.kame-tablet.kame-book-land .phone .app-screen { width: 100vw; height: var(--app-vh, 100dvh); }

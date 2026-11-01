@@ -26,7 +26,7 @@ import ResearchAdmin from './screens/ResearchAdmin';
 import Install from './Install';
 import Run, { MiniRun } from './screens/Run';
 import * as Ikoi from './ikoi';
-import { getFlip, setFlip, subscribeFlip, computeFlip, watchFlipEnv } from './flip';
+import { getFlip, setFlip, subscribeFlip, computeFlip, computeTablet, watchFlipEnv } from './flip';
 import IkoiEdit from './screens/IkoiEdit';
 import { initShakaSound, attachCollisionSound } from './sound';
 import { appendGlyph } from './fluent';
@@ -1891,9 +1891,14 @@ export default class App extends React.Component {
     const prev = this._flip || {};
     this._flip = f;
     const b = document.body.classList;
+    // iPad（開発者モードだけ）: スマホ枠をやめて画面いっぱい
+    const tb = computeTablet(Ikoi.isDev()), prevTb = this._tablet || {};
+    this._tablet = tb;
+    b.toggle('kame-tablet', tb.on); b.toggle('kame-tablet-land', tb.on && tb.land);
+    const tbChanged = prevTb.on !== tb.on || prevTb.land !== tb.land;
     b.toggle('kame-cover', f.kind === 'cover'); b.toggle('kame-fold', f.kind === 'fold');
     document.documentElement.style.setProperty('--kame-zoom', String(f.zoom || 1));
-    const changed = prev.kind !== f.kind || prev.foldTop !== f.foldTop || prev.foldBottom !== f.foldBottom || prev.zoom !== f.zoom || this._flipNavKey !== JSON.stringify(getFlip());
+    const changed = tbChanged || prev.kind !== f.kind || prev.foldTop !== f.foldTop || prev.foldBottom !== f.foldBottom || prev.zoom !== f.zoom || this._flipNavKey !== JSON.stringify(getFlip());
     this._flipNavKey = JSON.stringify(getFlip());
     if (changed) {
       // 山の箱の大きさが変わるので作り直す（次の tick で新しい大きさで始まる）
@@ -5296,7 +5301,7 @@ export default class App extends React.Component {
       isShaka: this.isShakaView(st), isMypage: st.screen === 'mypage',
       // Galaxy Z Flip 用（開発者モードだけ）
       foldSplit: this.isFoldSplit(st), flipKind: (this._flip && this._flip.kind) || null, flip: this._flip || {},
-      flipCfg: getFlip(), setFlip, coverNav: this._flip && this._flip.kind === 'cover' ? getFlip() : null,
+      flipCfg: getFlip(), setFlip, tabletOn: !!(this._tablet && this._tablet.on), coverNav: this._flip && this._flip.kind === 'cover' ? getFlip() : null,
       shakaBottom: this.isFoldSplit(st) ? 0 : this.navH(),
       editIkoiLine: this.editIkoiLine, ikoiTarget: st.ikoiTarget, closeIkoiEdit: this.closeIkoiEdit,
       isIkoiEdit: st.screen === 'ikoiEdit', devMode: Ikoi.isDev(), goIkoiEdit: this.goIkoiEdit, tapDevSecret: this.tapDevSecret,

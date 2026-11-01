@@ -346,6 +346,11 @@ function AuthGate({ v }) {
 }
 
 /* Galaxy Z Flip 用の表示（開発者だけの先行体験）: オン/オフと、サブディスプレイ・折り目の微調整 */
+const DevToggle = ({ on }) => (
+  <span style={{ width: 40, height: 24, borderRadius: 12, background: on ? '#c4f000' : '#e4e1d8', position: 'relative', flex: '0 0 auto', transition: 'background .2s' }}>
+    <span style={{ position: 'absolute', top: 3, left: on ? 19 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+  </span>
+);
 const KIND = { cover: 'サブ', fold: '折り', null: '通常' };
 function FlipSettings({ v }) {
   const c = v.flipCfg, set = v.setFlip;
@@ -363,13 +368,16 @@ function FlipSettings({ v }) {
   );
   return (
     <>
+      <button onClick={() => set({ tab: !c.tab })} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+        <span style={{ fontSize: 16 }}>🖥</span>
+        <span style={{ flex: 1, fontSize: 14 }}>iPad 表示</span>
+        <DevToggle on={c.tab} />
+      </button>
       <button onClick={() => set({ on: !c.on })} style={{ ...row(!c.on), width: '100%', border: 'none', borderBottom: c.on ? '1px solid #f1efe8' : 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
         <span style={{ fontSize: 16 }}>📱</span>
         <span style={{ flex: 1, fontSize: 14 }}>Z Flip 表示</span>
         {c.on && <span style={{ ...mono, fontSize: 11, color: '#8a8a82' }}>{KIND[v.flipKind]}</span>}
-        <span style={{ width: 40, height: 24, borderRadius: 12, background: c.on ? '#c4f000' : '#e4e1d8', position: 'relative', flex: '0 0 auto', transition: 'background .2s' }}>
-          <span style={{ position: 'absolute', top: 3, left: c.on ? 19 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
-        </span>
+        <DevToggle on={c.on} />
       </button>
       {c.on && (
         <div style={{ padding: '6px 0 10px' }}>
