@@ -116,11 +116,12 @@ export default function MyPage({ v }) {
               <span style={{ flex: 1, fontSize: 14 }}>いこいさん編集</span>
               <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
             </button>
-            <button onClick={v.goResearchAdmin} style={{ ...row(true), width: '100%', border: 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+            <button onClick={v.goResearchAdmin} style={{ ...row(), width: '100%', border: 'none', borderBottom: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
               <span style={{ fontSize: 16 }}>📊</span>
               <span style={{ flex: 1, fontSize: 14 }}>研究データ</span>
               <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
             </button>
+            <FlipSettings v={v} />
           </div>
         </>}
         <div style={label}>きろく</div>
@@ -341,5 +342,51 @@ function AuthGate({ v }) {
         <button onClick={v.closeAuth} style={{ display: 'block', width: '100%', marginTop: 14, textAlign: 'center', fontSize: 12, color: '#8a8a82', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }}>ゲストのままつかう</button>
       </div>
     </div>
+  );
+}
+
+/* Galaxy Z Flip 用の表示（開発者だけの先行体験）: オン/オフと、サブディスプレイ・折り目の微調整 */
+const KIND = { cover: 'サブ', fold: '折り', null: '通常' };
+function FlipSettings({ v }) {
+  const c = v.flipCfg, set = v.setFlip;
+  const seg = (opts, cur, k) => (
+    <div style={{ display: 'flex', background: '#f1efe8', borderRadius: 10, padding: 2, gap: 2 }}>
+      {opts.map(([val, text]) => <button key={val} onClick={() => set({ [k]: val })} style={{ border: 'none', borderRadius: 8, padding: '5px 9px', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', background: cur === val ? '#fff' : 'transparent', color: cur === val ? '#1b1b18' : '#8a8a82' }}>{text}</button>)}
+    </div>
+  );
+  const slider = (text, k, min, max, step, unit) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 15px' }}>
+      <span style={{ width: 70, fontSize: 12.5, color: '#55554e', flex: '0 0 auto' }}>{text}</span>
+      <input type="range" min={min} max={max} step={step} value={c[k]} onChange={(e) => set({ [k]: Number(e.target.value) })} style={{ flex: 1, minWidth: 0, accentColor: '#1b1b18' }} />
+      <span style={{ ...mono, width: 44, textAlign: 'right', fontSize: 11, color: '#8a8a82', flex: '0 0 auto' }}>{c[k]}{unit}</span>
+    </div>
+  );
+  return (
+    <>
+      <button onClick={() => set({ on: !c.on })} style={{ ...row(!c.on), width: '100%', border: 'none', borderBottom: c.on ? '1px solid #f1efe8' : 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+        <span style={{ fontSize: 16 }}>📱</span>
+        <span style={{ flex: 1, fontSize: 14 }}>Z Flip 表示</span>
+        {c.on && <span style={{ ...mono, fontSize: 11, color: '#8a8a82' }}>{KIND[v.flipKind]}</span>}
+        <span style={{ width: 40, height: 24, borderRadius: 12, background: c.on ? '#c4f000' : '#e4e1d8', position: 'relative', flex: '0 0 auto', transition: 'background .2s' }}>
+          <span style={{ position: 'absolute', top: 3, left: c.on ? 19 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+        </span>
+      </button>
+      {c.on && (
+        <div style={{ padding: '6px 0 10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 15px' }}>
+            <span style={{ fontSize: 12.5, color: '#55554e' }}>表示</span>
+            {seg([['auto', '自動'], ['cover', 'サブ'], ['fold', '折り']], c.mode, 'mode')}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 15px' }}>
+            <span style={{ fontSize: 12.5, color: '#55554e' }}>サブのナビ</span>
+            {seg([['left', '左下'], ['right', '右下']], c.navSide, 'navSide')}
+          </div>
+          {slider('ナビの幅', 'navW', 25, 100, 1, '%')}
+          {slider('ナビの高さ', 'navH', 40, 140, 2, 'px')}
+          {slider('画面の幅', 'baseW', 300, 430, 5, 'px')}
+          {slider('折り目', 'foldAdj', -120, 120, 2, 'px')}
+        </div>
+      )}
+    </>
   );
 }

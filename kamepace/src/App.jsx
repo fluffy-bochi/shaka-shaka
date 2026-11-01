@@ -26,6 +26,7 @@ import ResearchAdmin from './screens/ResearchAdmin';
 import Install from './Install';
 import Run, { MiniRun } from './screens/Run';
 import * as Ikoi from './ikoi';
+import { getFlip, setFlip, subscribeFlip, computeFlip, watchFlipEnv } from './flip';
 import IkoiEdit from './screens/IkoiEdit';
 import { initShakaSound, attachCollisionSound } from './sound';
 import { appendGlyph } from './fluent';
@@ -217,7 +218,7 @@ export default class App extends React.Component {
     // サンプルを入れる前に作ったシャカの山は少ないので、その形は保存せずにサンプル込みで作り直す
     // （保存すると、振ったあとの形が少ない山の形で上書きされ、リロードのたびに山が変わる）
     this.setState(prev => ({ entries: [...prev.entries, ...add], collected: [...(prev.collected || []), ...addColl] }), () => {
-      if (this.engine && this.state.screen === 'shaka' && this.state.dayOffset === 0) { this._skipPileSave = true; this.rebuildPhysics(); }
+      if (this.engine && this.isShakaView() && this.state.dayOffset === 0) { this._skipPileSave = true; this.rebuildPhysics(); }
     });
   }
   clearSample() {
@@ -756,7 +757,7 @@ export default class App extends React.Component {
     // 自動の変更: クラウドにほかの端末の新しい記録があれば、上書きせずに読み込み直す（そのあと改めて降る）
     if (st.user) setTimeout(() => cloudSavePassive(this.dataState(), () => this.loadCloud(true)), 0);
     else this.save();
-    if (st.screen === 'shaka' && drops.length) this.addFallingBodies(drops);
+    if (this.isShakaView(st) && drops.length) this.addFallingBodies(drops);
   }
   /* ホームのバッジに出す1つ: いちばん強いもの（つらさ／強さ 0軽い・1ふつう・2強い）。
      同じなら「いまの調子」で上にあるもの（体調 → デバフ → バフ、それぞれ並び順） */
@@ -1873,8 +1874,33 @@ export default class App extends React.Component {
 
   /* 画面サイズ: 実際のアプリ画面要素を実測（PC表示のスマホ枠にも追従） */
   _screenRef = React.createRef();
-  screenW() { const el = this._screenRef.current; return (el && el.clientWidth) || Math.min(480, window.innerWidth || 372); }
-  screenH() { const el = this._screenRef.current; return ((el && el.clientHeight) || window.innerHeight || 812) - 64; }
+  screenW() { const el = (this._foldSplit && this._shakaPaneRef.current) || this._screenRef.current; return (el && el.clientWidth) || Math.min(480, window.innerWidth || 372); }
+  screenH() {
+    if (this._foldSplit && this._shakaPaneRef.current) return this._shakaPaneRef.current.clientHeight || 300; // 折っている時: 折り目より上だけ（ナビは下の画面）
+    const el = this._screenRef.current; return ((el && el.clientHeight) || window.innerHeight || 812) - this.navH();
+  }
+  /* ---- Galaxy Z Flip 用の表示（開発者モードだけ・flip.js） ---- */
+  _shakaPaneRef = React.createRef();
+  navH() { return this._flip && this._flip.kind === 'cover' ? (getFlip().navH || 64) : 64; }
+  // シャカの山が見えているか（折っている時はホームでも上にシャカ）
+  isFoldSplit(s = this.state) { return !!(this._flip && this._flip.kind === 'fold') && ['home', 'shaka'].includes(s.screen); }
+  get _foldSplit() { return this.isFoldSplit(); }
+  isShakaView(s = this.state) { return s.screen === 'shaka' || (s.screen === 'home' && this.isFoldSplit(s)); }
+  updateFlip = () => {
+    const f = computeFlip(Ikoi.isDev());
+    const prev = this._flip || {};
+    this._flip = f;
+    const b = document.body.classList;
+    b.toggle('kame-cover', f.kind === 'cover'); b.toggle('kame-fold', f.kind === 'fold');
+    document.documentElement.style.setProperty('--kame-zoom', String(f.zoom || 1));
+    const changed = prev.kind !== f.kind || prev.foldTop !== f.foldTop || prev.foldBottom !== f.foldBottom || prev.zoom !== f.zoom || this._flipNavKey !== JSON.stringify(getFlip());
+    this._flipNavKey = JSON.stringify(getFlip());
+    if (changed) {
+      // 山の箱の大きさが変わるので作り直す（次の tick で新しい大きさで始まる）
+      if (this.engine) { this._pileLayout = null; this.stopPhysics(); }
+      this.forceUpdate();
+    }
+  };
   // 100個で画面全体を埋めるサイズ。100を超えたら縮小して画面に収める（あふれ対策）
   calcR(w, h, count) {
     const area = Math.max(1, w) * Math.max(1, h);
@@ -2586,7 +2612,7 @@ export default class App extends React.Component {
     });
     if (!pos.length && !neg.length) return;
     // シャカを見ているときはその場で降らせる。見ていなければ次にシャカを開いたときに上から降る
-    const onShaka = this.state.screen === 'shaka' && !!this.engine;
+    const onShaka = this.isShakaView() && !!this.engine;
     this.updRun(run => ({ ...run, drip: { ...(run.drip || {}), ...upd }, newPos: (run.newPos || 0) + (onShaka ? 0 : pos.length) }));
     if (pos.length && onShaka) this.addFallingBodies(pos);
     if (neg.length) this.dropNegativeBodies(neg.map(g => ({ g, run: r.startAt })));
@@ -3321,7 +3347,7 @@ export default class App extends React.Component {
     if (!this.state.gyroMode) return;
     clearTimeout(this._recoverRebuildT);
     this._recoverRebuildT = setTimeout(() => {
-      if (this.state.gyroMode && this.state.screen === 'shaka') { this._pileLayout = null; this.rebuildPhysics(); }
+      if (this.state.gyroMode && this.isShakaView()) { this._pileLayout = null; this.rebuildPhysics(); }
     }, 6300);
   }
   /* 画面1「つぎへ」: 入力を保存し、残りの疲労（山が満杯=100個）になるまで🌙を降らせる */
@@ -3600,7 +3626,7 @@ export default class App extends React.Component {
     if (changed) {
       this.set({ entries });
       this.save();
-      if (this.state.screen === 'shaka' && drops.length) this.addFallingBodies(drops);
+      if (this.isShakaView() && drops.length) this.addFallingBodies(drops);
       if (negDrops.length) this.dropNegativeBodies(negDrops); // シャカ以外なら保留→次のシャカ表示で降る
     }
   }
@@ -3697,7 +3723,8 @@ export default class App extends React.Component {
     window.__importEvents = (items) => this.importEvents(items);
     window.__kameApp = this; // 検証用（状態の読み取りのみに使う）
     // いこいさんのセリフ・表情（みんなに反映された版）を読み、変わったら描き直す
-    this._unIkoi = Ikoi.subscribe(() => this.forceUpdate());
+    this._unIkoi = Ikoi.subscribe(() => { this.forceUpdate(); this.updateFlip(); });
+    this._unFlip = subscribeFlip(this.updateFlip); this._unFlipEnv = watchFlipEnv(() => setTimeout(this.updateFlip, 60)); this.updateFlip();
     loadIkoi().then(d => { if (d) Ikoi.setPublished(d); }).catch(() => { /* 読めなければ serifu.js の初期値 */ });
     // 研究の期間（協力者IDのアルファベットごとの収集期間）
     loadResearchConfig().then(c => { this._resCfg = c; }).catch(() => { /* 読めなければ期間の制限なし */ });
@@ -3712,7 +3739,7 @@ export default class App extends React.Component {
       const shakaEl = document.getElementById('shakacase');
       const collectStack = document.getElementById('collectstack');
       const collectScroll = document.getElementById('collectscroll');
-      if (this.state.screen === 'shaka') {
+      if (this.isShakaView()) {
         // データ読込前(booted false)に空の山で始めない。また空エンジンのまま固定されたら作り直す
         if (shakaEl && this.state.booted) {
           const emptyButShould = this.engine && (!this.bodies || this.bodies.length === 0) && this.pileCount() > 0;
@@ -3803,7 +3830,7 @@ export default class App extends React.Component {
     const lab = this.screenLabel();
     if (lab !== this._stLabel) { if (this._stLabel) this.tickScreenTime(); this._stLabel = lab; }
     if (this.state.tutorial) this.checkTutorial(prevState);
-    if (this.state.predictOpen && this.state.screen !== 'shaka') { this._pred = null; this.set({ predictOpen: false }); }
+    if (this.state.predictOpen && !this.isShakaView()) { this._pred = null; this.set({ predictOpen: false }); }
     // 朝の「今日の予定」から開いた登録が終わったら（保存・やめる）、その画面に戻る
     if (this._afterRecord && prevState.screen === 'record' && this.state.screen !== 'record') {
       const to = this._afterRecord; this._afterRecord = null;
@@ -3814,6 +3841,7 @@ export default class App extends React.Component {
     clearInterval(this._tick); clearInterval(this._planT); clearInterval(this._clockT); clearInterval(this._schedT);
     if (this._unwatch) this._unwatch();
     if (this._unIkoi) this._unIkoi();
+    if (this._unFlip) this._unFlip(); if (this._unFlipEnv) this._unFlipEnv();
     if (this._motionOn) window.removeEventListener('devicemotion', this._onDeviceMotion);
     if (this._onPop) window.removeEventListener('popstate', this._onPop);
     this.stopPhysics(); this.stopCollectPhysics();
@@ -3922,7 +3950,7 @@ export default class App extends React.Component {
       // 山が落ち着くのを待ってから降らせる（記録画面から回復を記録したときに1個しか消えない不具合の対策）。
       clearTimeout(this._negDropT);
       this._negDropT = setTimeout(() => {
-        if (this.engine && this.state.screen === 'shaka') this.dropNegativeBodies(pend);
+        if (this.engine && this.isShakaView()) this.dropNegativeBodies(pend);
         else this._pendingNeg = [...pend, ...(this._pendingNeg || [])]; // 画面を離れていたら次に降らせる
       }, 850);
     }
@@ -4041,7 +4069,7 @@ export default class App extends React.Component {
     if (this.state.homeMotion === on) return;
     this.set({ homeMotion: on });
     try { localStorage.setItem('shaka_home_motion', on ? '1' : '0'); } catch (e) { /* ignore */ }
-    if (this.state.screen === 'shaka') {
+    if (this.isShakaView()) {
       if (on) { clearTimeout(this._settleT); this.resumeMotion(); }
       else this.freezeMotion();
     }
@@ -4404,7 +4432,7 @@ export default class App extends React.Component {
     if (this.state.gyroMode === on) return;
     this.set({ gyroMode: on });
     try { localStorage.setItem('shaka_gyro_mode', on ? '1' : '0'); } catch (e) { /* ignore */ }
-    if (this.state.screen === 'shaka') {
+    if (this.isShakaView()) {
       // 箱の形（蓋の位置）がモードで変わるので作り直す。ジャイロ中は傾きに追従して動かし続ける。
       this._pileLayout = null;
       this.rebuildPhysics();
@@ -4415,7 +4443,7 @@ export default class App extends React.Component {
   };
   _onDeviceMotion = (event) => {
     // ジャイロ（傾き）モード: 実世界の下方向へ重力を向ける。逆さにすると上辺側へ絵文字が集まる。
-    if (this.state.gyroMode && this.engine && this.state.screen === 'shaka') {
+    if (this.state.gyroMode && this.engine && this.isShakaView()) {
       // 回復（睡眠含む）の🌙が落下中は傾きを無視して重力を真下に固定（回復が確実に消費されるように）
       if (Date.now() < (this._recoverUntil || 0)) {
         this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2;
@@ -4453,7 +4481,7 @@ export default class App extends React.Component {
       const d = Math.abs(a.x - lm.x) + Math.abs(a.y - lm.y) + Math.abs(a.z - lm.z);
       const now = performance.now();
       // シャカ画面表示中だけ反応（150msスロットルで暴走防止）
-      if (d > 16 && this.state.screen === 'shaka' && (!this._lastSensorShake || now - this._lastSensorShake > 150)) {
+      if (d > 16 && this.isShakaView() && (!this._lastSensorShake || now - this._lastSensorShake > 150)) {
         this._lastSensorShake = now;
         if (this.state.tutorial === 6 && !this.state.tutFlags.shaken) this.set({ tutFlags: { ...this.state.tutFlags, shaken: true } });
         this.shakeImpulse(10);
@@ -5224,14 +5252,14 @@ export default class App extends React.Component {
 
     return {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
-      isHome: st.screen === 'home', isRecord: st.screen === 'record',
+      isHome: (st.screen === 'home' || this.isFoldSplit(st)), isRecord: st.screen === 'record',
       isWake: ['wake1', 'wake2', 'wake3'].includes(st.screen), isWake1: st.screen === 'wake1', isWake2: st.screen === 'wake2', isWake3: st.screen === 'wake3',
       isBed1: st.screen === 'bed1', isBed2: st.screen === 'bed2', isBed: ['bed1', 'bed2'].includes(st.screen),
       bedDraft: st.bedDraft, setBedDraft: this.setBedDraft, finishBed1: this.finishBed1, goBed: this.goBed, goBed2: this.goBed2,
       bedFlow: st.bedFlow && st.screen === 'shaka', backBed: () => this.set({ screen: 'shaka' }), wakeRecs: st.screen === 'bed2' ? this.chartData([st.bedDay || this.bedDay()]) : null /* 夜はその日のぶんだけ */, bed: st.screen === 'bed2' ? this.bedVals() : null,
       // 日曜の夜の就寝記録: 最後に今週の週間レポートへ
       bedWeekKey: st.screen === 'bed2' && strToDate(st.bedDay || this.bedDay()).getDay() === 0 ? weekMonday(st.bedDay || this.bedDay()) : null,
-      homeComment: st.screen === 'home' ? (st.tapLine || (() => {
+      homeComment: (st.screen === 'home' || this.isFoldSplit(st)) ? (st.tapLine || (() => {
         const d = this.homeDateStr(), nowHm = this.tsToHm(Date.now());
         const next = sortEntries(st.entries.filter(e => e.date === d && this.isPlanLike(e) && e.from && (d !== todayStr() || e.from > nowHm)))[0];
         const timed = d === todayStr() ? this.timeOfDayLine() : '';
@@ -5239,7 +5267,7 @@ export default class App extends React.Component {
         return homeLine(Math.min(100, this.pileCount()), next && { ...next, ...this.entryBodyMind(next), title: next.plan || next.title }, d, st.lastRec, Date.now());
       })()) : '',
       tapCharacter: this.tapCharacter,
-      predict: st.screen === 'shaka' ? (() => {
+      predict: this.isShakaView(st) ? (() => {
         const now = Date.now(), off = st.dayOffset;
         // 左端=その日の起床時刻（記入がなければ8時）、右端=寝る時刻（就寝の記録は未作成なので23:00）
         const { start, end } = this._predRange(off);
@@ -5265,7 +5293,11 @@ export default class App extends React.Component {
         const n = rs ? Math.round((d - strToDate(rs)) / 86400000) + 1 : firsts.length ? Math.round((d - strToDate(firsts[0])) / 86400000) + 1 : 1;
         return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + '日月火水木金土'[d.getDay()] + '曜日 ' + Math.max(1, n) + '日目';
       })(),
-      isShaka: st.screen === 'shaka', isMypage: st.screen === 'mypage',
+      isShaka: this.isShakaView(st), isMypage: st.screen === 'mypage',
+      // Galaxy Z Flip 用（開発者モードだけ）
+      foldSplit: this.isFoldSplit(st), flipKind: (this._flip && this._flip.kind) || null, flip: this._flip || {},
+      flipCfg: getFlip(), setFlip, coverNav: this._flip && this._flip.kind === 'cover' ? getFlip() : null,
+      shakaBottom: this.isFoldSplit(st) ? 0 : this.navH(),
       editIkoiLine: this.editIkoiLine, ikoiTarget: st.ikoiTarget, closeIkoiEdit: this.closeIkoiEdit,
       isIkoiEdit: st.screen === 'ikoiEdit', devMode: Ikoi.isDev(), goIkoiEdit: this.goIkoiEdit, tapDevSecret: this.tapDevSecret,
       isResearchAdmin: st.screen === 'researchAdmin', goResearchAdmin: this.goResearchAdmin,
@@ -5309,10 +5341,10 @@ export default class App extends React.Component {
       startTutorial: this.startTutorial, endTutorial: this.endTutorial, tutNext: this.tutNext,
       isCollect: st.screen === 'collect', collectedTotal: this.collectedTotal(),
       goCollect: this.goCollect, goRecordNow: this.goRecordNow,
-      navHomeColor: ['home', 'record'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
-      navHomeFill: ['home', 'record'].includes(st.screen) ? 1 : 0,
-      navShakaColor: ['shaka', 'collect'].includes(st.screen) ? '#1b1b18' : '#8a8a82',
-      navShakaFill: ['shaka', 'collect'].includes(st.screen) ? 1 : 0,
+      navHomeColor: ['home', 'record'].includes(st.screen) || this.isFoldSplit(st) ? '#1b1b18' : '#8a8a82',
+      navHomeFill: ['home', 'record'].includes(st.screen) || this.isFoldSplit(st) ? 1 : 0,
+      navShakaColor: ['shaka', 'collect'].includes(st.screen) || this.isFoldSplit(st) ? '#1b1b18' : '#8a8a82',
+      navShakaFill: ['shaka', 'collect'].includes(st.screen) || this.isFoldSplit(st) ? 1 : 0,
       navBookColor: st.screen === 'bookshelf' ? '#1b1b18' : '#8a8a82',
       navBookFill: st.screen === 'bookshelf' ? 1 : 0,
       goBookshelf: this.goBookshelf,
@@ -5328,7 +5360,7 @@ export default class App extends React.Component {
       homeDate: this.homeDateStr(),
       homeIsToday: this.homeDateStr() === todayStr(),
       homeNowSlot: this.homeDateStr() === todayStr() ? this.slotNow() : null,
-      homeFeed: st.screen === 'home' ? this.homePosts().rows : [], openRecordNow: () => this.openRecord(this.slotNow()),
+      homeFeed: (st.screen === 'home' || this.isFoldSplit(st)) ? this.homePosts().rows : [], openRecordNow: () => this.openRecord(this.slotNow()),
       homeDateY: strToDate(this.homeDateStr()).getFullYear(),
       homeDateM: strToDate(this.homeDateStr()).getMonth() + 1,
       homeDateD: strToDate(this.homeDateStr()).getDate(),
@@ -5635,7 +5667,7 @@ export default class App extends React.Component {
       shakaDate: st.dayOffset === 0 ? formatDateShort(todayStr()) : formatDateShort(viewDateStr),
       clockHm: st.clockHm || this.tsToHm(Date.now()), // 大きい時計は常に現在時刻
       // 時計の下に、いまやっている行動を出す（予測バーを開いている間は、スライダーの時刻にやっていた/やっている/やる予定の行動）
-      predictActs: (st.screen === 'shaka' && (st.dayOffset === 0 || st.predictOpen)) ? (() => {
+      predictActs: (this.isShakaView(st) && (st.dayOffset === 0 || st.predictOpen)) ? (() => {
         const T = st.predictOpen ? (st.predictT || Date.now()) : Date.now(); // 予測を開いていなければ「いま」
         // 表示は「予定名 - 絵文字 行動名 開始–終了」。Googleカレンダーなどの予定（枠）に行動を入れたときは、
         // 予定名を頭に付けて1行にまとめ、行動が入った枠そのもの（行動待ちの空枠）は重複するので出さない。
@@ -5668,14 +5700,21 @@ export default class App extends React.Component {
         {v.isOnboard && <Onboard v={v} />}
         {v.isCycle && <Cycle v={v} />}
         {!v.isOnboard && <>
-        {v.isHome && <Home v={v} />}
+        {v.foldSplit ? <>
+          {/* 縦に折っている時: 折り目より上にシャカ、下にタイムライン */}
+          <div ref={this._shakaPaneRef} style={{ position: 'relative', flex: '0 0 auto', height: 'calc(' + v.flip.foldTop + 'px - env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}><Shaka v={v} /></div>
+          <div style={{ flex: '0 0 auto', height: Math.max(0, v.flip.foldBottom - v.flip.foldTop), background: '#1b1b18' }} />
+          <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}><Home v={v} /></div>
+        </> : <>
+          {v.isHome && <Home v={v} />}
+          {v.isShaka && <Shaka v={v} />}
+        </>}
         {v.isRecord && <Record v={v} />}
         {v.isWake1 && <WakeCheck v={v} />}
         {v.isWake2 && <WakeReview v={v} />}
         {v.isWake3 && <WakePlan v={v} />}
         {v.isBed1 && <BedCheck v={v} />}
         {v.isBed2 && <BedReview v={v} />}
-        {v.isShaka && <Shaka v={v} />}
         {v.isCollect && <Collect v={v} />}
         {v.isMypage && <MyPage v={v} />}
         {v.isIkoiEdit && <IkoiEdit v={v} />}
@@ -5747,6 +5786,8 @@ export default class App extends React.Component {
         {/* 実施中のバー（ホーム・行動選択画面の下） */}
         {v.run && !v.isRun && (v.isHome || v.isPickScreen) && <MiniRun v={v} />}
         {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && !v.isResearchAdmin && !v.isWeekReport && <Nav v={v} />}
+        {/* Z Flip のサブディスプレイ: ナビのない画面でも、カメラにかかる下の帯は空けておく */}
+        {v.coverNav && !v.isBookshelf && (v.isWake || v.isBed || v.isIkoiEdit || v.isResearchAdmin || v.isWeekReport) && <div style={{ flex: '0 0 auto', height: v.coverNav.navH }} />}
         </>}
         {!v.isOnboard && !st0.tutorial && <Install />}
       </div>

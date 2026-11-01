@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import Emo from '../fluent';
+import Nav from './Nav';
 import { todayStr, strToDate, dateToStr, pad2, weekMonday } from '../model';
 import {
   buildDay, buildMonth, monthsWithData, nameMap, daySlots, dayChart,
@@ -167,7 +168,7 @@ export default function Bookshelf({ v }) {
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
-  const land = manualOrient != null ? manualOrient === 'land' : autoLand;
+  const land = v.coverNav ? false : (manualOrient != null ? manualOrient === 'land' : autoLand); // Z Flip のサブディスプレイ（ほぼ正方形）は縦のまま
   // スマホが物理的に縦のまま「横」を選んだ → 画面を90°回転して横向きとして見せる
   const forceRotate = land && !autoLand && !frameMode;
   const [view, setView] = useState('day');        // 'day' | 'month'
@@ -541,10 +542,11 @@ export default function Bookshelf({ v }) {
           </div>
         </div>
 
-        {/* 内蔵ナビ（下タブ） */}
+        {/* 内蔵ナビ（下タブ）。Z Flip のサブディスプレイでは共通のナビ（アイコンだけ・カメラのない側） */}
+        {v.coverNav ? <Nav v={v} /> : (
         <div style={{ flex: '0 0 auto', minHeight: 64, paddingBottom: 'env(safe-area-inset-bottom)', display: 'flex', alignItems: 'stretch', background: '#fff', borderTop: '1px solid #efece3' }}>
           {navItems.map((it, i) => <NavItem key={i} it={it} size={23} />)}
-        </div>
+        </div>)}
 
         {/* その日/その月シート（下からスライドイン・タブバーは覆わない） */}
         {sheet && (<>

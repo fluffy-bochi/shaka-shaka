@@ -6,7 +6,7 @@ const mono = { fontFamily: "'Space Mono',monospace" };
 export default function Shaka({ v }) {
   return (
     <>
-      <div id="shakacase" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 64, zIndex: 0, overflow: 'hidden' }} />
+      <div id="shakacase" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: v.shakaBottom, zIndex: 0, overflow: 'hidden' }} />
       {/* 上部: 日付ピル＋シャッフル（メイン画面なので閉じるボタンは無し） */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 20px 0' }}>
         <div style={{ width: 34 }} />
@@ -44,10 +44,10 @@ export default function Shaka({ v }) {
       <PredictBar v={v} />
       {/* 起床後記録: 🌙が降っている間、下にある「つぎへ」で次の画面へ */}
       {v.wakeFlow && (
-        <button onClick={v.goWake2} style={{ position: 'absolute', left: 20, right: 20, bottom: 84, zIndex: 4, border: 'none', borderRadius: 16, background: '#c4f000', color: '#2f3a00', fontWeight: 800, fontSize: 16, padding: '16px 0', cursor: 'pointer', boxShadow: '0 8px 22px rgba(122,154,0,.4)' }}>つぎへ</button>
+        <button onClick={v.goWake2} style={{ position: 'absolute', left: 20, right: 20, bottom: v.shakaBottom + 20, zIndex: 4, border: 'none', borderRadius: 16, background: '#c4f000', color: '#2f3a00', fontWeight: 800, fontSize: 16, padding: '16px 0', cursor: 'pointer', boxShadow: '0 8px 22px rgba(122,154,0,.4)' }}>つぎへ</button>
       )}
       {v.bedFlow && (
-        <button onClick={v.goBed2} style={{ position: 'absolute', left: 20, right: 20, bottom: 84, zIndex: 4, border: 'none', borderRadius: 16, background: '#c4f000', color: '#2f3a00', fontWeight: 800, fontSize: 16, padding: '16px 0', cursor: 'pointer', boxShadow: '0 8px 22px rgba(122,154,0,.4)' }}>つぎへ</button>
+        <button onClick={v.goBed2} style={{ position: 'absolute', left: 20, right: 20, bottom: v.shakaBottom + 20, zIndex: 4, border: 'none', borderRadius: 16, background: '#c4f000', color: '#2f3a00', fontWeight: 800, fontSize: 16, padding: '16px 0', cursor: 'pointer', boxShadow: '0 8px 22px rgba(122,154,0,.4)' }}>つぎへ</button>
       )}
     </>
   );
