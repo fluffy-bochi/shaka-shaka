@@ -61,6 +61,7 @@ export function initShakaSound() {
     };
     window.addEventListener('pointerdown', unlock, { once: false });
     window.addEventListener('touchstart', unlock, { once: false });
+    window.addEventListener('keydown', unlock, { once: false }); // キーボードだけで操作するとき（iPad のインタラクティブテスト）
   } else {
     const onGesture = () => ensureContext();
     window.addEventListener('pointerdown', onGesture, { once: false });

@@ -1,9 +1,10 @@
 import React from 'react';
 import Matter from 'matter-js';
 import { appendGlyph } from '../fluent';
+import { initShakaSound, attachCollisionSound } from '../sound';
 
 /* iPad のインタラクティブテスト（開発者モードだけ）。自分のシャカの山とは別の箱で、記録も保存もしない。
-   キーボードの数字で絵文字を降らせる。回復（rec）はプラスの絵文字に当たると1つずつ消しあう（シャカと同じ）。 */
+   キーボードの数字で絵文字を降らせる。R でシャカシャカ（展示ではモニターに映すのでジャイロは使わない）。回復（rec）はプラスの絵文字に当たると1つずつ消しあう（シャカと同じ）。 */
 const KEYS = {
   1: { g: '😫', n: 2 },            // つぶやき いちばん疲れている顔
   2: { g: '😟', n: 1 },            // 2番目に疲れている顔
@@ -32,6 +33,7 @@ export default function IpadTest({ v }) {
     const wall = (x, y, w, h) => Matter.Bodies.rectangle(x, y, w, h, { isStatic: true, friction: 0.4 });
     Matter.World.add(engine.world, [wall(W / 2, H + 50, W * 3, 100), wall(-50, H / 2, 100, H * 4), wall(W + 50, H / 2, 100, H * 4)]);
     const s = { engine, r, W, H, bodies: [], raf: 0, last: 0, acc: 0 };
+    initShakaSound(); attachCollisionSound(engine); // ぶつかった音（シャカと同じ）
     sim.current = s;
 
     const pop = (x, y) => { const fx = document.createElement('div'); fx.className = 'pop-fx'; fx.style.left = x + 'px'; fx.style.top = y + 'px'; box.appendChild(fx); setTimeout(() => fx.remove(), 450); };
@@ -76,6 +78,17 @@ export default function IpadTest({ v }) {
     setCount(s.bodies.filter(b => !b.rec).length);
   }, []);
 
+  /* シャカシャカ: 全部の絵文字を散らす（シャカの🔀と同じ動き。箱が大きいぶん少し強め） */
+  const shake = React.useCallback(() => {
+    const s = sim.current; if (!s) return;
+    const k = 9 * Math.sqrt(Math.max(1, s.r / 24));
+    s.bodies.forEach(({ body }) => {
+      Matter.Sleeping.set(body, false);
+      Matter.Body.setVelocity(body, { x: (Math.random() - 0.5) * 2 * k, y: -Math.random() * k * 0.9 });
+      Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.4);
+    });
+  }, []);
+
   const clear = () => {
     const s = sim.current; if (!s) return;
     s.bodies.forEach(b => { Matter.World.remove(s.engine.world, b.body); b.el.remove(); });
@@ -85,6 +98,7 @@ export default function IpadTest({ v }) {
   React.useEffect(() => {
     const onKey = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if ((e.code === 'KeyR' || e.key === 'r' || e.key === 'R') && !e.repeat) { e.preventDefault(); shake(); return; }
       const m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code || '');
       const key = m ? m[1] : (/^[0-9]$/.test(e.key) ? e.key : null);
       if (key == null) return;
@@ -93,7 +107,7 @@ export default function IpadTest({ v }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [drop]);
+  }, [drop, shake]);
 
   return (
     <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#f7f4ec' }}>
@@ -101,6 +115,7 @@ export default function IpadTest({ v }) {
         <button onClick={v.closeIpadTest} aria-label="閉じる" style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: '#fff', fontSize: 18, cursor: 'pointer' }}>×</button>
         <span style={{ flex: 1, fontSize: 15, fontWeight: 900 }}>インタラクティブテスト</span>
         <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 13, fontWeight: 700 }}>{count}</span>
+        <button onClick={shake} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>🔀 R</button>
         <button onClick={clear} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>リセット</button>
       </div>
       <div ref={boxRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }} />
