@@ -41,7 +41,7 @@ import { TAP_ANNOY_FROM, TAP_ANNOY_WINDOW_SEC } from './serifu';
 import Shaka from './screens/Shaka';
 import Collect from './screens/Collect';
 import MyPage from './screens/MyPage';
-import Nav from './screens/Nav';
+import Nav, { CoverRail } from './screens/Nav';
 import Trash from './screens/Trash';
 import BuffLog from './screens/BuffLog';
 import { SlotTimes, CatsManage, Templates, Sensitivity } from './screens/Settings';
@@ -1875,7 +1875,11 @@ export default class App extends React.Component {
 
   /* 画面サイズ: 実際のアプリ画面要素を実測（PC表示のスマホ枠にも追従） */
   _screenRef = React.createRef();
-  screenW() { const el = (this._foldSplit && this._shakaPaneRef.current) || this._screenRef.current; return (el && el.clientWidth) || Math.min(480, window.innerWidth || 372); }
+  screenW() {
+    const el = (this._foldSplit && this._shakaPaneRef.current) || this._screenRef.current;
+    const rail = this._flip && this._flip.kind === 'cover' && !this._foldSplit ? (getFlip().railW || 56) : 0; // サブ: 右端の縦ナビのぶんを除く
+    return ((el && el.clientWidth) || Math.min(480, window.innerWidth || 372)) - rail;
+  }
   screenH() {
     if (this._foldSplit && this._shakaPaneRef.current) return this._shakaPaneRef.current.clientHeight || 300; // 折っている時: 折り目より上だけ（ナビは下の画面）
     const el = this._screenRef.current; return ((el && el.clientHeight) || window.innerHeight || 812) - this.navH();
@@ -1898,9 +1902,7 @@ export default class App extends React.Component {
     b.toggle('kame-tablet', tb.on); b.toggle('kame-tablet-land', tb.on && tb.land);
     const tbChanged = prevTb.on !== tb.on || prevTb.land !== tb.land;
     b.toggle('kame-cover', f.kind === 'cover'); b.toggle('kame-fold', f.kind === 'fold');
-    // 折っている時の、上下に分けない画面（マイページなど）: 右端の縦ナビのぶん幅を空ける
-    b.toggle('kame-fold-ns', f.kind === 'fold' && !this.isFoldSplit());
-    document.documentElement.style.setProperty('--kame-foldnav', (f.foldNavW || 0) + 'px');
+    document.documentElement.style.setProperty('--kame-rail', (getFlip().railW || 56) + 'px');
     document.documentElement.style.setProperty('--kame-zoom', String(f.zoom || 1));
     const changed = tbChanged || prev.kind !== f.kind || prev.foldTop !== f.foldTop || prev.foldBottom !== f.foldBottom || prev.zoom !== f.zoom || this._flipNavKey !== JSON.stringify(getFlip());
     this._flipNavKey = JSON.stringify(getFlip());
@@ -3836,7 +3838,6 @@ export default class App extends React.Component {
     }
   }
   componentDidUpdate(prevProps, prevState) {
-    if (this._flip && this._flip.kind === 'fold') document.body.classList.toggle('kame-fold-ns', !this.isFoldSplit()); // Z Flip を折っている時の縦ナビの幅
     // 画面が変わったら、それまでの時間を前の画面に足してから切りかえる
     const lab = this.screenLabel();
     if (lab !== this._stLabel) { if (this._stLabel) this.tickScreenTime(); this._stLabel = lab; }
@@ -5310,7 +5311,7 @@ export default class App extends React.Component {
       flipCfg: getFlip(), setFlip, tabletOn: !!(this._tablet && this._tablet.on),
       isIpadTest: st.screen === 'ipadTest', goIpadTest: () => this.set({ screen: 'ipadTest' }), closeIpadTest: () => this.set({ screen: 'mypage' }), coverNav: this._flip && this._flip.kind === 'cover' ? getFlip() : null,
       shakaBottom: this.isFoldSplit(st) ? 0 : this.navH(),
-      foldNav: this._flip && this._flip.kind === 'fold' ? { top: this._flip.foldBottom, w: this._flip.foldNavW } : null,
+      shakaRight: this._flip && this._flip.kind === 'cover' ? (getFlip().railW || 56) : 0, // サブ: 右端の縦ナビの下に山を入れない
       editIkoiLine: this.editIkoiLine, ikoiTarget: st.ikoiTarget, closeIkoiEdit: this.closeIkoiEdit,
       isIkoiEdit: st.screen === 'ikoiEdit', devMode: Ikoi.isDev(), goIkoiEdit: this.goIkoiEdit, tapDevSecret: this.tapDevSecret,
       isResearchAdmin: st.screen === 'researchAdmin', goResearchAdmin: this.goResearchAdmin,
@@ -5717,11 +5718,7 @@ export default class App extends React.Component {
           {/* 縦に折っている時: 折り目より上にシャカ、下にタイムライン */}
           <div ref={this._shakaPaneRef} style={{ position: 'relative', flex: '0 0 auto', height: 'calc(' + v.flip.foldTop + 'px - env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}><Shaka v={v} /></div>
           <div style={{ flex: '0 0 auto', height: Math.max(0, v.flip.foldBottom - v.flip.foldTop), background: '#f7f4ec' }} />
-          {/* 下: タイムライン＋右端にナビ（左下は端末の戻る・ホームがあるので使わない） */}
-          <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}><Home v={v} /></div>
-            <div style={{ flex: '0 0 auto', width: v.flip.foldNavW }} />
-          </div>
+          <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}><Home v={v} /></div>
         </> : <>
           {v.isHome && <Home v={v} />}
           {v.isShaka && <Shaka v={v} />}
@@ -5805,6 +5802,8 @@ export default class App extends React.Component {
         {v.run && !v.isRun && (v.isHome || v.isPickScreen) && <MiniRun v={v} />}
         {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && !v.isResearchAdmin && !v.isWeekReport && !v.isIpadTest && <Nav v={v} />}
         {/* Z Flip のサブディスプレイ: ナビのない画面でも、カメラにかかる下の帯は空けておく */}
+        {/* Z Flip のサブディスプレイ: ナビは右端に縦（アイコンだけ・下の帯の上まで） */}
+        {v.coverNav && (v.isBookshelf || !(v.isWake || v.isBed || v.isIkoiEdit || v.isResearchAdmin || v.isWeekReport || v.isIpadTest)) && <CoverRail v={v} />}
         {v.coverNav && !v.isBookshelf && (v.isWake || v.isBed || v.isIkoiEdit || v.isResearchAdmin || v.isWeekReport) && <div style={{ flex: '0 0 auto', height: v.coverNav.navH }} />}
         </>}
         {!v.isOnboard && !st0.tutorial && <Install />}

@@ -224,7 +224,7 @@ export default function Home({ v }) {
       </div>
       </div>
       {/* 右下: きもち・できごと・体調（💬）／記録（＋） */}
-      <div style={{ position: 'absolute', right: 20, bottom: v.run ? 136 : 80, zIndex: 3, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ position: 'absolute', right: 20 + (v.shakaRight || 0), bottom: v.run ? 136 : 80, zIndex: 3, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <button onClick={v.openMood} aria-label="きもち・できごと・体調" style={fab}><span style={{ fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 32, color: '#1b1b18' }}>chat_bubble</span></button>
         <button onClick={v.openRecordNow} aria-label="記録する" style={fab}><span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 38, color: '#1b1b18', fontWeight: 300 }}>add</span></button>
       </div>

@@ -6,7 +6,7 @@ const mono = { fontFamily: "'Space Mono',monospace" };
 export default function Shaka({ v }) {
   return (
     <>
-      <div id="shakacase" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: v.shakaBottom, zIndex: 0, overflow: 'hidden' }} />
+      <div id="shakacase" style={{ position: 'absolute', left: 0, top: 0, bottom: v.shakaBottom, right: v.shakaRight || 0, zIndex: 0, overflow: 'hidden' }} />
       {/* 上部: 日付ピル＋シャッフル（メイン画面なので閉じるボタンは無し） */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 20px 0' }}>
         <div style={{ width: 34 }} />
@@ -37,7 +37,7 @@ export default function Shaka({ v }) {
       )}
       <div style={{ flex: 1 }} />
       {/* 右端の「ためた回復」タブ（画面右辺にくっつく） */}
-      <button onClick={v.goCollect} aria-label="ためた回復" style={{ position: 'absolute', right: 0, top: '46%', transform: 'translateY(-50%)', zIndex: 2, background: '#1b1b18', color: '#fff', border: 'none', borderRadius: '14px 0 0 14px', padding: '11px 9px 11px 11px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', boxShadow: '0 4px 14px rgba(27,27,24,.2)' }}>
+      <button onClick={v.goCollect} aria-label="ためた回復" style={{ position: 'absolute', right: v.shakaRight || 0, top: '46%', transform: 'translateY(-50%)', zIndex: 2, background: '#1b1b18', color: '#fff', border: 'none', borderRadius: '14px 0 0 14px', padding: '11px 9px 11px 11px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', boxShadow: '0 4px 14px rgba(27,27,24,.2)' }}>
         <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#c4f000', color: '#2f3a00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>🏆</span>
         <span style={{ ...mono, fontSize: 9, fontWeight: 700, writingMode: 'vertical-rl', letterSpacing: '.1em' }}>ためた</span>
       </button>
