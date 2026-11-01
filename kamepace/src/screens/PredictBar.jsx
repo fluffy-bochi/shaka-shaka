@@ -44,7 +44,7 @@ export default function PredictBar({ v }) {
   if (!p) return null;
   const name = p.past ? '記録' : '予測'; // 過去の日は「記録」
   if (!p.open) {
-    return <button onClick={v.openPredict} aria-label={name} style={{ ...tabShape(false), clipPath: 'polygon(0 12%, 100% 0, 100% 100%, 0 88%)', top: 'auto', bottom: (v.shakaBottom != null ? v.shakaBottom : 64) + 56, height: 100, zIndex: 4 }}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>{name}</span></button>;
+    return <button onClick={v.openPredict} aria-label={name} style={{ ...tabShape(false), right: v.shakaRight || 0, clipPath: 'polygon(0 12%, 100% 0, 100% 100%, 0 88%)', top: 'auto', bottom: (v.shakaBottom != null ? v.shakaBottom : 64) + 56, height: 100, zIndex: 4 }}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>{name}</span></button>;
   }
   const span = p.end - p.start;
   const frac = (t) => Math.max(0, Math.min(1, (t - p.start) / span));
@@ -59,7 +59,7 @@ export default function PredictBar({ v }) {
   const noon = new Date(p.start); noon.setHours(12, 0, 0, 0);
   const marks = [[p.start, hm(p.start)], ...(noon.getTime() > p.start && noon.getTime() < p.end ? [[noon.getTime(), '12:00']] : []), [p.end, hm(p.end).replace(/^(\d+):(\d+)$/, '$1:$2')]];
   return (
-    <div style={{ position: 'absolute', left: 0, right: 0, bottom: (v.shakaBottom != null ? v.shakaBottom : 64) + 56, height: 100, zIndex: 4, animation: closing ? 'predClose .1s ease-in forwards' : 'predOpen .2s ease-out' }}>
+    <div style={{ position: 'absolute', left: 0, right: v.shakaRight || 0, bottom: (v.shakaBottom != null ? v.shakaBottom : 64) + 56, height: 100, zIndex: 4, animation: closing ? 'predClose .1s ease-in forwards' : 'predOpen .2s ease-out' }}>
       <button onClick={doClose} aria-label={name + 'を閉じる'} style={{ ...tabShape(false), clipPath: 'none' }}>▶</button>{/* 右は四角 */}
       <button onClick={doClose} aria-label={name + 'を閉じる'} style={tabShape(true)}><span style={{ writingMode: 'vertical-rl', letterSpacing: '.1em' }}>{name}</span></button>
       <div style={{ position: 'absolute', left: 29, right: 29, top: 0, bottom: 0, background: 'rgba(0,0,0,.2)', padding: '0 12px' }}>

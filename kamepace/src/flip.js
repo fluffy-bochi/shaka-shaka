@@ -1,11 +1,11 @@
 /* Galaxy Z Flip 用の表示（開発者モードの人だけの先行体験）。
    - サブディスプレイ（カバー画面）: 小さくほぼ正方形の画面。全体を少し縮めて横幅を確保し、
-     ナビはアイコンだけにして、カメラのない側の下（ぴょこっと出ている所）に置く。
+     下の帯（左下=端末の戻る・ホーム、右下=カメラ）は空けて、ナビはアイコンだけで右端に縦。
    - 縦に折っている時（フレックスモード）: 折り目より上にシャカ、下にタイムライン（ホーム）。
    設定は端末ごと（localStorage）。開発者モードがオフなら何もしない。 */
 
 const KEY = 'kame_flip';
-const DEF = { tab: false, on: false, mode: 'auto', navSide: 'left', navW: 46, navH: 64, baseW: 375, foldAdj: 0, foldGap: 28, foldNavW: 58 };
+const DEF = { tab: false, on: false, mode: 'auto', railW: 56, navH: 64, baseW: 375, foldAdj: 0, foldGap: 28 }; // railW: サブの右端の縦ナビの幅 / navH: サブの下の使えない帯（左下=端末の戻る・ホーム、右下=カメラ）
 
 let cfg = { ...DEF };
 try { cfg = { ...DEF, ...(JSON.parse(localStorage.getItem(KEY) || '{}') || {}) }; } catch (e) { /* ignore */ }
@@ -60,7 +60,7 @@ export function computeFlip(enabled) {
     top += cfg.foldAdj || 0; bottom += cfg.foldAdj || 0;
     // 折り目はゆるく曲がっているので、上下 foldGap ずつは使わない
     const gap = cfg.foldGap || 0;
-    return { ...none, kind, foldTop: Math.round(top - gap), foldBottom: Math.round(Math.max(top, bottom) + gap), foldNavW: cfg.foldNavW || 58 };
+    return { ...none, kind, foldTop: Math.round(top - gap), foldBottom: Math.round(Math.max(top, bottom) + gap) };
   }
   return none;
 }

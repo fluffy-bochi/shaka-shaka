@@ -391,12 +391,8 @@ function FlipSettings({ v }) {
             <span style={{ fontSize: 12.5, color: '#55554e' }}>表示</span>
             {seg([['auto', '自動'], ['cover', 'サブ'], ['fold', '折り']], c.mode, 'mode')}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 15px' }}>
-            <span style={{ fontSize: 12.5, color: '#55554e' }}>サブのナビ</span>
-            {seg([['left', '左下'], ['right', '右下']], c.navSide, 'navSide')}
-          </div>
-          {slider('ナビの幅', 'navW', 25, 100, 1, '%')}
-          {slider('ナビの高さ', 'navH', 40, 140, 2, 'px')}
+          {slider('ナビの幅', 'railW', 40, 90, 2, 'px')}
+          {slider('下の帯', 'navH', 0, 140, 2, 'px')}
           {slider('画面の幅', 'baseW', 300, 430, 5, 'px')}
           {slider('折り目', 'foldAdj', -120, 120, 2, 'px')}
           {slider('折り目の余白', 'foldGap', 0, 80, 2, 'px')}

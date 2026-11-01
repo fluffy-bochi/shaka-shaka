@@ -544,7 +544,7 @@ export default function Bookshelf({ v }) {
         </div>
 
         {/* 内蔵ナビ（下タブ）。Z Flip のサブディスプレイでは共通のナビ（アイコンだけ・カメラのない側） */}
-        {v.coverNav || v.foldNav ? <Nav v={v} /> : (
+        {v.coverNav ? <Nav v={v} /> : (
         <div style={{ flex: '0 0 auto', minHeight: 64, paddingBottom: 'env(safe-area-inset-bottom)', display: 'flex', alignItems: 'stretch', background: '#fff', borderTop: '1px solid #efece3' }}>
           {navItems.map((it, i) => <NavItem key={i} it={it} size={23} />)}
         </div>)}

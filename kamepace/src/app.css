@@ -176,5 +176,5 @@ body.kame-tablet .phone { width: 100vw; padding: 0; border-radius: 0; background
 body.kame-tablet .phone .app-screen, body.kame-tablet .app-screen { width: 100vw; max-width: none; height: var(--app-vh, 100dvh); border-radius: 0; }
 body.kame-tablet-land:not(.kame-book-land) .phone .app-screen, body.kame-tablet-land:not(.kame-book-land) .app-screen { width: min(100vw, 600px); margin: 0 auto; }
 body.kame-tablet.kame-book-land .phone, body.kame-tablet.kame-book-land .phone .app-screen { width: 100vw; height: var(--app-vh, 100dvh); }
-/* 折っている時の上下に分けない画面: 右端の縦ナビのぶん幅を空ける（ナビは position: fixed） */
-body.kame-fold-ns .app-screen { width: calc(100vw - var(--kame-foldnav, 58px)); max-width: none; margin: 0; }
+/* サブディスプレイ: 右端の縦ナビのぶん、中身の幅を空ける */
+body.kame-cover .app-screen { padding-right: var(--kame-rail, 56px); }
