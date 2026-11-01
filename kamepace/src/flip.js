@@ -1,0 +1,78 @@
+/* Galaxy Z Flip 用の表示（開発者モードの人だけの先行体験）。
+   - サブディスプレイ（カバー画面）: 小さくほぼ正方形の画面。全体を少し縮めて横幅を確保し、
+     ナビはアイコンだけにして、カメラのない側の下（ぴょこっと出ている所）に置く。
+   - 縦に折っている時（フレックスモード）: 折り目より上にシャカ、下にタイムライン（ホーム）。
+   設定は端末ごと（localStorage）。開発者モードがオフなら何もしない。 */
+
+const KEY = 'kame_flip';
+const DEF = { on: false, mode: 'auto', navSide: 'left', navW: 46, navH: 64, baseW: 375, foldAdj: 0 };
+
+let cfg = { ...DEF };
+try { cfg = { ...DEF, ...(JSON.parse(localStorage.getItem(KEY) || '{}') || {}) }; } catch (e) { /* ignore */ }
+
+const subs = new Set();
+const emit = () => subs.forEach(f => { try { f(); } catch (e) { /* ignore */ } });
+
+export function getFlip() { return cfg; }
+export function setFlip(patch) {
+  cfg = { ...cfg, ...patch };
+  try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) { /* ignore */ }
+  emit();
+}
+export function subscribeFlip(f) { subs.add(f); return () => subs.delete(f); }
+
+/* いまの姿勢: 'folded'（半分折り）/'continuous'/null（APIなし） */
+function posture() {
+  try { return (navigator.devicePosture && navigator.devicePosture.type) || null; } catch (e) { return null; }
+}
+/* 折り目で上下に分かれた画面（Viewport Segments API）。上下2つなら [上, 下] */
+function vSegments() {
+  try {
+    const s = window.viewportSegments;
+    if (s && s.length === 2 && Math.abs(s[0].left - s[1].left) < 2 && s[1].top > s[0].top) return s;
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+/* サブディスプレイらしい画面: 小さくて、ほぼ正方形 */
+export function looksCover(w = window.innerWidth, h = window.innerHeight) {
+  return w > 0 && h > 0 && w <= 480 && h <= 560 && w / h > 0.7 && w / h < 1.45;
+}
+
+/* いまの表示: { kind: 'cover'|'fold'|null, foldTop, foldBottom, zoom } */
+export function computeFlip(enabled) {
+  const w = window.innerWidth || 0, h = window.innerHeight || 0;
+  const none = { kind: null, foldTop: 0, foldBottom: 0, zoom: 1 };
+  if (!enabled || !cfg.on) return none;
+  const portrait = h > w;
+  let kind = null;
+  if (cfg.mode === 'cover') kind = 'cover';
+  else if (cfg.mode === 'fold') kind = 'fold';
+  else if (looksCover(w, h)) kind = 'cover';
+  else if (portrait && (posture() === 'folded' || vSegments())) kind = 'fold';
+  if (kind === 'cover') {
+    const zoom = Math.min(1, Math.max(0.6, w / (cfg.baseW || 375)));
+    return { ...none, kind, zoom };
+  }
+  if (kind === 'fold') {
+    const seg = vSegments();
+    let top = seg ? seg[0].bottom : h / 2, bottom = seg ? seg[1].top : h / 2;
+    top += cfg.foldAdj || 0; bottom += cfg.foldAdj || 0;
+    return { ...none, kind, foldTop: Math.round(top), foldBottom: Math.round(Math.max(top, bottom)) };
+  }
+  return none;
+}
+
+/* 姿勢・画面サイズが変わったら知らせる */
+export function watchFlipEnv(f) {
+  const on = () => f();
+  window.addEventListener('resize', on);
+  window.addEventListener('orientationchange', on);
+  let dp = null;
+  try { dp = navigator.devicePosture; if (dp && dp.addEventListener) dp.addEventListener('change', on); } catch (e) { dp = null; }
+  return () => {
+    window.removeEventListener('resize', on);
+    window.removeEventListener('orientationchange', on);
+    try { if (dp && dp.removeEventListener) dp.removeEventListener('change', on); } catch (e) { /* ignore */ }
+  };
+}

@@ -185,7 +185,8 @@ export default function Home({ v }) {
           </div>
         </div>
         <WeekGoalRow v={v} />
-        <Speaker text={v.homeComment} size={140} onTap={v.tapCharacter} onEdit={v.editIkoiLine} />
+        {/* Z Flip を縦に折っている時は下半分をタイムラインに使う（いこいさんは出さない）。サブディスプレイでは小さめ */}
+        {!v.foldSplit && <Speaker text={v.homeComment} size={v.coverNav ? 96 : 140} onTap={v.tapCharacter} onEdit={v.editIkoiLine} />}
       </div>
       <div ref={listRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 0 160px' }}>
         {/* タイムライン（Figma「home」）: 時間帯の区切り＋投稿 */}

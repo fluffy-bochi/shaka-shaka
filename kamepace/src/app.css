@@ -159,3 +159,10 @@ body.kame-wide .app-status-spacer { height: 0; }
 
 /* 時刻入力の時計アイコンは出さない（狭い欄で数字が切れるため） */
 input[type="time"]::-webkit-calendar-picker-indicator { display: none; }
+
+/* Galaxy Z Flip（開発者モードだけ・flip.js）
+   サブディスプレイ: 全体を縮めて横幅を確保（--kame-zoom）。上の余白はステータスバーぶんだけ */
+body.kame-cover .app-screen { zoom: var(--kame-zoom, 1); height: calc(var(--app-vh, 100dvh) / var(--kame-zoom, 1)); max-width: none; }
+body.kame-cover .app-status-spacer { height: env(safe-area-inset-top); }
+/* 縦に折っている時: 上の余白はステータスバーぶんだけ（折り目の位置に合わせるため） */
+body.kame-fold .app-status-spacer { height: env(safe-area-inset-top); }
