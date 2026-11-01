@@ -5,7 +5,7 @@
    設定は端末ごと（localStorage）。開発者モードがオフなら何もしない。 */
 
 const KEY = 'kame_flip';
-const DEF = { tab: false, on: false, mode: 'auto', navSide: 'left', navW: 46, navH: 64, baseW: 375, foldAdj: 0 };
+const DEF = { tab: false, on: false, mode: 'auto', navSide: 'left', navW: 46, navH: 64, baseW: 375, foldAdj: 0, foldGap: 28, foldNavW: 58 };
 
 let cfg = { ...DEF };
 try { cfg = { ...DEF, ...(JSON.parse(localStorage.getItem(KEY) || '{}') || {}) }; } catch (e) { /* ignore */ }
@@ -58,7 +58,9 @@ export function computeFlip(enabled) {
     const seg = vSegments();
     let top = seg ? seg[0].bottom : h / 2, bottom = seg ? seg[1].top : h / 2;
     top += cfg.foldAdj || 0; bottom += cfg.foldAdj || 0;
-    return { ...none, kind, foldTop: Math.round(top), foldBottom: Math.round(Math.max(top, bottom)) };
+    // 折り目はゆるく曲がっているので、上下 foldGap ずつは使わない
+    const gap = cfg.foldGap || 0;
+    return { ...none, kind, foldTop: Math.round(top - gap), foldBottom: Math.round(Math.max(top, bottom) + gap), foldNavW: cfg.foldNavW || 58 };
   }
   return none;
 }
