@@ -14,7 +14,7 @@ const navItems = (v) => [
 export function CoverRail({ v }) {
   const c = v.coverNav;
   return (
-    <div style={{ position: 'absolute', zIndex: 6, right: 0, top: 0, bottom: c.navH, width: c.railW, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: '#fff', borderLeft: '1px solid #efece3', borderRadius: '0 0 0 14px' }}>
+    <div style={{ position: 'absolute', zIndex: 6, right: 0, top: 0, bottom: c.navH, width: c.railW, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: '#fff', borderLeft: '1px solid #efece3', borderRadius: c.navH ? '0 0 0 14px' : 0 }}>
       {navItems(v).map(it => <button key={it.icon} onClick={it.on} aria-label={it.label} style={{ ...btn(it.color), flex: '0 1 60px', padding: 0 }}><span style={ms(it.fill)}>{it.icon}</span></button>)}
     </div>
   );

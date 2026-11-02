@@ -5,13 +5,18 @@
    設定は端末ごと（localStorage）。開発者モードがオフなら何もしない。 */
 
 const KEY = 'kame_flip';
-const DEF = { tab: false, on: false, mode: 'auto', railW: 56, navH: 64, baseW: 375, foldAdj: 0, foldGap: 28 }; // railW: サブの右端の縦ナビの幅 / navH: サブの下の使えない帯（左下=端末の戻る・ホーム、右下=カメラ）
+const DEF = { tab: false, on: false, mode: 'auto', railW: 56, navH: 0, baseW: 375, foldAdj: 0, foldGap: 28 }; // railW: サブの右端の縦ナビの幅 / navH: サブの下に空ける帯（実機ではカメラ・戻るボタンの部分は表示領域の外なので 0）
 
 let cfg = { ...DEF };
 try { cfg = { ...DEF, ...(JSON.parse(localStorage.getItem(KEY) || '{}') || {}) }; } catch (e) { /* ignore */ }
 // 自動判定を直したので、手で「サブ」「折り」にしていた端末も一度だけ「自動」に戻す
 if (!cfg.autoV) {
   cfg = { ...cfg, mode: 'auto', autoV: 1 };
+  try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) { /* ignore */ }
+}
+// 下の帯は実機では不要だった。保存済みの 64px も一度だけ 0 に戻す
+if (!cfg.bandV) {
+  cfg = { ...cfg, navH: 0, bandV: 1 };
   try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) { /* ignore */ }
 }
 

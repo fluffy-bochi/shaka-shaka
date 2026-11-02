@@ -1891,7 +1891,7 @@ export default class App extends React.Component {
     const r = el.getBoundingClientRect(), z = (this._flip && this._flip.zoom) || 1;
     return { width: r.width / z, height: r.height / z };
   }
-  navH() { return this._flip && this._flip.kind === 'cover' ? (getFlip().navH || 64) : 64; }
+  navH() { return this._flip && this._flip.kind === 'cover' ? (getFlip().navH || 0) : 64; }
   // シャカの山が見えているか（折っている時はホームでも上にシャカ）
   isFoldSplit(s = this.state) { return !!(this._flip && this._flip.kind === 'fold') && ['home', 'shaka'].includes(s.screen); }
   get _foldSplit() { return this.isFoldSplit(); }
