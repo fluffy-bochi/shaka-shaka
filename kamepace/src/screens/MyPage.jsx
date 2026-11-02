@@ -382,7 +382,7 @@ function FlipSettings({ v }) {
       <button onClick={() => set({ on: !c.on })} style={{ ...row(!c.on), width: '100%', border: 'none', borderBottom: c.on ? '1px solid #f1efe8' : 'none', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
         <span style={{ fontSize: 16 }}>📱</span>
         <span style={{ flex: 1, fontSize: 14 }}>Z Flip 表示</span>
-        {c.on && <span style={{ ...mono, fontSize: 11, color: '#8a8a82' }}>{KIND[v.flipKind]}</span>}
+        {c.on && <span style={{ ...mono, fontSize: 11, color: '#8a8a82' }}>{KIND[v.flipKind]} {window.innerWidth}×{window.innerHeight}</span>}
         <DevToggle on={c.on} />
       </button>
       {c.on && (
