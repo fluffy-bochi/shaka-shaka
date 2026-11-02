@@ -13,7 +13,7 @@ const CARD_H = 212; // 上のカードの高さはカテゴリ・行動・予定
 const FIT_W = 360; // サブディスプレイでの縮小の基準＝Z Flip を開いて縦で見た時のカードの幅（412 − 左右の余白52）
 const sg = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0');
 
-function FatNums({ it, big, compact }) {
+function FatNums({ it, big }) {
   if (it.kind !== 'act') return it.meta ? <span style={{ fontSize: big ? 11 : 10.5, color: '#8a8a82', fontWeight: 700 }}>{it.meta}</span> : null;
   const lab = { fontSize: big ? 9 : 8.5, color: '#8a8a82', fontWeight: 700, marginRight: 1 };
   const num = { fontSize: big ? 13 : 12.5, fontWeight: 800, color: INK, fontFamily: "'Space Mono',monospace" };
@@ -21,7 +21,7 @@ function FatNums({ it, big, compact }) {
     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5, whiteSpace: 'nowrap' }}>
       <span><span style={lab}>体</span><span style={num}>{sg(it.body)}</span></span>
       <span><span style={lab}>心</span><span style={num}>{sg(it.mind)}</span></span>
-      {!compact && <span style={{ fontSize: 9, color: '#8a8a82', fontWeight: 700 }}>/{it.minText}</span>}
+      <span style={{ fontSize: 9, color: '#8a8a82', fontWeight: 700 }}>/{it.minText}</span>
     </span>
   );
 }
@@ -426,12 +426,12 @@ const Row = React.memo(function Row({ r, i, on, open, onTap, onLong, listAdd, da
   return (
     <div {...lpH} onClick={() => { if (lp.current.fired) { lp.current.fired = false; return; } onTap(r, i); }} style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none', position: 'relative', zIndex: on ? 2 : undefined, transform: shift ? 'translateY(' + shift + 'px)' : undefined, transition: 'transform .15s ease', height: hOf(r), display: 'flex', alignItems: 'center', padding: compact ? (on ? '0 2px' : '0 6px') : on ? '0 54px 0 30px' : '0 60px 0 42px', cursor: 'pointer', scrollSnapAlign: 'center', boxSizing: 'border-box' }}>
       {r.type === 'item' ? (
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: on ? (compact ? 5 : 8) : (compact ? 5 : 7), background: CREAM, borderRadius: on ? 10 : 8, height: on ? 56 : 30, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: on ? 8 : 7, background: CREAM, borderRadius: on ? 10 : 8, height: on ? 56 : 30, position: 'relative', overflow: 'hidden', paddingRight: 8, boxShadow: on ? '0 4px 14px rgba(27,27,24,.16)' : '0 1px 2px rgba(27,27,24,.05)' }}>
           <span style={{ position: 'absolute', left: 0, top: 0, width: on ? 48 : 26, height: on ? 48 : 26, background: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
-          <span style={{ position: 'relative', flex: '0 0 auto', marginLeft: on ? (compact ? 4 : 6) : 5 }}><Emo e={r.item.glyph} size={on ? (compact ? 26 : 32) : 20} /></span>
+          <span style={{ position: 'relative', flex: '0 0 auto', marginLeft: on ? 6 : 5 }}><Emo e={r.item.glyph} size={on ? 32 : 20} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: on ? (compact ? 13.5 : 16.5) : (compact ? 12 : 13.5), fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.item.name}</div>
-            {on && !(compact && listAdd && r.item.onList) && <FatNums it={r.item} big compact={compact} />}
+            <div style={{ fontSize: on ? 16.5 : 13.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.item.name}</div>
+            {on && <FatNums it={r.item} big />}
           </div>
           {/* リストのカードを見ているときは、選択中の行動からそのままリストに足せる */}
           {listAdd && r.item.onList && (
@@ -440,8 +440,8 @@ const Row = React.memo(function Row({ r, i, on, open, onTap, onLong, listAdd, da
         </div>
       ) : dark ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', height: on ? 30 : 26, borderRadius: 7, background: CREAM, border: '2px solid ' + color, overflow: 'hidden', boxSizing: 'border-box', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
-          <span style={{ flex: compact ? '0 0 22px' : on ? '0 0 34px' : '0 0 30px', alignSelf: 'stretch', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: on ? 11 : 9.5, color: r.type === 'addcat' ? '#fff' : (r.cat.ink || INK) }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
-          <span style={{ flex: 1, textAlign: 'center', fontSize: compact ? 12 : on ? 14.5 : 13, fontWeight: 800, color: INK, paddingRight: compact ? 4 : on ? 34 : 30, paddingLeft: compact ? 4 : 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
+          <span style={{ flex: on ? '0 0 34px' : '0 0 30px', alignSelf: 'stretch', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: on ? 11 : 9.5, color: r.type === 'addcat' ? '#fff' : (r.cat.ink || INK) }}>{r.type === 'addcat' ? '＋' : open ? '▼' : '▶'}</span>
+          <span style={{ flex: 1, textAlign: 'center', fontSize: on ? 14.5 : 13, fontWeight: 800, color: INK, paddingRight: on ? 34 : 30, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.type === 'cat' ? r.cat.name : '大カテゴリを追加'}</span>
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: on ? 30 : 26, borderRadius: 8, padding: '0 12px', background: color, color: r.type === 'cat' ? (r.cat.ink || '#fff') : '#fff', boxShadow: on ? '0 4px 14px rgba(27,27,24,.18)' : '0 1px 2px rgba(27,27,24,.08)' }}>
@@ -573,7 +573,7 @@ export default function Pick({ v }) {
     setOpen({});
   };
   const cover = !!v.coverNav; // Z Flip のサブディスプレイ: 左にリスト、右にカード
-  const [fit, setFit] = React.useState(0.5); // カードの縮小率（右の列の幅に合わせる）
+  const [fit, setFit] = React.useState(0.27); // カードの縮小率（右の列の幅に合わせる）
   const side = (on) => ({ width: cover ? 30 : 36, height: cover ? 30 : 36, flex: '0 0 auto', borderRadius: 10, border: 'none', boxShadow: '0 1px 3px rgba(27,27,24,.08)', background: on ? INK : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, marginBottom: cover ? 0 : 10 });
   const arrow = { position: 'absolute', left: 8, zIndex: 2, width: 26, height: 26, border: 'none', background: 'none', cursor: 'pointer', padding: 0 };
 
@@ -583,14 +583,17 @@ export default function Pick({ v }) {
   const [page, setPage] = React.useState(() => (mem.page === 1 ? 1 : 0));
   const onList = PAGES[page] === 'L'; // いまリストのカードを見ているか
   const pageEls = () => (pagerRef.current ? [...pagerRef.current.querySelectorAll('[data-page]')] : []);
-  // サブディスプレイはカードを広げるためにカードの枠を static にしていて、offsetLeft の基準が枠の外になる
-  const relLeft = (p) => { const el = pagerRef.current; return p.offsetLeft - (p.offsetParent === el ? 0 : el.offsetLeft); };
-  const leftFor = (i) => { const el = pagerRef.current, p = pageEls()[i]; return el && p ? relLeft(p) - (el.clientWidth - p.offsetWidth) / 2 : 0; };
-  const goPage = (i, smooth) => { const el = pagerRef.current; if (!el) return; el.scrollTo({ left: leftFor(i), behavior: smooth ? 'smooth' : 'auto' }); setPage(i); mem.page = i; };
+  // ふつうは左右に送る。サブディスプレイは上に行動カード・下にリストのカードで上下に送り、見ているカードが縦のまんなかに来る。
+  // サブはカードを広げるためにカードの枠を static にしていて、offsetTop の基準が枠の外になる
+  const startOf = (p) => { const el = pagerRef.current; return cover ? p.offsetTop - (p.offsetParent === el ? 0 : el.offsetTop) : p.offsetLeft; };
+  const sizeOf = (e) => (cover ? e.offsetHeight : e.offsetWidth);
+  const viewOf = (el) => (cover ? el.clientHeight : el.clientWidth);
+  const posFor = (i) => { const el = pagerRef.current, p = pageEls()[i]; return el && p ? startOf(p) - (viewOf(el) - sizeOf(p)) / 2 : 0; };
+  const goPage = (i, smooth) => { const el = pagerRef.current; if (!el) return; el.scrollTo({ [cover ? 'top' : 'left']: posFor(i), behavior: smooth ? 'smooth' : 'auto' }); setPage(i); mem.page = i; };
   const nearest = () => {
     const el = pagerRef.current; if (!el) return 0;
-    const c = el.scrollLeft + el.clientWidth / 2; let best = 0, bd = Infinity;
-    pageEls().forEach((p, i) => { const d = Math.abs(relLeft(p) + p.offsetWidth / 2 - c); if (d < bd) { bd = d; best = i; } });
+    const c = (cover ? el.scrollTop : el.scrollLeft) + viewOf(el) / 2; let best = 0, bd = Infinity;
+    pageEls().forEach((p, i) => { const d = Math.abs(startOf(p) + sizeOf(p) / 2 - c); if (d < bd) { bd = d; best = i; } });
     return best;
   };
   const onPager = () => { const i = nearest(); if (i !== page) { setPage(i); mem.page = i; } };
@@ -602,6 +605,7 @@ export default function Pick({ v }) {
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, [cover]);
+  React.useLayoutEffect(() => { if (cover) goPage(page, false); }, [cover, fit]); // eslint-disable-line react-hooks/exhaustive-deps
   // リストに積んだ・予定を開いたら、リストのカードへ（開いた直後は動かさない）
   const lastTick = React.useRef(v.pickList ? v.pickList.tick : 0);
   React.useEffect(() => {
@@ -626,14 +630,20 @@ export default function Pick({ v }) {
   const all = [];
   for (let c = 0; c < COPIES; c++) rows.forEach((r, i) => all.push({ r, i: c * N + i }));
 
-  /* 左に行動カード、右にリストのカード（横にスワイプ。となりのカードの端がのぞく。サブディスプレイはのぞかせない）。
-     端の余白は padding だと右端が scrollWidth に入らないので、前後のすき間の要素で作る */
-  const pagerGap = cover ? null : <div style={{ flex: '0 0 26px' }} />;
+  /* 左に行動カード、右にリストのカード（横にスワイプ。となりのカードの端がのぞく）。
+     端の余白は padding だと右端が scrollWidth に入らないので、前後のすき間の要素で作る。
+     サブディスプレイ: 上に行動カード、下にリストのカード（縦にスワイプ。見ているカードが縦のまんなか） */
+  const fitH = CARD_H * fit; // サブのカードの高さ（りれきを広げている間も場所を残して、閉じた時に位置がずれないように）
+  const pagerGap = cover ? <div style={{ flex: `0 0 calc(50% - ${fitH / 2}px)` }} /> : <div style={{ flex: '0 0 26px' }} />;
   const pagerEl = (
-    <div ref={pagerRef} onScroll={onPager} className="nos" style={{ position: cover ? 'static' : 'relative', display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', flex: '0 0 auto', overscrollBehaviorX: 'contain' }}>
+    <div ref={pagerRef} onScroll={onPager} className="nos" style={cover
+      ? { gridArea: '1 / 1', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden', overflowY: 'auto', scrollSnapType: 'y mandatory', overscrollBehaviorY: 'contain' }
+      : { position: 'relative', display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', flex: '0 0 auto', overscrollBehaviorX: 'contain' }}>
       {pagerGap}
       {PAGES.map((t, i) => (
-        <div key={i} data-page={i} style={{ flex: cover ? '0 0 100%' : '0 0 calc(100% - 52px)', minWidth: 0, marginLeft: i ? 10 : 0, scrollSnapAlign: 'center', scrollSnapStop: 'always' }}>
+        <div key={i} data-page={i} style={cover
+          ? { flex: `0 0 ${fitH}px`, minWidth: 0, marginTop: i ? 8 : 0, scrollSnapAlign: 'center', scrollSnapStop: 'always' }
+          : { flex: '0 0 calc(100% - 52px)', minWidth: 0, marginLeft: i ? 10 : 0, scrollSnapAlign: 'center', scrollSnapStop: 'always' }}>
           {t === 'A'
             ? <Card key={'a' + i + (selRow ? selRow.key : '')} row={selRow} cat={selRow && selRow.cat} v={v} hist={hist} setHist={setHist} editReq={editReq} onMoved={onMoved} fit={cover ? fit : null} />
             : (v.pickList ? <ListCard v={v} onPick={pickFromList} fit={cover ? fit : null} /> : null)}
@@ -694,7 +704,7 @@ export default function Pick({ v }) {
       </div>
       {cover ? (
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-          <div style={{ position: 'relative', flex: '0 0 120px', minWidth: 0, background: '#f7f4ec', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', flex: '0 0 204px', minWidth: 0, background: '#f7f4ec', overflow: 'hidden' }}>
             {arrows}
             {listEl}
           </div>
@@ -702,11 +712,10 @@ export default function Pick({ v }) {
           <div style={{ position: 'relative', flex: '0 0 13px' }}>
             <span style={{ position: 'absolute', left: 1, top: '50%', transform: 'translateY(-50%)', width: 0, height: 0, borderTop: '8px solid transparent', borderBottom: '8px solid transparent', borderRight: '11px solid ' + INK, pointerEvents: 'none' }} />
           </div>
-          {/* カードはリストのまんなか（選択中の行の横）。絞り込みはカードの右下の隙間 */}
-          <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateRows: 'minmax(0, 1fr) auto minmax(0, 1fr)', gridTemplateColumns: 'minmax(0, 1fr)', paddingRight: 6 }}>
-            <div />
+          {/* 見ているカードはリストのまんなか（選択中の行の横）。絞り込みは右下の隙間 */}
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'grid', gridTemplateRows: 'minmax(0, 1fr)', gridTemplateColumns: 'minmax(0, 1fr)', paddingRight: 6 }}>
             {pagerEl}
-            <div style={{ alignSelf: 'end', display: 'flex', justifyContent: 'flex-end', gap: 4, paddingBottom: 6 }}>{sideBtns}</div>
+            <div style={{ gridArea: '1 / 1', zIndex: 1, alignSelf: 'end', display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 3, paddingBottom: 6, pointerEvents: 'none' }}>{React.Children.map(sideBtns.props.children, (c) => (c && c.type === 'button' ? React.cloneElement(c, { style: { ...c.props.style, pointerEvents: 'auto' } }) : c))}</div>
           </div>
         </div>
       ) : <>
