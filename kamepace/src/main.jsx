@@ -60,6 +60,7 @@ function setAppVH() {
 setAppVH();
 window.addEventListener('resize', setAppVH);
 window.addEventListener('orientationchange', () => setTimeout(setAppVH, 250));
+document.addEventListener('visibilitychange', setAppVH); // Z Flip を閉じた/開いた直後
 
 /* ホーム画面に追加: ブラウザの「インストールできます」の合図を、画面ができる前に来ても取っておく（Install.jsx が使う） */
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window.__installEvt = e; window.dispatchEvent(new Event('kame-installable')); });

@@ -9,6 +9,11 @@ const DEF = { tab: false, on: false, mode: 'auto', railW: 56, navH: 64, baseW: 3
 
 let cfg = { ...DEF };
 try { cfg = { ...DEF, ...(JSON.parse(localStorage.getItem(KEY) || '{}') || {}) }; } catch (e) { /* ignore */ }
+// 自動判定を直したので、手で「サブ」「折り」にしていた端末も一度だけ「自動」に戻す
+if (!cfg.autoV) {
+  cfg = { ...cfg, mode: 'auto', autoV: 1 };
+  try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) { /* ignore */ }
+}
 
 const subs = new Set();
 const emit = () => subs.forEach(f => { try { f(); } catch (e) { /* ignore */ } });
@@ -34,9 +39,12 @@ function vSegments() {
   return null;
 }
 
-/* サブディスプレイらしい画面: 小さくて、ほぼ正方形 */
+/* サブディスプレイらしい画面。端末の画面そのものが小さくてほぼ正方形（Z Flip 6 のサブは 720×748）なら確実にサブ。
+   それ以外は表示領域の形で見る（ブラウザのバーで横長になっても拾う） */
 export function looksCover(w = window.innerWidth, h = window.innerHeight) {
-  return w > 0 && h > 0 && w <= 480 && h <= 560 && w / h > 0.7 && w / h < 1.45;
+  const sw = (window.screen && window.screen.width) || 0, sh = (window.screen && window.screen.height) || 0;
+  if (sw > 0 && sh > 0 && Math.min(sw, sh) <= 500 && Math.max(sw, sh) / Math.min(sw, sh) <= 1.3) return true;
+  return w > 0 && h > 0 && w <= 480 && h <= 560 && w / h > 0.7 && w / h < 1.9;
 }
 
 /* いまの表示: { kind: 'cover'|'fold'|null, foldTop, foldBottom, zoom } */
@@ -70,11 +78,13 @@ export function watchFlipEnv(f) {
   const on = () => f();
   window.addEventListener('resize', on);
   window.addEventListener('orientationchange', on);
+  document.addEventListener('visibilitychange', on); // 閉じた/開いた直後に resize が来ない時のため
   let dp = null;
   try { dp = navigator.devicePosture; if (dp && dp.addEventListener) dp.addEventListener('change', on); } catch (e) { dp = null; }
   return () => {
     window.removeEventListener('resize', on);
     window.removeEventListener('orientationchange', on);
+    document.removeEventListener('visibilitychange', on);
     try { if (dp && dp.removeEventListener) dp.removeEventListener('change', on); } catch (e) { /* ignore */ }
   };
 }

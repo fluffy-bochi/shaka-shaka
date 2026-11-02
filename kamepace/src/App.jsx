@@ -1886,6 +1886,11 @@ export default class App extends React.Component {
   }
   /* ---- Galaxy Z Flip 用の表示（開発者モードだけ・flip.js） ---- */
   _shakaPaneRef = React.createRef();
+  // 山の箱の大きさ（物理の座標）。サブの zoom 中は getBoundingClientRect が縮んだ値を返すので元の単位に戻す
+  caseSize(el) {
+    const r = el.getBoundingClientRect(), z = (this._flip && this._flip.zoom) || 1;
+    return { width: r.width / z, height: r.height / z };
+  }
   navH() { return this._flip && this._flip.kind === 'cover' ? (getFlip().navH || 64) : 64; }
   // シャカの山が見えているか（折っている時はホームでも上にシャカ）
   isFoldSplit(s = this.state) { return !!(this._flip && this._flip.kind === 'fold') && ['home', 'shaka'].includes(s.screen); }
@@ -1906,7 +1911,10 @@ export default class App extends React.Component {
     document.documentElement.style.setProperty('--kame-zoom', String(f.zoom || 1));
     const changed = tbChanged || prev.kind !== f.kind || prev.foldTop !== f.foldTop || prev.foldBottom !== f.foldBottom || prev.zoom !== f.zoom || this._flipNavKey !== JSON.stringify(getFlip());
     this._flipNavKey = JSON.stringify(getFlip());
-    if (changed) {
+    // サブのまま画面の高さだけ変わった時も、古い大きさの箱のままにしない
+    const caseEl = f.kind === 'cover' && this.engine ? document.getElementById('shakacase') : null;
+    const caseChanged = !!caseEl && (() => { const c = this.caseSize(caseEl); return Math.abs(c.width - this._caseW) > 2 || Math.abs(c.height - this._caseH) > 2; })();
+    if (changed || caseChanged) {
       // 山の箱の大きさが変わるので作り直す（次の tick で新しい大きさで始まる）
       if (this.engine) { this._pileLayout = null; this.stopPhysics(); }
       this.forceUpdate();
@@ -3735,7 +3743,7 @@ export default class App extends React.Component {
     window.__kameApp = this; // 検証用（状態の読み取りのみに使う）
     // いこいさんのセリフ・表情（みんなに反映された版）を読み、変わったら描き直す
     this._unIkoi = Ikoi.subscribe(() => { this.forceUpdate(); this.updateFlip(); });
-    this._unFlip = subscribeFlip(this.updateFlip); this._unFlipEnv = watchFlipEnv(() => setTimeout(this.updateFlip, 60)); this.updateFlip();
+    this._unFlip = subscribeFlip(this.updateFlip); this._unFlipEnv = watchFlipEnv(() => { setTimeout(this.updateFlip, 60); setTimeout(this.updateFlip, 400); }); this.updateFlip();
     loadIkoi().then(d => { if (d) Ikoi.setPublished(d); }).catch(() => { /* 読めなければ serifu.js の初期値 */ });
     // 研究の期間（協力者IDのアルファベットごとの収集期間）
     loadResearchConfig().then(c => { this._resCfg = c; }).catch(() => { /* 読めなければ期間の制限なし */ });
@@ -3863,7 +3871,7 @@ export default class App extends React.Component {
     if (!el || this.engine) return;
     this._pileKey = this.pileLayoutKey(this.state.user && this.state.user.uid);
     const { Engine, World, Bodies, Runner } = Matter;
-    const rect = el.getBoundingClientRect();
+    const rect = this.caseSize(el);
     const W = rect.width || 350, H = rect.height || 700;
     const r = this.calcR(W, H, this.pileCount()); // ホーム/睡眠と同じ個数基準で縮小
     this.PR = r;
@@ -4038,7 +4046,7 @@ export default class App extends React.Component {
       }
     }
     const el = document.getElementById('shakacase');
-    const rect = el ? el.getBoundingClientRect() : null;
+    const rect = el ? this.caseSize(el) : null;
     const W = (rect && rect.width) || 350, H = (rect && rect.height) || 700;
     // 灰色（未来の予定）は保存しない。_pileLayout は Home/睡眠の背景でも使われるため、
     // 予定の絵文字が実績としてそれらに写り込まないようにする。
@@ -4165,7 +4173,7 @@ export default class App extends React.Component {
       this.bodies = this.bodies.filter(b => b !== pb);
     }
     if (this.predBodies.length < want) {
-      const rect = el.getBoundingClientRect(); const W = rect.width || 350, H = rect.height || 700; const r = this.PR;
+      const rect = this.caseSize(el); const W = rect.width || 350, H = rect.height || 700; const r = this.PR;
       this.resumeMotion();
       while (this.predBodies.length < want) {
         const g = this._pred.pos[this.predBodies.length].g;
@@ -4189,7 +4197,7 @@ export default class App extends React.Component {
     // 未来で消える回復ぶんも、薄くせずに外す（過去で外す分と同じ扱い）
     const negK = T > Date.now() ? this._pred.neg.filter(u => u.t <= T).length : 0;
     const M = Math.min(past.hide + negK, solidAll.length);
-    const rect0 = el.getBoundingClientRect(); const W0 = rect0.width || 350; const r0 = this.PR;
+    const rect0 = this.caseSize(el); const W0 = rect0.width || 350; const r0 = this.PR;
     solidAll.forEach((b, i) => {
       const hide = i >= solidAll.length - M;
       if (hide && !b.hidden) { try { World.remove(this.engine.world, b.body); } catch (e) { /* noop */ } b.el.style.opacity = '0'; b.hidden = true; }
@@ -4253,7 +4261,7 @@ export default class App extends React.Component {
     if (!this.engine) return;
     const { World, Bodies } = Matter;
     const el = document.getElementById('shakacase'); if (!el) return;
-    const rect = el.getBoundingClientRect(); const W = rect.width || 350, H = rect.height || 700; const r = this.PR;
+    const rect = this.caseSize(el); const W = rect.width || 350, H = rect.height || 700; const r = this.PR;
     this.resumeMotion();
     glyphs.slice(0, 40).forEach(g => {
       const x = r + Math.random() * (W - 2 * r); const y = -r - Math.random() * (H * 0.4);
@@ -4284,7 +4292,7 @@ export default class App extends React.Component {
     this._recoverUntil = Date.now() + 6000;
     if (this.state.gyroMode && !sim) { this.engine.world.gravity.x = 0; this.engine.world.gravity.y = 1.2; this._scheduleGyroRebuild(); }
     const { World, Bodies } = Matter;
-    const rect = el.getBoundingClientRect();
+    const rect = this.caseSize(el);
     const W = rect.width || 350, H = rect.height || 700, r = this.PR;
     this.resumeMotion();
     glyphs.slice(0, 160).forEach(g0 => {
