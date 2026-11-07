@@ -330,13 +330,16 @@ function Card({ row, cat, v, hist, setHist, editReq, onMoved, fit }) {
         </div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px 12px' }}>
+        {/* 行動: START・予定・リスト＋・記録（2026-11-07 STARTと記録の場所と色を入れかえ） */}
         {it.kind === 'act' && <>
+          <button onClick={it.onRun || it.onStart} style={{ ...gray, padding: '6px 10px', letterSpacing: '.04em' }}>START</button>
           <button onClick={it.onPlan || it.onStart} style={gray}>予定</button>
-          <button onClick={it.onRec || it.onStart} style={gray}>記録</button>
           <button onClick={it.onList} style={{ ...btn, flex: 1, minWidth: 0, border: '1.5px solid #e4e1d8', background: CREAM, color: INK, padding: '5px 0' }}>リスト＋</button>
         </>}
         {it.onTrash && <button onClick={it.onTrash} aria-label="ゴミ箱へ" style={{ ...gray, padding: '4px 10px' }}><span style={ms(18, '#b4645a')}>delete</span></button>}
-        <button onClick={it.onRun || it.onStart} style={{ ...btn, flex: it.kind === 'act' ? 1.15 : 1, minWidth: 0, background: '#c4f000', color: '#2f3a00', fontWeight: 900, letterSpacing: '.04em', boxShadow: '0 3px 10px rgba(122,154,0,.3)' }}>{it.kind === 'act' ? 'START' : 'ひらく'}</button>
+        {it.kind === 'act'
+          ? <button onClick={it.onRec || it.onStart} style={{ ...btn, flex: 1, minWidth: 0, background: '#c4f000', color: '#2f3a00', fontWeight: 900, boxShadow: '0 3px 10px rgba(122,154,0,.3)' }}>記録</button>
+          : <button onClick={it.onRun || it.onStart} style={{ ...btn, flex: 1, minWidth: 0, background: '#c4f000', color: '#2f3a00', fontWeight: 900, letterSpacing: '.04em', boxShadow: '0 3px 10px rgba(122,154,0,.3)' }}>ひらく</button>}
       </div>
       {/* 右上の「編集」 */}
       {isAct && it.onEdit && <button onClick={() => { setPop(null); setEditing(true); }} style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, border: '1.5px solid #e4e1d8', borderRadius: 999, background: CREAM, color: INK, fontSize: 11, fontWeight: 800, padding: '2px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>編集</button>}
