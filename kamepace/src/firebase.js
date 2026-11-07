@@ -65,6 +65,75 @@ export async function logout() { googleAccessToken = null; await fbSignOut(auth)
    カレンダーアプリは users/{uid}/ 配下のサブコレクション(events, projectTasks, dailyData…)を使うので、
    かめペースのデータは users/{uid}/apps/kamepace に置いて衝突を避ける */
 function userDoc() { return doc(db, 'users', auth.currentUser.uid, 'apps', 'kamepace'); }
+/* 2026-11-07: 保存を日ごとに分けた（schema 3）。
+   1つのドキュメント（上限1MB）に全部入れていて 600KB をこえ、保存1回に約8秒かかっていたため。
+   - users/{uid}/apps/kamepace           … 設定など（days・collected 以外）＋ split: true
+   - users/{uid}/apps/kamepace/days/{日付} … その日の entries・tasks・collected（集めた絵文字。ts の日付で分ける）
+   保存は、本体の版（updatedAt）を確かめるトランザクションの中で、本体と「変わった日」だけを書く。
+   はじめて分けるときは、分ける前の本体を apps/kamepace_backup_schema2 に控える。
+   分けて書けない（ルールで permission-denied）ときは、今までどおり1つのドキュメントに書く */
+const daysCol = () => collection(db, 'users', auth.currentUser.uid, 'apps', 'kamepace', 'days');
+const dayRef = (d) => doc(db, 'users', auth.currentUser.uid, 'apps', 'kamepace', 'days', d);
+const backupRef = () => doc(db, 'users', auth.currentUser.uid, 'apps', 'kamepace_backup_schema2');
+// クラウドにある日のドキュメントの中身（JSON）。これと違う日だけ書く
+let cloudDays = new Map();
+let splitOff = false; // 分けて書けなかった（この起動中は1つのドキュメントで書く）
+const dayKeyOfTs = (ts) => { const d = new Date(ts); return isNaN(d) ? null : ymd(d); };
+function splitData(data) {
+  const { days = {}, collected = [], ...main } = data;
+  const out = {};
+  const bucket = (d) => (out[d] || (out[d] = { entries: [], tasks: [], collected: [] }));
+  Object.entries(days).forEach(([d, v]) => { const b = bucket(d); b.entries = (v && v.entries) || []; b.tasks = (v && v.tasks) || []; });
+  const noTs = [];
+  collected.forEach(c => { const d = c && c.ts ? dayKeyOfTs(c.ts) : null; if (d) bucket(d).collected.push(c); else noTs.push(c); });
+  // days・collected を空で残す: 古い版のアプリが読んでも設定まで「はじめから」にならないように（記録は日のドキュメントから戻せる）
+  return { main: { ...main, schema: 3, split: true, days: {}, collected: [], collectedNoTs: noTs }, days: out };
+}
+function joinData(main, dayMap) {
+  const { split, collectedNoTs, days: _d, collected: _c, ...rest } = main; // eslint-disable-line no-unused-vars
+  const days = {}, collected = [];
+  [...dayMap.keys()].sort().forEach(d => {
+    const v = dayMap.get(d);
+    if ((v.entries && v.entries.length) || (v.tasks && v.tasks.length)) days[d] = { entries: v.entries || [], tasks: v.tasks || [] };
+    (v.collected || []).forEach(c => collected.push(c));
+  });
+  return { ...rest, schema: 2, days, collected: [...collected, ...(collectedNoTs || [])] };
+}
+const dayJson = (v) => JSON.stringify({ entries: v.entries || [], tasks: v.tasks || [], collected: v.collected || [] });
+// 本体＋日のドキュメントを読んで、今までと同じ形（schema 2: days・collected 入り）にして返す
+async function readAll(server) {
+  const snap = server ? await getDocFromServer(userDoc()) : await getDoc(userDoc());
+  if (!snap.exists()) return null;
+  const main = snap.data();
+  let daySnaps = null;
+  try { daySnaps = await getDocs(daysCol()); } catch (e) { if (main.split) throw e; } // 分ける前でルールが無いときは読めなくてよい
+  const got = new Map();
+  if (daySnaps) daySnaps.forEach(ds => { const v = ds.data(); got.set(ds.id, { entries: v.entries || [], tasks: v.tasks || [], collected: v.collected || [] }); });
+  cloudDays = new Map([...got].map(([d, v]) => [d, dayJson(v)]));
+  lastStamp = main.updatedAt || 0;
+  if (main.split) return joinData(main, got);
+  // 本体が分ける前の形: まだ分けていない、または古い版のアプリが本体だけ書いた。
+  // 日のドキュメントがあれば、本体にない日をそこから足す（古い版の上書きで日の記録が見えなくならないように）
+  if (!got.size) return main;
+  // 両方にある日は、両方の記録をあわせる（開いたままの古い画面の中身で、新しい記録が消えないように）
+  const days = { ...(main.days || {}) };
+  const ek = (e) => (e.gid ? 'g:' + e.gid + ':' + (e.title || '') + ':' + (e.from || '') : e.drip ? 'd:' + e.drip : 'e:' + e.title + ':' + (e.from || '') + ':' + (e.to || ''));
+  const tk = (t) => t.srcId || t.title;
+  got.forEach((v, d) => {
+    const m = days[d];
+    if (!m) { if ((v.entries && v.entries.length) || (v.tasks && v.tasks.length)) days[d] = { entries: v.entries, tasks: v.tasks }; return; }
+    const ks = new Set((m.entries || []).map(ek)), ts = new Set((m.tasks || []).map(tk));
+    const doneV = new Set((v.tasks || []).filter(t => t.done).map(tk));
+    days[d] = {
+      entries: [...(m.entries || []), ...(v.entries || []).filter(e => !ks.has(ek(e)))],
+      tasks: [...(m.tasks || []).map(t => (!t.done && doneV.has(tk(t)) ? { ...t, done: true } : t)), ...(v.tasks || []).filter(t => !ts.has(tk(t)))],
+    };
+  });
+  const seen = new Set((main.collected || []).map(c => JSON.stringify(c)));
+  const extra = [];
+  got.forEach(v => (v.collected || []).forEach(c => { if (!seen.has(JSON.stringify(c))) extra.push(c); }));
+  return { ...main, days, collected: [...(main.collected || []), ...extra] };
+}
 let saveTimer = null, saveChain = Promise.resolve();
 // この端末が最後に読んだ／書いたクラウドの版（updatedAt）。クラウドの版がこれと違えば、ほかの端末があとから書いている
 // （端末ごとに時計がずれるので、大小ではなく同じかどうかで見る）
@@ -99,27 +168,88 @@ export function cloudSave(st) {
 }
 async function writeSave(st, seq) {
   const fail = (err) => { console.warn('[kamepace] save failed', err); if (onSaveError) onSaveError(err); };
-  const done = (data) => {
-    lastStamp = data.updatedAt || 0;
+  const done = (stamp) => {
+    lastStamp = stamp || 0;
     ackSeq = Math.max(ackSeq, seq);
     if (!hasUnsaved()) { try { localStorage.removeItem(bkKey()); } catch (e) { /* ignore */ } }
   };
   let data;
   try { data = serialize(st); } catch (err) { fail(err); return; }
+  const conflict = async () => {
+    // ほかの端末の版（日のドキュメントもふくめて全部）を読んで、まぜてもらう
+    try { const theirs = await readAll(true); if (theirs) onConflict(theirs); } catch (e) { fail(e); }
+  };
+  if (splitOff) return writeWhole(data, done, fail, conflict);
+  const { main, days } = splitData(data);
+  const puts = [], dels = [];
+  Object.entries(days).forEach(([d, v]) => { const j = dayJson(v); if (cloudDays.get(d) !== j) puts.push([d, v, j]); });
+  cloudDays.forEach((_, d) => { if (!days[d]) dels.push(d); });
   try {
     const ref = userDoc();
-    const theirs = await runTransaction(db, async (tx) => {
+    // 1回のトランザクションは500件まで。はじめて分けるときなどで多ければ、先に日のドキュメントだけ書いておく（本体はまだ前の形なので読まれない）
+    const pre = puts.length + dels.length > 400 ? puts.splice(0, puts.length - 300) : [];
+    if (pre.length) {
+      const first = await getDocFromServer(ref);
+      if (first.exists() && !first.data().split) { const b = first.data(); await setDoc(backupRef(), { ...b, backedUpAt: Date.now() }); }
+      for (let i = 0; i < pre.length; i += 400) {
+        const bt = writeBatch(db);
+        pre.slice(i, i + 400).forEach(([d, v]) => bt.set(dayRef(d), { ...v, updatedAt: data.updatedAt }));
+        await bt.commit();
+      }
+      pre.forEach(([d, , j]) => cloudDays.set(d, j));
+    }
+    const res = await runTransaction(db, async (tx) => {
       const snap = await tx.get(ref);
-      if (onConflict && snap.exists() && stampOf(snap) !== lastStamp) return snap.data();
-      tx.set(ref, data);
-      return null;
+      if (onConflict && snap.exists() && stampOf(snap) !== lastStamp) return 'conflict';
+      if (snap.exists() && !snap.data().split) tx.set(backupRef(), { ...snap.data(), backedUpAt: Date.now() }); // 分ける前の控え（はじめての1回）
+      tx.set(ref, main);
+      puts.forEach(([d, v]) => tx.set(dayRef(d), { ...v, updatedAt: data.updatedAt }));
+      dels.forEach(d => tx.delete(dayRef(d)));
+      return 'ok';
     });
-    if (theirs) { lastStamp = theirs.updatedAt || 0; onConflict(theirs); return; }
-    done(data);
+    if (res === 'conflict') { await conflict(); return; }
+    puts.forEach(([d, , j]) => cloudDays.set(d, j)); dels.forEach(d => cloudDays.delete(d));
+    done(main.updatedAt);
   } catch (err) {
-    // 通信がないときはトランザクションができないので、今までどおり書いておく（つながったら送られる）
+    if (err && err.code === 'permission-denied') {
+      // 日のドキュメントを書けない（Firestore のルールが古い）。前の形のまま保存を続ける
+      console.warn('[kamepace] split save denied; fallback to single doc', err);
+      splitOff = true;
+      return writeWhole(data, done, fail, conflict);
+    }
+    // 通信がないときはトランザクションができないので、まとめて書いておく（つながったら送られる）
     if (err && (err.code === 'unavailable' || err.code === 'deadline-exceeded')) {
-      try { await setDoc(userDoc(), data); done(data); } catch (e) { fail(e); }
+      try {
+        const bt = writeBatch(db);
+        bt.set(userDoc(), main);
+        puts.forEach(([d, v]) => bt.set(dayRef(d), { ...v, updatedAt: data.updatedAt }));
+        dels.forEach(d => bt.delete(dayRef(d)));
+        await bt.commit();
+        puts.forEach(([d, , j]) => cloudDays.set(d, j)); dels.forEach(d => cloudDays.delete(d));
+        done(main.updatedAt);
+      } catch (e) { fail(e); }
+      return;
+    }
+    fail(err);
+  }
+}
+// 前の形（1つのドキュメントに全部）で書く。日のドキュメントを書けないときだけ
+async function writeWhole(data, done, fail, conflict) {
+  try {
+    const ref = userDoc();
+    const res = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (onConflict && snap.exists() && stampOf(snap) !== lastStamp) return 'conflict';
+      if (snap.exists() && snap.data().split) return 'split'; // ほかの端末が分けて書いている → 本体だけ前の形にすると日の記録が見えなくなるので書かない
+      tx.set(ref, data);
+      return 'ok';
+    });
+    if (res === 'conflict') { await conflict(); return; }
+    if (res === 'split') { fail(new Error('split doc but cannot write days')); return; }
+    done(data.updatedAt);
+  } catch (err) {
+    if (err && (err.code === 'unavailable' || err.code === 'deadline-exceeded')) {
+      try { await setDoc(userDoc(), data); done(data.updatedAt); } catch (e) { fail(e); }
       return;
     }
     fail(err);
@@ -143,10 +273,7 @@ export async function cloudIsNewer() {
 }
 
 export async function loadUserData() {
-  const snap = await getDoc(userDoc());
-  const data = snap.exists() ? snap.data() : null;
-  if (data) lastStamp = data.updatedAt || 0;
-  return data;
+  return readAll(false);
 }
 
 /* ---- カレンダーアプリ(my-schedule-app)からの取り込み ----
