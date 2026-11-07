@@ -406,7 +406,7 @@ function ListCard({ v, onPick, fit }) {
 /* リストの1行（高さは行動 ROW_H・カテゴリ CAT_H で固定。選択中は横に広げて目立たせるだけで高さは変えない＝スクロール位置から選択行を計算できる）
    カテゴリは細くして、閉じた状態でスクロールせずに一覧できるようにする */
 // 行動の行は細く（カテゴリの色・絵文字・名前だけ）。選択中だけ大きくして、上下の行に少し重ねて体・心も出す
-const ROW_H = 36, CAT_H = 32, CAT_H_DARK = 32, COPIES = 5;
+const ROW_H = 36, CAT_H = 32, CAT_H_DARK = 32, COPIES = 1; // 2026-11-07: 一周しない（くり返さない）
 const SEL_PUSH = 13; // 選択中の行動（高さ56）が上下の行に重ならないよう、上下の行をずらす量
 // dark(枠): カテゴリは白地＋黒字＋カテゴリ色の枠、左にカテゴリ色の四角（▶）
 const hOfFor = (dark) => (r) => (r.type === 'item' ? ROW_H : dark ? CAT_H_DARK : CAT_H);
@@ -495,16 +495,19 @@ export default function Pick({ v }) {
   // 行ごとの上端位置（1コピーぶん）。行の高さが種類で違うので累積で持つ
   const off = React.useMemo(() => { const o = [0]; rows.forEach(r => o.push(o[o.length - 1] + hOf(r))); return o; }, [rows]);
   const P = off[N]; // 1コピーの高さ
-  const topOf = (i) => Math.floor(i / N) * P + off[((i % N) + N) % N];
-  const topFor = (i) => { const box = listRef.current; return topOf(i) + hOf(rows[((i % N) + N) % N]) / 2 - (box ? box.clientHeight / 2 : 0); };
+  // 一周しない: リストの上下に、箱の高さの半分のすき間（最初と最後の行もまんなかに来られるように）。
+  // すき間が高さの半分なので、行 i をまんなかに置くスクロール位置は off[i] + 行の高さ/2
+  const clampI = (i) => Math.max(0, Math.min(N - 1, i));
+  const topFor = (i) => { const j = clampI(i); return off[j] + hOf(rows[j]) / 2; };
   const centerIdx = () => {
     const box = listRef.current; if (!box || !P) return 0;
-    const y = box.scrollTop + box.clientHeight / 2, c = Math.floor(y / P), yy = y - c * P;
-    let j = 0; while (j < N - 1 && off[j + 1] <= yy) j++;
-    return c * N + j;
+    const y = box.scrollTop;
+    let j = 0; while (j < N - 1 && off[j + 1] <= y) j++;
+    return j;
   };
-  const scrollToIdx = (i, smooth) => {
+  const scrollToIdx = (i0, smooth) => {
     const box = listRef.current; if (!box) return;
+    const i = clampI(i0);
     box.scrollTo({ top: topFor(i), behavior: smooth ? 'smooth' : 'auto' });
     setIdx(i);
   };
@@ -533,9 +536,7 @@ export default function Pick({ v }) {
   // スクロールが止まったら: 端のコピーにいればまんなかのコピーへ戻し（エンドレス）、行にぴったり合わせる
   const settle = () => {
     const box = listRef.current; if (!box) return;
-    let i = centerIdx();
-    const mid = Math.floor(COPIES / 2) * N;
-    if (i < N || i >= (COPIES - 1) * N) { const ni = mid + (((i % N) + N) % N); box.scrollTop += ((ni - i) / N) * P; i = ni; }
+    const i = centerIdx();
     if (Math.abs(box.scrollTop - topFor(i)) > 1) box.scrollTo({ top: topFor(i), behavior: 'smooth' });
     setIdx(i);
   };
@@ -674,9 +675,10 @@ export default function Pick({ v }) {
         // 選択中の行動は大きくなるので、上下の行を少し外へずらして重ならないようにする（行の高さは変えない＝スクロールの計算はそのまま）
         const selItem = (all.find(x => x.i === idx) || {}).r;
         const gap = selItem && selItem.type === 'item' ? SEL_PUSH : 0;
-        return all.map(({ r, i }) => (
+        const pad = <div style={{ height: '50%', flex: '0 0 auto' }} />;
+        return [<React.Fragment key="padT">{pad}</React.Fragment>, ...all.map(({ r, i }) => (
           <Row key={i} r={r} i={i} on={i === idx} shift={i < idx ? -gap : i > idx ? gap : 0} dark={dark} compact={cover} open={r.type === 'cat' && !!open[r.cat.id]} onTap={onTap} onLong={onLong} listAdd={(onList || v.runAdd) && i === idx} />
-        ));
+        )), <React.Fragment key="padB">{pad}</React.Fragment>];
       })()}
     </div>
   );
