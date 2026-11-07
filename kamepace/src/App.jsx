@@ -1465,14 +1465,19 @@ export default class App extends React.Component {
     // 記録した時＝終わった時: 所要時間モードの記録は、終わりの時刻から逆にならべる。
     // 終わり＝実行画面の「記録」から来たときはその時刻（anchorEnd）、ふだんは今日のいまの枠ならいま。予定・編集・ほかの枠/日は従来どおり
     // 行動選択の「記録」＝終わりがいま、「予定」＝始まりがいま（いまより先のぶんは予定になり、時間どおりに降る）
-    const anchor = (!timeMode && !frameFill && !isEdit && isToday && !this.state.anchorEnd) ? this.state.confirmAnchor : null;
+    // 所要時間モードは右上の時間帯（slotId）を優先: いまの時刻（または実行の終わりの時刻）が選んだ時間帯でなければ、時刻に合わせず選んだ時間帯に入れる
+    const nowSlot = this.slotNow();
+    const anchorSlotOk = this.state.anchorEnd ? this.slotOf({ from: this.state.anchorEnd }) === slotId : nowSlot === slotId;
+    const anchor = (!timeMode && !frameFill && !isEdit && isToday && !this.state.anchorEnd && anchorSlotOk) ? this.state.confirmAnchor : null;
     const nowMin = Math.floor(now / 60000) * 60000;
-    const endAnchor = (!timeMode && !frameFill && !isEdit && isToday)
-      ? (this.state.anchorEnd ? hmToTsOn(recDate, this.state.anchorEnd) : (anchor === 'end' || (!anchor && slotId === this.slotNow()) ? nowMin : null)) : null;
+    const endAnchor = (!timeMode && !frameFill && !isEdit && isToday && anchorSlotOk)
+      ? (this.state.anchorEnd ? hmToTsOn(recDate, this.state.anchorEnd) : (anchor === 'end' || (!anchor && slotId === nowSlot) ? nowMin : null)) : null;
     let backCursor = anchor === 'start' ? nowMin : endAnchor != null ? endAnchor - durMins.reduce((a, b) => a + b, 0) * 60000 : null;
     // 編集（所要時間モード）: 元の記録の始まりの時刻から順にならべる（時間帯の空きに詰め直すと、時刻がずれてしまう）
     const editOrig = isEdit ? (this.state.editIdxs || []).map(i => this.state.entries[i]).filter(e => e && e.from).sort((a, b) => a.from.localeCompare(b.from))[0] : null;
-    let editCursor = editOrig ? editOrig.from : null;
+    // 右上で時間帯を変えた時は元の時刻を使わず、選んだ時間帯に入れ直す
+    const editSlots = isEdit ? (this.state.editIdxs || []).map(i => this.state.entries[i]).filter(Boolean).map(e => this.slotOf(e)) : [];
+    let editCursor = (editOrig && editSlots.includes(slotId)) ? editOrig.from : null;
     // 通常記録の配置位置: 同スロットの使用済み分（編集中は元の記録を除いて数える）
     let slotOffset = baseEntries
       .filter(e => e.date === recDate && !e.exp && !e.planned && this.slotOf(e) === slotId)
@@ -1530,10 +1535,9 @@ export default class App extends React.Component {
         const min = durMins[i];
         const e = mkEntry(t, min, null, null, false, taskKey);
         e.slot = slotId;
-        if (editCursor != null) { e.from = editCursor; e.to = this.addHm(editCursor, min); editCursor = e.to; e.slot = editOrig.slot || this.slotOf({ from: e.from }); }
+        if (editCursor != null) { e.from = editCursor; e.to = this.addHm(editCursor, min); editCursor = e.to; }
         else if (backCursor != null) {
           e.from = this.tsToHm(backCursor); e.to = this.tsToHm(backCursor + min * 60000);
-          if (anchor) e.slot = this.slotOf({ from: e.from });
           if (anchor === 'start' && backCursor + min * 60000 > now) { e.planned = true; e.dropped = planUnitsDue(e, now); e._new = e.dropped > 0; }
           backCursor += min * 60000;
         }
