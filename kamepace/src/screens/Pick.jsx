@@ -352,7 +352,7 @@ function Card({ row, cat, v, hist, setHist, editReq, onMoved, fit }) {
   );
 }
 
-/* リストのカード（行動カードの右）: 名前（テンプレ名）・積んだ行動（並べ替え・削除）・予定／記録／START */
+/* リストのカード（行動カードの右）: 名前（テンプレ名）・積んだ行動（並べ替え・削除）・START／予定／記録 */
 function ListCard({ v, onPick, fit }) {
   const L = v.pickList;
   const empty = !L.rows.length, named = !!(L.name || '').trim();
@@ -397,10 +397,10 @@ function ListCard({ v, onPick, fit }) {
         </div>
       ) :
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px 14px' }}>
-        <button onClick={empty ? undefined : v.listToPlan} style={gray}>予定</button>
-        <button onClick={empty ? undefined : v.listToRec} style={gray}>記録</button>
-        <span style={{ flex: 1 }} />
-        <button onClick={empty ? undefined : v.startListRun} style={{ flex: '0 0 44%', border: 'none', borderRadius: 12, background: empty ? '#e4e1d8' : '#c4f000', color: empty ? '#a5a39a' : '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: empty ? 'default' : 'pointer', letterSpacing: '.04em', boxShadow: empty ? 'none' : '0 4px 12px rgba(122,154,0,.3)' }}>START</button>
+        {/* 行動カードと同じ並び: START・予定（グレー）・記録（ライム）（2026-11-07） */}
+        <button onClick={empty ? undefined : v.startListRun} style={{ ...gray, flex: '0 0 auto', whiteSpace: 'nowrap', padding: '10px 12px', letterSpacing: '.04em' }}>START</button>
+        <button onClick={empty ? undefined : v.listToPlan} style={{ ...gray, flex: '0 0 auto', whiteSpace: 'nowrap', padding: '10px 12px' }}>予定</button>
+        <button onClick={empty ? undefined : v.listToRec} style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', border: 'none', borderRadius: 12, background: empty ? '#e4e1d8' : '#c4f000', color: empty ? '#a5a39a' : '#2f3a00', fontSize: 15, fontWeight: 900, padding: '11px 0', cursor: empty ? 'default' : 'pointer', boxShadow: empty ? 'none' : '0 4px 12px rgba(122,154,0,.3)' }}>記録</button>
       </div>}
     </div>
   );
