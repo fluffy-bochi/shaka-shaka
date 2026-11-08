@@ -138,13 +138,14 @@ export default function Run({ v }) {
             {!bar.none && !over && ratio < 0.8 && <span style={{ position: 'absolute', right: 0 }}>{mmss(bar.total)}</span>}
           </div>
           {/* 必・♡ ｜ ▶ ｜ りれき */}
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', margin: '10px 0 36px' }}>{/* 下のアラームとの間はFigmaくらいあける */}
-            <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)', alignItems: 'center', margin: '10px 0 36px' }}>{/* 下のアラームとの間はFigmaくらいあける */}
+            {/* 必・♡ は左端、ラップは ▶／⏸ から少し離して左の列の右端に（止めているときは押せない） */}
+            <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 4, paddingRight: 'clamp(8px, 5vw, 20px)' }}>
               <button onClick={() => setPop(pop === 'req' ? null : 'req')} aria-label="生活必須行動" style={chip(!!c.req)}>必</button>
               <button onClick={() => setPop(pop === 'fav' ? null : 'fav')} aria-label="やりたいこと" style={chip(!!c.fav)}><span style={ms(15, c.fav ? '#fff' : INK, true)}>favorite</span></button>
+              <span style={{ flex: 1, margin: '0 -2px' }} />
+              <button onClick={v.runLap} disabled={!r.running} style={{ flex: '0 0 auto', width: 36, height: 36, borderRadius: '50%', border: 'none', background: '#efece3', color: INK, fontSize: 10, fontWeight: 900, padding: 0, whiteSpace: 'nowrap', fontFamily: 'inherit', opacity: r.running ? 1 : 0.35, cursor: r.running ? 'pointer' : 'default' }}>ラップ</button>
             </div>
-            {/* ラップ: ▶／⏸ の左（止めているときは押せない） */}
-            <button onClick={v.runLap} disabled={!r.running} style={{ position: 'absolute', right: 'calc(50% + 34px)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: '#efece3', color: INK, fontSize: 10, fontWeight: 900, padding: 0, whiteSpace: 'nowrap', fontFamily: 'inherit', opacity: r.running ? 1 : 0.35, cursor: r.running ? 'pointer' : 'default' }}>ラップ</button>
             <button onClick={v.runToggle} aria-label={r.running ? '一時停止' : '再開'} style={{ width: 60, height: 60, borderRadius: '50%', border: 'none', background: r.running ? INK : LIME, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, boxShadow: '0 6px 16px rgba(27,27,24,.2)' }}>
               <span style={ms(38, r.running ? '#fff' : LIME_INK, true)}>{r.running ? 'pause' : 'play_arrow'}</span>
             </button>
