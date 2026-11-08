@@ -174,7 +174,7 @@ body.kame-tablet .shell { padding: 0; min-height: var(--app-vh, 100dvh); }
 body.kame-tablet .shell-head, body.kame-tablet .shell-side { display: none; }
 body.kame-tablet .phone { width: 100vw; padding: 0; border-radius: 0; background: none; box-shadow: none; }
 body.kame-tablet .phone .app-screen, body.kame-tablet .app-screen { width: 100vw; max-width: none; height: var(--app-vh, 100dvh); border-radius: 0; }
-body.kame-tablet-land:not(.kame-book-land) .phone .app-screen, body.kame-tablet-land:not(.kame-book-land) .app-screen { width: min(100vw, 600px); margin: 0 auto; }
+body.kame-tablet-land:not(.kame-book-land):not(.kame-itest) .phone .app-screen, body.kame-tablet-land:not(.kame-book-land):not(.kame-itest) .app-screen { width: min(100vw, 600px); margin: 0 auto; }
 body.kame-tablet.kame-book-land .phone, body.kame-tablet.kame-book-land .phone .app-screen { width: 100vw; height: var(--app-vh, 100dvh); }
 /* サブディスプレイ: 右端の縦ナビのぶん、中身の幅を空ける */
 body.kame-cover .app-screen { padding-right: var(--kame-rail, 56px); }
