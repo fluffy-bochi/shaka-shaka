@@ -25,6 +25,18 @@ function barOf(r, c, now) {
   return { total, endTs, over, ratio: over ? 1 : Math.min(1, el / total), plan: over ? total / el : 1, extra: over ? el - total : 0 };
 }
 const PINK = '#ff5fa2';
+/* ラップ: 最初の区間と lap: true の区間から新しいラップ。一時停止→再開はおなじラップのまま。
+   at＝そのラップまでの経過（実施時間）、a＝始まった時刻 */
+function lapsOf(segs, now) {
+  const out = []; let acc = 0;
+  (segs || []).forEach((s, i) => {
+    const d = (s.b == null ? now : s.b) - s.a;
+    if (i === 0 || s.lap) out.push({ a: s.a, at: acc, ms: 0, open: false });
+    const L = out[out.length - 1]; L.ms += d; if (s.b == null) L.open = true;
+    acc += d;
+  });
+  return out;
+}
 const mmss = (t) => { const s = Math.max(0, Math.floor(t / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; };
 
 /* アラーム／タイマーの1行: [全体｜実施中] [アラーム|タイマー] ……… [時刻 or 分] */
@@ -63,6 +75,13 @@ export default function Run({ v }) {
   // シークバーの終わりは実施中のアラームに合わせる: アラーム＝その時刻まで（時計で進む）、タイマー＝予定時間（実施時間で進む）
   const bar = barOf(r, c, now);
   const over = bar.over, ratio = bar.ratio;
+  const laps = lapsOf(c.segs, now);
+  // バーの区切りの点: タイマー（時間なし）は実施時間、アラームは時計の時刻で位置を出す
+  const lapPos = laps.slice(1).map(L => {
+    if (bar.none) return c.ms ? L.at / c.ms : 0;
+    if (r.curAlarmTs && c.startAt) return (L.a - c.startAt) / Math.max(bar.total, now - c.startAt);
+    return L.at / Math.max(bar.total, c.ms);
+  }).map(x => Math.max(0, Math.min(1, x)));
   const chip = (on) => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 30, height: 28, borderRadius: 999, padding: '0 9px', background: on ? INK : '#efece3', color: on ? '#fff' : INK, fontSize: 13, fontWeight: 900, border: 'none', cursor: 'pointer', fontFamily: 'inherit' });
   const arrowBtn = (on) => ({ width: 26, height: 26, border: 'none', background: 'none', padding: 0, cursor: on ? 'pointer' : 'default', opacity: on ? 1 : 0.2, display: 'flex', alignItems: 'center', justifyContent: 'center' });
   const lab = { fontSize: 8.5, color: MUTED, fontWeight: 700, marginRight: 1 };
@@ -106,6 +125,7 @@ export default function Run({ v }) {
             {/* 延長ぶん（予定の時間を過ぎたところから）はピンク */}
             {over && <div style={{ position: 'absolute', left: bar.plan * 100 + '%', right: 0, height: 4, borderRadius: 2, background: PINK }} />}
             {over && <div style={{ position: 'absolute', left: `calc(${bar.plan * 100}% - 1px)`, width: 2, height: 10, background: INK }} />}
+            {lapPos.map((x, i) => <div key={i} style={{ position: 'absolute', left: `calc(${x * 100}% - 4px)`, width: 8, height: 8, borderRadius: '50%', boxSizing: 'border-box', background: '#fff', border: '2px solid ' + INK }} />)}
             <div style={{ position: 'absolute', left: `calc(${ratio * 100}% - 6px)`, width: 12, height: 12, borderRadius: '50%', background: over ? PINK : INK }} />
           </div>
           {/* 下: 左＝0:00、点の下＝経過時間、右端＝終わりの時間（近いときは重ならないよう端の表示を隠す） */}
@@ -115,11 +135,13 @@ export default function Run({ v }) {
             {!bar.none && !over && ratio < 0.8 && <span style={{ position: 'absolute', right: 0 }}>{mmss(bar.total)}</span>}
           </div>
           {/* 必・♡ ｜ ▶ ｜ りれき */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', margin: '10px 0 36px' }}>{/* 下のアラームとの間はFigmaくらいあける */}
-            <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', margin: '10px 0 36px' }}>{/* 下のアラームとの間はFigmaくらいあける */}
+            <div style={{ display: 'flex', gap: 4 }}>
               <button onClick={() => setPop(pop === 'req' ? null : 'req')} aria-label="生活必須行動" style={chip(!!c.req)}>必</button>
               <button onClick={() => setPop(pop === 'fav' ? null : 'fav')} aria-label="やりたいこと" style={chip(!!c.fav)}><span style={ms(15, c.fav ? '#fff' : INK, true)}>favorite</span></button>
             </div>
+            {/* ラップ: ▶／⏸ の左（止めているときは押せない） */}
+            <button onClick={v.runLap} disabled={!r.running} style={{ position: 'absolute', right: 'calc(50% + 34px)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: '#efece3', color: INK, fontSize: 10, fontWeight: 900, padding: 0, whiteSpace: 'nowrap', fontFamily: 'inherit', opacity: r.running ? 1 : 0.35, cursor: r.running ? 'pointer' : 'default' }}>ラップ</button>
             <button onClick={v.runToggle} aria-label={r.running ? '一時停止' : '再開'} style={{ width: 60, height: 60, borderRadius: '50%', border: 'none', background: r.running ? INK : LIME, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, boxShadow: '0 6px 16px rgba(27,27,24,.2)' }}>
               <span style={ms(38, r.running ? '#fff' : LIME_INK, true)}>{r.running ? 'pause' : 'play_arrow'}</span>
             </button>
@@ -136,6 +158,19 @@ export default function Run({ v }) {
           {/* 全体／実施中 の アラーム・タイマー */}
           <AlarmRow label="全体" a={r.alarm.all} top onMode={(m) => v.setRunAlarm('all', { mode: m })} onAt={(t) => v.setRunAlarm('all', { at: t })} onMin={(n) => v.setRunAlarm('all', { min: n })} />
           <AlarmRow label="実施中" a={r.alarm.cur} onMode={(m) => v.setRunAlarm('cur', { mode: m })} onAt={(t) => v.setRunAlarm('cur', { at: t })} onMin={(n) => v.setRunAlarm('cur', { min: n })} />
+          {/* ラップ（新しいものを上に） */}
+          {laps.length > 1 && (
+            <div style={{ padding: '6px 4px 0' }}>
+              {laps.map((L, i) => ({ L, i })).reverse().map(({ L, i }) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '9px 0', borderBottom: '1px solid #e4e1d8', ...mono }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: SUB, minWidth: 64, fontFamily: 'inherit' }}>ラップ{i + 1}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: MUTED }}>{hm(L.a)}〜</span>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ fontSize: 15, fontWeight: 800, color: L.open && r.running ? '#7a9a00' : INK }}>{mmss(L.ms)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       {/* りれき（月カレンダー）: カードの形で上に重ねる */}
