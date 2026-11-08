@@ -140,7 +140,7 @@ export default function IpadTest({ v }) {
   return (
     <div ref={outerRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', background: '#f7f4ec' }}>
     <div style={rootStyle}>
-      <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px' }}>
+      <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, padding: rotated ? '6px 16px' : 'calc(6px + env(safe-area-inset-top)) 16px 6px' }}>
         <button onClick={v.closeIpadTest} aria-label="閉じる" style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: '#fff', fontSize: 18, cursor: 'pointer' }}>×</button>
         <span style={{ flex: 1, fontSize: 15, fontWeight: 900 }}>インタラクティブテスト</span>
         <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2 }}>
