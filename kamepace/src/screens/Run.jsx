@@ -20,7 +20,10 @@ function barOf(r, c, now) {
   if (r.curNoTime) return { none: true, total: 0, endTs: null, over: false, ratio: 1, plan: 1, extra: 0 }; // 時間なし: いっぱい
   let total, el, endTs;
   if (r.curAlarmTs && c.startAt) { total = Math.max(60000, r.curAlarmTs - c.startAt); el = Math.max(0, now - c.startAt); endTs = r.curAlarmTs; }
-  else { total = c.planMs; el = c.ms; endTs = now + (c.planMs - c.ms); } // 過ぎたら、予定の時間が終わった時刻（いま−延長ぶん）
+  else { // タイマーはいまのラップごと: バーの終わり＝いまのラップの始まり＋予定の時間（過ぎたら、予定の時間が終わった時刻＝いま−延長ぶん）
+    const ls = lapsOf(c.segs, now), L = ls[ls.length - 1] || { at: 0, ms: c.ms };
+    total = Math.max(1, L.at + c.planMs); el = c.ms; endTs = now + (c.planMs - L.ms);
+  }
   const over = el > total;
   return { total, endTs, over, ratio: over ? 1 : Math.min(1, el / total), plan: over ? total / el : 1, extra: over ? el - total : 0 };
 }
