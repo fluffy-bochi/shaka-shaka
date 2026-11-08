@@ -79,6 +79,13 @@ export default function Run({ v }) {
   const bar = barOf(r, c, now);
   const over = bar.over, ratio = bar.ratio;
   const laps = lapsOf(c.segs, now);
+  // 一覧は行動ごとではなく、リスト全部のラップを時間の順に（番号は行動の名前ごとに数える）
+  const allLaps = (() => {
+    const xs = []; (r.rows || []).forEach(x => lapsOf(x.segs, now).forEach(L => xs.push({ ...L, name: x.name, on: x.on })));
+    xs.sort((p, q) => p.a - q.a);
+    const n = {}; xs.forEach(L => { n[L.name] = (n[L.name] || 0) + 1; L.no = n[L.name]; });
+    return xs.reverse();
+  })();
   // バーの区切りの点: タイマー（時間なし）は実施時間、アラームは時計の時刻で位置を出す
   const lapPos = laps.slice(1).map(L => {
     if (bar.none) return c.ms ? L.at / c.ms : 0;
@@ -162,15 +169,15 @@ export default function Run({ v }) {
           {/* 全体／実施中 の アラーム・タイマー */}
           <AlarmRow label="全体" a={r.alarm.all} top onMode={(m) => v.setRunAlarm('all', { mode: m })} onAt={(t) => v.setRunAlarm('all', { at: t })} onMin={(n) => v.setRunAlarm('all', { min: n })} />
           <AlarmRow label="実施中" a={r.alarm.cur} onMode={(m) => v.setRunAlarm('cur', { mode: m })} onAt={(t) => v.setRunAlarm('cur', { at: t })} onMin={(n) => v.setRunAlarm('cur', { min: n })} />
-          {/* ラップ（新しいものを上に） */}
-          {laps.length > 1 && (
+          {/* ラップ: リスト全部を新しいものを上に（休憩3・作業2・休憩2…） */}
+          {allLaps.length > 1 && (
             <div style={{ padding: '6px 4px 0' }}>
-              {laps.map((L, i) => ({ L, i })).reverse().map(({ L, i }) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '9px 0', borderBottom: '1px solid #e4e1d8', ...mono }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: SUB, minWidth: 64, fontFamily: 'inherit' }}>ラップ{i + 1}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: MUTED }}>{hm(L.a)}〜</span>
+              {allLaps.map((L, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '9px 0', borderBottom: '1px solid #e4e1d8' }}>
+                  <span style={{ flex: '0 1 auto', minWidth: 0, fontSize: 12.5, fontWeight: 800, color: L.on ? INK : SUB, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{L.name}{L.no}</span>
+                  <span style={{ flex: '0 0 auto', fontSize: 11, fontWeight: 700, color: MUTED, ...mono }}>{hm(L.a)}〜</span>
                   <span style={{ flex: 1 }} />
-                  <span style={{ fontSize: 15, fontWeight: 800, color: L.open && r.running ? '#7a9a00' : INK }}>{mmss(L.ms)}</span>
+                  <span style={{ flex: '0 0 auto', fontSize: 15, fontWeight: 800, color: L.open && r.running ? '#7a9a00' : INK, ...mono }}>{mmss(L.ms)}</span>
                 </div>
               ))}
             </div>
