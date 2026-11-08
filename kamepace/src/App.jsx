@@ -2614,6 +2614,13 @@ export default class App extends React.Component {
     items.splice(i + 1, 0, { ...items[i], uid: 'li' + Date.now() + Math.floor(Math.random() * 1000) });
     this.setRun({ ...r, items, cur: items.findIndex(x => x.uid === curUid) });
   };
+  /* いまのラップ（その行動の最後のラップ）: a＝始まった時刻、ms＝そのラップの実施時間。最初の区間と lap: true の区間で区切る */
+  runLapNow(r, uid, now) {
+    const ss = r.segs.filter(s => s.uid === uid);
+    let a = null, ms = 0;
+    ss.forEach((s, i) => { if (i === 0 || s.lap) { a = s.a; ms = 0; } ms += (s.b == null ? now : s.b) - s.a; });
+    return { a, ms };
+  }
   runMs(r, uid, now) { return r.segs.filter(s => s.uid === uid).reduce((a, s) => a + ((s.b == null ? now : s.b) - s.a), 0); }
   /* 実行中の行動は、記録する前から実行した時間に合わせて降らせる（食事 −8/時なら 7分30秒ごとに1個）。
      run.drip[uid] = 降らせた個数（プラスの行動は＋、回復は−）。プラスは山に入り（pileSource）、
@@ -2728,8 +2735,10 @@ export default class App extends React.Component {
     const hits = [];
     if (a.all && a.all.mode === 'alarm' && a.all.at) { const k = 'allA:' + a.all.at; if (!fired[k] && now >= this.runAtTs(r, a.all.at)) hits.push([k, 'all', '全体アラーム', a.all.at + ' になりました']); }
     if (a.all && a.all.mode === 'timer' && a.all.min > 0) { const k = 'allT:' + a.all.min; if (!fired[k] && now >= (r.startAt || now) + a.all.min * 60000) hits.push([k, 'all', '全体タイマー', '始めてから' + this.fmtMin(a.all.min) + 'たちました']); }
-    if (cur && a.cur && a.cur.mode === 'alarm' && a.cur.at) { const k = 'curA:' + cur.uid + ':' + a.cur.at; if (!fired[k] && now >= this.runAtTs(r, a.cur.at)) hits.push([k, 'cur', '実施中アラーム', cur.name + '・' + a.cur.at + ' になりました']); }
-    if (cur && a.cur && a.cur.mode === 'timer' && !a.cur.none && cur.min > 0) { const k = 'curT:' + cur.uid + ':' + cur.min; if (!fired[k] && this.runMs(r, cur.uid, now) >= cur.min * 60000) hits.push([k, 'cur', '実施中タイマー', cur.name + 'の' + this.fmtMin(cur.min) + 'がたちました']); }
+    // 実施中はラップごと: タイマーはいまのラップの時間で測り、アラームはいまのラップが始まった後の時刻だけ鳴らす（ラップが変わるとまた鳴る）
+    const lap = cur ? this.runLapNow(r, cur.uid, now) : null;
+    if (cur && lap && lap.a != null && a.cur && a.cur.mode === 'alarm' && a.cur.at) { const t = this.runAtTs(r, a.cur.at), k = 'curA:' + cur.uid + ':' + lap.a + ':' + a.cur.at; if (!fired[k] && t >= lap.a && now >= t) hits.push([k, 'cur', '実施中アラーム', cur.name + '・' + a.cur.at + ' になりました']); }
+    if (cur && lap && lap.a != null && a.cur && a.cur.mode === 'timer' && !a.cur.none && cur.min > 0) { const k = 'curT:' + cur.uid + ':' + lap.a + ':' + cur.min; if (!fired[k] && lap.ms >= cur.min * 60000) hits.push([k, 'cur', '実施中タイマー', cur.name + 'の' + this.fmtMin(cur.min) + 'がたちました']); }
     if (!hits.length) return;
     const f = { ...fired }; hits.forEach(([k]) => { f[k] = true; });
     this.setRun({ ...r, fired: f });
