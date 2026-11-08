@@ -19,13 +19,35 @@ const KEYS = {
 };
 const FILL_UNIT = 125; // シャカと同じ: この個数で箱がいっぱい（memory: emoji-pile-fill-rule）
 
+/* 向き: auto＝端末の向きのまま／portrait＝縦／landscape＝横。iOS は Web から向きを固定できないので、
+   選んだ向きと端末の向きが違うときは画面ごと90°回して出す（dir＝回す向き 90 / -90） */
+const ORI_KEY = 'kame_ipadtest_ori';
+const readOri = () => { try { const o = JSON.parse(localStorage.getItem(ORI_KEY) || 'null'); if (o && o.mode) return o; } catch (e) { /* ignore */ } return { mode: 'auto', dir: 90 }; };
+
 export default function IpadTest({ v }) {
   const boxRef = React.useRef(null);
   const sim = React.useRef(null);
   const [count, setCount] = React.useState(0);
+  const [ori, setOri0] = React.useState(readOri);
+  const setOri = (o) => { setOri0(o); try { localStorage.setItem(ORI_KEY, JSON.stringify(o)); } catch (e) { /* ignore */ } };
+  // 外枠（テスト画面に使える場所）の大きさ。縦長か横長かで回すかを決める
+  const outerRef = React.useRef(null);
+  const [win, setWin] = React.useState({ w: 0, h: 0 });
+  React.useEffect(() => {
+    const el = outerRef.current; if (!el) return undefined;
+    document.body.classList.add('kame-itest'); // iPad の横向きでもスマホ幅（600px）に絞らず全面に
+    const on = () => setWin({ w: Math.round(el.clientWidth), h: Math.round(el.clientHeight) });
+    on();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(on) : null;
+    if (ro) ro.observe(el); else window.addEventListener('resize', on);
+    return () => { document.body.classList.remove('kame-itest'); if (ro) ro.disconnect(); else window.removeEventListener('resize', on); };
+  }, []);
+  const rotated = (ori.mode === 'portrait' && win.w > win.h) || (ori.mode === 'landscape' && win.h > win.w);
+  // 箱の大きさが変わったら（回転・画面の大きさ）物理の箱を作り直す
+  const layoutKey = [rotated, win.w, win.h].join(':'); // 回す向き（dir）だけ変えたときは箱の中は同じなので作り直さない
 
   React.useEffect(() => {
-    const box = boxRef.current; if (!box) return undefined;
+    const box = boxRef.current; if (!box || !win.w) return undefined;
     const W = box.clientWidth, H = box.clientHeight;
     const r = Math.sqrt((W * H) / (FILL_UNIT * Math.PI));
     const engine = Matter.Engine.create({ positionIterations: 8, velocityIterations: 4 });
@@ -57,8 +79,9 @@ export default function IpadTest({ v }) {
       s.raf = requestAnimationFrame(step);
     };
     s.raf = requestAnimationFrame(step);
+    setCount(0);
     return () => { cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
-  }, []);
+  }, [layoutKey]);
 
   const drop = React.useCallback((key) => {
     const s = sim.current, box = boxRef.current, k = KEYS[key]; if (!s || !box || !k) return;
@@ -109,11 +132,21 @@ export default function IpadTest({ v }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [drop, shake]);
 
+  const pill = (on) => ({ border: 'none', borderRadius: 999, padding: '6px 12px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', background: on ? '#1b1b18' : 'transparent', color: on ? '#fff' : '#55554e', fontFamily: 'inherit' });
+  // 回すときは、外枠の中で縦横を入れかえた大きさにして90°回す
+  const rootStyle = rotated
+    ? { position: 'absolute', left: '50%', top: '50%', width: win.h, height: win.w, transform: `translate(-50%, -50%) rotate(${ori.dir}deg)`, display: 'flex', flexDirection: 'column', background: '#f7f4ec' }
+    : { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: '#f7f4ec' };
   return (
-    <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#f7f4ec' }}>
+    <div ref={outerRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', background: '#f7f4ec' }}>
+    <div style={rootStyle}>
       <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px' }}>
         <button onClick={v.closeIpadTest} aria-label="閉じる" style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: '#fff', fontSize: 18, cursor: 'pointer' }}>×</button>
         <span style={{ flex: 1, fontSize: 15, fontWeight: 900 }}>インタラクティブテスト</span>
+        <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2 }}>
+          {[['auto', '自動'], ['portrait', '縦'], ['landscape', '横']].map(([k, n]) => <button key={k} onClick={() => setOri({ ...ori, mode: k })} style={pill(ori.mode === k)}>{n}</button>)}
+        </div>
+        {rotated && <button onClick={() => setOri({ ...ori, dir: -ori.dir })} aria-label="回す向きを逆に" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: '#fff', cursor: 'pointer', fontSize: 16, padding: 0 }}>⟲</button>}
         <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 13, fontWeight: 700 }}>{count}</span>
         <button onClick={shake} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>🔀 R</button>
         <button onClick={clear} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>リセット</button>
@@ -128,6 +161,7 @@ export default function IpadTest({ v }) {
           </button>
         ))}
       </div>
+    </div>
     </div>
   );
 }
