@@ -2565,17 +2565,30 @@ export default class App extends React.Component {
     this.set({ screen: 'run' });
   };
   runClose(run, now) { return run.segs.map(s => (s.b == null ? { ...s, b: now } : s)); }
+  /* 区間を開く。ほかの行動をやったあとに同じ行動へ戻ってきたときは、ラップの区切り（lap: true）にする（一時停止→再開は区切らない） */
+  runOpenSeg(segs, uid, now) {
+    const last = segs[segs.length - 1];
+    const back = segs.some(s => s.uid === uid) && last && last.uid !== uid;
+    return [...segs, back ? { uid, a: now, b: null, lap: true } : { uid, a: now, b: null }];
+  }
   runToggle = () => {
     const r = this.state.run; if (!r) return;
     this.unlockBeep();
     const now = Date.now(), open = r.segs.some(s => s.b == null);
-    this.setRun(open ? { ...r, segs: this.runClose(r, now) } : { ...r, segs: [...r.segs, { uid: r.items[r.cur].uid, a: now, b: null }] });
+    this.setRun(open ? { ...r, segs: this.runClose(r, now) } : { ...r, segs: this.runOpenSeg(r.segs, r.items[r.cur].uid, now) });
   };
   runSelect = (i) => {
     const r = this.state.run; if (!r || i === r.cur || !r.items[i]) return;
     const now = Date.now(), open = r.segs.some(s => s.b == null);
     const segs = this.runClose(r, now);
-    this.setRun({ ...r, cur: i, segs: open ? [...segs, { uid: r.items[i].uid, a: now, b: null }] : segs });
+    this.setRun({ ...r, cur: i, segs: open ? this.runOpenSeg(segs, r.items[i].uid, now) : segs });
+  };
+  /* ラップ: 実行中の区間をいまで区切り、新しいラップを始める（止めているときは何もしない） */
+  runLap = () => {
+    const r = this.state.run; if (!r) return;
+    const now = Date.now(), open = r.segs.find(s => s.b == null);
+    if (!open || now - open.a < 1000) return;
+    this.setRun({ ...r, segs: [...this.runClose(r, now), { uid: open.uid, a: now, b: null, lap: true }] });
   };
   runMove = (uid, d) => {
     const r = this.state.run; if (!r) return;
@@ -5560,7 +5573,7 @@ export default class App extends React.Component {
       }) : null,
       setListName: this.setListName, listToConfirm: this.listToConfirm, listToRec: () => this.listToConfirm('end'), listToPlan: () => this.listToConfirm('start'), saveListTemplate: this.saveListTemplate, tplAsk: st.tplAsk || null, tplWrite: this.tplWrite, tplAskClose: this.tplAskClose,
       startListRun: () => { const pl = st.pickList; if (pl.items.length) this.startRun(pl.items, (pl.name || '').trim(), true); },
-      run: st.run ? (() => { try { return this.runVals(); } catch (e) { console.warn('[kamepace] run', e); return null; } })() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish, runDiscard: this.runDiscard, runRename: this.runRename, setRunAlarm: this.setRunAlarm,
+      run: st.run ? (() => { try { return this.runVals(); } catch (e) { console.warn('[kamepace] run', e); return null; } })() : null, isPickScreen: st.screen === 'record' && !st.searchStep && !st.catId, isRun: st.screen === 'run' && !!st.run, goRun: this.goRun, runToggle: this.runToggle, runLap: this.runLap, runSelect: this.runSelect, runMove: this.runMove, runRemove: this.runRemove, runFinish: this.runFinish, runDiscard: this.runDiscard, runRename: this.runRename, setRunAlarm: this.setRunAlarm,
       runAlarm: st.runAlarm, closeRunAlarm: this.closeRunAlarm, runAlarmNext: this.runAlarmNext,
       exitRun: () => this.set({ screen: 'record', runAdd: false }), minimizeRun: () => this.set({ screen: 'home', runAdd: false }), goRunAdd: this.goRunAdd, runAdd: !!st.runAdd && !!st.run,
       pickCats, pickCatId: st.catId,
