@@ -166,6 +166,8 @@ body.kame-cover .app-screen { zoom: var(--kame-zoom, 1); height: calc(var(--app-
 body.kame-cover .app-status-spacer { height: env(safe-area-inset-top); }
 /* 縦に折っている時: 上の余白はステータスバーぶんだけ（折り目の位置に合わせるため） */
 body.kame-fold .app-status-spacer { height: env(safe-area-inset-top); }
+/* インタラクティブテスト: 上の余白はテスト画面の中で取る（回したとき外に空白が残らないように） */
+body.kame-itest .app-status-spacer { height: 0; }
 
 /* iPad（開発者モードだけ・flip.js computeTablet）: スマホ枠・ロゴ・QRをやめて画面いっぱい。
    縦は横幅に合わせて全面。横は本棚だけ横向きで全面、ほかの画面は縦の幅のまま真ん中に */
