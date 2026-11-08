@@ -5728,7 +5728,7 @@ export default class App extends React.Component {
       prevDay: this.prevDay, nextDay: this.nextDay,
       prevColor: st.dayOffset <= this._dayRange.min ? '#d8d5cb' : '#55554e',
       nextColor: st.dayOffset >= this._dayRange.max ? '#d8d5cb' : '#55554e',
-      showToast: !!st.toast, toastText: st.toast || '',
+      showToast: !!st.toast, toastText: st.toast || '', toast: (t) => this.toast(t),
       /* auth / mypage */
       user: st.user,
       authOpen: st.authOpen, authEmail: st.authEmail, authPass: st.authPass, authErr: st.authErr, authBusy: st.authBusy,
