@@ -4887,7 +4887,8 @@ export default class App extends React.Component {
       const nCal = this.importEvents(cal);
       const nTask = this.importTasks(tasks);
       const n = nCal + nTask;
-      this.toast(n > 0 ? `🗓️ 予定${nCal}件・ToDo${nTask}件` : '新しい予定はなし');
+      // 見つかった件数も出す（新しいものがないときに、読めていないのか・もう入っているのかがわかるように）
+      this.toast(n > 0 ? `🗓️ 予定${nCal}件・ToDo${nTask}件をとりこみました` : `新しい予定はなし（Googleの予定 ${cal.length}件）`);
     } catch (e) {
       console.warn('[kamepace] sync failed', e);
       this.toast('⚠️ 取り込み失敗: ' + jpError((e && e.code) || ''));

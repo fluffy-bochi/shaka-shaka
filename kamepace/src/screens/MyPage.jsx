@@ -180,6 +180,14 @@ export default function MyPage({ v }) {
             </button>
             {v.user && !v.gcalOff && <button onClick={() => v.openLinkOff('google')} style={linkOffBtn}>解除</button>}
           </div>
+          {/* mylifecore のサーバーを通さず、Googleカレンダーをいま直接読む（Googleのログイン画面が出る） */}
+          {v.user && (
+            <button onClick={v.doCalendarSync} style={{ ...row(true), width: '100%', border: 'none', borderTop: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+              <span style={{ fontSize: 16 }}>📥</span>
+              <span style={{ flex: 1, fontSize: 14 }}>Googleから直接取り込む</span>
+              <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
+            </button>
+          )}
         </div>
         <div style={label}>れんけい</div>
         <div style={card}>

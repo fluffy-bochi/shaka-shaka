@@ -440,8 +440,9 @@ async function ensureGoogleToken() {
 }
 
 async function fetchCalendarToday(token) {
-  const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - 1); // きのうから（0時〜朝5時はアプリではまだ前の日）
-  const end = new Date(); end.setHours(23, 59, 59, 999);
+  // きのうから7日先まで（0時〜朝5時はアプリではまだ前の日・自動の取り込みと同じ範囲）
+  const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - 1);
+  const end = new Date(); end.setHours(0, 0, 0, 0); end.setDate(end.getDate() + 7);
   const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
     + '?timeMin=' + encodeURIComponent(start.toISOString())
     + '&timeMax=' + encodeURIComponent(end.toISOString())
@@ -450,7 +451,7 @@ async function fetchCalendarToday(token) {
   if (!res.ok) throw new Error('calendar ' + res.status);
   const data = await res.json();
   return (data.items || [])
-    .filter(ev => ev.status !== 'cancelled')
+    .filter(ev => ev.status !== 'cancelled' && ev.start && ev.start.dateTime) // 終日の予定は時間の枠にならないので入れない（自動の取り込みと同じ）
     .map(ev => {
       const allDay = !(ev.start && ev.start.dateTime);
       const s = ev.start && (ev.start.dateTime || (ev.start.date ? ev.start.date + 'T00:00:00' : null));
