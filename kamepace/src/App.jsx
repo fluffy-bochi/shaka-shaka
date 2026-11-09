@@ -5512,7 +5512,7 @@ export default class App extends React.Component {
         : 'ログインすると予定・タスクを自動で取り込みます',
       syncMylifecore: this.syncMylifecore, gcalAutoOn: this.gcalAutoOn,
       gcalOff: !!(st.prefs || {}).gcalOff,
-      gcalStatusText: !st.user ? '' : (st.prefs || {}).gcalOff ? '連携を解除しています' : '5分ごとに自動 · ' + (st.lastGcalAt ? this.tsToHm(st.lastGcalAt) + ' に確認' + (st.lastGcalN != null ? '（' + GCAL_DAYS + '日間の予定 ' + st.lastGcalN + '件）' : '') : '予定を自動で取り込みます'),
+      gcalStatusText: !st.user ? '' : (st.prefs || {}).gcalOff ? '連携を解除しています' : '5分ごとに自動 · ' + (st.lastGcalAt ? this.tsToHm(st.lastGcalAt) + ' に確認' + (st.lastGcalN != null ? '（予定 ' + st.lastGcalN + '件）' : '') : '予定を自動で取り込みます'),
       // 睡眠カードに出す、その日の睡眠回復量（ためた回復の🌙を日別集計）
       sleepRecText: (() => {
         const dd = this.homeDateStr();

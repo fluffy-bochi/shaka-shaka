@@ -283,8 +283,9 @@ const tsToDate = (v) => (v && typeof v.toDate === 'function') ? v.toDate() : (v 
 // googleOnly: Googleカレンダーの予定（mylifecore のサーバーが5分ごとに入れる google_〜）だけ。mylifecore の連携を切っていても使う
 export async function fetchScheduleEvents(dayCount = 2, googleOnly = false) {
   if (!auth.currentUser) return [];
-  const start = new Date(); start.setHours(0, 0, 0, 0);
-  const end = new Date(start); end.setDate(end.getDate() + dayCount); // 今日+明日
+  // きのうから読む: アプリは朝5時までを前の日の夜として扱うので、0時をすぎても「きのう」の予定が要る（2026-11-10: 0時すぎにきのうの予定が入らなかった）
+  const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - 1);
+  const end = new Date(); end.setHours(0, 0, 0, 0); end.setDate(end.getDate() + dayCount); // きのう〜今日から dayCount 日
   const col = collection(db, 'users', auth.currentUser.uid, 'events');
   const q = query(col, where('start', '>=', Timestamp.fromDate(start)), where('start', '<', Timestamp.fromDate(end)));
   const snap = await getDocs(q);
@@ -439,7 +440,7 @@ async function ensureGoogleToken() {
 }
 
 async function fetchCalendarToday(token) {
-  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - 1); // きのうから（0時〜朝5時はアプリではまだ前の日）
   const end = new Date(); end.setHours(23, 59, 59, 999);
   const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
     + '?timeMin=' + encodeURIComponent(start.toISOString())
