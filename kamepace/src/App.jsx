@@ -16,7 +16,7 @@ import {
 } from './model';
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout, loginCode, codeOfEmail, auth,
-  cloudSave, cloudSavePassive, hasUnsaved, takeUnsavedBackup, setSaveErrorHandler, setConflictHandler, cloudIsNewer, loadUserData, fetchGoogleData, disconnectGoogle, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, completeScheduleTask, completeDailyTask, jpError,
+  cloudSave, cloudSavePassive, hasUnsaved, takeUnsavedBackup, setSaveErrorHandler, setConflictHandler, cloudIsNewer, loadUserData, fetchGoogleData, disconnectGoogle, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, startOwnGcalLink, fetchOwnGcal, completeScheduleTask, completeDailyTask, jpError,
   loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete, loadResearchConfig,
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
@@ -55,6 +55,18 @@ import { buildAcademicYear, academicYearOf } from './sample';
 
 // Googleカレンダーの自動取り込みで読む日数（今日から）
 const GCAL_DAYS = 7;
+// Google の同意画面から戻ってきたとき（/api/gcal-callback が #gcal=… / #gcalErr=… を付けて戻す）。
+// ログインとデータの読み込みを待ってから使うので、いったん sessionStorage に置いて URL から消す
+if (typeof window !== 'undefined') {
+  try {
+    const h = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    const link = h.get('gcal'), err = h.get('gcalErr');
+    if (link || err) {
+      sessionStorage.setItem('kame_gcal_pending', JSON.stringify(link ? { link } : { err }));
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  } catch (e) { /* ignore */ }
+}
 // iOSとAndroidで加速度センサーの符号が違うため、傾き（ジャイロ）重力の向き補正に使う
 const IS_IOS_DEVICE = typeof navigator !== 'undefined' && (
   /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -4679,10 +4691,15 @@ export default class App extends React.Component {
      予定は時間どおりに進んで終了時刻で自動記録される（既存の planned/frame の仕組みに乗る） */
   async syncScheduleApp() {
     if (!this.state.user) return;
+    this.applyGcalPending();
     const pf = this.state.prefs || {};
-    // mylifecore の連携を解除していても、Googleカレンダーの予定だけは自動で取り込む（Googleの連携を解除していなければ）
+    // ほどふぉ単体の Google 連携があれば、それで Googleカレンダーを読む（mylifecore を通さない）
+    const own = !!(pf.gcalLink && !pf.gcalOff);
+    if (own) await this.syncOwnGcal(false);
+    // mylifecore の連携を解除していても、Googleカレンダーの予定だけは自動で取り込む（Googleの連携を解除していなければ）。
+    // 単体の連携があるときは、mylifecore 経由の Google の予定は読まない（同じ予定を二重に見ないように）
     if (pf.mlcOff) {
-      if (pf.gcalOff) return;
+      if (pf.gcalOff || own) return;
       try {
         const n = this.importEvents(await fetchScheduleEvents(GCAL_DAYS, true), GCAL_DAYS);
         this.set({ lastGcalAt: Date.now(), lastGcalN: this._lastImportSeen });
@@ -4711,6 +4728,37 @@ export default class App extends React.Component {
       }
     } catch (e) {
       console.warn('[kamepace] schedule sync failed', e); // 権限・ネットワーク等は静かに再試行に任せる
+    }
+  }
+
+  /* Google の同意画面から戻ってきた結果を使う（ログインしてデータを読んだあと） */
+  applyGcalPending() {
+    let p = null;
+    try { p = JSON.parse(sessionStorage.getItem('kame_gcal_pending') || 'null'); sessionStorage.removeItem('kame_gcal_pending'); } catch (e) { /* ignore */ }
+    if (!p) return;
+    if (p.link) {
+      this.set({ prefs: { ...(this.state.prefs || {}), gcalLink: p.link, gcalLinkBad: false, gcalOff: false } });
+      this.state.prefs = { ...(this.state.prefs || {}), gcalLink: p.link, gcalLinkBad: false, gcalOff: false }; // このあとすぐ読むので手元にも
+      this.save();
+      this.toast('📅 Googleカレンダーと連携しました');
+    } else this.toast('⚠️ Googleカレンダーと連携できませんでした' + (p.err === 'cancelled' ? '' : '（' + p.err + '）'));
+  }
+  /* ほどふぉ単体の連携で Googleカレンダーを読む。loud＝結果を必ずトーストで出す（「いま取り込む」） */
+  async syncOwnGcal(loud) {
+    const pf = this.state.prefs || {};
+    if (!pf.gcalLink) return;
+    try {
+      const items = await fetchOwnGcal(pf.gcalLink, GCAL_DAYS);
+      const n = this.importEvents(items, GCAL_DAYS, 'cal:');
+      this.set({ lastGcalAt: Date.now(), lastGcalN: items.length, ...(pf.gcalLinkBad ? { prefs: { ...(this.state.prefs || {}), gcalLinkBad: false } } : null) });
+      if (n > 0) this.toast('📅 Googleカレンダーから予定' + n + '件をとりこみました');
+      else if (loud) this.toast('📅 Googleカレンダーの新しい予定はなし（予定 ' + items.length + '件）');
+    } catch (e) {
+      console.warn('[kamepace] own gcal sync failed', e);
+      if (e && e.needsReauth) {
+        if (!pf.gcalLinkBad) { this.set({ prefs: { ...(this.state.prefs || {}), gcalLinkBad: true } }); this.save(); }
+        this.toast('⚠️ Googleカレンダーの連携が切れました。マイページでつなぎ直してください');
+      } else if (loud) this.toast('⚠️ 取り込み失敗: ' + ((e && e.message) || ''));
     }
   }
 
@@ -4855,7 +4903,7 @@ export default class App extends React.Component {
     this.set({ linkOff: null });
     if (!kind) return;
     if (kind === 'mlc') this.set({ prefs: { ...(this.state.prefs || {}), mlcOff: true } });
-    else { this.set({ prefs: { ...(this.state.prefs || {}), gcalOff: true } }); try { await disconnectGoogle(); } catch (e) { /* ignore */ } }
+    else { const { gcalLink, gcalLinkBad, ...rest } = this.state.prefs || {}; this.set({ prefs: { ...rest, gcalOff: true } }); try { await disconnectGoogle(); } catch (e) { /* ignore */ } } // eslint-disable-line no-unused-vars
     if (clear) {
       const t0 = todayStr();
       const evRe = kind === 'mlc' ? /^sched:/ : /^(cal:|sched:google_)/, tkRe = kind === 'mlc' ? /^(ptask|daily):/ : /^task:/;
@@ -4872,7 +4920,15 @@ export default class App extends React.Component {
   /* Googleカレンダー: 自動の取り込みをオンにして、いま取り込む（ログインし直しはいらない） */
   gcalAutoOn = async () => {
     if (!this.state.user) { this.openAuth(); return; }
-    this.set({ prefs: { ...(this.state.prefs || {}), gcalOff: false } }); this.save();
+    const pf = this.state.prefs || {};
+    // ほどふぉ単体の連携がない・切れているときは、Google の同意画面へ（戻ってきたら自動で取り込みが始まる）
+    if (!pf.gcalLink || pf.gcalLinkBad) {
+      this.toast('⏳ Googleへ移動します…', 4000);
+      try { await startOwnGcalLink(); } catch (e) { this.toast('⚠️ 連携を始められませんでした: ' + ((e && e.message) || '')); }
+      return;
+    }
+    if (pf.gcalOff) { this.set({ prefs: { ...pf, gcalOff: false } }); this.save(); }
+    if (pf.gcalLink) { await this.syncOwnGcal(true); return; }
     try {
       const n = this.importEvents(await fetchScheduleEvents(GCAL_DAYS, true), GCAL_DAYS);
       this.set({ lastGcalAt: Date.now(), lastGcalN: this._lastImportSeen });
@@ -4904,11 +4960,11 @@ export default class App extends React.Component {
   /* カレンダーの予定は「枠」（タイトルだけ）として取り込む。
      - テンプレ（タスク構成つき）があれば自動適用: 枠の時間をタスクに配分して記録
      - 初めてのタイトルは行動待ちの枠として置く（ホームでタップして行動を入れる → テンプレ保存） */
-  importEvents(items, days) {
+  importEvents(items, days, prefix) {
     if (!Array.isArray(items)) return 0;
     this._lastImportSeen = items.length;
     // カレンダー側で変わった・消えた予定を追いかける（まだ行動を入れていない「枠」だけ。記録したものや手で直したものはさわらない）
-    const synced = this.syncImportedFrames(items, days); // 変えたときは新しい entries（まだ state には入れていない）
+    const synced = this.syncImportedFrames(items, days, prefix); // 変えたときは新しい entries（まだ state には入れていない）
     const cur = synced || this.state.entries;
     // srcId は「cal:<id>#<タスク番号>」にもなるため、基部で重複判定。
     // Googleの予定は手動の取り込み（cal:<id>）と自動（sched:google_<id>）で同じものとみなす
@@ -4971,7 +5027,7 @@ export default class App extends React.Component {
      - 時刻・名前・日付が変わっていたら直す
      - 取り込んだ範囲（今日〜days日）の予定でカレンダーから消えていたら、まだ終わっていない枠だけゴミ箱へ
      days なし（範囲がわからないとき）は消さない。戻り値: 変えたときは新しい entries、変えないときは null（state には入れない） */
-  syncImportedFrames(items, days) {
+  syncImportedFrames(items, days, prefix = 'sched:google_') {
     const base = (id) => String(id).split('#')[0].replace(/^sched:google_/, 'cal:');
     const place = (it) => { // importEvents と同じ置き方（0時またぎ・0〜5時は前日の夜）
       let date = it.date || todayStr(), from = it.from || '00:00', to = it.to || '23:59';
@@ -4984,7 +5040,7 @@ export default class App extends React.Component {
     let changed = false;
     const entries = this.state.entries.map(e => {
       // ここで消した枠（gcalGone）は、カレンダーにまた出てきたら戻す
-      if (!e.srcId || (e.exp && !e.gcalGone) || !e.needsSetup || e.delta || String(e.srcId).includes('#') || !/^sched:google_/.test(String(e.srcId))) return e;
+      if (!e.srcId || (e.exp && !e.gcalGone) || !e.needsSetup || e.delta || String(e.srcId).includes('#') || !String(e.srcId).startsWith(prefix)) return e; // 読んだのと同じ取り込み元の枠だけ
       const it = byId.get(base(e.srcId));
       if (it) {
         const p = place(it);
@@ -5513,7 +5569,11 @@ export default class App extends React.Component {
         : 'ログインすると予定・タスクを自動で取り込みます',
       syncMylifecore: this.syncMylifecore, gcalAutoOn: this.gcalAutoOn,
       gcalOff: !!(st.prefs || {}).gcalOff,
-      gcalStatusText: !st.user ? '' : (st.prefs || {}).gcalOff ? '連携を解除しています' : '5分ごとに自動 · ' + (st.lastGcalAt ? this.tsToHm(st.lastGcalAt) + ' に確認' + (st.lastGcalN != null ? '（予定 ' + st.lastGcalN + '件）' : '') : '予定を自動で取り込みます'),
+      gcalLinked: !!(st.prefs || {}).gcalLink && !(st.prefs || {}).gcalOff, gcalLinkBad: !!(st.prefs || {}).gcalLinkBad,
+      gcalStatusText: !st.user ? '' : (st.prefs || {}).gcalOff ? '連携を解除しています'
+        : (st.prefs || {}).gcalLinkBad ? '連携が切れています · つなぎ直してください'
+        : (st.prefs || {}).gcalLink ? '5分ごとに自動 · ' + (st.lastGcalAt ? this.tsToHm(st.lastGcalAt) + ' に確認（予定 ' + (st.lastGcalN || 0) + '件）' : '予定を自動で取り込みます')
+        : (st.lastGcalAt ? 'mylifecore 経由 · ' + this.tsToHm(st.lastGcalAt) + ' に確認（予定 ' + (st.lastGcalN || 0) + '件）' : '連携していません'),
       // 睡眠カードに出す、その日の睡眠回復量（ためた回復の🌙を日別集計）
       sleepRecText: (() => {
         const dd = this.homeDateStr();

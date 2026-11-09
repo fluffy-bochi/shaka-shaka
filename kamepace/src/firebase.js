@@ -419,6 +419,37 @@ export async function _seedDailyTasks(dateKey, titles, completedIdx = -1) {
 // 検証用フック（読み書きは自分のuid配下のみ）
 if (typeof window !== 'undefined') window.__kameFb = { _seedScheduleEvent, _seedScheduleTask, _seedDailyTasks, loadUserData, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks };
 
+/* ---- ほどふぉ単体の Googleカレンダー連携（mylifecore を通さない） ----
+   サーバー（kamepace/api/gcal-*.js）が Google の更新用トークンを使って予定を読む。
+   更新用トークンはサーバーの秘密で暗号化したもの（link）を prefs.gcalLink に持つ。 */
+async function idTokenHeader() {
+  if (!auth.currentUser) throw new Error('not-signed-in');
+  return { Authorization: 'Bearer ' + await auth.currentUser.getIdToken() };
+}
+/* Google の同意画面へ（戻ってくると URL の #gcal= に link が入る） */
+export async function startOwnGcalLink() {
+  const r = await fetch('/api/gcal-auth', { headers: await idTokenHeader() });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.url) throw new Error(d.error || ('auth ' + r.status));
+  window.location.href = d.url;
+}
+/* きのう0時〜今日から days 日の、時間のある予定。更新用トークンが使えないときは e.needsReauth */
+export async function fetchOwnGcal(link, days = 7) {
+  const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - 1);
+  const end = new Date(); end.setHours(0, 0, 0, 0); end.setDate(end.getDate() + days);
+  const r = await fetch('/api/gcal-events', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await idTokenHeader()) },
+    body: JSON.stringify({ link, from: start.toISOString(), to: end.toISOString() }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(d.error || ('events ' + r.status)), { needsReauth: !!d.needsReauth });
+  return (d.items || []).map(ev => {
+    const s = new Date(ev.start), e = new Date(ev.end);
+    return { srcId: 'cal:' + ev.id, title: ev.title || '(無題の予定)', date: ymd(s), from: hm(s), to: hm(e) };
+  });
+}
+
 /* ---- Google Calendar / Tasks import ---- */
 function pad2m(n) { return String(n).padStart(2, '0'); }
 function hm(d) { return pad2m(d.getHours()) + ':' + pad2m(d.getMinutes()); }
