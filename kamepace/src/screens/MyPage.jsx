@@ -176,18 +176,10 @@ export default function MyPage({ v }) {
                 <span style={{ display: 'block', fontSize: 14 }}>Googleカレンダー</span>
                 {v.gcalStatusText && <span style={{ ...mono, fontSize: 10.5, color: '#9d9b91' }}>{v.gcalStatusText}</span>}
               </span>
-              <span style={{ display: 'inline-flex', background: v.user && !v.gcalOff ? '#eef7cc' : '#f1efe8', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: v.user && !v.gcalOff ? '#2f3a00' : '#8a8a82', flex: '0 0 auto' }}>{!v.user ? 'ログインで連携' : v.gcalOff ? '連携する' : '🟢 いま取り込む'}</span>
+              <span style={{ display: 'inline-flex', background: v.user && v.gcalLinked && !v.gcalLinkBad ? '#eef7cc' : '#f1efe8', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, fontWeight: 700, color: v.user && v.gcalLinked && !v.gcalLinkBad ? '#2f3a00' : '#8a8a82', flex: '0 0 auto' }}>{!v.user ? 'ログインで連携' : (!v.gcalLinked || v.gcalLinkBad) ? (v.gcalLinkBad ? 'つなぎ直す' : '連携する') : '🟢 いま取り込む'}</span>
             </button>
-            {v.user && !v.gcalOff && <button onClick={() => v.openLinkOff('google')} style={linkOffBtn}>解除</button>}
+            {v.user && v.gcalLinked && <button onClick={() => v.openLinkOff('google')} style={linkOffBtn}>解除</button>}
           </div>
-          {/* mylifecore のサーバーを通さず、Googleカレンダーをいま直接読む（Googleのログイン画面が出る） */}
-          {v.user && (
-            <button onClick={v.doCalendarSync} style={{ ...row(true), width: '100%', border: 'none', borderTop: '1px solid #f1efe8', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
-              <span style={{ fontSize: 16 }}>📥</span>
-              <span style={{ flex: 1, fontSize: 14 }}>Googleから直接取り込む</span>
-              <span style={{ fontSize: 16, color: '#c9c7bf' }}>›</span>
-            </button>
-          )}
         </div>
         <div style={label}>れんけい</div>
         <div style={card}>
