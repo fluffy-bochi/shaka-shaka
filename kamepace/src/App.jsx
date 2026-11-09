@@ -53,6 +53,8 @@ import Bookshelf from './screens/Bookshelf';
 import IpadTest from './screens/IpadTest';
 import { buildAcademicYear, academicYearOf } from './sample';
 
+// Googleカレンダーの自動取り込みで読む日数（今日から）
+const GCAL_DAYS = 7;
 // iOSとAndroidで加速度センサーの符号が違うため、傾き（ジャイロ）重力の向き補正に使う
 const IS_IOS_DEVICE = typeof navigator !== 'undefined' && (
   /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -4682,8 +4684,8 @@ export default class App extends React.Component {
     if (pf.mlcOff) {
       if (pf.gcalOff) return;
       try {
-        const n = this.importEvents(await fetchScheduleEvents(2, true));
-        this.set({ lastGcalAt: Date.now() });
+        const n = this.importEvents(await fetchScheduleEvents(GCAL_DAYS, true), GCAL_DAYS);
+        this.set({ lastGcalAt: Date.now(), lastGcalN: this._lastImportSeen });
         if (n > 0) this.toast('📅 Googleカレンダーから予定' + n + '件をとりこみました');
       } catch (e) { console.warn('[kamepace] gcal sync failed', e); }
       return;
@@ -4872,8 +4874,8 @@ export default class App extends React.Component {
     if (!this.state.user) { this.openAuth(); return; }
     this.set({ prefs: { ...(this.state.prefs || {}), gcalOff: false } }); this.save();
     try {
-      const n = this.importEvents(await fetchScheduleEvents(2, true));
-      this.set({ lastGcalAt: Date.now() });
+      const n = this.importEvents(await fetchScheduleEvents(GCAL_DAYS, true), GCAL_DAYS);
+      this.set({ lastGcalAt: Date.now(), lastGcalN: this._lastImportSeen });
       this.toast(n > 0 ? '📅 Googleカレンダーから予定' + n + '件をとりこみました' : '📅 Googleカレンダーの新しい予定はなし');
     } catch (e) { this.toast('⚠️ 取り込み失敗: ' + jpError((e && e.code) || '')); }
   };
@@ -4901,12 +4903,16 @@ export default class App extends React.Component {
   /* カレンダーの予定は「枠」（タイトルだけ）として取り込む。
      - テンプレ（タスク構成つき）があれば自動適用: 枠の時間をタスクに配分して記録
      - 初めてのタイトルは行動待ちの枠として置く（ホームでタップして行動を入れる → テンプレ保存） */
-  importEvents(items) {
+  importEvents(items, days) {
     if (!Array.isArray(items)) return 0;
+    this._lastImportSeen = items.length;
+    // カレンダー側で変わった・消えた予定を追いかける（まだ行動を入れていない「枠」だけ。記録したものや手で直したものはさわらない）
+    const synced = this.syncImportedFrames(items, days); // 変えたときは新しい entries（まだ state には入れていない）
+    const cur = synced || this.state.entries;
     // srcId は「cal:<id>#<タスク番号>」にもなるため、基部で重複判定。
     // Googleの予定は手動の取り込み（cal:<id>）と自動（sched:google_<id>）で同じものとみなす
     const base = (id) => String(id).split('#')[0].replace(/^sched:google_/, 'cal:');
-    const existing = new Set(this.state.entries.filter(e => e.srcId).map(e => base(e.srcId)));
+    const existing = new Set(cur.filter(e => e.srcId).map(e => base(e.srcId)));
     let added = 0;
     const newEntries = [];
     const now = Date.now();
@@ -4954,11 +4960,44 @@ export default class App extends React.Component {
       added++;
     });
     if (added) {
-      this.set({ entries: sortEntries([...this.state.entries, ...newEntries]) });
+      this.set({ entries: sortEntries([...cur, ...newEntries]) });
       setTimeout(() => this.advancePlans(), 0);
       this.save();
-    }
+    } else if (synced) { this.set({ entries: sortEntries(synced) }); this.save(); }
     return added;
+  }
+  /* 取り込んだ予定の枠（needsSetup・行動未入力）を、いまのカレンダーに合わせる。
+     - 時刻・名前・日付が変わっていたら直す
+     - 取り込んだ範囲（今日〜days日）の予定でカレンダーから消えていたら、まだ終わっていない枠だけゴミ箱へ
+     days なし（範囲がわからないとき）は消さない。戻り値: 変えたときは新しい entries、変えないときは null（state には入れない） */
+  syncImportedFrames(items, days) {
+    const base = (id) => String(id).split('#')[0].replace(/^sched:google_/, 'cal:');
+    const place = (it) => { // importEvents と同じ置き方（0時またぎ・0〜5時は前日の夜）
+      let date = it.date || todayStr(), from = it.from || '00:00', to = it.to || '23:59';
+      if (to < from) to = this.addHm(to, 1440);
+      if (it.from && from < '05:00') { date = shiftDate(date, -1); from = this.addHm(from, 1440); to = this.addHm(to, 1440); }
+      return { date, from, to, title: it.title || '(無題)' };
+    };
+    const byId = new Map(items.filter(it => it && it.srcId).map(it => [base(it.srcId), it]));
+    const t0 = todayStr(), tEnd = days ? shiftDate(t0, days - 1) : null, now = Date.now();
+    let changed = false;
+    const entries = this.state.entries.map(e => {
+      // ここで消した枠（gcalGone）は、カレンダーにまた出てきたら戻す
+      if (!e.srcId || (e.exp && !e.gcalGone) || !e.needsSetup || e.delta || String(e.srcId).includes('#') || !/^sched:google_/.test(String(e.srcId))) return e;
+      const it = byId.get(base(e.srcId));
+      if (it) {
+        const p = place(it);
+        if (!e.exp && p.date === e.date && p.from === e.from && p.to === e.to && p.title === e.plan) return e;
+        changed = true;
+        const { gcalGone, trashedAt, ...rest } = e; // eslint-disable-line no-unused-vars
+        return { ...rest, ...p, exp: false, plan: p.title, title: e.title === e.plan ? p.title : e.title, act: e.title === e.plan ? guessAct(p.title) : e.act };
+      }
+      if (e.exp) return e;
+      // 範囲内（前日の夜に置いたぶんも考えて今日〜最後の日の前日まで）で、まだ終わっていない枠がカレンダーにない → 消えた予定
+      if (tEnd && e.date >= t0 && e.date < tEnd && entryEndTs(e) > now) { changed = true; return { ...e, exp: true, trashedAt: now, gcalGone: true }; }
+      return e;
+    });
+    return changed ? entries : null;
   }
   importTasks(items) {
     if (!Array.isArray(items)) return 0;
@@ -5473,7 +5512,7 @@ export default class App extends React.Component {
         : 'ログインすると予定・タスクを自動で取り込みます',
       syncMylifecore: this.syncMylifecore, gcalAutoOn: this.gcalAutoOn,
       gcalOff: !!(st.prefs || {}).gcalOff,
-      gcalStatusText: !st.user ? '' : (st.prefs || {}).gcalOff ? '連携を解除しています' : '5分ごとに自動 · ' + (st.lastGcalAt ? this.tsToHm(st.lastGcalAt) + ' に取り込み' : '予定を自動で取り込みます'),
+      gcalStatusText: !st.user ? '' : (st.prefs || {}).gcalOff ? '連携を解除しています' : '5分ごとに自動 · ' + (st.lastGcalAt ? this.tsToHm(st.lastGcalAt) + ' に確認' + (st.lastGcalN != null ? '（' + GCAL_DAYS + '日間の予定 ' + st.lastGcalN + '件）' : '') : '予定を自動で取り込みます'),
       // 睡眠カードに出す、その日の睡眠回復量（ためた回復の🌙を日別集計）
       sleepRecText: (() => {
         const dd = this.homeDateStr();

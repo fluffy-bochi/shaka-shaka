@@ -296,6 +296,9 @@ export async function fetchScheduleEvents(dayCount = 2, googleOnly = false) {
     // 睡眠ブロック・時報・予測は取り込まない（記録の対象にならないもの）
     if (ev.blockType === 'sleep' || ev.blockType === 'chime' || ev.isPredicted) return;
     if (googleOnly && !d.id.startsWith('google_')) return;
+    // 終日の予定（0:00〜翌0:00）は時間の枠にならないので取り込まない（前は前日の夜に0分の枠として入っていた）
+    const allDay = ev.allDay || ev.isAllDay || (s.getHours() === 0 && s.getMinutes() === 0 && e.getHours() === 0 && e.getMinutes() === 0 && e - s >= 86400000);
+    if (allDay) return;
     out.push({
       srcId: 'sched:' + d.id,
       title: ev.title || '(無題の予定)',
