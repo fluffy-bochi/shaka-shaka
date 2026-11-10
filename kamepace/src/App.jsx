@@ -25,6 +25,7 @@ import { dripRate, sleepSpans, awakeMs } from './drip';
 import ResearchAdmin from './screens/ResearchAdmin';
 import Install from './Install';
 import Run, { MiniRun } from './screens/Run';
+import RunPip from './screens/RunPip';
 import * as Ikoi from './ikoi';
 import { getFlip, setFlip, subscribeFlip, computeFlip, computeTablet, watchFlipEnv } from './flip';
 import IkoiEdit from './screens/IkoiEdit';
@@ -5934,6 +5935,8 @@ export default class App extends React.Component {
         )}
         {/* 実施中のバー（ホーム・行動選択画面の下） */}
         {v.run && !v.isRun && (v.isHome || v.isPickScreen) && <MiniRun v={v} />}
+        {/* 実行中のピクチャーインピクチャ（開いていないときは何も出さない） */}
+        <RunPip v={v} />
         {!v.isBookshelf && !v.isWake && !v.isBed && !v.isIkoiEdit && !v.isResearchAdmin && !v.isWeekReport && !v.isIpadTest && <Nav v={v} />}
         {/* Z Flip のサブディスプレイ: ナビのない画面でも、カメラにかかる下の帯は空けておく */}
         {/* Z Flip のサブディスプレイ: ナビは右端に縦（アイコンだけ・下の帯の上まで） */}

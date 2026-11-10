@@ -2,6 +2,7 @@ import React from 'react';
 import Emo from '../fluent';
 import { FreqPop, History, HmInput } from './Pick';
 import { TaskEditPopup } from './Home';
+import { pipKind, openRunPip, usePip } from './RunPip';
 
 /* タスク実行（START）: いまの行動を大きく、開始時刻・いまの時刻と、経過／予定の時間のバー。
    ▶／⏸の左に 必・♡、右に りれき。その下に 全体／実施中 の アラーム（時刻）・タイマー（時間）を切り替えて設定。
@@ -10,13 +11,13 @@ const INK = '#1b1b18', SUB = '#55554e', MUTED = '#8a8a82', LIME = '#c4f000', LIM
 const mono = { fontFamily: "'Space Mono',monospace" };
 const ms = (size, color, fill = false) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: fill ? "'FILL' 1" : "'FILL' 0", fontSize: size, color, lineHeight: 1 });
 const sg = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0');
-const hm = (ts) => { const d = new Date(ts); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
+export const hm = (ts) => { const d = new Date(ts); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
 // 経過・予定の時間: 1時間未満は 分:秒、1時間以上は 時:分:秒
 // 実行区間から、いまの時点の経過ミリ秒（実行中の区間は b=null）
-const msOf = (segs, now) => (segs || []).reduce((a, s) => a + ((s.b == null ? now : s.b) - s.a), 0);
+export const msOf = (segs, now) => (segs || []).reduce((a, s) => a + ((s.b == null ? now : s.b) - s.a), 0);
 /* シークバー: 実施中がアラーム（時刻）なら開始→その時刻を時計で、タイマーなら予定時間を実施時間で。endTs＝終わる時刻（タイマーは いま＋残り） */
 // 時間が過ぎたら延長: バー全体を経過時間に広げ、予定ぶん（plan）までを黒、そこから先（延長）をピンクにする
-function barOf(r, c, now) {
+export function barOf(r, c, now) {
   if (r.curNoTime) return { none: true, total: 0, endTs: null, over: false, ratio: 1, plan: 1, extra: 0 }; // 時間なし: いっぱい
   let total, el, endTs;
   if (r.curAlarmTs && c.startAt) { total = Math.max(60000, r.curAlarmTs - c.startAt); el = Math.max(0, now - c.startAt); endTs = r.curAlarmTs; }
@@ -27,10 +28,10 @@ function barOf(r, c, now) {
   const over = el > total;
   return { total, endTs, over, ratio: over ? 1 : Math.min(1, el / total), plan: over ? total / el : 1, extra: over ? el - total : 0 };
 }
-const PINK = '#ff5fa2';
+export const PINK = '#ff5fa2';
 /* ラップ: 最初の区間と lap: true の区間から新しいラップ。一時停止→再開はおなじラップのまま。
    at＝そのラップまでの経過（実施時間）、a＝始まった時刻 */
-function lapsOf(segs, now) {
+export function lapsOf(segs, now) {
   const out = []; let acc = 0;
   (segs || []).forEach((s, i) => {
     const d = (s.b == null ? now : s.b) - s.a;
@@ -40,7 +41,7 @@ function lapsOf(segs, now) {
   });
   return out;
 }
-const mmss = (t) => { const s = Math.max(0, Math.floor(t / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; };
+export const mmss = (t) => { const s = Math.max(0, Math.floor(t / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; };
 
 /* アラーム／タイマーの1行: [全体｜実施中] [アラーム|タイマー] ……… [時刻 or 分] */
 function AlarmRow({ label, a, onMode, onAt, onMin, top }) {
@@ -97,12 +98,15 @@ export default function Run({ v }) {
   const lab = { fontSize: 8.5, color: MUTED, fontWeight: 700, marginRight: 1 };
   const num = { fontSize: 12, fontWeight: 800, color: INK, ...mono };
   const SHEET_CLOSED = 58;
+  const canPip = React.useMemo(pipKind, []), pipOn = usePip();
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec', WebkitTapHighlightColor: 'transparent', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 0' }}>
         {/* 下三角＝小さくする（ホームへ。下に「実施中」のバーが出る） */}
         <button onClick={v.minimizeRun} aria-label="小さくする" style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: '#e4e1d8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(32, INK, true)}>keyboard_arrow_down</span></button>
         <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(() => { const d = new Date(now); return (d.getMonth() + 1) + '月' + d.getDate() + '日'; })()}</div>
+        {/* ピクチャーインピクチャ（もう一度押すと閉じる） */}
+        {canPip && <button onClick={openRunPip} aria-label="ピクチャーインピクチャ" style={{ width: 36, height: 36, borderRadius: 8, border: 'none', background: pipOn ? INK : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(24, pipOn ? '#fff' : INK)}>picture_in_picture_alt</span></button>}
         {/* 削除＝記録せずに実行をやめる（確認つき） */}
         <button onClick={() => setDelAsk(true)} style={{ border: 'none', background: 'none', color: '#d9534f', fontSize: 15, fontWeight: 900, padding: '8px 4px', cursor: 'pointer', fontFamily: 'inherit' }}>削除</button>
         <button onClick={v.runFinish} style={{ border: '2px solid ' + INK, borderRadius: 999, background: '#fff', color: INK, fontSize: 17, fontWeight: 900, padding: '7px 20px', cursor: 'pointer', fontFamily: 'inherit' }}>記録</button>
