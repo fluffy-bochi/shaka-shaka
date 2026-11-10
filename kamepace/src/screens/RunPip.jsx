@@ -83,6 +83,11 @@ export function usePip() {
   return pipActive();
 }
 
+/* リストの前・次の行動へ（実行画面のリストの行をタップしたのと同じ） */
+const curIdx = (v) => ((v.run && v.run.rows) || []).findIndex(x => x.on);
+const canStep = (v, d) => { const i = curIdx(v), n = ((v.run && v.run.rows) || []).length; return i >= 0 && i + d >= 0 && i + d < n; };
+function runStep(v, d) { if (canStep(v, d)) v.runSelect(curIdx(v) + d); }
+
 /* ---- PC: 正方形の小窓 ---- */
 function Square({ v, win }) {
   const [, tick] = React.useState(0);
@@ -120,10 +125,15 @@ function Square({ v, win }) {
       </div>
       <div style={{ flex: '0 0 auto', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '8px 18px 16px' }}>
         <button onClick={v.runLap} disabled={!r.running} style={{ ...round, justifySelf: 'start', width: 44, height: 44, borderRadius: '50%', background: '#efece3', color: INK, fontSize: 11, fontWeight: 900, opacity: r.running ? 1 : 0.35 }}>ラップ</button>
-        <button onClick={v.runToggle} aria-label={r.running ? '一時停止' : '再開'} style={{ ...round, width: 60, height: 60, borderRadius: '50%', background: r.running ? INK : LIME, boxShadow: '0 6px 16px rgba(27,27,24,.2)' }}>
-          <span style={ms(38, r.running ? '#fff' : LIME_INK, true)}>{r.running ? 'pause' : 'play_arrow'}</span>
-        </button>
-        <button onClick={() => { v.runFinish(); try { window.focus(); } catch (e) { /* ignore */ } }} style={{ ...round, justifySelf: 'end', border: '2px solid ' + INK, borderRadius: 999, background: '#fff', color: INK, fontSize: 14, fontWeight: 900, padding: '6px 14px' }}>記録</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button onClick={() => runStep(v, -1)} disabled={!canStep(v, -1)} aria-label="前に戻る" style={{ ...round, width: 40, height: 40, borderRadius: '50%', background: 'transparent', opacity: canStep(v, -1) ? 1 : 0.25 }}><span style={ms(32, INK, true)}>skip_previous</span></button>
+          <button onClick={v.runToggle} aria-label={r.running ? '一時停止' : '再開'} style={{ ...round, width: 60, height: 60, borderRadius: '50%', background: r.running ? INK : LIME, boxShadow: '0 6px 16px rgba(27,27,24,.2)' }}>
+            <span style={ms(38, r.running ? '#fff' : LIME_INK, true)}>{r.running ? 'pause' : 'play_arrow'}</span>
+          </button>
+          <button onClick={() => runStep(v, 1)} disabled={!canStep(v, 1)} aria-label="次に移動" style={{ ...round, width: 40, height: 40, borderRadius: '50%', background: 'transparent', opacity: canStep(v, 1) ? 1 : 0.25 }}><span style={ms(32, INK, true)}>skip_next</span></button>
+        </div>
+        {/* 記録: アプリに戻して（小窓を閉じて）記録の確認画面へ */}
+        <button onClick={() => { v.runFinish(); try { window.focus(); } catch (e) { /* ignore */ } closeRunPip(); }} style={{ ...round, justifySelf: 'end', border: '2px solid ' + INK, borderRadius: 999, background: '#fff', color: INK, fontSize: 14, fontWeight: 900, padding: '6px 14px' }}>記録</button>
       </div>
     </div>
   );
@@ -203,8 +213,9 @@ function VideoPip({ v }) {
     video.muted = true; video.playsInline = true; video.autoplay = true;
     video.setAttribute('playsinline', ''); video.setAttribute('muted', '');
     video.setAttribute('autopictureinpicture', ''); // iPhone: 実行中にアプリを離れたら自動で小窓に
-    // 画面には見せないが、iPhone は DOM にあって再生中でないと小窓にできない
-    Object.assign(video.style, { position: 'fixed', left: '0', top: '0', width: '2px', height: '2px', opacity: '0.01', pointerEvents: 'none', zIndex: '-1' });
+    // 画面には見せないが、iPhone は DOM にあって再生中でないと小窓にできない。
+    // 要素の形が小窓の形になる端末があるので、絵と同じ縦横比にしておく（正方形にすると縦がつぶれた）
+    Object.assign(video.style, { position: 'fixed', left: '0', top: '0', width: (SQ_W / 10) + 'px', height: (SQ_H / 10) + 'px', opacity: '0.01', pointerEvents: 'none', zIndex: '-1' });
     let stream = null;
     try { stream = cv.captureStream(1); video.srcObject = stream; } catch (e) { console.warn('[kamepace] pip stream', e); }
     (host.current || document.body).appendChild(video);
@@ -221,7 +232,10 @@ function VideoPip({ v }) {
     video.addEventListener('enterpictureinpicture', onPip); video.addEventListener('leavepictureinpicture', onPip);
     video.addEventListener('webkitpresentationmodechanged', onPip);
     const msn = navigator.mediaSession;
+    const step = (d) => { const x = vRef.current; if (x) runStep(x, d); setTimeout(draw, 0); };
     try { if (msn) { msn.setActionHandler('play', toggle); msn.setActionHandler('pause', toggle); } } catch (e) { /* ignore */ }
+    // 小窓の ⏮/⏭（出せる端末だけ）＝前に戻る・次に移動
+    try { if (msn) { msn.setActionHandler('previoustrack', () => step(-1)); msn.setActionHandler('nexttrack', () => step(1)); } } catch (e) { /* ignore */ }
     const t = setInterval(draw, 1000);
     // アプリに戻ってきたら（裏で止まった）動画をまた流しておく
     const onVis = () => { if (!document.hidden && video.paused) video.play().catch(() => {}); };
@@ -231,7 +245,7 @@ function VideoPip({ v }) {
       document.removeEventListener('visibilitychange', onVis);
       video.removeEventListener('pause', onPause);
       try { if (document.pictureInPictureElement === video) document.exitPictureInPicture(); } catch (e) { /* ignore */ }
-      try { if (msn) { msn.setActionHandler('play', null); msn.setActionHandler('pause', null); } } catch (e) { /* ignore */ }
+      try { if (msn) ['play', 'pause', 'previoustrack', 'nexttrack'].forEach(a => msn.setActionHandler(a, null)); } catch (e) { /* ignore */ }
       try { stream && stream.getTracks().forEach(tr => tr.stop()); } catch (e) { /* ignore */ }
       video.remove();
       if (S.video === video) { S.video = null; S.canvas = null; }
