@@ -6,11 +6,11 @@ import { barOf, msOf, mmss, hm, PINK } from './Run';
 /* 実行中のピクチャーインピクチャ（実行中のときだけ）。
    - PC（Document Picture-in-Picture がある Chrome/Edge）: Z Flip のサブディスプレイくらいの正方形の小窓に、
      いまの行動・バー・▶/⏸・ラップ・記録。
-   - スマホ（動画の PiP だけ）: ホームの「実施中」のバーと同じ形を canvas に描いて動画として流す。
+   - スマホ（動画の PiP だけ）: PC と同じ正方形の形を canvas に描いて動画として流す。
      PiP の ▶/⏸ で一時停止・再開。 */
 const INK = '#1b1b18', SUB = '#55554e', MUTED = '#8a8a82', LIME = '#c4f000', LIME_INK = '#2f3a00';
 const SQ_W = 360, SQ_H = 374; // Z Flip 6 のサブディスプレイ（720×748）の CSS ピクセル
-const CW = 360, CH = 150, DPR = 2; // スマホの小窓（横長・Android の上限 2.39:1 の内側）
+const CW = SQ_W, CH = SQ_H, DPR = 2; // スマホの小窓も PC と同じ正方形（小窓の幅は OS が決めるので、スマホの幅には合わせられない）
 const ms = (size, color, fill = false) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: fill ? "'FILL' 1" : "'FILL' 0", fontSize: size, color, lineHeight: 1 });
 
 const S = { win: null, video: null, canvas: null, toggle: null };
@@ -129,7 +129,7 @@ function Square({ v, win }) {
   );
 }
 
-/* ---- スマホ: 「実施中」のバーの形を canvas に描く ---- */
+/* ---- スマホ: PC の小窓と同じ正方形を canvas に描く ---- */
 const imgCache = {};
 function glyphImg(g, redraw) {
   if (imgCache[g] !== undefined) return imgCache[g];
@@ -151,33 +151,45 @@ function fit(ctx, text, maxW) {
 function drawCard(cv, v, redraw) {
   const ctx = cv.getContext('2d'), r = v.run;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, CW, CH);
+  ctx.fillStyle = '#f7f4ec'; ctx.fillRect(0, 0, CW, CH);
   if (!r) return;
   const now = Date.now(), c = { ...r.cur, ms: msOf(r.cur.segs, now) }, bar = barOf(r, c, now), over = bar.over;
+  const font = (w, px, mono) => `${w} ${px}px ${mono ? '"Space Mono", ui-monospace, monospace' : '"Zen Kaku Gothic New", system-ui, sans-serif'}`;
   ctx.fillStyle = c.color || '#ccc';
-  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(96, 0); ctx.lineTo(0, 96); ctx.closePath(); ctx.fill();
-  const im = glyphImg(c.glyph, redraw), es = 72, ex = 18, ey = (CH - 10 - es) / 2;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(70, 0); ctx.lineTo(0, 70); ctx.closePath(); ctx.fill();
+  // 絵文字
+  const im = glyphImg(c.glyph, redraw), es = 110, ex = (CW - es) / 2, ey = 34;
   if (im) ctx.drawImage(im, ex, ey, es, es);
-  else { ctx.font = `${Math.round(es * 0.82)}px system-ui`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.fillStyle = INK; ctx.fillText(c.glyph || '', ex + es / 2, ey + es / 2); }
-  const tx = ex + es + 14, tw = CW - tx - 60;
-  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = INK; ctx.font = '900 26px "Zen Kaku Gothic New", system-ui, sans-serif';
-  ctx.fillText(fit(ctx, c.name || '', tw), tx, 62);
-  ctx.fillStyle = over ? PINK : MUTED; ctx.font = '700 17px "Space Mono", ui-monospace, monospace';
-  const t2 = mmss(c.ms) + (bar.none ? '' : ' / ' + mmss(bar.total));
-  ctx.fillText(fit(ctx, t2, tw), tx, 92);
-  if (over) { ctx.font = '700 14px "Space Mono", ui-monospace, monospace'; ctx.fillText(fit(ctx, '延長 +' + mmss(bar.extra), tw), tx, 114); }
-  // 右: 止めている／動いている
-  const bx = CW - 52, by = (CH - 10 - 40) / 2;
-  ctx.fillStyle = r.running ? '#efece3' : LIME;
-  ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, 40, 40, 11); else ctx.rect(bx, by, 40, 40); ctx.fill();
-  ctx.fillStyle = r.running ? INK : LIME_INK;
-  if (r.running) { ctx.fillRect(bx + 13, by + 11, 5, 18); ctx.fillRect(bx + 22, by + 11, 5, 18); }
-  else { ctx.beginPath(); ctx.moveTo(bx + 15, by + 10); ctx.lineTo(bx + 30, by + 20); ctx.lineTo(bx + 15, by + 30); ctx.closePath(); ctx.fill(); }
-  // 下のバー
-  ctx.fillStyle = '#e4e1d8'; ctx.fillRect(0, CH - 8, CW, 8);
-  ctx.fillStyle = INK; ctx.fillRect(0, CH - 8, CW * (over ? bar.plan : bar.ratio), 8);
-  if (over) { ctx.fillStyle = PINK; ctx.fillRect(CW * bar.plan, CH - 8, CW * (1 - bar.plan), 8); }
+  else { ctx.font = `${Math.round(es * 0.82)}px system-ui`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.fillStyle = INK; ctx.fillText(c.glyph || '', CW / 2, ey + es / 2); }
+  // 名前・カテゴリ
+  const L = 26, W = CW - L * 2;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = INK; ctx.font = font(900, 22); ctx.fillText(fit(ctx, c.name || '', W), CW / 2, 172);
+  ctx.fillStyle = SUB; ctx.font = font(700, 11.5); ctx.fillText(fit(ctx, c.cat || '', W), CW / 2, 190);
+  // 開始・終わりの時刻とバー
+  ctx.font = font(700, 10.5, true); ctx.fillStyle = SUB;
+  ctx.textAlign = 'left'; ctx.fillText(c.startAt ? hm(c.startAt) : '—', L, 218);
+  ctx.textAlign = 'right'; if (!bar.none) ctx.fillText(hm(bar.endTs), CW - L, 218);
+  const by = 230, ratio = bar.ratio;
+  const line = (x0, x1, col) => { ctx.fillStyle = col; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x0, by - 2, Math.max(0, x1 - x0), 4, 2); else ctx.rect(x0, by - 2, Math.max(0, x1 - x0), 4); ctx.fill(); };
+  line(L, CW - L, '#d8d5cb');
+  line(L, L + W * (over ? bar.plan : ratio), INK);
+  if (over) line(L + W * bar.plan, CW - L, PINK);
+  ctx.fillStyle = over ? PINK : INK; ctx.beginPath(); ctx.arc(L + W * ratio, by, 6, 0, Math.PI * 2); ctx.fill();
+  // 経過時間（／予定の時間・延長）
+  const t1 = mmss(c.ms), t2 = over ? '（+' + mmss(bar.extra) + '）' : bar.none ? '' : ' / ' + mmss(bar.total);
+  ctx.font = font(700, 20, true); const w1 = ctx.measureText(t1).width;
+  ctx.font = font(700, 12, true); const w2 = ctx.measureText(t2).width;
+  const x0 = (CW - w1 - w2) / 2;
+  ctx.textAlign = 'left';
+  ctx.font = font(700, 20, true); ctx.fillStyle = over ? PINK : INK; ctx.fillText(t1, x0, 262);
+  ctx.font = font(700, 12, true); ctx.fillStyle = over ? PINK : MUTED; ctx.fillText(t2, x0 + w1, 262);
+  // 止めている／動いている（小窓の ▶/⏸ で切り替え）
+  const cx = CW / 2, cy = 318, rr = 30;
+  ctx.fillStyle = r.running ? INK : LIME; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = r.running ? '#fff' : LIME_INK;
+  if (r.running) { ctx.fillRect(cx - 10, cy - 12, 7, 24); ctx.fillRect(cx + 3, cy - 12, 7, 24); }
+  else { ctx.beginPath(); ctx.moveTo(cx - 8, cy - 14); ctx.lineTo(cx + 14, cy); ctx.lineTo(cx - 8, cy + 14); ctx.closePath(); ctx.fill(); }
 }
 
 function VideoPip({ v }) {
