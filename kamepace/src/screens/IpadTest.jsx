@@ -20,9 +20,16 @@ const KEYS = {
 const FILL_UNIT = 125; // シャカと同じ: この個数で箱がいっぱい（memory: emoji-pile-fill-rule）
 
 /* 向き: auto＝端末の向きのまま／portrait＝縦／landscape＝横。iOS は Web から向きを固定できないので、
-   選んだ向きと端末の向きが違うときは画面ごと90°回して出す（dir＝回す向き 90 / -90） */
+   選んだ向きと端末の向きが違うときは画面ごと90°回して出す。flip＝⟲で逆さに（回さないときは180°・回すときは -90°）。
+   モニターや iPad の置き方（上下逆の縦など）に合わせる */
 const ORI_KEY = 'kame_ipadtest_ori';
-const readOri = () => { try { const o = JSON.parse(localStorage.getItem(ORI_KEY) || 'null'); if (o && o.mode) return o; } catch (e) { /* ignore */ } return { mode: 'auto', dir: 90 }; };
+const readOri = () => {
+  try {
+    const o = JSON.parse(localStorage.getItem(ORI_KEY) || 'null');
+    if (o && o.mode) return { mode: o.mode, flip: o.flip != null ? !!o.flip : o.dir === -90 }; // 前の形（dir 90/-90）も読む
+  } catch (e) { /* ignore */ }
+  return { mode: 'auto', flip: false };
+};
 
 export default function IpadTest({ v }) {
   const boxRef = React.useRef(null);
@@ -44,7 +51,8 @@ export default function IpadTest({ v }) {
   }, []);
   const rotated = (ori.mode === 'portrait' && win.w > win.h) || (ori.mode === 'landscape' && win.h > win.w);
   // 箱の大きさが変わったら（回転・画面の大きさ）物理の箱を作り直す
-  const layoutKey = [rotated, win.w, win.h].join(':'); // 回す向き（dir）だけ変えたときは箱の中は同じなので作り直さない
+  const layoutKey = [rotated, win.w, win.h].join(':'); // 逆さ（flip）だけ変えたときは箱の中は同じなので作り直さない
+  const angle = rotated ? (ori.flip ? -90 : 90) : (ori.flip ? 180 : 0);
 
   React.useEffect(() => {
     const box = boxRef.current; if (!box || !win.w) return undefined;
@@ -133,27 +141,27 @@ export default function IpadTest({ v }) {
   }, [drop, shake]);
 
   const pill = (on) => ({ border: 'none', borderRadius: 999, padding: '6px 12px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', background: on ? '#1b1b18' : 'transparent', color: on ? '#fff' : '#55554e', fontFamily: 'inherit' });
-  // 回すときは、外枠の中で縦横を入れかえた大きさにして90°回す
+  // 回すときは、外枠の中で縦横を入れかえた大きさにして90°回す（逆さは180°）
   const rootStyle = rotated
-    ? { position: 'absolute', left: '50%', top: '50%', width: win.h, height: win.w, transform: `translate(-50%, -50%) rotate(${ori.dir}deg)`, display: 'flex', flexDirection: 'column', background: '#f7f4ec' }
-    : { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: '#f7f4ec' };
+    ? { position: 'absolute', left: '50%', top: '50%', width: win.h, height: win.w, transform: `translate(-50%, -50%) rotate(${angle}deg)`, display: 'flex', flexDirection: 'column', background: '#f7f4ec' }
+    : { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: '#f7f4ec', transform: angle ? `rotate(${angle}deg)` : undefined };
   return (
     <div ref={outerRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', background: '#f7f4ec' }}>
     <div style={rootStyle}>
-      <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, padding: rotated ? '6px 16px' : 'calc(6px + env(safe-area-inset-top)) 16px 6px' }}>
+      <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, padding: angle ? '6px 16px' : 'calc(6px + env(safe-area-inset-top)) 16px 6px' }}>
         <button onClick={v.closeIpadTest} aria-label="閉じる" style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: '#fff', fontSize: 18, cursor: 'pointer' }}>×</button>
         <span style={{ flex: 1, fontSize: 15, fontWeight: 900 }}>インタラクティブテスト</span>
         <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2 }}>
           {[['auto', '自動'], ['portrait', '縦'], ['landscape', '横']].map(([k, n]) => <button key={k} onClick={() => setOri({ ...ori, mode: k })} style={pill(ori.mode === k)}>{n}</button>)}
         </div>
-        {rotated && <button onClick={() => setOri({ ...ori, dir: -ori.dir })} aria-label="回す向きを逆に" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: '#fff', cursor: 'pointer', fontSize: 16, padding: 0 }}>⟲</button>}
+        <button onClick={() => setOri({ ...ori, flip: !ori.flip })} aria-label="上下を逆に" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: ori.flip ? '#1b1b18' : '#fff', color: ori.flip ? '#fff' : 'inherit', cursor: 'pointer', fontSize: 16, padding: 0 }}>⟲</button>
         <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 13, fontWeight: 700 }}>{count}</span>
         <button onClick={shake} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>🔀 R</button>
         <button onClick={clear} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>リセット</button>
       </div>
       <div ref={boxRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }} />
       {/* キーボードがないときの数字キー */}
-      <div style={{ position: 'relative', zIndex: 2, display: 'flex', gap: 6, padding: '8px 12px calc(8px + env(safe-area-inset-bottom))', background: '#fff', borderTop: '1px solid #efece3' }}>
+      <div style={{ position: 'relative', zIndex: 2, display: 'flex', gap: 6, padding: angle ? '8px 12px' : '8px 12px calc(8px + env(safe-area-inset-bottom))', background: '#fff', borderTop: '1px solid #efece3' }}>
         {['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map(k => (
           <button key={k} onClick={() => drop(k)} style={{ flex: 1, height: 52, border: 'none', borderRadius: 12, background: KEYS[k].rec ? '#eef7cc' : '#f1efe8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, cursor: 'pointer', fontFamily: 'inherit' }}>
             <span style={{ fontSize: 18 }}>{KEYS[k].g}</span>
