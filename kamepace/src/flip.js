@@ -46,9 +46,13 @@ function vSegments() {
 
 /* サブディスプレイらしい画面。端末の画面そのものが小さくてほぼ正方形（Z Flip 6 のサブは 720×748）なら確実にサブ。
    それ以外は表示領域の形で見る（ブラウザのバーで横長になっても拾う） */
-export function looksCover(w = window.innerWidth, h = window.innerHeight) {
+/* 端末の画面そのものがサブディスプレイ（大画面を2分割した半分ではない） */
+export function isCoverScreen() {
   const sw = (window.screen && window.screen.width) || 0, sh = (window.screen && window.screen.height) || 0;
-  if (sw > 0 && sh > 0 && Math.min(sw, sh) <= 500 && Math.max(sw, sh) / Math.min(sw, sh) <= 1.3) return true;
+  return sw > 0 && sh > 0 && Math.min(sw, sh) <= 500 && Math.max(sw, sh) / Math.min(sw, sh) <= 1.3;
+}
+export function looksCover(w = window.innerWidth, h = window.innerHeight) {
+  if (isCoverScreen()) return true;
   return w > 0 && h > 0 && w <= 480 && h <= 560 && w / h > 0.7 && w / h < 1.9;
 }
 
@@ -65,7 +69,8 @@ export function computeFlip(enabled) {
   else if (portrait && (posture() === 'folded' || vSegments())) kind = 'fold';
   if (kind === 'cover') {
     const zoom = Math.min(1, Math.max(0.6, w / (cfg.baseW || 375)));
-    return { ...none, kind, zoom };
+    // split: 大画面を2分割した半分で、サブと同じ表示になっているとき
+    return { ...none, kind, zoom, split: !isCoverScreen() };
   }
   if (kind === 'fold') {
     const seg = vSegments();
