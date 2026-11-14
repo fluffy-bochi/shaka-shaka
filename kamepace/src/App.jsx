@@ -1928,7 +1928,7 @@ export default class App extends React.Component {
     b.toggle('kame-cover', f.kind === 'cover'); b.toggle('kame-fold', f.kind === 'fold');
     document.documentElement.style.setProperty('--kame-rail', (getFlip().railW || 56) + 'px');
     document.documentElement.style.setProperty('--kame-zoom', String(f.zoom || 1));
-    const changed = tbChanged || prev.kind !== f.kind || prev.foldTop !== f.foldTop || prev.foldBottom !== f.foldBottom || prev.zoom !== f.zoom || this._flipNavKey !== JSON.stringify(getFlip());
+    const changed = tbChanged || prev.kind !== f.kind || prev.foldTop !== f.foldTop || prev.foldBottom !== f.foldBottom || prev.zoom !== f.zoom || prev.split !== f.split || this._flipNavKey !== JSON.stringify(getFlip());
     this._flipNavKey = JSON.stringify(getFlip());
     // サブのまま画面の高さだけ変わった時も、古い大きさの箱のままにしない
     const caseEl = f.kind === 'cover' && this.engine ? document.getElementById('shakacase') : null;
@@ -5440,7 +5440,7 @@ export default class App extends React.Component {
       // Galaxy Z Flip 用（開発者モードだけ）
       foldSplit: this.isFoldSplit(st), flipKind: (this._flip && this._flip.kind) || null, flip: this._flip || {},
       flipCfg: getFlip(), setFlip, tabletOn: !!(this._tablet && this._tablet.on),
-      isIpadTest: st.screen === 'ipadTest', goIpadTest: () => this.set({ screen: 'ipadTest' }), closeIpadTest: () => this.set({ screen: 'mypage' }), coverNav: this._flip && this._flip.kind === 'cover' ? getFlip() : null,
+      isIpadTest: st.screen === 'ipadTest', goIpadTest: () => this.set({ screen: 'ipadTest' }), closeIpadTest: () => this.set({ screen: 'mypage' }), coverNav: this._flip && this._flip.kind === 'cover' ? getFlip() : null, coverSplit: !!(this._flip && this._flip.kind === 'cover' && this._flip.split),
       shakaBottom: this.isFoldSplit(st) ? 0 : this.navH(),
       shakaRight: this._flip && this._flip.kind === 'cover' ? (getFlip().railW || 56) : 0, // サブ: 右端の縦ナビの下に山を入れない
       editIkoiLine: this.editIkoiLine, ikoiTarget: st.ikoiTarget, closeIkoiEdit: this.closeIkoiEdit,

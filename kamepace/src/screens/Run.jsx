@@ -72,6 +72,10 @@ export default function Run({ v }) {
   const [tab, setTab] = React.useState('list'); // 下のシートのタブ（左＝リスト・右＝タスク）
   const [delAsk, setDelAsk] = React.useState(false); // 削除の確認
   const [nameDraft, setNameDraft] = React.useState(null); // リストの名前（入力中。null＝いまの名前）
+  // 下のシートは持ち上げると上のヘッダー（戻る・記録）のすぐ下まで広がる。full＝いちばん上まで / drag＝ドラッグ中の高さ(px)
+  const [full, setFull] = React.useState(false);
+  const [drag, setDrag] = React.useState(null);
+  const rootRef = React.useRef(null), headRef = React.useRef(null), dg = React.useRef(null);
   React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
   if (!r) return null;
   const now = Date.now();
@@ -98,10 +102,43 @@ export default function Run({ v }) {
   const lab = { fontSize: 8.5, color: MUTED, fontWeight: 700, marginRight: 1 };
   const num = { fontSize: 12, fontWeight: 800, color: INK, ...mono };
   const SHEET_CLOSED = 58;
+  // シートのいちばん上＝ヘッダーの下（ヘッダーのボタンは隠さない）
+  const sheetTop = () => (headRef.current ? headRef.current.offsetTop + headRef.current.offsetHeight + 6 : 56);
+  // 持ち手（タブの行）を上下にドラッグ: 離したら 閉じる／4割／いちばん上 のいちばん近いところへ
+  const sheetDrag = {
+    onPointerDown: (e) => {
+      const root = rootRef.current; if (!root) return;
+      const H = root.offsetHeight, rect = root.getBoundingClientRect();
+      const zoom = rect.height && H ? rect.height / H : 1; // サブディスプレイの CSS zoom 中は指の動きを中の長さに直す
+      const h0 = !listOpen ? SHEET_CLOSED : full ? H - sheetTop() : H * 0.4;
+      dg.current = { y: e.clientY, h0, H, zoom, max: H - sheetTop(), moved: false, id: e.pointerId, el: e.currentTarget };
+    },
+    onPointerMove: (e) => {
+      const d = dg.current; if (!d || d.id !== e.pointerId) return;
+      const dy = (e.clientY - d.y) / d.zoom;
+      if (!d.moved) {
+        if (Math.abs(dy) < 6) return;
+        d.moved = true;
+        try { d.el.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+        if (!listOpen) setListOpen(true);
+      }
+      setDrag(Math.max(SHEET_CLOSED, Math.min(d.max, d.h0 - dy)));
+    },
+    onPointerUp: (e) => {
+      const d = dg.current; if (!d || !d.moved) { if (d && d.id === e.pointerId && !d.moved) dg.current = null; return; }
+      const h = Math.max(SHEET_CLOSED, Math.min(d.max, d.h0 - (e.clientY - d.y) / d.zoom));
+      const snaps = [[SHEET_CLOSED, 'closed'], [d.H * 0.4, 'open'], [d.max, 'full']];
+      const best = snaps.reduce((a, b) => (Math.abs(b[0] - h) < Math.abs(a[0] - h) ? b : a))[1];
+      setListOpen(best !== 'closed'); setFull(best === 'full'); setDrag(null);
+      // click が続かない端末もあるので、少しあとで片づける
+      setTimeout(() => { if (dg.current === d) dg.current = null; }, 400);
+    },
+    onPointerCancel: () => { dg.current = null; setDrag(null); },
+  };
   const canPip = React.useMemo(pipKind, []), pipOn = usePip();
   return (
-    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec', WebkitTapHighlightColor: 'transparent', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 0' }}>
+    <div ref={rootRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec', WebkitTapHighlightColor: 'transparent', overflow: 'hidden' }}>
+      <div ref={headRef} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '6px 16px 0' }}>
         {/* 下三角＝小さくする（ホームへ。下に「実施中」のバーが出る） */}
         <button onClick={v.minimizeRun} aria-label="小さくする" style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: '#e4e1d8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><span style={ms(32, INK, true)}>keyboard_arrow_down</span></button>
         <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(() => { const d = new Date(now); return (d.getMonth() + 1) + '月' + d.getDate() + '日'; })()}</div>
@@ -197,8 +234,8 @@ export default function Run({ v }) {
         </div>
       )}
       {/* リスト（下から開く・閉じる） */}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6, height: listOpen ? '40%' : SHEET_CLOSED /* 開いたとき: Figma「タスク実行/START」と同じくらい（画面の約4割） */, transition: 'height .25s ease', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '22px 22px 0 0', boxShadow: '0 -2px 14px rgba(27,27,24,.1)' }}>
-        <div onClick={() => setListOpen(!listOpen)} style={{ flex: '0 0 auto', cursor: 'pointer', padding: '8px 14px 8px' }}>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6, height: drag != null ? drag : !listOpen ? SHEET_CLOSED : full ? `calc(100% - ${sheetTop()}px)` : '40%' /* 開いたとき: Figma「タスク実行/START」と同じくらい（画面の約4割） */, transition: drag != null ? 'none' : 'height .25s ease', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '22px 22px 0 0', boxShadow: '0 -2px 14px rgba(27,27,24,.1)' }}>
+        <div onClick={() => { if (dg.current && dg.current.moved) { dg.current = null; return; } dg.current = null; if (listOpen) { setListOpen(false); setFull(false); } else setListOpen(true); }} {...sheetDrag} style={{ flex: '0 0 auto', cursor: 'pointer', padding: '8px 14px 8px', touchAction: 'none' }}>
           <div style={{ width: 120, height: 4, borderRadius: 2, background: '#e4e1d8', margin: '0 auto 8px' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* タブ: 左＝リスト・右＝タスク。押すと開いてそのタブに */}

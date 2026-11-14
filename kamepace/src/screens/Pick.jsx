@@ -658,7 +658,7 @@ export default function Pick({ v }) {
   );
   /* 上下の矢印。サブディスプレイはリストの幅のまんなかに、地色の帯で置く（行に重なっても読めるように） */
   const arrowStyle = (pos) => (cover
-    ? { position: 'absolute', left: 0, right: 0, ...pos, zIndex: 2, height: 22, border: 'none', background: '#f7f4ec', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }
+    ? { position: 'absolute', left: 0, right: 0, ...pos, zIndex: 2, height: 22, border: 'none', background: pos.top != null ? '#f7f4ec' : 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }
     : { ...arrow, ...(pos.top != null ? { top: 12 } : { bottom: 12 }) });
   const arrows = <>
     <button onClick={() => move(-1)} aria-label="上へ" style={arrowStyle({ top: 0 })}><span style={ms(24, '#8a8a82')}>keyboard_arrow_up</span></button>
@@ -709,7 +709,8 @@ export default function Pick({ v }) {
       </div>
       {cover ? (
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-          <div style={{ position: 'relative', flex: '0 0 204px', minWidth: 0, background: '#f7f4ec', overflow: 'hidden' }}>
+          {/* 2分割の半分の画面は文字が縮まないぶんリストが大きく見えるので、リストを細くしてカードを大きく */}
+          <div style={{ position: 'relative', flex: v.coverSplit ? '0 0 clamp(150px, 40%, 204px)' : '0 0 204px', minWidth: 0, background: '#f7f4ec', overflow: 'hidden' }}>
             {arrows}
             {listEl}
           </div>
