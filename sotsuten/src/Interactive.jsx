@@ -2,6 +2,11 @@ import React from 'react';
 import Matter from 'matter-js';
 import { appendGlyph } from './fluent';
 import { initShakaSound, attachCollisionSound } from './sound';
+import Home from './screens/Home';
+import Bookshelf from './screens/Bookshelf';
+import { addPress, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD } from './exhibit';
+import { homeLine } from './wake';
+import { strToDate } from './model';
 
 /* 卒展用インタラクティブ（ほどほどふぉーと本体の IpadTest.jsx から移した単独版）。記録も保存もしない。
    キーボードの数字で絵文字を降らせる。R でシャカシャカ（展示ではモニターに映すのでジャイロは使わない）。回復（rec）はプラスの絵文字に当たると1つずつ消しあう（シャカと同じ）。 */
@@ -33,6 +38,7 @@ const readOri = () => {
 /* PC モード: 本番の iPad の縦横比（縦 3:4）の箱を画面の真ん中に。上の余白にボタン類、下の余白にフッター */
 const IPAD_RATIO = 4 / 3;
 const PC_MIN_TOP = 120, PC_MIN_BOT = 64;
+const IPAD_CSS_W = 820; // 本番の iPad（縦）の CSS 幅。PC モードのホーム・本棚はこの幅に見えるように拡大する
 const ms = (fill, size) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: `'FILL' ${fill}`, fontSize: size, lineHeight: 1 });
 const toggleFull = () => {
   try {
@@ -44,8 +50,14 @@ const toggleFull = () => {
 export default function Interactive() {
   const boxRef = React.useRef(null);
   const sim = React.useRef(null);
-  const [count, setCount] = React.useState(0);
+  const [count0, setCount] = React.useState(0);
   const [tab, setTab] = React.useState('gauge'); // フッターの選択（B=本棚・H=ホーム・G=ゲージ。本番は iPad のハードキーで操作）
+  // 来場者が数字キーで入れた今日の記録（保存しない）。過去の日はサンプルのペルソナ
+  const [mine, setMine] = React.useState([]);
+  const [lastRec, setLastRec] = React.useState(null);
+  const [homeDate, setHomeDate] = React.useState(null); // null＝今日
+  const [bookFav, setBookFav] = React.useState({});
+  const [bookDiary, setBookDiary] = React.useState({});
   const [ori, setOri0] = React.useState(readOri);
   const setOri = (o) => { setOri0(o); try { localStorage.setItem(ORI_KEY, JSON.stringify(o)); } catch (e) { /* ignore */ } };
   // 外枠（テスト画面に使える場所）の大きさ。縦長か横長かで回すかを決める
@@ -128,6 +140,8 @@ export default function Interactive() {
       s.bodies.push({ body, el, rec: !!k.rec, at: Date.now() });
     }
     setCount(s.bodies.filter(b => !b.rec).length);
+    setMine(l => addPress(l, key, k.g, k.n, !!k.rec));
+    setLastRec({ ts: Date.now(), rec: !!k.rec });
   }, []);
 
   /* シャカシャカ: 全部の絵文字を散らす（シャカの🔀と同じ動き。箱が大きいぶん少し強め） */
@@ -145,11 +159,14 @@ export default function Interactive() {
     const s = sim.current; if (!s) return;
     s.bodies.forEach(b => { Matter.World.remove(s.engine.world, b.body); b.el.remove(); });
     s.bodies = []; setCount(0);
+    setMine([]); setLastRec(null); setHomeDate(null); setBookFav({}); setBookDiary({}); // 次の来場者のために今日の記録も消す
   };
 
   React.useEffect(() => {
     const onKey = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tg = e.target && e.target.tagName;
+      if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT') return; // 本棚の日記を書いているとき
       const nav = { KeyB: 'book', KeyH: 'home', KeyG: 'gauge' }[e.code] || { b: 'book', h: 'home', g: 'gauge' }[(e.key || '').toLowerCase()];
       if (nav && !e.repeat) { e.preventDefault(); setTab(nav); return; }
       if ((e.code === 'KeyF' || e.key === 'f' || e.key === 'F') && !e.repeat) { e.preventDefault(); toggleFull(); return; }
@@ -163,6 +180,49 @@ export default function Interactive() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [drop, shake]);
+
+  /* ---- ホーム・本棚（本体の画面をそのまま使う）に渡す値 ---- */
+  const today = todayStr();
+  const hd = homeDate || today;
+  const sample = React.useMemo(() => sampleFor([today, shiftDate(today, -365), hd]), [today, hd]);
+  const entries = React.useMemo(() => sample.entries.concat(mine), [sample, mine]);
+  const wakeLog = React.useMemo(() => Object.values(sample.wake), [sample]);
+  const homeV = tab !== 'home' ? null : (() => {
+    const dt = strToDate(hd);
+    const noop = () => {};
+    const count = hd === today ? count0 : (sample.balance[hd] || 0);
+    return {
+      homeDate: hd, homeIsToday: hd === today, homeNowSlot: hd === today ? slotNow() : null,
+      homeDateY: dt.getFullYear(), homeDateM: dt.getMonth() + 1, homeDateD: dt.getDate(), homeDateWd: WD[dt.getDay()],
+      homeDateLabel: hd === today ? '今日' : hd === shiftDate(today, -1) ? '昨日' : hd === shiftDate(today, 1) ? '明日' : '',
+      homePrevDay: () => setHomeDate(shiftDate(hd, -1)), homeNextDay: () => setHomeDate(shiftDate(hd, 1)),
+      setHomeDate: (e) => { if (e.target.value) setHomeDate(e.target.value === today ? null : e.target.value); }, goToday: () => setHomeDate(null),
+      homeFeed: homeRows(entries, wakeLog, sample.collected, hd), homeTasks: [],
+      homeComment: homeLine(Math.min(100, count), null, hd, hd === today ? lastRec : null, Date.now()),
+      homeWeekGoal: '課題は早めに少しずつ', homeWeekGoalGlyph: '🎨',
+      activeBuffGlyphs: [], openBuffs: noop, goMypage: noop, tapCharacter: noop, openMood: noop, openRecordNow: noop, onAddTask: noop,
+    };
+  })();
+  const bookV = tab !== 'book' ? null : {
+    land: FW > FH, bookEntries: entries, bookCollected: sample.collected, bookBeforeSleep: sample.balance,
+    bookFav: { ...sample.fav, ...bookFav }, bookDiary: { ...sample.diary, ...bookDiary },
+    setBookFav: (d) => setBookFav(f => ({ ...f, [d]: !({ ...sample.fav, ...f })[d] })),
+    setBookDiary: (d, val) => setBookDiary(x => ({ ...x, [d]: val })),
+    goBookDay: (d) => { setHomeDate(d === today ? null : d); setTab('home'); },
+  };
+  // PC モードは iPad の幅に見えるように拡大（iPad では等倍）
+  const zoom = pc ? bw / IPAD_CSS_W : 1;
+  const stage = (style) => (
+    <div style={{ position: 'relative', overflow: 'hidden', background: '#f7f4ec', ...style }}>
+      <div ref={boxRef} style={{ position: 'absolute', inset: 0, overflow: 'hidden' }} />
+      {tab !== 'gauge' && (
+        <div style={{ position: 'absolute', left: 0, top: 0, zIndex: 3, width: pc ? bw / zoom : '100%', height: pc ? bh / zoom : '100%', zoom, display: 'flex', flexDirection: 'column', background: '#f7f4ec' }}>
+          {homeV && <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}><Home v={homeV} /></div>}
+          {bookV && <Bookshelf key={bookV.land ? 'land' : 'port'} v={bookV} />}
+        </div>
+      )}
+    </div>
+  );
 
   const pill = (on) => ({ border: 'none', borderRadius: 999, padding: '6px 12px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', background: on ? '#1b1b18' : 'transparent', color: on ? '#fff' : '#55554e', fontFamily: 'inherit' });
   const ghost = { border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' };
@@ -183,7 +243,7 @@ export default function Interactive() {
       </div>
       <button onClick={() => setOri({ ...ori, flip: !ori.flip })} aria-label="上下を逆に" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: ori.flip ? '#1b1b18' : '#fff', color: ori.flip ? '#fff' : 'inherit', cursor: 'pointer', fontSize: 16, padding: 0 }}>⟲</button>
       <button onClick={toggleFull} aria-label="フルスクリーン" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: '#fff', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={ms(0, 20)}>fullscreen</span></button>
-      <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 13, fontWeight: 700 }}>{count}</span>
+      <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 13, fontWeight: 700 }}>{count0}</span>
       <button onClick={shake} style={ghost}>🔀 R</button>
       <button onClick={clear} style={ghost}>リセット</button>
     </div>
@@ -218,13 +278,13 @@ export default function Interactive() {
       {pc ? (
         <>
           <div style={{ flex: `0 0 ${mTop}px`, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#efece3' }}>{bar}{keys}</div>
-          <div ref={boxRef} style={{ position: 'relative', flex: `0 0 ${bh}px`, width: bw, margin: '0 auto', overflow: 'hidden', background: '#f7f4ec' }} />
+          {stage({ flex: `0 0 ${bh}px`, width: bw, margin: '0 auto' })}
           {mBot > 0 && footer}
         </>
       ) : (
         <>
           {bar}
-          <div ref={boxRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }} />
+          {stage({ flex: 1, minHeight: 0 })}
           {keys}
         </>
       )}

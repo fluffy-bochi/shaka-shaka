@@ -1,0 +1,234 @@
+/* データモデル: 旧本番（reference/index.html）と同期互換の entries/tasks を正とし、
+   時間帯スロットは entries の from 時刻によるバケツ分けの「見え方」。 */
+import { ACT_EMOJI, guessAct, slotOfEntry } from './data';
+
+/* ---- date helpers（旧本番と同一） ---- */
+export function pad2(n) { return String(n).padStart(2, '0'); }
+export function dateToStr(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+/* その日をふくむ週の月曜の日付（今週の目標のキー） */
+export function weekMonday(d) { return shiftDate(d, -((strToDate(d).getDay() + 6) % 7)); }
+export function strToDate(s) { const [y, m, dd] = s.split('-').map(Number); return new Date(y, m - 1, dd); }
+/* 1日の区切り: 就寝を押したとき か 朝5時 の早いほう。
+   0時〜5時に就寝を押す前の記録は前日の 24時〜29時（例 01:30 → 前日の 25:30）。
+   就寝を押したら（23時台でも）その後は翌日。bedDates は就寝記録のある日（bedLog の date）を返す関数 */
+export const DAY_CUT_HOUR = 5;
+let _bedDates = () => [];
+export function setBedDatesSource(fn) { _bedDates = fn || (() => []); }
+export function calendarTodayStr() { return dateToStr(new Date()); }
+// 就寝ボタンを考えない「その夜が属する日」（0〜5時は前日）
+export function nightDayStr(now) { const d = now ? new Date(now) : new Date(); if (d.getHours() < DAY_CUT_HOUR) d.setDate(d.getDate() - 1); return dateToStr(d); }
+export function todayStr() {
+  const base = nightDayStr();
+  let list = []; try { list = _bedDates() || []; } catch (e) { /* noop */ }
+  return list.includes(base) ? shiftDate(base, 1) : base;
+}
+// その日の 00:00 を起点にした時刻表記（翌日にかかれば 24:30 のように 24 以上になる。前日にかかる分は 00:00）
+export function tsToHmOn(dateStr, ts) {
+  const min = Math.max(0, Math.floor((ts - strToDate(dateStr).getTime()) / 60000));
+  return pad2(Math.floor(min / 60)) + ':' + pad2(min % 60);
+}
+export function shiftDate(s, days) { const d = strToDate(s); d.setDate(d.getDate() + days); return dateToStr(d); }
+const MON_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const WD_ABBR = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+export function formatDateCaps(s) { const d = strToDate(s); return d.getFullYear() + ' · ' + MON_ABBR[d.getMonth()] + ' ' + d.getDate() + ' · ' + WD_ABBR[d.getDay()]; }
+export function formatDateShort(s) { const d = strToDate(s); return MON_ABBR[d.getMonth()] + ' ' + d.getDate() + ' · ' + WD_ABBR[d.getDay()]; }
+
+export function hmToTsOn(dateStr, hm) {
+  const d = strToDate(dateStr || todayStr());
+  const [h, m] = (hm || '0:0').split(':').map(Number);
+  d.setHours(h || 0, m || 0, 0, 0);
+  return d.getTime();
+}
+export function entryStartTs(e) { return hmToTsOn(e.date, e.from); }
+export function entryEndTs(e) { return hmToTsOn(e.date, e.to); }
+
+/* 現時点で「降っているべき」個数（from→to を疲労度ぶんに等分）— 旧本番と同一 */
+export function planUnitsDue(e, now) {
+  const N = Math.abs(e.delta);
+  if (N <= 0) return 0;
+  const fromTs = entryStartTs(e), toTs = entryEndTs(e);
+  if (now < fromTs) return 0;
+  if (toTs <= fromTs) return now >= toTs ? N : 0;
+  const interval = (toTs - fromTs) / N;
+  return Math.max(0, Math.min(N, Math.floor((now - fromTs) / interval)));
+}
+
+/* ---- entry → 表示用 record ---- */
+export function entryGlyph(e) { return e.glyph || ACT_EMOJI[e.act] || '✨'; }
+export function entryMin(e) {
+  if (typeof e.min === 'number') return e.min;
+  const d = Math.round((entryEndTs(e) - entryStartTs(e)) / 60000);
+  return d > 0 ? d : 0;
+}
+export function entryToRecord(e) {
+  return {
+    name: e.title, glyph: entryGlyph(e), min: entryMin(e), fat: e.delta,
+    plan: e.plan, after: e.after, planned: e.planned, dropped: e.dropped,
+    from: e.from, to: e.to, _new: e._new, slot: slotOfEntry(e),
+    // カレンダー取り込みの「枠」（タイトルだけ・行動待ち）
+    frame: !!e.needsSetup && !e.delta,
+  };
+}
+
+/* ---- 保存フォーマット（旧本番 schema 2 互換・親子構造） ----
+   users/{uid} を「日にち → entries/tasks」の入れ子で持つ。
+   customCats/customPlans/customActions は新アプリの追加フィールド（旧アプリは無視する）。 */
+export function serialize(st) {
+  const days = {};
+  const bucket = (d) => { if (!days[d]) days[d] = { entries: [], tasks: [] }; return days[d]; };
+  (st.entries || []).forEach(e => {
+    if (e._sample) return; // サンプル（ペルソナ・デモ）データはクラウド/ローカルに保存しない
+    const { date, _new, _newSkip, ...rest } = e; // eslint-disable-line no-unused-vars
+    bucket(date || todayStr()).entries.push(rest);
+  });
+  (st.tasks || []).forEach(t => {
+    const { date, ...rest } = t;
+    bucket(date || todayStr()).tasks.push(rest);
+  });
+  return {
+    schema: 2,
+    days,
+    collected: (st.collected || []).filter(c => !c._sample), // サンプルの睡眠等は保存しない
+    collectedSeen: st.collectedSeen || 0,
+    templates: st.templates || {},
+    sortMode: !!st.sortMode,
+    consumed: st.consumed || 0,
+    sampleDay: st.sampleDay || null,
+    customCats: st.customCats || [],
+    customPlans: st.customPlans || [],
+    customActions: st.customActions || [],
+    customItems: st.customItems || {},
+    prefs: st.prefs || {},
+    actGoals: st.actGoals || {}, // 行動ごとの目標頻度 { normTitle: 週あたり回数 }（旧・頻度が未設定のときだけ使う）
+    research: st.research || null,
+    actEdits: st.actEdits || {}, // 行動の編集 { 行動id: { name, body, mind, defMin, recover, prevNames: [] } }（最初からある行動にも上書きで効く） // 研究への協力 { on, code, since }（協力者IDで匿名の集計を送る）
+    actFreq: st.actFreq || {}, // 生活必須行動(req)・やりたいこと(fav)と頻度 { normTitle: { req: {k, unit:'日'|'週'|'月', n}＝k日にn回, fav: {...} } }
+    slotHours: st.slotHours || null,
+    hiddenCats: st.hiddenCats || [],
+    hiddenActs: st.hiddenActs || [],
+    onboardDone: !!st.onboardDone,
+    profile: st.profile || null,
+    lastMins: st.lastMins || {},
+    activeBuffs: st.activeBuffs || [],
+    buffLog: st.buffLog || [],
+    cycle: st.cycle || null,
+    lastBuffCheck: st.lastBuffCheck || null,
+    wakeLog: st.wakeLog || [], // 起床後記録 [{date,ts,cond,mood,fatigue}]
+    bedLog: st.bedLog || [], // 就寝記録 [{date,ts,hm,cond,mood,fatigue}]（hm は翌朝の起床記録の就寝時刻になる）
+    mainScreen: st.mainScreen || null,
+    bodyFatCoef: st.bodyFatCoef || 1,
+    mindFatCoef: st.mindFatCoef || 1,
+    bodyRecCoef: st.bodyRecCoef || 1,
+    mindRecCoef: st.mindRecCoef || 1,
+    calibLog: st.calibLog || [],  // 夜の申告と現在地のずれ・その日の内訳 [{date,reported,predicted,seen,buff,coef,B,M,R,acts}]（calib.js）
+    actCal: st.actCal || {},      // 行動ごとの補正 { normTitle: 倍率 }
+    calibUndo: st.calibUndo || null, // その夜の調整前の値（記録しなおし用）
+    calibAnchor: st.calibAnchor || null, // 本人が設定した疲れやすさ（夜の調整の引きとめ先）
+    bookFav: st.bookFav || {},      // 本棚: お気に入り（付箋） dateStr→true
+    bookDiary: st.bookDiary || {},  // 本棚: 日記 dateStr→string
+    weekGoals: st.weekGoals || {},  // 今週の目標 { その週の月曜の日付: 文字列 }（月曜の朝の記録で決める）
+    weekGoalActs: st.weekGoalActs || {}, // 今週の目標に関連する行動 { 月曜の日付: 行動id }（目標の先頭にアイコン）
+    weekReports: st.weekReports || {},   // 週間レポート { 月曜の日付: { eval: 'done'|'half'|'not', seen: true } }（数字は記録から毎回計算）
+    trashedPlans: st.trashedPlans || [],   // ゴミ箱の予定 [{plan,src,trashedAt}]
+    purgedPlanIds: st.purgedPlanIds || [], // 完全削除した標準予定の id
+    purgedTaskIds: st.purgedTaskIds || [], // 手動で消した取り込みタスクの srcId（再取り込みしない）
+    screenTime: st.screenTime || {}, // 画面ごとの利用時間 { 日付: { 画面: 秒 } }（研究データ用）
+    updatedAt: Date.now(),
+  };
+}
+
+export function deserialize(data) {
+  let loaded = null;
+  if (data && data.days && typeof data.days === 'object') {
+    const entries = [], tasks = [];
+    Object.keys(data.days).forEach(d => {
+      const day = data.days[d] || {};
+      (day.entries || []).forEach(e => entries.push({ ...e, date: d }));
+      (day.tasks || []).forEach(t => tasks.push({ ...t, date: d }));
+    });
+    loaded = { entries, tasks };
+  } else if (data && Array.isArray(data.entries)) {
+    // 旧フラット形式 → 新形式へ移行
+    loaded = {
+      entries: data.entries.map(e => ({ ...e, date: e.date || todayStr() })),
+      tasks: Array.isArray(data.tasks) ? data.tasks.map(t => ({ ...t, date: t.date || todayStr() })) : [],
+    };
+  }
+  if (!loaded) return freshState();
+  return {
+    entries: loaded.entries,
+    tasks: loaded.tasks,
+    sortMode: !!data.sortMode,
+    collected: Array.isArray(data.collected) ? data.collected.map(c => ({ ...c })) : [],
+    collectedSeen: typeof data.collectedSeen === 'number' ? data.collectedSeen : 0,
+    templates: (data.templates && typeof data.templates === 'object') ? data.templates : {},
+    consumed: typeof data.consumed === 'number' ? data.consumed : 0,
+    sampleDay: data.sampleDay || null,
+    customCats: Array.isArray(data.customCats) ? data.customCats : [],
+    customPlans: Array.isArray(data.customPlans) ? data.customPlans : [],
+    customActions: Array.isArray(data.customActions) ? data.customActions : [],
+    customItems: (data.customItems && typeof data.customItems === 'object') ? data.customItems : {},
+    prefs: (data.prefs && typeof data.prefs === 'object') ? data.prefs : {},
+    actGoals: (data.actGoals && typeof data.actGoals === 'object') ? data.actGoals : {},
+    actFreq: (data.actFreq && typeof data.actFreq === 'object') ? data.actFreq : {},
+    research: (data.research && typeof data.research === 'object') ? data.research : null,
+    actEdits: (data.actEdits && typeof data.actEdits === 'object') ? data.actEdits : {},
+    slotHours: (Array.isArray(data.slotHours) && data.slotHours.length === 4) ? data.slotHours : null,
+    hiddenCats: Array.isArray(data.hiddenCats) ? data.hiddenCats : [],
+    hiddenActs: Array.isArray(data.hiddenActs) ? data.hiddenActs : [],
+    onboardDone: !!data.onboardDone,
+    profile: (data.profile && typeof data.profile === 'object') ? data.profile : null,
+    lastMins: (data.lastMins && typeof data.lastMins === 'object') ? data.lastMins : {},
+    activeBuffs: Array.isArray(data.activeBuffs) ? data.activeBuffs : [],
+    buffLog: Array.isArray(data.buffLog) ? data.buffLog : [],
+    cycle: (data.cycle && typeof data.cycle === 'object') ? data.cycle : null,
+    lastBuffCheck: data.lastBuffCheck || null,
+    wakeLog: Array.isArray(data.wakeLog) ? data.wakeLog : [],
+    bedLog: Array.isArray(data.bedLog) ? data.bedLog : [],
+    mainScreen: (data.mainScreen === 'home' || data.mainScreen === 'shaka') ? data.mainScreen : null,
+    // 体・心それぞれの個人係数。旧1軸フィールド(fatigueCoef/recoverCoef)からの移行も受ける
+    bodyFatCoef: typeof data.bodyFatCoef === 'number' ? data.bodyFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
+    mindFatCoef: typeof data.mindFatCoef === 'number' ? data.mindFatCoef : (typeof data.fatigueCoef === 'number' ? data.fatigueCoef : 1),
+    bodyRecCoef: typeof data.bodyRecCoef === 'number' ? data.bodyRecCoef : (typeof data.recoverCoef === 'number' ? data.recoverCoef : 1),
+    mindRecCoef: typeof data.mindRecCoef === 'number' ? data.mindRecCoef : (typeof data.recoverCoef === 'number' ? data.recoverCoef : 1),
+    calibLog: Array.isArray(data.calibLog) ? data.calibLog : [],
+    actCal: (data.actCal && typeof data.actCal === 'object') ? data.actCal : {},
+    calibUndo: (data.calibUndo && typeof data.calibUndo === 'object') ? data.calibUndo : null,
+    calibAnchor: (data.calibAnchor && typeof data.calibAnchor === 'object') ? data.calibAnchor : null,
+    bookFav: (data.bookFav && typeof data.bookFav === 'object') ? data.bookFav : {},
+    bookDiary: (data.bookDiary && typeof data.bookDiary === 'object') ? data.bookDiary : {},
+    weekGoals: (data.weekGoals && typeof data.weekGoals === 'object') ? data.weekGoals : {},
+    weekGoalActs: (data.weekGoalActs && typeof data.weekGoalActs === 'object') ? data.weekGoalActs : {},
+    weekReports: (data.weekReports && typeof data.weekReports === 'object') ? data.weekReports : {},
+    trashedPlans: Array.isArray(data.trashedPlans) ? data.trashedPlans : [],
+    purgedPlanIds: Array.isArray(data.purgedPlanIds) ? data.purgedPlanIds : [],
+    purgedTaskIds: Array.isArray(data.purgedTaskIds) ? data.purgedTaskIds : [],
+    screenTime: (data.screenTime && typeof data.screenTime === 'object') ? data.screenTime : {},
+  };
+}
+
+export function freshState() {
+  return {
+    entries: [], tasks: [], sortMode: false,
+    collected: [], collectedSeen: 0, templates: {}, consumed: 0, sampleDay: null,
+    customCats: [], customPlans: [], customActions: [], customItems: {}, prefs: {}, actGoals: {}, actFreq: {}, research: null, actEdits: {},
+    slotHours: null, hiddenCats: [], hiddenActs: [],
+    onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null, wakeLog: [], bedLog: [], mainScreen: null,
+    bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1, calibLog: [], actCal: {}, calibUndo: null, calibAnchor: null,
+    bookFav: {}, bookDiary: {}, weekGoals: {}, weekGoalActs: {}, weekReports: {}, screenTime: {},
+    trashedPlans: [], purgedPlanIds: [], purgedTaskIds: [],
+  };
+}
+
+export function sortEntries(entries) {
+  return [...entries].sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.from || '').localeCompare(b.from || ''));
+}
+
+/* ---- templates（あすけん方式: 同じ予定は同じ疲労度）---- */
+export function normTitle(t) { return (t || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
+export function getTemplate(templates, title) { const k = normTitle(title); return (templates && templates[k]) || null; }
+
+/* 新規 entry の共通フィールド（旧アプリ互換: act/mood/exp を必ず持たせる） */
+export function baseEntry(title, delta, date) {
+  return { title, act: guessAct(title), mood: '🙂', delta, exp: false, date: date || todayStr() };
+}
