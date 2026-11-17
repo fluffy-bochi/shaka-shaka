@@ -127,7 +127,7 @@ export function homeRows(entries, wakeLog, collected, d) {
 export const WD = ['日', '月', '火', '水', '木', '金', '土'];
 
 /* その日の時期に合わせた日付の横のひとこと（卒業研究の締め切り一覧より）。
-   〜12/8 提出 → 〜12/23 発表（公開審査会1日目） → 〜1/12 修正締切 → 学内展（仮 2/14〜2/21）は何日目。どれでもない日は '' */
+   〜12/8 提出 → 〜12/23 発表（公開審査会1日目） → 〜1/12 修正締切 → 〜2/13 展示開始まで → 学内展（仮 2/14〜2/21）は何日目。どれでもない日は '' */
 export const EXHIBIT = { from: '2027-02-14', to: '2027-02-21' };
 const STAGES = [
   { until: '2026-12-08', name: '提出' },
@@ -141,7 +141,7 @@ export function exhibitDayLabel(d) {
     return d === EXHIBIT.to ? '展示最終日/' + total + '日間' : '展示' + (dayDiff(EXHIBIT.from, d) + 1) + '日目/' + total + '日間';
   }
   const st = STAGES.find(x => d <= x.until);
-  if (!st) return '';
+  if (!st) return d < EXHIBIT.from ? '展示開始まであと' + dayDiff(d, EXHIBIT.from) + '日' : ''; // 修正締切の次の日〜展示の前日
   const n = dayDiff(d, st.until);
   return n === 0 ? '今日が' + st.name : st.name + 'まであと' + n + '日';
 }
