@@ -104,7 +104,7 @@ export const DEFAULT_LINES = (() => {
 
 /* 初期の表情（public/wake/ の画像） */
 const FACE_LABELS = { normal: 'ふだん', piece: 'ピース', guts: 'ガッツポーズ', ok: 'OK', ng: 'NG', worry: '困り顔', sad: '悲しい顔', angry: '怒った顔', thanks: 'ありがとう', please: 'お願い', banzai: '万歳', clap: '拍手', love: 'うっとり', think: '考える', cold: '寒い' };
-export const DEFAULT_FACES = Object.fromEntries(Object.entries(S.NURSE_FACES).map(([k, file]) => [k, { label: FACE_LABELS[k] || k, src: '/wake/' + encodeURIComponent(file) }]));
+export const DEFAULT_FACES = Object.fromEntries(Object.entries(S.NURSE_FACES).map(([k, file]) => [k, { label: FACE_LABELS[k] || k, src: '/chara/' + encodeURIComponent(file) }]));
 
 /* ---- いま使っている内容 ---- */
 // data = { lines: { key: [{t,f}] }, faces: { key: { label, src } } }（どちらも初期値との差分だけでもよい）
@@ -152,7 +152,7 @@ export function fill(tpl, vals) { return (tpl || '').replace(/\{([^}]+)\}/g, (m,
    そうでなければ「おすすめの文」（TPL_REST_TIP）の {休み方} に差し込む */
 export function restTip(tpl, tip) { const t = (tip || '').trim(); return /[。．.！!？?]$/.test(t) ? t : fill(tpl, { 休み方: t }); }
 export function faces() { return cur().faces; }
-export function faceSrc(key) { const f = cur().faces[key] || cur().faces.normal; return f.src; }
+export function faceSrc(key) { const fs = cur().faces; const f = fs[key] || fs[S.CHARA_ALIAS[key]] || fs.normal; return f.src; }
 
 /* 文に合う表情の画像。セリフに表情を指定していればそれ（文の先頭に近い部分のもの）、なければ言葉から自動 */
 export function faceKeyFor(text) {
@@ -162,7 +162,7 @@ export function faceKeyFor(text) {
   faceOf.forEach((f, line) => { if (!fs[f] || line.length < 4) return; const i = t.indexOf(line); if (i >= 0 && i < at) { at = i; best = f; } });
   if (best) return best;
   const rule = S.FACE_RULES.find(([re]) => re.test(t));
-  return rule && fs[rule[1]] ? rule[1] : 'normal';
+  return rule ? rule[1] : 'normal'; // 画像がない表情は faceSrc が近い表情（CHARA_ALIAS）か normal にする
 }
 
 /* 表示しているセリフ（いくつかをつないだ文もある）から、元になったセリフを探す。

@@ -111,22 +111,17 @@ export const TAP_ANNOY = [
    画像は kamepace/public/wake/ に置く。セリフの文言に含まれる言葉から、表情（下の FACE_RULES）を自動で選ぶ。
    上から順に見て、最初にあてはまった表情になる。どれにもあてはまらなければ normal。
    表情を変えたい／増やしたいときは、NURSE_FACES に画像ファイル名を足して、FACE_RULES に「言葉→表情」を書く。 */
+/* 卒展版はいこいさんではなく犬（コーギー）のキャラクター。画像は sotsuten/public/chara/。
+   表情の画像がまだないものは CHARA_ALIAS で近い表情に、それもなければ normal にする */
 export const NURSE_FACES = {
-  normal: 'nurse.png',
-  piece: '01_A_女性看護師：ピース-1.png', // ピース：のんびり・元気
-  guts: '02_A_女性看護師：ガッツポーズ.png', // ガッツポーズ：応援
-  ok: '03_A_女性看護師：OK.png', // OK：いい調子・大丈夫
-  ng: '04_A_女性看護師：NG.png', // NG：やりすぎ・注意
-  worry: '08_A_女性看護師：困り顔.png', // 困り顔：心配
-  sad: '10_A_女性看護師：悲しい顔.png', // 悲しい顔：寄りそう
-  angry: '11_A_女性看護師：怒った顔-1.png', // 怒った顔：めっ（夜ふかしなど）
-  thanks: '19_A_女性看護師：ありがとう.png', // ありがとう：おつかれさま
-  please: '20_A_女性看護師：お願い.png', // お願い：休んでほしい
-  banzai: '26_A_女性看護師：万歳.png', // 万歳：お祝い・行事
-  clap: '29_A_女性看護師：拍手.png', // 拍手：よく頑張ったね
-  love: '39_A_女性看護師：妄想（恋愛）.png', // うっとり：おいしいもの・季節のもの
-  think: '40_A_女性看護師：考える・悩む.png', // 考える：問いかけ
-  cold: '85_A_女性看護師：極寒.png', // 極寒：寒い・冷える
+  normal: 'dog_normal.png', // ふだん（舌を出してにこにこ）
+};
+export const CHARA_ALIAS = {
+  please: 'please', ng: 'please', // 休んでほしい・やりすぎ注意 → お願い
+  worry: 'worry', sad: 'worry', angry: 'worry', cold: 'worry', // 心配・寄りそう・夜ふかし・寒い → 心配
+  clap: 'happy', banzai: 'happy', thanks: 'happy', guts: 'happy', love: 'happy', // ほめる・お祝い・おつかれさま → よろこぶ
+  ok: 'ok', piece: 'ok', // いい調子・のんびり → OK
+  think: 'think', // 問いかけ → 考える
 };
 export const FACE_RULES = [
   [/寒|冷え|羽織/, 'cold'],
