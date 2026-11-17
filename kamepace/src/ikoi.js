@@ -152,7 +152,30 @@ export function fill(tpl, vals) { return (tpl || '').replace(/\{([^}]+)\}/g, (m,
    そうでなければ「おすすめの文」（TPL_REST_TIP）の {休み方} に差し込む */
 export function restTip(tpl, tip) { const t = (tip || '').trim(); return /[。．.！!？?]$/.test(t) ? t : fill(tpl, { 休み方: t }); }
 export function faces() { return cur().faces; }
-export function faceSrc(key) { const f = cur().faces[key] || cur().faces.normal; return f.src; }
+export function faceSrc(key) {
+  if (chara === 'dog') { const f = DOG_FACES[key] || DOG_FACES[DOG_ALIAS[key]] || DOG_FACES.normal; return '/chara/' + encodeURIComponent(f); }
+  const f = cur().faces[key] || cur().faces.normal; return f.src;
+}
+
+/* ---- キャラクター（マイページで選ぶ・端末ごと）: いこいさん／やるきーぬ（犬）。セリフは同じで、表情の画像だけ変わる ---- */
+export const CHARAS = [{ id: 'ikoi', name: 'いこいさん' }, { id: 'dog', name: 'やるきーぬ' }];
+const CHARA_KEY = 'kame_chara';
+let chara = 'ikoi';
+try { if (localStorage.getItem(CHARA_KEY) === 'dog') chara = 'dog'; } catch (e) { /* ignore */ }
+export function getChara() { return chara; }
+export function setChara(id) { chara = id === 'dog' ? 'dog' : 'ikoi'; try { localStorage.setItem(CHARA_KEY, chara); } catch (e) { /* ignore */ } changed(); }
+/* やるきーぬの表情（public/chara/）。画像がまだない表情は DOG_ALIAS で近い表情に、それもなければ normal。
+   表情の画像が届いたら DOG_FACES に please / worry / happy / ok / think を足す */
+const DOG_FACES = {
+  normal: 'dog_normal.png', // ふだん（舌を出してにこにこ）
+};
+const DOG_ALIAS = {
+  please: 'please', ng: 'please', // 休んでほしい・やりすぎ注意 → お願い
+  worry: 'worry', sad: 'worry', angry: 'worry', cold: 'worry', // 心配・寄りそう・夜ふかし・寒い → 心配
+  clap: 'happy', banzai: 'happy', thanks: 'happy', guts: 'happy', love: 'happy', // ほめる・お祝い・おつかれさま → よろこぶ
+  ok: 'ok', piece: 'ok', // いい調子・のんびり → OK
+  think: 'think', // 問いかけ → 考える
+};
 
 /* 文に合う表情の画像。セリフに表情を指定していればそれ（文の先頭に近い部分のもの）、なければ言葉から自動 */
 export function faceKeyFor(text) {
