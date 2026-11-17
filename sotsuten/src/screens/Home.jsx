@@ -86,38 +86,6 @@ function RecordRow({ g, children, style }) {
   );
 }
 
-/* 卒業研究の締め切りまでのカウントダウン（いまの時刻から・1秒ごと）。過ぎたら「おわり」 */
-const DEADLINES = [
-  { label: '制作提出', when: '12/8 14:40', at: new Date(2026, 11, 8, 14, 40) },
-  { label: '発表', when: '12/23', at: new Date(2026, 11, 23, 0, 0) },
-  { label: '修正締切', when: '1/12 9:00', at: new Date(2027, 0, 12, 9, 0) },
-];
-function Countdowns() {
-  const [now, setNow] = React.useState(Date.now());
-  React.useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-  const p2 = (n) => String(n).padStart(2, '0');
-  return (
-    <div style={{ display: 'flex', gap: 6, margin: '0 16px 8px' }}>
-      {DEADLINES.map(d => {
-        const ms = d.at.getTime() - now, done = ms <= 0;
-        const sec = Math.max(0, Math.floor(ms / 1000));
-        const days = Math.floor(sec / 86400), hms = p2(Math.floor(sec / 3600) % 24) + ':' + p2(Math.floor(sec / 60) % 60) + ':' + p2(sec % 60);
-        return (
-          <div key={d.label} style={{ flex: 1, minWidth: 0, background: '#fff', borderRadius: 12, padding: '7px 10px', opacity: done ? 0.5 : 1 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              <span style={{ fontSize: 11, fontWeight: 800 }}>{d.label}</span>
-              <span style={{ ...mono, fontSize: 9.5, color: '#8a8a82' }}>{d.when}</span>
-            </div>
-            <div style={{ ...mono, fontWeight: 700, color: '#1b1b18', marginTop: 2, whiteSpace: 'nowrap' }}>
-              {done ? <span style={{ fontSize: 13 }}>おわり</span> : <><span style={{ fontSize: 17 }}>{days}</span><span style={{ fontSize: 10, marginLeft: 1, marginRight: 5 }}>日</span><span style={{ fontSize: 12 }}>{hms}</span></>}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 /* 今週の目標（展示では表示だけ） */
 function WeekGoalRow({ v }) {
   return (
@@ -163,8 +131,8 @@ export default function Home({ v }) {
             <button onClick={v.homeNextDay} aria-label="次の日" style={{ ...ndBtn, color: false ? '#fff' : '#55554e' }}>
               <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 22 }}>chevron_right</span>
             </button>
-            {/* 展示（学内展）の何日目か。最終日は「最終日」。期間外は出さない */}
-            {v.exhibitDay && <span style={{ flex: '0 0 auto', marginLeft: 4, fontSize: 12, fontWeight: 800, color: '#2f3a00', background: '#eef7cc', borderRadius: 999, padding: '4px 10px', whiteSpace: 'nowrap' }}>{v.exhibitDay}</span>}
+            {/* その日の時期のひとこと（提出まであと◯日・展示◯日目/◯日間 など。exhibit.js exhibitDayLabel） */}
+            {v.exhibitDay && <span style={{ flex: '0 0 auto', marginLeft: 6, fontSize: 13, fontWeight: 700, color: '#55554e', whiteSpace: 'nowrap' }}>{v.exhibitDay}</span>}
             {/* 今日以外を見ているときだけ「今日」に戻るチップ */}
             {!v.homeIsToday && (
               <button onClick={v.goToday} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, height: 30, background: '#c4f000', border: 'none', borderRadius: 999, padding: '0 11px', fontSize: 12, fontWeight: 800, color: '#2f3a00', cursor: 'pointer', flex: '0 0 auto' }}>
@@ -176,7 +144,6 @@ export default function Home({ v }) {
             <button onClick={v.goMypage} style={{ width: 38, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#55554e', cursor: 'pointer' }}>person</button>
           </div>
         </div>
-        <Countdowns />
         <WeekGoalRow v={v} />
         {/* Z Flip を縦に折っている時は下半分をタイムラインに使う（いこいさんは出さない）。サブディスプレイでは小さめ */}
         {!v.foldSplit && <Speaker text={v.homeComment} size={280} onTap={v.tapCharacter} /> /* 卒展はやるきーぬを大きく（本体は140） */}

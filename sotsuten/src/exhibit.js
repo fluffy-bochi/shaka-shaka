@@ -126,12 +126,24 @@ export function homeRows(entries, wakeLog, collected, d) {
 
 export const WD = ['日', '月', '火', '水', '木', '金', '土'];
 
-/* 学内展（本展・仮 2027/2/14〜2/21）の何日目か。最終日は「最終日」、期間外は '' */
+/* その日の時期に合わせた日付の横のひとこと（卒業研究の締め切り一覧より）。
+   〜12/8 提出 → 〜12/23 発表（公開審査会1日目） → 〜1/12 修正締切 → 学内展（仮 2/14〜2/21）は何日目。どれでもない日は '' */
 export const EXHIBIT = { from: '2027-02-14', to: '2027-02-21' };
+const STAGES = [
+  { until: '2026-12-08', name: '提出' },
+  { until: '2026-12-23', name: '発表' },
+  { until: '2027-01-12', name: '修正締切' },
+];
+const dayDiff = (a, b) => Math.round((new Date(b + 'T00:00') - new Date(a + 'T00:00')) / 86400000);
 export function exhibitDayLabel(d) {
-  if (d < EXHIBIT.from || d > EXHIBIT.to) return '';
-  if (d === EXHIBIT.to) return '最終日';
-  const n = Math.round((new Date(d + 'T00:00') - new Date(EXHIBIT.from + 'T00:00')) / 86400000) + 1;
-  return '展示' + n + '日目';
+  if (d >= EXHIBIT.from && d <= EXHIBIT.to) {
+    const total = dayDiff(EXHIBIT.from, EXHIBIT.to) + 1;
+    return d === EXHIBIT.to ? '展示最終日/' + total + '日間' : '展示' + (dayDiff(EXHIBIT.from, d) + 1) + '日目/' + total + '日間';
+  }
+  const st = STAGES.find(x => d <= x.until);
+  if (!st) return '';
+  const n = dayDiff(d, st.until);
+  return n === 0 ? '今日が' + st.name : st.name + 'まであと' + n + '日';
 }
+
 export { todayStr, shiftDate };
