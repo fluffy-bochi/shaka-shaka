@@ -204,9 +204,9 @@ export default function Interactive() {
   const navLabel = Math.round(Math.max(10, Math.min(22, mBot * 0.09)));
   const footer = (
     <div style={{ flex: `0 0 ${mBot}px`, display: 'flex', alignItems: 'stretch', background: '#fff', borderTop: '1px solid #efece3' }}>
-      {[['book', 'auto_stories', '本棚'], ['home', 'home', 'ホーム'], ['gauge', 'blur_on', 'ゲージ']].map(([id, ic, n]) => { const on = tab === id; return (
+      {[['book', 'auto_stories', '本棚', 'B'], ['home', 'home', 'ホーム', 'H'], ['gauge', 'blur_on', 'ゲージ', 'G']].map(([id, ic, n, key]) => { const on = tab === id; return (
         <div key={ic} onClick={() => setTab(id)} style={{ cursor: 'pointer', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: navLabel * 0.4, fontSize: navLabel, fontWeight: 700, color: on ? '#1b1b18' : '#8a8a82' }}>
-          <span style={ms(on ? 1 : 0, navIcon)}>{ic}</span>{n}
+          <span style={ms(on ? 1 : 0, navIcon)}>{ic}</span><span>{n}<span style={{ marginLeft: '0.4em', fontFamily: "'Space Mono',monospace", fontWeight: 700, color: '#8a8a82' }}>{key}</span></span>
         </div>
       ); })}
     </div>
