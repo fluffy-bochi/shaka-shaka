@@ -86,20 +86,35 @@ function RecordRow({ g, children, style }) {
   );
 }
 
-/* カレンダーで日付を選ぶボタン。input は1px不可視で置き、タップ時に showPicker で開く */
-function CalendarBtn({ value, onChange, white }) {
-  const ref = React.useRef(null);
-  const open = () => {
-    const el = ref.current; if (!el) return;
-    try { if (el.showPicker) { el.showPicker(); return; } } catch (e) { /* fallthrough */ }
-    el.focus(); el.click();
-  };
+/* 卒業研究の締め切りまでのカウントダウン（いまの時刻から・1秒ごと）。過ぎたら「おわり」 */
+const DEADLINES = [
+  { label: '制作提出', when: '12/8 14:40', at: new Date(2026, 11, 8, 14, 40) },
+  { label: '発表', when: '12/23', at: new Date(2026, 11, 23, 0, 0) },
+  { label: '修正締切', when: '1/12 9:00', at: new Date(2027, 0, 12, 9, 0) },
+];
+function Countdowns() {
+  const [now, setNow] = React.useState(Date.now());
+  React.useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const p2 = (n) => String(n).padStart(2, '0');
   return (
-    <button onClick={open} aria-label="カレンダーから選ぶ" style={{ ...ndBtn, position: 'relative', color: white ? '#fff' : '#55554e' }}>
-      <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20 }}>calendar_month</span>
-      <input ref={ref} type="date" value={value} onChange={onChange} tabIndex={-1}
-        style={{ position: 'absolute', left: 0, bottom: 0, width: 1, height: 1, opacity: 0, border: 'none', padding: 0, pointerEvents: 'none' }} />
-    </button>
+    <div style={{ display: 'flex', gap: 6, margin: '0 16px 8px' }}>
+      {DEADLINES.map(d => {
+        const ms = d.at.getTime() - now, done = ms <= 0;
+        const sec = Math.max(0, Math.floor(ms / 1000));
+        const days = Math.floor(sec / 86400), hms = p2(Math.floor(sec / 3600) % 24) + ':' + p2(Math.floor(sec / 60) % 60) + ':' + p2(sec % 60);
+        return (
+          <div key={d.label} style={{ flex: 1, minWidth: 0, background: '#fff', borderRadius: 12, padding: '7px 10px', opacity: done ? 0.5 : 1 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              <span style={{ fontSize: 11, fontWeight: 800 }}>{d.label}</span>
+              <span style={{ ...mono, fontSize: 9.5, color: '#8a8a82' }}>{d.when}</span>
+            </div>
+            <div style={{ ...mono, fontWeight: 700, color: '#1b1b18', marginTop: 2, whiteSpace: 'nowrap' }}>
+              {done ? <span style={{ fontSize: 13 }}>おわり</span> : <><span style={{ fontSize: 17 }}>{days}</span><span style={{ fontSize: 10, marginLeft: 1, marginRight: 5 }}>日</span><span style={{ fontSize: 12 }}>{hms}</span></>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -148,8 +163,8 @@ export default function Home({ v }) {
             <button onClick={v.homeNextDay} aria-label="次の日" style={{ ...ndBtn, color: false ? '#fff' : '#55554e' }}>
               <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 22 }}>chevron_right</span>
             </button>
-            {/* カレンダーから任意の日へ（透明inputを重ねるとiOSで隣のボタンのタップを吸うため、ボタン→showPickerで開く） */}
-            <CalendarBtn value={v.homeDate} onChange={v.setHomeDate} white={false} />
+            {/* 展示（学内展）の何日目か。最終日は「最終日」。期間外は出さない */}
+            {v.exhibitDay && <span style={{ flex: '0 0 auto', marginLeft: 4, fontSize: 12, fontWeight: 800, color: '#2f3a00', background: '#eef7cc', borderRadius: 999, padding: '4px 10px', whiteSpace: 'nowrap' }}>{v.exhibitDay}</span>}
             {/* 今日以外を見ているときだけ「今日」に戻るチップ */}
             {!v.homeIsToday && (
               <button onClick={v.goToday} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, height: 30, background: '#c4f000', border: 'none', borderRadius: 999, padding: '0 11px', fontSize: 12, fontWeight: 800, color: '#2f3a00', cursor: 'pointer', flex: '0 0 auto' }}>
@@ -158,15 +173,10 @@ export default function Home({ v }) {
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto', marginLeft: 6 }}>
-            {/* いまの調子（バフ・デバフ）バッジ */}
-            <button onClick={v.openBuffs} style={{ display: 'flex', alignItems: 'center', gap: 3, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, padding: '0 9px', cursor: 'pointer' }}>
-              {v.activeBuffGlyphs.length > 0
-                ? v.activeBuffGlyphs.slice(0, 1).map((g, i) => <Emo key={i} e={g} size={20} />)
-                : <span style={{ fontSize: 15 }}>🎭</span>}
-            </button>
             <button onClick={v.goMypage} style={{ width: 38, height: 38, background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontSize: 20, color: '#55554e', cursor: 'pointer' }}>person</button>
           </div>
         </div>
+        <Countdowns />
         <WeekGoalRow v={v} />
         {/* Z Flip を縦に折っている時は下半分をタイムラインに使う（いこいさんは出さない）。サブディスプレイでは小さめ */}
         {!v.foldSplit && <Speaker text={v.homeComment} size={280} onTap={v.tapCharacter} /> /* 卒展はやるきーぬを大きく（本体は140） */}
@@ -183,27 +193,6 @@ export default function Home({ v }) {
             <span style={addIcon}>add</span>記録を追加
           </button>
         ) : <Post key={p.key} p={p} />)}
-        {/* タスク（mylifecore / Google ToDo / かめペースで手動追加）: 時間軸の下。
-            チェックすると押した時刻の時間帯に記録として移る（タイトル＝紐づけた行動・コメント＝タスク名） */}
-        {/* タスクも投稿と同じ見た目: 区切り「タスク」＋行（チェック・アイコン・名前・…） */}
-        <div style={divRow}>
-          <span style={divLine} />
-          <span style={divText}>タスク</span>
-        </div>
-        {v.homeTasks.map((t) => (
-          <div key={t.srcId} onClick={t.onToggle} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, minHeight: 46, background: '#f7f4ec', borderTop: '1px solid #bab5a7', padding: '6px 16px 6px 72px', cursor: 'pointer', userSelect: 'none' }}>
-            <span style={{ position: 'absolute', left: 28, top: '50%', marginTop: -12, width: 24, height: 24, borderRadius: '50%', border: t.done ? 'none' : '2px solid #bab5a7', background: t.done ? '#c4f000' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 15, color: '#2f3a00', boxSizing: 'border-box' }}>{t.done ? 'check' : ''}</span>
-            {t.glyph && <span style={{ flex: '0 0 auto', display: 'inline-flex' }}><Emo e={t.glyph} size={20} /></span>}
-            <div style={{ flex: 1, minWidth: 0, opacity: t.done ? 0.55 : 1 }}>
-              {t.srcLabel && <div style={{ fontSize: 10.5, color: '#545454', lineHeight: '16px' }}>{t.srcLabel}</div>}
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#1b1b18', textDecoration: t.done ? 'line-through' : 'none', lineHeight: 1.45, wordBreak: 'break-all' }}>{t.title}</div>
-            </div>
-            <button onClick={(e) => { e.stopPropagation(); t.onEdit(); }} aria-label="タスクの編集" style={{ flex: '0 0 auto', width: 30, height: 22, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 16, letterSpacing: 1, color: '#b4b2a8', lineHeight: 1 }}>•••</button>
-          </div>
-        ))}
-        <button onClick={v.onAddTask} style={addRow}>
-          <span style={addIcon}>add</span>タスクを追加
-        </button>
       </div>
       </div>
       {/* 右下: きもち・できごと・体調（💬）／記録（＋） */}
