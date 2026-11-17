@@ -26,9 +26,19 @@ const ORI_KEY = 'kame_ipadtest_ori';
 const readOri = () => {
   try {
     const o = JSON.parse(localStorage.getItem(ORI_KEY) || 'null');
-    if (o && o.mode) return { mode: o.mode, flip: o.flip != null ? !!o.flip : o.dir === -90 }; // 前の形（dir 90/-90）も読む
+    if (o && o.mode) return { mode: o.mode, flip: o.flip != null ? !!o.flip : o.dir === -90, pc: !!o.pc }; // 前の形（dir 90/-90）も読む
   } catch (e) { /* ignore */ }
-  return { mode: 'auto', flip: false };
+  return { mode: 'auto', flip: false, pc: false };
+};
+/* PC モード: 本番の iPad の縦横比（縦 3:4）の箱を画面の真ん中に。上の余白にボタン類、下の余白にフッター */
+const IPAD_RATIO = 4 / 3;
+const PC_MIN_TOP = 120, PC_MIN_BOT = 64;
+const ms = (fill, size) => ({ fontFamily: 'Material Symbols Rounded', fontVariationSettings: `'FILL' ${fill}`, fontSize: size, lineHeight: 1 });
+const toggleFull = () => {
+  try {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen).call(document.documentElement);
+  } catch (e) { /* ignore */ }
 };
 
 export default function Interactive() {
@@ -50,7 +60,18 @@ export default function Interactive() {
   }, []);
   const rotated = (ori.mode === 'portrait' && win.w > win.h) || (ori.mode === 'landscape' && win.h > win.w);
   // 箱の大きさが変わったら（回転・画面の大きさ）物理の箱を作り直す
-  const layoutKey = [rotated, win.w, win.h].join(':'); // 逆さ（flip）だけ変えたときは箱の中は同じなので作り直さない
+  // 回した後の画面（フレーム）の大きさ。PC モードではその中に iPad の比の箱
+  const FW = rotated ? win.h : win.w, FH = rotated ? win.w : win.h;
+  const pc = ori.pc;
+  let bw = FW, bh = FH;
+  if (pc) {
+    const avH = Math.max(0, FH - PC_MIN_TOP - PC_MIN_BOT); // ボタンとフッターの場所は必ず残す（足りないときは箱を同じ比で小さく）
+    if (FH >= FW) { bw = Math.min(FW, avH / IPAD_RATIO); bh = bw * IPAD_RATIO; }
+    else { bh = Math.min(avH, FW / IPAD_RATIO); bw = bh * IPAD_RATIO; }
+    bw = Math.floor(bw); bh = Math.floor(bh);
+  }
+  const mTop = pc ? Math.max(PC_MIN_TOP, Math.floor((FH - bh) / 2)) : 0, mBot = pc ? FH - bh - mTop : 0;
+  const layoutKey = [rotated, win.w, win.h, pc].join(':'); // 逆さ（flip）だけ変えたときは箱の中は同じなので作り直さない
   const angle = rotated ? (ori.flip ? -90 : 90) : (ori.flip ? 180 : 0);
 
   React.useEffect(() => {
@@ -128,6 +149,7 @@ export default function Interactive() {
   React.useEffect(() => {
     const onKey = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if ((e.code === 'KeyF' || e.key === 'f' || e.key === 'F') && !e.repeat) { e.preventDefault(); toggleFull(); return; }
       if ((e.code === 'KeyR' || e.key === 'r' || e.key === 'R') && !e.repeat) { e.preventDefault(); shake(); return; }
       const m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code || '');
       const key = m ? m[1] : (/^[0-9]$/.test(e.key) ? e.key : null);
@@ -140,33 +162,69 @@ export default function Interactive() {
   }, [drop, shake]);
 
   const pill = (on) => ({ border: 'none', borderRadius: 999, padding: '6px 12px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', background: on ? '#1b1b18' : 'transparent', color: on ? '#fff' : '#55554e', fontFamily: 'inherit' });
+  const ghost = { border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' };
   // 回すときは、外枠の中で縦横を入れかえた大きさにして90°回す（逆さは180°）
   const rootStyle = rotated
     ? { position: 'absolute', left: '50%', top: '50%', width: win.h, height: win.w, transform: `translate(-50%, -50%) rotate(${angle}deg)`, display: 'flex', flexDirection: 'column', background: '#f7f4ec' }
     : { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: '#f7f4ec', transform: angle ? `rotate(${angle}deg)` : undefined };
+  const safe = !pc && !angle;
+
+  const bar = (
+    <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, padding: safe ? 'calc(6px + env(safe-area-inset-top)) 16px 6px' : '6px 16px' }}>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>インタラクティブテスト</span>
+      <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2 }}>
+        {[[true, 'PC'], [false, 'iPad']].map(([k, n]) => <button key={n} onClick={() => setOri({ ...ori, pc: k })} style={pill(pc === k)}>{n}</button>)}
+      </div>
+      <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2 }}>
+        {[['auto', '自動'], ['portrait', '縦'], ['landscape', '横']].map(([k, n]) => <button key={k} onClick={() => setOri({ ...ori, mode: k })} style={pill(ori.mode === k)}>{n}</button>)}
+      </div>
+      <button onClick={() => setOri({ ...ori, flip: !ori.flip })} aria-label="上下を逆に" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: ori.flip ? '#1b1b18' : '#fff', color: ori.flip ? '#fff' : 'inherit', cursor: 'pointer', fontSize: 16, padding: 0 }}>⟲</button>
+      <button onClick={toggleFull} aria-label="フルスクリーン" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: '#fff', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={ms(0, 20)}>fullscreen</span></button>
+      <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 13, fontWeight: 700 }}>{count}</span>
+      <button onClick={shake} style={ghost}>🔀 R</button>
+      <button onClick={clear} style={ghost}>リセット</button>
+    </div>
+  );
+  // 数字キー（キーボードがないとき用）。PC モードでは上の余白の残りの高さいっぱい
+  const keys = (
+    <div style={{ position: 'relative', zIndex: 2, display: 'flex', gap: 6, flex: pc ? 1 : '0 0 auto', minHeight: 0, padding: pc ? '0 12px 10px' : (safe ? '8px 12px calc(8px + env(safe-area-inset-bottom))' : '8px 12px'), background: pc ? 'transparent' : '#fff', borderTop: pc ? 'none' : '1px solid #efece3' }}>
+      {['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map(k => (
+        <button key={k} onClick={() => drop(k)} style={{ flex: 1, height: pc ? 'auto' : 52, maxHeight: pc ? 120 : undefined, border: 'none', borderRadius: 12, background: KEYS[k].rec ? '#eef7cc' : (pc ? '#fff' : '#f1efe8'), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <span style={{ fontSize: 18 }}>{KEYS[k].g}</span>
+          <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 10, fontWeight: 700, color: '#55554e' }}>{k}</span>
+        </button>
+      ))}
+    </div>
+  );
+  // フッター（本体のナビと同じ見た目。ゲージ＝シャカの画面なのでゲージが選ばれた色）
+  const navIcon = Math.round(Math.max(23, Math.min(56, mBot * 0.24)));
+  const navLabel = Math.round(Math.max(10, Math.min(22, mBot * 0.09)));
+  const footer = (
+    <div style={{ flex: `0 0 ${mBot}px`, display: 'flex', alignItems: 'stretch', background: '#fff', borderTop: '1px solid #efece3' }}>
+      {[['auto_stories', '本棚', false], ['home', 'ホーム', false], ['blur_on', 'ゲージ', true]].map(([ic, n, on]) => (
+        <div key={ic} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: navLabel * 0.4, fontSize: navLabel, fontWeight: 700, color: on ? '#1b1b18' : '#8a8a82' }}>
+          <span style={ms(on ? 1 : 0, navIcon)}>{ic}</span>{n}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div ref={outerRef} style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: '#f7f4ec' }}>
     <div style={rootStyle}>
-      <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, padding: angle ? '6px 16px' : 'calc(6px + env(safe-area-inset-top)) 16px 6px' }}>
-        <span style={{ flex: 1, fontSize: 15, fontWeight: 900 }}>インタラクティブテスト</span>
-        <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2 }}>
-          {[['auto', '自動'], ['portrait', '縦'], ['landscape', '横']].map(([k, n]) => <button key={k} onClick={() => setOri({ ...ori, mode: k })} style={pill(ori.mode === k)}>{n}</button>)}
-        </div>
-        <button onClick={() => setOri({ ...ori, flip: !ori.flip })} aria-label="上下を逆に" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: ori.flip ? '#1b1b18' : '#fff', color: ori.flip ? '#fff' : 'inherit', cursor: 'pointer', fontSize: 16, padding: 0 }}>⟲</button>
-        <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 13, fontWeight: 700 }}>{count}</span>
-        <button onClick={shake} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>🔀 R</button>
-        <button onClick={clear} style={{ border: '1.5px solid #e4e1d8', borderRadius: 999, background: '#fff', padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>リセット</button>
-      </div>
-      <div ref={boxRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }} />
-      {/* キーボードがないときの数字キー */}
-      <div style={{ position: 'relative', zIndex: 2, display: 'flex', gap: 6, padding: angle ? '8px 12px' : '8px 12px calc(8px + env(safe-area-inset-bottom))', background: '#fff', borderTop: '1px solid #efece3' }}>
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map(k => (
-          <button key={k} onClick={() => drop(k)} style={{ flex: 1, height: 52, border: 'none', borderRadius: 12, background: KEYS[k].rec ? '#eef7cc' : '#f1efe8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, cursor: 'pointer', fontFamily: 'inherit' }}>
-            <span style={{ fontSize: 18 }}>{KEYS[k].g}</span>
-            <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 10, fontWeight: 700, color: '#55554e' }}>{k}</span>
-          </button>
-        ))}
-      </div>
+      {pc ? (
+        <>
+          <div style={{ flex: `0 0 ${mTop}px`, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#efece3' }}>{bar}{keys}</div>
+          <div ref={boxRef} style={{ position: 'relative', flex: `0 0 ${bh}px`, width: bw, margin: '0 auto', overflow: 'hidden', background: '#f7f4ec' }} />
+          {mBot > 0 && footer}
+        </>
+      ) : (
+        <>
+          {bar}
+          <div ref={boxRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }} />
+          {keys}
+        </>
+      )}
     </div>
     </div>
   );
