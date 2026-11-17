@@ -115,6 +115,11 @@ export const TAP_ANNOY = [
    表情の画像がまだないものは CHARA_ALIAS で近い表情に、それもなければ normal にする */
 export const NURSE_FACES = {
   normal: 'dog_normal.png', // ふだん（舌を出してにこにこ）
+  please: 'dog_please.png', // お願い（休んでほしい・やりすぎ注意）
+  worry: 'dog_worry.png', // 心配（疲れ・つらい・夜ふかし・寒い）
+  happy: 'dog_happy.png', // よろこぶ（ほめる・お祝い・おつかれさま）
+  ok: 'dog_ok.png', // OK（いい調子・のんびり）
+  think: 'dog_think.png', // 考える（問いかけ）
 };
 export const CHARA_ALIAS = {
   please: 'please', ng: 'please', // 休んでほしい・やりすぎ注意 → お願い
