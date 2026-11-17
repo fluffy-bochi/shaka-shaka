@@ -264,6 +264,15 @@ export default function MyPage({ v }) {
             </div>
           </div>
           <div style={row(true)}>
+            <span style={{ fontSize: 16 }}>🐾</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14 }}>キャラクター</div>
+            </div>
+            <div style={{ display: 'flex', gap: 0, background: '#efece3', borderRadius: 10, padding: 3, flex: '0 0 auto' }}>
+              {v.charas.map(c => <button key={c.id} onClick={() => v.setChara(c.id)} style={{ border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: v.chara === c.id ? '#1b1b18' : 'transparent', color: v.chara === c.id ? '#fff' : '#8a8a82' }}>{c.name}</button>)}
+            </div>
+          </div>
+          <div style={row(true)}>
             <span style={{ fontSize: 16 }}>🎨</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14 }}>カテゴリの色</div>

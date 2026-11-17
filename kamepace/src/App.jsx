@@ -5628,6 +5628,7 @@ export default class App extends React.Component {
       goSlotTimes: this.goSlotTimes, goCatsManage: this.goCatsManage,
       goTemplates: this.goTemplates, goSensitivity: this.goSensitivity,
       catPalette: st.catPalette, setCatSoft: () => this.setCatPalette('soft'), setCatVivid: () => this.setCatPalette('vivid'),
+      chara: Ikoi.getChara(), charas: Ikoi.CHARAS, setChara: (id) => Ikoi.setChara(id), // ホームなどのキャラクター（いこいさん／やるきーぬ）
       homeMotion: st.homeMotion, setMotionFixed: () => this.setMotion(false), setMotionMove: () => this.setMotion(true),
       mainScreen: st.mainScreen || 'shaka', setMainShaka: () => this.setMainScreen('shaka'), setMainHome: () => this.setMainScreen('home'),
       motionFixedBg: st.homeMotion ? '#fff' : '#1b1b18', motionFixedColor: st.homeMotion ? '#8a8a82' : '#fff',
