@@ -1,0 +1,555 @@
+import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
+import Emo from '../fluent';
+import { todayStr, strToDate, dateToStr, pad2, weekMonday } from '../model';
+import {
+  buildDay, buildMonth, monthsWithData, nameMap, daySlots, dayChart,
+  placeMain, placeSplit, placeNet, GEO_PORT, GEO_LAND,
+} from '../bookshelf';
+
+const MONO = "'Space Mono', monospace";
+const WD = ['日', '月', '火', '水', '木', '金', '土'];
+
+/* ---------- 小物 ---------- */
+/* 積まれる絵文字はシャカと同じ Fluent 3D（Emo）で描く */
+const Pile = ({ pts, w, fs, ghost }) => pts.map((p, i) => (
+  <div key={i} style={{
+    position: 'absolute', width: w, display: 'flex', justifyContent: 'center', lineHeight: 1,
+    left: p.x, bottom: p.bottom, transform: `rotate(${p.rot}deg)`,
+    ...(ghost ? { opacity: 0.3, filter: 'grayscale(.85)' } : { filter: 'drop-shadow(0 1px 1px rgba(27,27,24,.12))' }),
+  }}><Emo e={p.e} size={fs} /></div>
+));
+
+const Glass = () => (<>
+  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.08))', boxShadow: 'inset -3px 0 5px rgba(27,27,24,.07),inset 2px 0 0 rgba(255,255,255,.45)', zIndex: 2, pointerEvents: 'none' }} />
+  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, background: 'linear-gradient(90deg,#f1ede3,#fbf9f3 60%,#efe9dd)', borderBottom: '1px solid rgba(27,27,24,.07)', zIndex: 2 }} />
+</>);
+
+function Chart({ chart }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ position: 'relative', width: 74, height: 74, flex: '0 0 auto', borderRadius: '50%', background: chart.grad }}>
+        <div style={{ position: 'absolute', inset: 23, background: '#fffdf8', borderRadius: '50%' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {chart.items.map((c, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, flex: '0 0 auto', background: c.color }} />
+            <span style={{ display: 'inline-flex', lineHeight: 1 }}><Emo e={c.e} size={13} /></span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: '#55554e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+            <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: '#1b1b18' }}>×{c.n}</span>
+          </div>
+        ))}
+        {!chart.items.length && <span style={{ fontSize: 11, color: '#9d9b91' }}>まだ記録がありません</span>}
+      </div>
+    </div>
+  );
+}
+
+function Timeline({ slots }) {
+  if (!slots.length) return <div style={{ fontSize: 12, color: '#9d9b91', padding: '10px 0' }}>この日の記録はまだありません。</div>;
+  return slots.map((sl, si) => (
+    <div key={si} style={{ marginTop: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 13 }}>{sl.icon}</span>
+        <span style={{ fontSize: 11.5, fontWeight: 900 }}>{sl.name}</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {sl.rows.map((r, ri) => (
+          <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', borderBottom: '1px solid #f1efe8', opacity: r.ghost ? 0.45 : 1 }}>
+            <span style={{ display: 'inline-flex', filter: r.ghost ? 'grayscale(.85)' : 'none' }}><Emo e={r.glyph} size={16} /></span>
+            <span style={{ flex: 1, fontSize: 12, fontWeight: 700 }}>{r.name}</span>
+            <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: r.rec ? '#7a9a00' : '#e8842c' }}>{r.f}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  ));
+}
+
+function Ranking({ title, rows }) {
+  return (<>
+    <div style={{ fontSize: 11, fontWeight: 700, color: '#55554e', margin: '14px 0 2px' }}>{title}</div>
+    {rows.length ? rows.map((r, i) => (
+      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', borderBottom: '1px solid #f1efe8' }}>
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: '#9d9b91', width: 14, flex: '0 0 auto' }}>{r.rank}</span>
+        <span style={{ display: 'inline-flex' }}><Emo e={r.e} size={16} /></span>
+        <span style={{ flex: 1, fontSize: 12, fontWeight: 700 }}>{r.name}</span>
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: r.color }}>×{r.n}</span>
+      </div>
+    )) : <div style={{ fontSize: 11, color: '#9d9b91', padding: '6px 2px' }}>まだありません</div>}
+  </>);
+}
+
+/* お気に入り付箋 */
+function Fusen({ on, onClick }) {
+  return (
+    <div onClick={onClick} title="付箋をつける" style={{
+      position: 'absolute', top: -14, right: 26, width: 20, height: 46, borderRadius: 2, transform: 'rotate(3deg)',
+      cursor: 'pointer', userSelect: 'none', zIndex: 3,
+      background: on ? 'linear-gradient(180deg,#ff8fbe,#ff5fa2)' : '#f3f0e4',
+      border: on ? '1px solid #f04b91' : '1px dashed #cfcaba', boxShadow: '0 2px 5px rgba(27,27,24,.15)',
+    }}>
+      <div style={{ position: 'absolute', left: 2, right: 2, top: 2, height: 8, background: on ? 'rgba(255,255,255,.35)' : 'transparent' }} />
+    </div>
+  );
+}
+
+/* その日の3つの数値（寝る前の疲労・その日の頑張り・その日の回復） */
+function StatBox({ label, value, color, bg }) {
+  return (
+    <div style={{ flex: 1, background: bg, borderRadius: 10, padding: '9px 4px 8px', textAlign: 'center' }}>
+      <div style={{ fontFamily: MONO, fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 9, fontWeight: 700, color: '#8a8a82', marginTop: 5 }}>{label}</div>
+    </div>
+  );
+}
+
+/* ノート（その日／その月の中身）— 縦のシート・横の右ページ共通 */
+function NoteBody({ isMonth, day, month, names, slotHours, diary, onDiary, footLabel, beforeSleepMap }) {
+  if (isMonth) {
+    return (<>
+      <div style={{ padding: '8px 20px 8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16, fontWeight: 900 }}>{month.year}年{month.label}</span>
+          {month.cur && <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: '#2f3a00', background: '#eef7cc', borderRadius: 6, padding: '2px 6px' }}>今月</span>}
+        </div>
+        <div style={{ fontFamily: MONO, fontSize: 10, color: '#9d9b91', marginTop: 2 }}>この月のまとめ</div>
+      </div>
+      <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 14px' }}>
+        <Ranking title="頑張りランキング TOP5" rows={month.fatTop} />
+        <Ranking title="回復ランキング TOP5" rows={month.recTop} />
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#55554e', margin: '14px 0 8px' }}>絵文字のかず</div>
+        <Chart chart={month.chart} />
+      </div>
+    </>);
+  }
+  const slots = daySlots(day, slotHours);
+  const chart = dayChart(day, names);
+  const fat = day.fatSolid.length + day.fatGhost.length;
+  const rec = day.recSolid.length + day.recGhost.length;
+  // 寝る前の疲労は「前日からの繰り越し込み」の残量があればそれを使う（無ければその日単体の 疲労−回復）
+  const beforeSleep = (beforeSleepMap && beforeSleepMap[day.dateStr] != null) ? beforeSleepMap[day.dateStr] : Math.max(0, fat - rec);
+  return (<>
+    <div style={{ padding: '8px 20px 8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 16, fontWeight: 900 }}>{day.label} {day.wd}曜</span>
+        {day.today && <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: '#2f3a00', background: '#eef7cc', borderRadius: 6, padding: '2px 6px' }}>今日</span>}
+      </div>
+      <div style={{ fontFamily: MONO, fontSize: 10, color: '#9d9b91', marginTop: 2 }}>この本の中身</div>
+    </div>
+    <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 14px' }}>
+      <div style={{ display: 'flex', gap: 7, marginBottom: 12 }}>
+        <StatBox label="寝る前の疲労" value={beforeSleep} color="#a85a55" bg="#f8eae9" />
+        <StatBox label="この日の頑張り" value={fat} color="#c96f6f" bg="#f8eae9" />
+        <StatBox label="この日の回復" value={rec} color="#6b8f36" bg="#eef5df" />
+      </div>
+      <Timeline slots={slots} />
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#55554e', margin: '14px 0 8px' }}>絵文字のかず</div>
+      <Chart chart={chart} />
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#55554e', margin: '14px 0 6px' }}>日記</div>
+      <textarea value={diary} onChange={onDiary} placeholder="この日のことをメモ" rows={Math.max(3, (diary || '').split('\n').length + 1)} style={{ width: '100%', minHeight: 56, resize: 'vertical', background: '#fbfaf6', border: '1px solid #eee9dc', borderRadius: 10, padding: '8px 10px', fontFamily: 'inherit', fontSize: 12, lineHeight: 1.6, color: '#1b1b18', outline: 'none' }} />
+    </div>
+  </>);
+}
+
+/* ---------- 本体 ---------- */
+export default function Bookshelf({ v }) {
+  const today = todayStr();
+  const rootRef = useRef(null);
+  /* 展示: 向きは展示の画面（縦横）から受け取る。90°回転やスマホ枠の処理はしない */
+  const land = !!v.land;
+  const forceRotate = false;
+  const [view, setView] = useState('day');        // 'day' | 'month'
+  const [monthYm, setMonthYm] = useState(today.slice(0, 7));
+  const [sort, setSort] = useState('date');        // 'date' | 'more' | 'less'
+  const [flood, setFlood] = useState('all');       // 'all' | 'over' | 'ok'
+  const [favFilter, setFavFilter] = useState(false);
+  const [disp, setDisp] = useState('net');         // 横・日別: 'net'=寝るまえの量(基本) | 'both'=疲労と回復
+  const [pageOpen, setPageOpen] = useState(true);  // 横: 右の「その日」ページの開閉
+  const [selKey, setSelKey] = useState(today);
+  const [selMonYm, setSelMonYm] = useState(today.slice(0, 7));
+  const [sheet, setSheet] = useState(false);
+
+  const entries = v.bookEntries || [];
+  const slotHours = v.bookSlotHours;
+  const fav = v.bookFav || {};
+  const diaries = v.bookDiary || {};
+
+  const names = useMemo(() => nameMap(entries), [entries]);
+  const months = useMemo(() => monthsWithData(entries), [entries]);
+  /* 睡眠の回復（collected の 🌙）を日別に集計 → 回復列に含める */
+  const sleepMap = useMemo(() => {
+    const m = {};
+    (v.bookCollected || []).forEach((c) => {
+      if (c.glyph !== '🌙' || !c.ts) return;
+      const k = dateToStr(new Date(c.ts));
+      m[k] = (m[k] || 0) + (c.amount || 1);
+    });
+    return m;
+  }, [v.bookCollected]);
+
+  /* 日別: 選択月の1日〜末日 */
+  const monthDays = useMemo(() => {
+    const [y, m] = monthYm.split('-').map(Number);
+    const last = new Date(y, m, 0).getDate();
+    const arr = [];
+    for (let i = 1; i <= last; i++) arr.push(buildDay(entries, y + '-' + pad2(m) + '-' + pad2(i), sleepMap));
+    return arr;
+  }, [entries, monthYm, sleepMap]);
+
+  const filtered = useMemo(() => {
+    let r = monthDays.filter((d) => (flood === 'all' || (flood === 'over') === d.over) && (!favFilter || fav[d.dateStr]));
+    if (sort === 'more') r = r.slice().sort((a, b) => b.total - a.total);
+    else if (sort === 'less') r = r.slice().sort((a, b) => a.total - b.total);
+    return r;
+  }, [monthDays, flood, favFilter, fav, sort]);
+
+  /* 縦: 週ごとの段（月曜始まり） */
+  const weeks = useMemo(() => {
+    const out = [];
+    if (sort === 'date') {
+      let row = null;
+      filtered.forEach((d) => {
+        if (!row || d.dow === 0) { row = { days: [], wk: d.wk, padPx: 8 + d.dow * 47 }; out.push(row); }
+        row.days.push(d);
+      });
+    } else {
+      for (let i = 0; i < filtered.length; i += 7) out.push({ days: filtered.slice(i, i + 7), wk: '', padPx: 8 });
+    }
+    return out;
+  }, [filtered, sort]);
+
+  const monthObjs = useMemo(() => months.map((ym) => {
+    const [y, m] = ym.split('-').map(Number);
+    const mo = buildMonth(entries, y, m, names, sleepMap);
+    mo.cur = ym === today.slice(0, 7);
+    return mo;
+  }), [entries, months, names, today, sleepMap]);
+
+  const selDay = useMemo(() => buildDay(entries, selKey, sleepMap), [entries, selKey, sleepMap]);
+  const selMonth = useMemo(() => {
+    const found = monthObjs.find((m) => m.ym === selMonYm);
+    if (found) return found;
+    const [y, m] = selMonYm.split('-').map(Number);
+    const mo = buildMonth(entries, y, m, names, sleepMap); mo.cur = selMonYm === today.slice(0, 7); return mo;
+  }, [monthObjs, selMonYm, entries, names, today, sleepMap]);
+
+  const isMonth = view === 'month';
+  const footLabel = isMonth ? 'この月を見る' : 'この日を見る';
+
+  /* ---------- スクロール位置 ---------- */
+  const portRef = useRef(null), landRef = useRef(null), landMonthRef = useRef(null);
+
+  /* 横の棚のスクロール補助:
+     - マウスホイール/トラックパッドの縦回転を横スクロールに変換（PCで回せない問題）
+     - 90°回転表示中は指の動き(画面縦=棚の横)を自前で横スクロールに変換（回転中にスクロールできない問題） */
+  useEffect(() => {
+    if (!land) return undefined;
+    const els = [landRef.current, landMonthRef.current].filter(Boolean);
+    const cleanups = els.map((el) => {
+      const onWheel = (e) => {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { el.scrollLeft += e.deltaY; e.preventDefault(); }
+      };
+      let sy = 0, sl = 0, active = false;
+      const onTS = (e) => { active = true; sy = e.touches[0].clientY; sl = el.scrollLeft; };
+      const onTM = (e) => {
+        if (!active || !forceRotate) return; // 通常の横向きはネイティブスクロールに任せる
+        el.scrollLeft = sl - (e.touches[0].clientY - sy);
+        e.preventDefault();
+      };
+      const onTE = () => { active = false; };
+      el.addEventListener('wheel', onWheel, { passive: false });
+      el.addEventListener('touchstart', onTS, { passive: true });
+      el.addEventListener('touchmove', onTM, { passive: false });
+      el.addEventListener('touchend', onTE);
+      return () => {
+        el.removeEventListener('wheel', onWheel);
+        el.removeEventListener('touchstart', onTS);
+        el.removeEventListener('touchmove', onTM);
+        el.removeEventListener('touchend', onTE);
+      };
+    });
+    return () => cleanups.forEach((f) => f());
+  }, [land, isMonth, forceRotate]);
+  const centerToday = (el) => {
+    // 90°回転表示中でも狂わないよう、画面座標でなくレイアウト座標(offsetLeft)で中央へ
+    if (!el) return false;
+    const t = el.querySelector('[data-today="1"]');
+    if (!t) return false;
+    let x = 0;
+    for (let n = t; n && n !== el; n = n.offsetParent) x += n.offsetLeft;
+    el.scrollLeft = x + t.offsetWidth / 2 - el.clientWidth / 2;
+    return true;
+  };
+  const scrollPortToToday = (el) => {
+    if (!el) return;
+    const t = el.querySelector('[data-today="1"]');
+    if (t) { const r = t.getBoundingClientRect(), sr = el.getBoundingClientRect(); el.scrollTop += (r.top - sr.top) - sr.height * 0.55; }
+    else el.scrollTop = el.scrollHeight;
+  };
+  useEffect(() => {
+    if (land) { const el = landRef.current; if (el && !centerToday(el)) el.scrollLeft = 0; }
+    else scrollPortToToday(portRef.current);
+  }, [land, view, monthYm, sort, flood, favFilter, disp]);
+
+  const jumpToday = () => {
+    setView('day'); setMonthYm(today.slice(0, 7)); setSelKey(today);
+    requestAnimationFrame(() => {
+      if (land) { const el = landRef.current; if (el) centerToday(el); }
+      else scrollPortToToday(portRef.current);
+    });
+  };
+
+  const selectDay = (d) => { setSelKey(d.dateStr); if (!land) setSheet(true); };
+  const selectMonth = (mo) => { setSelMonYm(mo.ym); if (!land) setSheet(true); };
+  // 「この日を見る／この月を見る」→ ホームでその日を開く
+  const goDay = () => v.goBookDay(isMonth ? selMonYm + '-01' : selKey);
+
+  /* ---------- パーツ描画 ---------- */
+  const monthOptions = months.map((ym) => {
+    const [y, m] = ym.split('-').map(Number);
+    return { ym, label: (y === strToDate(today).getFullYear() ? '' : y + '/') + m + '月' };
+  });
+
+  const Segment = () => (
+    <div style={{ display: 'flex', background: '#eceadd', borderRadius: 999, padding: 2, flex: '0 0 auto' }}>
+      {[['day', '日別'], ['month', '月別']].map(([k, lb]) => (
+        <div key={k} onClick={() => setView(k)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', fontFamily: MONO, fontSize: 10, fontWeight: 700, borderRadius: 999, padding: '3px 10px', background: view === k ? '#1b1b18' : 'transparent', color: view === k ? '#fff' : '#55554e' }}>{lb}</div>
+      ))}
+    </div>
+  );
+  const TodayBtn = () => (
+    <div onClick={jumpToday} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', fontFamily: MONO, fontSize: 10, fontWeight: 700, color: '#2f3a00', background: '#eef7cc', border: '1px solid #d9ecab', borderRadius: 999, padding: '4px 9px' }}>今日</div>
+  );
+  const selStyle = { fontFamily: MONO, fontSize: 10, fontWeight: 700, color: '#55554e', background: '#fff', border: '1px solid #e3e0d5', borderRadius: 8, padding: '4px 5px', outline: 'none' };
+  const MonthSel = () => (
+    <select value={monthYm} onChange={(e) => setMonthYm(e.target.value)} style={selStyle}>
+      {monthOptions.map((o) => <option key={o.ym} value={o.ym}>{o.label}</option>)}
+    </select>
+  );
+  const SortSel = () => (
+    <select value={sort} onChange={(e) => setSort(e.target.value)} style={selStyle}>
+      <option value="date">日付順</option><option value="more">多い順</option><option value="less">少ない順</option>
+    </select>
+  );
+  const FloodSel = () => (
+    <select value={flood} onChange={(e) => setFlood(e.target.value)} style={selStyle}>
+      <option value="all">すべての日</option><option value="over">あふれた日</option><option value="ok">おさまった日</option>
+    </select>
+  );
+  const FavFilter = ({ round }) => (
+    <div onClick={() => setFavFilter((s) => !s)} style={{ cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: MONO, fontSize: 10, fontWeight: 700, border: '1px solid ' + (favFilter ? '#ff5fa2' : '#e3e0d5'), background: favFilter ? '#ff5fa2' : '#fff', color: favFilter ? '#fff' : '#8a8a82', borderRadius: round ? 999 : 8, padding: '4px 9px', userSelect: 'none' }}>付箋の日</div>
+  );
+  /* 寝るまえの量（基本）⇄ 疲労と回復 のスイッチ */
+  const DispSwitch = () => (
+    <div onClick={() => setDisp(disp === 'net' ? 'both' : 'net')} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none', flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+      <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: disp === 'both' ? '#1b1b18' : '#8a8a82' }}>疲労と回復</span>
+      <span style={{ width: 34, height: 20, borderRadius: 999, background: disp === 'both' ? '#c4f000' : '#e4e1d8', position: 'relative', flex: '0 0 auto', transition: 'background .15s' }}>
+        <span style={{ position: 'absolute', top: 2, left: disp === 'both' ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)', transition: 'left .15s' }} />
+      </span>
+    </div>
+  );
+
+  /* --- 縦の本（41×168） --- */
+  const PortBook = ({ day }) => {
+    const b = placeMain(day, GEO_PORT);
+    return (
+      <div data-today={day.today ? '1' : undefined} onClick={() => selectDay(day)} style={{ position: 'relative', cursor: 'pointer', width: 41, height: 168, background: day.today ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.16)', border: day.today ? '2px solid #c4f000' : '1px solid rgba(27,27,24,.18)', borderRadius: '3px 3px 1px 1px', overflow: 'hidden', boxShadow: '0 3px 5px rgba(27,27,24,.1)' }}>
+        <Glass />
+        <div style={{ position: 'absolute', top: 9, left: 0, right: 0, textAlign: 'center', fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: day.today ? '#5a7a00' : '#7a786f', letterSpacing: '-.02em', zIndex: 3 }}>{day.label}</div>
+        <div style={{ position: 'absolute', top: 19, left: 0, right: 0, textAlign: 'center', fontSize: 8, fontWeight: day.today ? 700 : 500, color: day.today ? '#7a9a00' : '#a7a59b', zIndex: 3 }}>{day.wd}</div>
+        {fav[day.dateStr] && <div style={{ position: 'absolute', top: 0, right: 6, width: 8, height: 17, background: '#ff5fa2', clipPath: 'polygon(0 0,100% 0,100% 100%,50% 76%,0 100%)', zIndex: 3 }} />}
+        <Pile pts={b.solid} w={20} fs={19} />
+        <Pile pts={b.ghost} w={20} fs={19} ghost />
+        {day.dateStr === selKey && <div style={{ position: 'absolute', inset: 0, border: '2px solid #ff5fa2', borderRadius: '3px 3px 1px 1px', pointerEvents: 'none', zIndex: 4 }} />}
+      </div>
+    );
+  };
+
+  /* --- 横の本（66×250）--- */
+  const LandBook = ({ day }) => {
+    const split = disp === 'both';
+    const sp = split ? placeSplit(day, GEO_LAND) : null;
+    const net = split ? null : placeNet(day);
+    return (
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', paddingBottom: 16 }} onClick={() => selectDay(day)}>
+        {/* 月曜の下: 週の番号（その週が始まっていれば、かわりに週間レポートの入口） */}
+        {day.isMon && sort === 'date' && (day.dateStr <= today && v.openWeekReport
+          ? <ReportTag mon={day.dateStr} style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 3 }} />
+          : <div style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)', fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: '#e8b23a', whiteSpace: 'nowrap', zIndex: 3 }}>{day.wk}</div>)}
+        {day.today && <div data-today="1" style={{ position: 'absolute', top: 2, left: '50%', transform: 'translateX(-50%)', fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 999, padding: '1px 7px', whiteSpace: 'nowrap', zIndex: 5 }}>今日</div>}
+        <div style={{ position: 'relative', width: 66, height: 250, marginTop: 20, background: 'rgba(255,255,255,.16)', border: '1px solid rgba(27,27,24,.18)', borderRadius: '4px 4px 2px 2px', overflow: 'hidden', boxShadow: '0 3px 6px rgba(27,27,24,.12)' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.08))', boxShadow: 'inset -4px 0 6px rgba(27,27,24,.07),inset 2px 0 0 rgba(255,255,255,.45)', zIndex: 2, pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 9, background: 'linear-gradient(90deg,#f1ede3,#fbf9f3 60%,#efe9dd)', borderBottom: '1px solid rgba(27,27,24,.07)', zIndex: 2 }} />
+          <div style={{ position: 'absolute', top: 16, left: 0, right: 0, textAlign: 'center', fontFamily: MONO, fontSize: 12, fontWeight: 700, color: '#7a786f', zIndex: 3 }}>{day.label}</div>
+          <div style={{ position: 'absolute', top: 31, left: 0, right: 0, textAlign: 'center', fontSize: 11, fontWeight: 500, color: '#a7a59b', zIndex: 3 }}>{day.wd}</div>
+          {split ? (<>
+            <div style={{ position: 'absolute', top: 46, left: 0, width: '50%', textAlign: 'center', fontSize: 8, fontWeight: 700, color: '#c9c5b8', zIndex: 3 }}>疲労</div>
+            <div style={{ position: 'absolute', top: 46, right: 0, width: '50%', textAlign: 'center', fontSize: 8, fontWeight: 700, color: '#c9c5b8', zIndex: 3 }}>回復</div>
+            <div style={{ position: 'absolute', top: 58, bottom: 6, left: '50%', width: 1, background: 'rgba(27,27,24,.12)' }} />
+            <Pile pts={sp.fh.solid} w={22} fs={20} /><Pile pts={sp.fh.ghost} w={22} fs={20} ghost />
+            <Pile pts={sp.rh.solid} w={22} fs={20} /><Pile pts={sp.rh.ghost} w={22} fs={20} ghost />
+          </>) : (<Pile pts={net} w={26} fs={23} />)}
+          {fav[day.dateStr] && <div style={{ position: 'absolute', top: 0, right: 9, width: 9, height: 20, background: '#ff5fa2', clipPath: 'polygon(0 0,100% 0,100% 100%,50% 76%,0 100%)', zIndex: 3 }} />}
+          {day.today && <div style={{ position: 'absolute', inset: 0, border: '3px solid #c4f000', borderRadius: '4px 4px 2px 2px', pointerEvents: 'none', zIndex: 4 }} />}
+          {day.dateStr === selKey && !day.today && <div style={{ position: 'absolute', inset: 0, border: '3px solid #ff5fa2', borderRadius: '4px 4px 2px 2px', pointerEvents: 'none', zIndex: 4 }} />}
+        </div>
+      </div>
+    );
+  };
+
+  /* --- 月の表紙 --- */
+  const Cover = ({ mo, w, h }) => (
+    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', paddingBottom: 16 }} onClick={() => selectMonth(mo)}>
+      {mo.cur && <div style={{ position: 'absolute', top: 2, left: '50%', transform: 'translateX(-50%)', fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 999, padding: '1px 7px', whiteSpace: 'nowrap', zIndex: 5 }}>今月</div>}
+      <div style={{ position: 'relative', width: w, height: h, marginTop: 20, background: 'linear-gradient(180deg,rgba(255,255,255,.6),rgba(255,255,255,.18))', border: '1px solid rgba(27,27,24,.18)', borderRadius: '4px 10px 10px 4px', overflow: 'hidden', boxShadow: 'inset 6px 0 8px rgba(27,27,24,.08),inset 2px 0 0 rgba(255,255,255,.45),0 4px 8px rgba(27,27,24,.14)' }}>
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: 10, width: 1, background: 'rgba(27,27,24,.14)' }} />
+        <div style={{ position: 'absolute', top: 10, left: 0, right: 0, textAlign: 'center', zIndex: 2 }}><span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: '#7a786f', background: 'rgba(251,249,243,.85)', borderRadius: 6, padding: '1px 8px' }}>{mo.label}</span></div>
+        <Pile pts={mo.pile} w={12} fs={10} />
+        <Pile pts={mo.pileG} w={12} fs={10} ghost />
+        {mo.cur && <div style={{ position: 'absolute', inset: 0, border: '3px solid #c4f000', borderRadius: '4px 10px 10px 4px', pointerEvents: 'none' }} />}
+        {mo.ym === selMonYm && !mo.cur && <div style={{ position: 'absolute', inset: 0, border: '3px solid #ff5fa2', borderRadius: '4px 10px 10px 4px', pointerEvents: 'none' }} />}
+      </div>
+    </div>
+  );
+
+  // 週の段の板: 右に「週間レポート」（その週の月曜が今日以前のとき）
+  const ReportTag = ({ mon, style }) => (
+    <div onClick={(e) => { e.stopPropagation(); v.openWeekReport(mon, 'bookshelf'); }} style={{ cursor: 'pointer', userSelect: 'none', display: 'inline-flex', alignItems: 'center', gap: 2, whiteSpace: 'nowrap', fontSize: 9.5, fontWeight: 800, color: '#2f3a00', background: '#c4f000', borderRadius: 999, padding: '1px 8px 1px 5px', boxShadow: '0 1px 3px rgba(0,0,0,.25)', ...style }}>
+      <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 12 }}>summarize</span>週間レポート
+    </div>
+  );
+  const shelfBoard = (wk, mon) => (
+    <div style={{ height: 13, background: 'linear-gradient(180deg,#4a3120,#2a190f)', boxShadow: '0 5px 9px rgba(27,27,24,.22)', position: 'relative', zIndex: 1 }}>
+      {wk && <div style={{ position: 'absolute', left: 10, top: 1, fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: '#e8b23a', letterSpacing: '.04em' }}>{wk}</div>}
+      {mon && mon <= today && v.openWeekReport && <ReportTag mon={mon} style={{ position: 'absolute', right: 10, top: -2 }} />}
+    </div>
+  );
+
+  const fusen = (day) => <Fusen on={!!fav[day.dateStr]} onClick={() => v.setBookFav(day.dateStr)} />;
+  const noteProps = {
+    isMonth, day: selDay, month: selMonth, names, slotHours,
+    // 自分で書いていない日は、その日に入れたコメントを自動で並べる（書きかえたらその文が残る）
+    diary: diaries[selKey] || (!isMonth && v.bookAutoDiary ? v.bookAutoDiary(selKey) : ''), onDiary: (e) => v.setBookDiary(selKey, e.target.value), footLabel,
+    beforeSleepMap: v.bookBeforeSleep || null,
+  };
+
+  /* ======================= 縦持ち（1a） ======================= */
+  if (!land) {
+    return (
+      <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#f7f4ec' }}>
+        <div style={{ padding: '4px 22px 10px' }}>
+          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: '#9d9b91' }}>BOOKSHELF</div>
+          <div style={{ fontSize: 21, fontWeight: 900, marginTop: 2, letterSpacing: '-.01em' }}>がんばりの本棚</div>
+          <div style={{ fontSize: 12, color: '#8a8a82', marginTop: 4 }}>下の段ほど最近。今日は本棚の一番下にある。</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+            <Segment /><TodayBtn />{!isMonth && <><MonthSel /><SortSel /></>}
+          </div>
+        </div>
+
+        <div ref={portRef} className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div style={{ position: 'relative', padding: '10px 0 20px' }}>
+            <div style={{ height: 13, background: 'linear-gradient(180deg,#5a3d27,#33200f)', position: 'relative', zIndex: 2, boxShadow: '0 3px 6px rgba(27,27,24,.2)' }} />
+            {!isMonth ? weeks.map((week, wi) => (
+              <div key={wi} style={{ position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-start', gap: 6, padding: `16px 8px 0 ${week.padPx}px`, position: 'relative', zIndex: 1 }}>
+                  {week.days.map((d) => <PortBook key={d.dateStr} day={d} />)}
+                </div>
+                {shelfBoard(week.wk, sort === 'date' && week.days.length ? weekMonday(week.days[0].dateStr) : null)}
+              </div>
+            )) : (() => {
+              const rows = []; for (let i = 0; i < monthObjs.length; i += 2) rows.push(monthObjs.slice(i, i + 2));
+              return rows.map((row, ri) => (
+                <div key={ri} style={{ position: 'relative' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-start', gap: 12, padding: '20px 8px 0', position: 'relative', zIndex: 1 }}>
+                    {row.map((mo) => <Cover key={mo.ym} mo={mo} w={158} h={260} />)}
+                  </div>
+                  {shelfBoard()}
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+
+        {/* その日バー */}
+        <div style={{ flex: '0 0 auto', position: 'relative', zIndex: 3 }}>
+          <div onClick={() => setSheet(true)} style={{ cursor: 'pointer', position: 'absolute', top: -25, left: 18, width: 70, height: 26, background: '#fffdf8', border: '1px solid #e7e2d3', borderBottom: 'none', borderRadius: '10px 10px 0 0', boxShadow: '0 -5px 10px rgba(27,27,24,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 14, color: '#1b1b18' }}>menu_book</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#55554e', letterSpacing: '.08em' }}>{isMonth ? 'その月' : 'その日'}</span>
+          </div>
+          <div onClick={() => setSheet(true)} style={{ cursor: 'pointer', background: '#fffdf8', borderTop: '1px solid #e7e2d3', boxShadow: '0 -10px 24px rgba(27,27,24,.1)', padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 900 }}>{isMonth ? `${selMonth.year}年${selMonth.label}` : `${selDay.label} ${selDay.wd}曜`}</span>
+            {!isMonth && selDay.today && <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: '#2f3a00', background: '#eef7cc', borderRadius: 6, padding: '2px 6px' }}>今日</span>}
+            {isMonth && selMonth.cur && <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: '#2f3a00', background: '#eef7cc', borderRadius: 6, padding: '2px 6px' }}>今月</span>}
+            <span style={{ flex: 1 }} />
+            <div onClick={(e) => { e.stopPropagation(); goDay(); }} style={{ cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 999, padding: '8px 14px' }}>{footLabel}</div>
+          </div>
+        </div>
+
+        {/* その日/その月シート（下からスライドイン・タブバーは覆わない） */}
+        {sheet && (<>
+          <div onClick={() => setSheet(false)} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(27,27,24,.35)', zIndex: 9 }} />
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '66%', background: '#fffdf8', border: '1px solid #e7e2d3', borderBottom: 'none', borderRadius: '22px 22px 0 0', boxShadow: '0 -18px 44px rgba(27,27,24,.3)', zIndex: 10, display: 'flex', flexDirection: 'column', animation: 'sheetUp .3s cubic-bezier(.2,.8,.3,1)' }}>
+            {!isMonth && fusen(selDay)}
+            <div style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'center', padding: '8px 0 0' }}><div style={{ width: 40, height: 4, borderRadius: 999, background: '#e3dfd2' }} /></div>
+            <NoteBody {...noteProps} />
+            <div style={{ flex: '0 0 auto', padding: '10px 20px', borderTop: '1px solid #f1efe8' }}><div onClick={goDay} style={{ cursor: 'pointer', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 12, padding: 9 }}>{footLabel}</div></div>
+          </div>
+        </>)}
+      </div>
+    );
+  }
+
+  /* ======================= 横持ち（3a） ======================= */
+  // forceRotate: 縦のビューポートいっぱいに90°回転して「横向きスマホ」として見せる
+  const rotateStyle = forceRotate ? {
+    position: 'fixed', top: 0, left: 0, width: '100dvh', height: '100dvw',
+    transform: 'rotate(90deg) translateY(-100%)', transformOrigin: 'top left', zIndex: 50,
+  } : null;
+  const landscape = (
+    <div ref={rootRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', background: '#f7f4ec', ...rotateStyle }}>
+      {/* 中央: 棚（zIndex:1 で独自のstacking contextを作り、背表紙内のハイライト(今日/選択枠)が
+          右の「その日」ページ(zIndex:3)より前に出ないようにする） */}
+      <div style={{ position: 'relative', zIndex: 1, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* タイトル行（日別/月別・今日・回転を横に）＋その下に残りのボタンを1行で */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '20px 14px 0' }}>
+          <div style={{ fontSize: 21, fontWeight: 900, letterSpacing: '-.01em', whiteSpace: 'nowrap', flex: '0 0 auto' }}>がんばりの本棚</div>
+          <Segment /><TodayBtn />
+        </div>
+        {!isMonth && (
+          <div className="nos" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '14px 14px 0', overflowX: 'auto' }}>
+            <DispSwitch /><MonthSel /><FloodSel /><SortSel /><FavFilter round={false} />
+          </div>
+        )}
+        {!isMonth ? (
+          <div ref={landRef} className="nos" style={{ position: 'relative', flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'flex-end', gap: 11, height: '100%', padding: '0 40px' }}>
+              {filtered.map((d) => <LandBook key={d.dateStr} day={d} />)}
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 14, background: 'linear-gradient(180deg,#4a3120,#241509)', borderRadius: 2, boxShadow: '0 5px 10px rgba(27,27,24,.28)', zIndex: 2 }} />
+            </div>
+          </div>
+        ) : (
+          <div ref={landMonthRef} className="nos" style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'flex-end', gap: 22, height: '100%', padding: '0 40px' }}>
+              {monthObjs.map((mo) => <Cover key={mo.ym} mo={mo} w={170} h={280} />)}
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 14, background: 'linear-gradient(180deg,#4a3120,#241509)', borderRadius: 2, boxShadow: '0 5px 10px rgba(27,27,24,.28)', zIndex: 2 }} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 本のページ（棚に重なるオーバーレイ。タブで右へスライド収納） */}
+      <div style={{ position: 'absolute', top: 22, bottom: 14, right: 12, width: 'min(288px, 46%)', zIndex: 3, transform: pageOpen ? 'none' : 'translateX(calc(100% + 12px))', transition: 'transform .3s cubic-bezier(.2,.8,.3,1)', background: '#fffdf8', border: '1px solid #e7e2d3', borderRadius: '10px 16px 16px 10px', boxShadow: '3px 3px 0 #efeadb,6px 6px 0 #e2dccb,0 16px 34px rgba(27,27,24,.18)', display: 'flex', flexDirection: 'column' }}>
+        {/* タブ（ページの左肩に付く。閉じてもナビの左に残る） */}
+        <button onClick={() => setPageOpen((o) => !o)} style={{ position: 'absolute', left: -26, top: 4, width: 26, height: 66, background: '#fff', border: 'none', borderRadius: '10px 0 0 10px', boxShadow: '-6px 4px 12px rgba(27,27,24,.12)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer', padding: 0 }}>
+          <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 18, color: '#1b1b18' }}>menu_book</span>
+          <span style={{ writingMode: 'vertical-rl', fontSize: 9, fontWeight: 700, color: '#55554e', letterSpacing: '.1em' }}>{isMonth ? 'その月' : 'その日'}</span>
+        </button>
+        {!isMonth && fusen(selDay)}
+        <NoteBody {...noteProps} />
+        <div style={{ flex: '0 0 auto', padding: '12px 20px', borderTop: '1px solid #f1efe8' }}><div onClick={goDay} style={{ cursor: 'pointer', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#2f3a00', background: '#c4f000', borderRadius: 12, padding: 10 }}>{footLabel}</div></div>
+      </div>
+    </div>
+  );
+  return landscape;
+}

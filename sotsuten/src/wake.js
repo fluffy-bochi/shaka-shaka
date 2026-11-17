@@ -1,0 +1,166 @@
+/* 起床後記録: がんばりタイプの判定・セリフ・グラフ用データ。
+   疲労度は 0〜100（山が100個で満杯）。0〜40=ゆったり / 41〜80=ほどほど / 81〜100=みちみち。
+   1日の疲労の推移を滑らかな曲線にして、一番長く居たゾーンをその日のタイプにする。 */
+import { hmToTsOn, entryGlyph, entryMin } from './model';
+import { REST_FROM, AFTER_RECORD_MIN, TAP_NO_REPEAT } from './serifu';
+import { lines as L, fill, restTip, faceKeyFor, faceSrc } from './ikoi'; // セリフはいこいさん編集で変えられる（初期値は serifu.js）
+
+export const WAKE_TYPES = [
+  { id: 'yuttari', name: 'ゆったりタイプ', glyph: '🌿' },
+  { id: 'hodohodo', name: 'ほどほどタイプ', glyph: '☀️' },
+  { id: 'michimichi', name: 'みちみちタイプ', glyph: '🔥' },
+];
+const OUTDOOR = /歩|散歩|外に出|外の空気|外を/; // 夜は勧めない、外に出る系のセリフを見つける言葉
+export const NO_TYPE = { id: 'none', name: 'まだ記録なし', glyph: '🌱' };
+
+export function zoneOf(f) { return f <= 40 ? 0 : f <= 80 ? 1 : 2; }
+
+function hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0); }
+function pick(seed, arr) { return arr && arr.length ? arr[hash(seed) % arr.length] : ''; }
+
+/* その日の疲労の推移（10分刻み・移動平均で滑らかに）。朝の残り疲労 startFat から、
+   各記録の from→to に疲労ぶんを等分に足し引きして 0〜100 に収める。 */
+export function fatigueCurve(entries, dateStr, startFat, range) {
+  const list = (entries || []).filter(e => e.date === dateStr && !e.exp && !e.wakeAdd && e.delta && e.from && e.to);
+  const t0 = hmToTsOn(dateStr, '00:00');
+  const STEP = 10 * 60000;
+  // range: { from: 起床の時刻, to: 就寝の時刻 }。起床の疲労 startFat はその時点の値なので、
+  // 起床より前に進んだ分（睡眠など）は足さない
+  const from = range && range.from ? range.from : null;
+  const prog = (e, t) => { const a = hmToTsOn(dateStr, e.from), b = hmToTsOn(dateStr, e.to); return b <= a ? (t >= b ? 1 : 0) : Math.max(0, Math.min(1, (t - a) / (b - a))); };
+  const raw = [];
+  for (let i = 0; i <= 144; i++) {
+    const t = t0 + i * STEP;
+    let lv = startFat || 0;
+    list.forEach(e => { lv += e.delta * (prog(e, t) - (from ? prog(e, from) : 0)); });
+    raw.push(Math.max(0, Math.min(100, lv)));
+  }
+  if (!list.length && !from) return [];
+  // 対象の時間帯: 起床〜就寝（わからないときは記録のある時間帯＝最初の開始〜最後の終了）
+  const first = from || (list.length ? Math.min(...list.map(e => hmToTsOn(dateStr, e.from))) : t0);
+  const last = range && range.to ? range.to : (list.length ? Math.max(...list.map(e => hmToTsOn(dateStr, e.to))) : first);
+  const i0 = Math.max(0, Math.floor((first - t0) / STEP)), i1 = Math.min(144, Math.ceil((last - t0) / STEP));
+  if (i1 < i0) return [];
+  const seg = raw.slice(i0, i1 + 1);
+  return seg.map((_, i) => {
+    let s = 0, n = 0;
+    for (let k = -2; k <= 2; k++) { const v = seg[i + k]; if (v != null) { s += v; n++; } }
+    return s / n;
+  });
+}
+
+/* 曲線から、一番長く居たゾーン＝その日のタイプ */
+export function typeOfCurve(curve) {
+  if (!curve || !curve.length) return NO_TYPE;
+  const cnt = [0, 0, 0];
+  curve.forEach(v => { cnt[zoneOf(v)]++; });
+  let best = 0;
+  for (let z = 1; z < 3; z++) if (cnt[z] >= cnt[best]) best = z; // 同数なら高いほう
+  return WAKE_TYPES[best];
+}
+
+// 体調の不調の記録（症状・デバフのアイコン・自動の症状）。がんばった行動としては言わない
+const isCond = (e) => !!(e.drip || e.symptom || e.autoSym);
+/* 昨日のまとめ: タイプ・一番力を入れた行動・一番回復した行動 */
+export function daySummary(entries, dateStr, startFat, range) {
+  const curve = fatigueCurve(entries, dateStr, startFat, range); // 起床〜就寝で一番長く居たゾーン
+  const list = (entries || []).filter(e => e.date === dateStr && !e.exp && !e.wakeAdd && e.delta && e.title);
+  // 行動ごとに合計して、がんばりポイント（＋）・回復（−）の多い順に3位まで。いこいさんの「〇〇に力を入れましたね」は1位の行動
+  const rank = (sign, rows = list) => {
+    const by = {};
+    rows.filter(e => e.delta * sign > 0).forEach(e => {
+      const r = by[e.title] || (by[e.title] = { title: e.title, glyph: entryGlyph(e), pt: 0, min: 0, cond: isCond(e) });
+      r.pt += Math.abs(e.delta);
+      r.min += entryMin(e) || 0; // その行動にかけた時間（合計）
+    });
+    return Object.values(by).filter(r => r.pt >= 0.5).sort((a, b) => b.pt - a.pt).map(r => ({ ...r, pt: Math.round(r.pt) }));
+  };
+  const upAll = rank(1), recAll = rank(-1), ups = upAll.slice(0, 3), recs = recAll.slice(0, 3), up = ups[0], rec = recs[0];
+  // 1位が体調の不調（症状・デバフのアイコン）のとき、いこいさんは「〇〇の負担が多かった」と言い、できたこと（不調でない行動の上位、なければ日中にとった休み）に触れる
+  const did = up && up.cond ? (upAll.find(r => !r.cond) || rank(-1, list.filter(e => !isCond(e) && e.from && e.from >= '06:00' && e.from < '18:00'))[0] || null) : null;
+  return { type: typeOfCurve(curve), up: up && up.title, rec: rec && rec.title, upGlyph: up && up.glyph, recGlyph: rec && rec.glyph, ups, recs, has: list.length > 0,
+    burden: up && up.cond ? up.title : null, did: did && did.title, didRest: !!(did && did.pt && !upAll.includes(did)) };
+}
+
+/* 画面3: 昨日のふりかえりのセリフ */
+export function reviewLine(sum, dateStr) {
+  const id = sum.type.id;
+  const parts = [pick(dateStr + 'b', L('REVIEW_BASE_' + id))];
+  if (sum.burden) {
+    // 1位が不調: 「〇〇の負担が多かったようです。今日は△△ができましたね。」（△△を日中の休みからとったときは、回復の一言は重ねない）
+    parts.push(fill(pick(dateStr + 'u', L('TPL_REVIEW_BURDEN')), { 不調: sum.burden }));
+    if (sum.did) parts.push(fill(pick(dateStr + 'd', L('TPL_REVIEW_BURDEN_DID')), { 行動: sum.did }));
+    if (sum.rec && !sum.didRest && id !== 'yuttari') parts.push(fill(pick(dateStr + 'r', L('TPL_REVIEW_REC')), { 行動: sum.rec }));
+  } else if (id === 'yuttari') {
+    // ゆったりの日は「何もしていない」前提にせず、回復の記録（休憩・睡眠など）で山が減ったときだけ休憩できたかを聞く
+    if (sum.rec) parts.push(fill(pick(dateStr + 'r', L('TPL_REVIEW_YUTTARI_REC')), { 行動: sum.rec }));
+  } else {
+    if (sum.up) parts.push(fill(pick(dateStr + 'u', L('TPL_REVIEW_UP')), { 行動: sum.up }));
+    if (sum.rec) parts.push(fill(pick(dateStr + 'r', L('TPL_REVIEW_REC')), { 行動: sum.rec }));
+  }
+  parts.push(pick(dateStr + 'c', L('REVIEW_CLOSER_' + id)));
+  return parts.join('');
+}
+
+/* 画面4: 今日の予定のセリフ */
+export function planLine(plans, tasks, sum, dateStr) {
+  const parts = [];
+  if (plans.length) parts.push(fill(pick(dateStr + 'h', L('TPL_PLAN_HAS')), { 件数: plans.length, 最初の予定: plans[0].title }));
+  else parts.push(pick(dateStr + 'n', L('TPL_PLAN_NONE')));
+  if (tasks.length) parts.push(fill(pick(dateStr + 't', L('TPL_PLAN_TASKS')), { 件数: tasks.length }));
+  parts.push(pick(dateStr + 'p', L('PLAN_CLOSER')));
+  return parts.join('');
+}
+
+/* 次の予定の中身で、どのセリフにするか（上から優先）。next.body / next.mind はその予定の体・心の疲労（がんばりゲージの単位） */
+export const NEXT_OVER = 80, NEXT_BIG = 20, NEXT_HUGE = 40;
+export function nextKind(count, next) {
+  const d = next.delta || 0, b = next.body || 0, m = next.mind || 0;
+  if (d > 0 && count + d > NEXT_OVER) return 'TPL_NEXT_OVER'; // やったらがんばりゲージが80を超えそう
+  if (m >= NEXT_HUGE || b >= NEXT_HUGE) return m >= b ? 'TPL_NEXT_MIND_HUGE' : 'TPL_NEXT_BODY_HUGE';
+  if (m >= NEXT_BIG || b >= NEXT_BIG) return m >= b ? 'TPL_NEXT_MIND_BIG' : 'TPL_NEXT_BODY_BIG';
+  if (d < 0) return 'TPL_NEXT_REC';
+  return 'TPL_HOME_NEXT';
+}
+
+/* ホーム上部のコメント。優先順:
+   1) 記録した直後: おつかれさま／疲れは取れましたか？（この先の予定は言わない）。山が REST_FROM 以上なら休み方も添える
+   2) 山が REST_FROM 以上: おすすめの休み方の提案
+   3) それ以外: 山の量に合わせた一言＋次の予定
+   セリフの文言は serifu.js */
+export function homeLine(count, next, dateStr, lastRec, now) {
+  const seed = dateStr + 'h' + count;
+  const tired = count >= REST_FROM;
+  const hr = new Date(now).getHours();
+  const allTips = L('REST_TIPS'), nightTips = allTips.filter(t => !OUTDOOR.test(t));
+  const tips = (hr >= 18 || hr < 6) && nightTips.length ? nightTips : allTips; // 夜（18時〜6時）は外に出る休み方は勧めない
+  const restLine = () => pick(seed + 'i', L('REST_INTRO')) + restTip(pick(seed + 'f', L('TPL_REST_TIP')), pick(seed + 't', tips));
+  if (lastRec && now - lastRec.ts < AFTER_RECORD_MIN * 60000) {
+    const head = pick(seed + 'a' + lastRec.ts, L(lastRec.rec ? 'AFTER_RECOVER' : 'AFTER_FATIGUE'));
+    return head + (tired ? restLine() : '');
+  }
+  if (tired) return restLine();
+  const parts = [pick(seed, L(zoneOf(count) === 0 ? 'HOME_ZONE0' : 'HOME_ZONE1'))];
+  if (next) parts.push(fill(pick(seed + 'n', L(nextKind(count, next))), { 予定: next.title, 時刻: next.from }));
+  return parts.join('');
+}
+
+/* ホームのおねえさんをタップしたときのセリフ。now=Date、recent=直近に言ったセリフ（連続を避ける）、annoyed=連続タップ中か */
+export function tapLine(now, recent, annoyed) {
+  const h = now.getHours();
+  const slot = h >= 5 && h < 11 ? 'morning' : h < 14 && h >= 11 ? 'noon' : h >= 14 && h < 17 ? 'afternoon' : h >= 17 && h < 21 ? 'evening' : h >= 21 ? 'night' : 'late';
+  const key = String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  const dated = L('TAP_DATE:' + key).filter(Boolean);
+  let pool;
+  if (annoyed) pool = L('TAP_ANNOY');
+  else pool = [...L('TAP_' + slot), ...L('TAP_' + slot), ...dated, ...dated, ...(now.getMonth() === 9 ? L('TAP_OCTOBER') : []), ...L('TAP_CHAT')];
+  if (h >= 18 || h < 6) pool = pool.filter(x => !OUTDOOR.test(x)); // 夜（18時〜6時）は、外を歩く・出かけるなどの提案は言わない
+  const avoid = new Set((recent || []).slice(-TAP_NO_REPEAT));
+  let cand = pool.filter(x => !avoid.has(x));
+  if (!cand.length) cand = pool.filter(x => x !== (recent || [])[recent.length - 1]);
+  if (!cand.length) cand = pool;
+  return cand[Math.floor(Math.random() * cand.length)];
+}
+
+/* セリフに合ったおねえさんのイラスト（表情）のURL。合うものがなければふだんの顔 */
+export function nurseSrc(text) { return faceSrc(faceKeyFor(text)); }

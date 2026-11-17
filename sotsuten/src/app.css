@@ -22,3 +22,8 @@ button { font-family: inherit; }
   pointer-events: none;
   animation: popfx .4s ease-out forwards;
 }
+
+.nos::-webkit-scrollbar { display: none; }
+.nos { scrollbar-width: none; }
+@keyframes bubbleIn { from { opacity: .2; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes sheetUp { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
