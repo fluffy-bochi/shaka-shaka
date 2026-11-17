@@ -111,15 +111,7 @@ export function homeRows(entries, wakeLog, collected, d) {
       onTap: noop, onMenu: noop,
     };
   });
-  const wk = wakeLog.find(w => w.date === d);
-  const moon = collected.reduce((a, c) => (c.glyph === '🌙' && c.ts && dateToStr(new Date(c.ts)) === d) ? a + (c.amount || 1) : a, 0);
-  const wakeHm = wk ? hmText(new Date(wk.ts).toTimeString().slice(0, 5)) : '';
-  posts.push({
-    key: 'wake', kind: 'wake', sortHm: wakeHm ? wakeHm.padStart(5, '0') : '00:00', slot: 'asa', glyph: '🌅',
-    head: '起床後の記録', time: wakeHm, main: '', empty: !wk, sumText: wk && moon ? '−' + moon : '',
-    cond: wk ? condOf({ ts: wk.ts, cond: wk.cond, mood: wk.mood }) : null, onTap: noop, onMenu: noop,
-  });
-  posts.push({ key: 'bed', kind: 'bed', sortHm: '99:99', slot: 'yoru', glyph: '🌙', head: '就寝前の記録', time: '', main: '', empty: true, sumText: '', onTap: noop, onMenu: noop });
+  // 起床後・就寝前の記録は展示では出さない
   const nowSlot = d === today ? slotNow() : null;
   posts.forEach(p => { p.past = !!nowSlot && p.kind !== 'bed' && p.slot !== nowSlot; });
   posts.sort((a, b) => (a.sortHm || '').localeCompare(b.sortHm || ''));
@@ -133,4 +125,13 @@ export function homeRows(entries, wakeLog, collected, d) {
 }
 
 export const WD = ['日', '月', '火', '水', '木', '金', '土'];
+
+/* 学内展（本展・仮 2027/2/14〜2/21）の何日目か。最終日は「最終日」、期間外は '' */
+export const EXHIBIT = { from: '2027-02-14', to: '2027-02-21' };
+export function exhibitDayLabel(d) {
+  if (d < EXHIBIT.from || d > EXHIBIT.to) return '';
+  if (d === EXHIBIT.to) return '最終日';
+  const n = Math.round((new Date(d + 'T00:00') - new Date(EXHIBIT.from + 'T00:00')) / 86400000) + 1;
+  return '展示' + n + '日目';
+}
 export { todayStr, shiftDate };

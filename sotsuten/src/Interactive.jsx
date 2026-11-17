@@ -4,7 +4,7 @@ import { appendGlyph } from './fluent';
 import { initShakaSound, attachCollisionSound } from './sound';
 import Home from './screens/Home';
 import Bookshelf from './screens/Bookshelf';
-import { addPress, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD } from './exhibit';
+import { addPress, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
 import { homeLine } from './wake';
 import { strToDate } from './model';
 
@@ -196,11 +196,11 @@ export default function Interactive() {
       homeDateY: dt.getFullYear(), homeDateM: dt.getMonth() + 1, homeDateD: dt.getDate(), homeDateWd: WD[dt.getDay()],
       homeDateLabel: hd === today ? '今日' : hd === shiftDate(today, -1) ? '昨日' : hd === shiftDate(today, 1) ? '明日' : '',
       homePrevDay: () => setHomeDate(shiftDate(hd, -1)), homeNextDay: () => setHomeDate(shiftDate(hd, 1)),
-      setHomeDate: (e) => { if (e.target.value) setHomeDate(e.target.value === today ? null : e.target.value); }, goToday: () => setHomeDate(null),
-      homeFeed: homeRows(entries, wakeLog, sample.collected, hd), homeTasks: [],
+      goToday: () => setHomeDate(null),
+      homeFeed: homeRows(entries, wakeLog, sample.collected, hd), exhibitDay: exhibitDayLabel(hd),
       homeComment: homeLine(Math.min(100, count), null, hd, hd === today ? lastRec : null, Date.now()),
       homeWeekGoal: '課題は早めに少しずつ', homeWeekGoalGlyph: '🎨',
-      activeBuffGlyphs: [], openBuffs: noop, goMypage: noop, tapCharacter: noop, openMood: noop, openRecordNow: noop, onAddTask: noop,
+      goMypage: noop, tapCharacter: noop, openMood: noop, openRecordNow: noop,
     };
   })();
   const bookV = tab !== 'book' ? null : {
