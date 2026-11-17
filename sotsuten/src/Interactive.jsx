@@ -45,6 +45,7 @@ export default function Interactive() {
   const boxRef = React.useRef(null);
   const sim = React.useRef(null);
   const [count, setCount] = React.useState(0);
+  const [tab, setTab] = React.useState('gauge'); // フッターの選択（B=本棚・H=ホーム・G=ゲージ。本番は iPad のハードキーで操作）
   const [ori, setOri0] = React.useState(readOri);
   const setOri = (o) => { setOri0(o); try { localStorage.setItem(ORI_KEY, JSON.stringify(o)); } catch (e) { /* ignore */ } };
   // 外枠（テスト画面に使える場所）の大きさ。縦長か横長かで回すかを決める
@@ -149,6 +150,8 @@ export default function Interactive() {
   React.useEffect(() => {
     const onKey = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const nav = { KeyB: 'book', KeyH: 'home', KeyG: 'gauge' }[e.code] || { b: 'book', h: 'home', g: 'gauge' }[(e.key || '').toLowerCase()];
+      if (nav && !e.repeat) { e.preventDefault(); setTab(nav); return; }
       if ((e.code === 'KeyF' || e.key === 'f' || e.key === 'F') && !e.repeat) { e.preventDefault(); toggleFull(); return; }
       if ((e.code === 'KeyR' || e.key === 'r' || e.key === 'R') && !e.repeat) { e.preventDefault(); shake(); return; }
       const m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code || '');
@@ -201,11 +204,11 @@ export default function Interactive() {
   const navLabel = Math.round(Math.max(10, Math.min(22, mBot * 0.09)));
   const footer = (
     <div style={{ flex: `0 0 ${mBot}px`, display: 'flex', alignItems: 'stretch', background: '#fff', borderTop: '1px solid #efece3' }}>
-      {[['auto_stories', '本棚', false], ['home', 'ホーム', false], ['blur_on', 'ゲージ', true]].map(([ic, n, on]) => (
-        <div key={ic} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: navLabel * 0.4, fontSize: navLabel, fontWeight: 700, color: on ? '#1b1b18' : '#8a8a82' }}>
+      {[['book', 'auto_stories', '本棚'], ['home', 'home', 'ホーム'], ['gauge', 'blur_on', 'ゲージ']].map(([id, ic, n]) => { const on = tab === id; return (
+        <div key={ic} onClick={() => setTab(id)} style={{ cursor: 'pointer', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: navLabel * 0.4, fontSize: navLabel, fontWeight: 700, color: on ? '#1b1b18' : '#8a8a82' }}>
           <span style={ms(on ? 1 : 0, navIcon)}>{ic}</span>{n}
         </div>
-      ))}
+      ); })}
     </div>
   );
 
