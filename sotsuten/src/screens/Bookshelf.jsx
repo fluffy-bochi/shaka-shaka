@@ -239,6 +239,17 @@ export default function Bookshelf({ v }) {
 
   /* ---------- スクロール位置 ---------- */
   const portRef = useRef(null), landRef = useRef(null), landMonthRef = useRef(null);
+  /* 展示（iPad）: 縦の棚はスマホ幅（本7冊＝339px）で作られているので、棚の幅いっぱいに拡大する */
+  const SHELF_W = 339;
+  const [shelfW, setShelfW] = useState(0);
+  useLayoutEffect(() => {
+    const el = portRef.current; if (!el) return undefined;
+    const on = () => setShelfW(el.clientWidth);
+    on();
+    const ro = new ResizeObserver(on); ro.observe(el);
+    return () => ro.disconnect();
+  }, [land]);
+  const shelfZoom = shelfW ? Math.max(1, shelfW / SHELF_W) : 1;
 
   /* 横の棚のスクロール補助:
      - マウスホイール/トラックパッドの縦回転を横スクロールに変換（PCで回せない問題）
@@ -284,13 +295,13 @@ export default function Bookshelf({ v }) {
   const scrollPortToToday = (el) => {
     if (!el) return;
     const t = el.querySelector('[data-today="1"]');
-    if (t) { const r = t.getBoundingClientRect(), sr = el.getBoundingClientRect(); el.scrollTop += (r.top - sr.top) - sr.height * 0.55; }
+    if (t) { const r = t.getBoundingClientRect(), sr = el.getBoundingClientRect(), k = sr.height ? el.clientHeight / sr.height : 1; el.scrollTop += k * Math.max((r.top - sr.top) - sr.height * 0.55, r.bottom - sr.bottom) + 40 * shelfZoom; } // 外側の zoom（PC モード）で画面の座標とスクロールの単位が違うので k で直す // 本が大きいときは今日の本の下まで見えるように
     else el.scrollTop = el.scrollHeight;
   };
   useEffect(() => {
     if (land) { const el = landRef.current; if (el && !centerToday(el)) el.scrollLeft = 0; }
     else scrollPortToToday(portRef.current);
-  }, [land, view, monthYm, sort, flood, favFilter, disp]);
+  }, [land, view, monthYm, sort, flood, favFilter, disp, shelfZoom]); // 拡大が決まったら今日の段へ合わせ直す
 
   const jumpToday = () => {
     setView('day'); setMonthYm(today.slice(0, 7)); setSelKey(today);
@@ -448,7 +459,7 @@ export default function Bookshelf({ v }) {
         </div>
 
         <div ref={portRef} className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-          <div style={{ position: 'relative', padding: '10px 0 20px' }}>
+          <div style={{ position: 'relative', padding: '10px 0 20px', zoom: shelfZoom }}>
             <div style={{ height: 13, background: 'linear-gradient(180deg,#5a3d27,#33200f)', position: 'relative', zIndex: 2, boxShadow: '0 3px 6px rgba(27,27,24,.2)' }} />
             {!isMonth ? weeks.map((week, wi) => (
               <div key={wi} style={{ position: 'relative' }}>
