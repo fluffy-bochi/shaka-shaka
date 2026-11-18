@@ -15,25 +15,27 @@ export default function PostForm() {
   const [text, setText] = React.useState('');
   const [state, setState] = React.useState('edit'); // edit | confirm | sending | done | error
   const [err, setErr] = React.useState('');
+  const [posted, setPosted] = React.useState(null); // 送った投稿の見た目（送った時刻で固定）
   const canSave = state === 'edit' && (text.trim() || face !== 3);
   const icon = FACES.find(f => f.face === face).g;
   const f = FACES.find(x => x.face === face);
   // 確認のポップアップに出す、展示のホームでの見え方（その投稿だけ）
   const now = new Date();
   const preview = { glyph: icon, head: 'つぶやき', time: now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0'), main: text.trim(), isNote: true,
-    sumText: (f.rec ? '−' : '+') + f.n, cond: { mind: face, mindArrow: '' } };
+    sumText: (f.rec ? '−' : '+') + f.n };
   const send = async () => {
     if (state !== 'confirm') return;
     setState('sending');
-    try { await sendPost({ face, text: text.trim() }); setState('done'); } catch (e) { setErr((e && e.code) || ''); setState('error'); }
+    try { await sendPost({ face, text: text.trim() }); setPosted(preview); setState('done'); } catch (e) { setErr((e && e.code) || ''); setState('error'); }
   };
 
+  // 投稿後: 上から ありがとう → その人の投稿（展示のホームと同じ見た目） → Webアプリへの誘導
   if (state === 'done') {
     return (
-      <div style={{ minHeight: '100dvh', background: '#f7f4ec', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }}>
-        <Emo e={icon} size={64} />
-        <div style={{ fontSize: 22, fontWeight: 900 }}>ありがとう！</div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginTop: 18, background: '#fff', borderRadius: 20, padding: '20px 28px', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
+      <div style={{ minHeight: '100dvh', background: '#f7f4ec', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22, padding: 'calc(56px + env(safe-area-inset-top)) 16px 40px' }}>
+        <div style={{ fontSize: 24, fontWeight: 900 }}>ありがとう！</div>
+        <div style={{ width: '100%', maxWidth: 420, borderTop: '1px solid #bab5a7', borderBottom: '1px solid #bab5a7' }}><Post p={posted || preview} /></div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginTop: 10, background: '#fff', borderRadius: 20, padding: '20px 28px', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
           <img src="/icon/kamepace-icon-180.png" alt="" style={{ width: 64, height: 64, borderRadius: 15 }} />
           <div style={{ fontSize: 16, fontWeight: 900 }}>ほどほどふぉーと</div>
           <a href={APP_URL} style={{ marginTop: 4, borderRadius: 12, background: '#c4f000', color: '#2f3a00', fontSize: 15, fontWeight: 800, padding: '12px 22px', textDecoration: 'none' }}>Webアプリはこちらから</a>

@@ -121,7 +121,7 @@ export function homeRows(entries, wakeLog, collected, d) {
     const sum = es.reduce((a, e) => a + (e.delta || 0), 0);
     const isTweet = es.length === 1 && first.event;
     return {
-      cond: isTweet && (first.cond != null || first.mindCond != null) ? condOf({ ts: entryStartTs(first), cond: first.cond, mood: first.mindCond }) : null,
+      cond: null, // 卒展では気分（♡）は出さない
       key: k, sortHm: from, slot: slotOfEntry(first),
       glyph: entryGlyph(longest), head: label, time: hmText(from) + (!isTweet && to && to !== from ? '〜' + hmText(to) : ''), main: note, isNote: !!note,
       sumText: isTweet && !sum ? '' : sg(sum), planned: false,
