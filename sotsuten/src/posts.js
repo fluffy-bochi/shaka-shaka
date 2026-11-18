@@ -66,6 +66,23 @@ export function watchPostsKeep(since, cb, onErr) {
   return () => { stop = true; clearTimeout(t); if (un) un(); };
 }
 
+/* QRコードのしるし（作った時刻入り）。展示が1分ごとに作り直し、スマホは新しいしるしで開いたときだけ投稿できる。
+   サーバーで確かめるものではなく、リロード・直リンク・古いリンクでの投稿を防ぐためのもの */
+export const TOKEN_FRESH_MS = 3 * 60000; // QRを読んでから開くまでの猶予
+const TK = 0x5a17c3;
+const sum36 = (str) => (str.split('').reduce((a, c) => a + c.charCodeAt(0) * 7, 0) % 36).toString(36);
+export function makeToken() {
+  const body = (Math.floor(Date.now() / 1000) ^ TK).toString(36) + Math.random().toString(36).slice(2, 6);
+  return body + sum36(body);
+}
+export function tokenTime(tok) {
+  if (!tok || tok.length < 7) return null;
+  const body = tok.slice(0, -1);
+  if (sum36(body) !== tok.slice(-1)) return null;
+  const sec = parseInt(body.slice(0, -4), 36) ^ TK;
+  return Number.isFinite(sec) ? sec * 1000 : null;
+}
+
 /* 投稿 → 落とす絵文字と数（回復ならマイナス） */
 export function postDrop(d) {
   const f = FACES.find(x => x.face === d.face) || FACES[2];
