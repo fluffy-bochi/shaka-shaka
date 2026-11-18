@@ -1,7 +1,7 @@
 import React from 'react';
 import Matter from 'matter-js';
 import { appendGlyph } from './fluent';
-import { initShakaSound, attachCollisionSound } from './sound';
+import { initShakaSound, attachCollisionSound, playShaka } from './sound';
 import Home from './screens/Home';
 import Bookshelf from './screens/Bookshelf';
 import QRCode from 'qrcode';
@@ -155,8 +155,10 @@ export default function Interactive() {
       const el = document.createElement('div');
       el.className = 'say-bubble';
       el.textContent = text;
+      el.style.visibility = 'hidden'; // 最初の位置が決まるまで隠す
       box.appendChild(el);
       s.bubbles.push({ el, b, until: Date.now() + BUBBLE_MS });
+      if (b.rec) b.holdUntil = Date.now() + BUBBLE_MS;
     };
     // 山を保存（箱の大きさに対する割合で。回復の絵文字は残さない）
     s.save = () => saveJSON(PILE_KEY, s.bodies.filter(b => !b.rec && !b.dead).map(b => ({ g: b.g, x: +(b.body.position.x / W).toFixed(4), y: +(b.body.position.y / H).toFixed(4), a: +b.body.angle.toFixed(3) })));
@@ -172,8 +174,9 @@ export default function Interactive() {
       for (const n of s.bodies) {
         if (n.dead || !n.rec) continue;
         const p = s.bodies.find(b => !b.dead && !b.rec && (b.body.position.x - n.body.position.x) ** 2 + (b.body.position.y - n.body.position.y) ** 2 < hit2);
-        if (p) { pop((p.body.position.x + n.body.position.x) / 2, (p.body.position.y + n.body.position.y) / 2); kill(p); kill(n); }
-        else if (Date.now() - n.at > 2500 && n.body.speed < 0.3) kill(n); // 消すものがなければ、着いたら消える
+        if (n.holdUntil && Date.now() < n.holdUntil) continue; // 吹き出しがついている回復の絵文字は、吹き出しが消えるまで山の上に残す
+        if (p) { pop((p.body.position.x + n.body.position.x) / 2, (p.body.position.y + n.body.position.y) / 2); playShaka(12, true); kill(p); kill(n); } // 消えるときも音
+        else if (Date.now() - n.at > 2500 && n.body.speed < 0.3) { playShaka(7, true); kill(n); } // 消すものがなければ、着いたら消える
       }
       if (s.bodies.some(b => b.dead)) { s.bodies = s.bodies.filter(b => !b.dead); setCount(s.bodies.filter(b => !b.rec).length); }
       for (const b of s.bodies) {
@@ -183,12 +186,13 @@ export default function Interactive() {
       if (s.bubbles.length) {
         const nowMs = Date.now();
         s.bubbles = s.bubbles.filter(q => {
-          if (nowMs > q.until) { q.el.style.opacity = '0'; setTimeout(() => q.el.remove(), 400); return false; }
-          if (!q.b.dead) { // 回復の絵文字が消えたあとは、その場に残す
+          if (nowMs > q.until || q.b.dead) { q.el.style.opacity = '0'; setTimeout(() => q.el.remove(), 400); return false; } // 時間がきたか、絵文字が消えたら一緒に消す
+          { // いつも絵文字の真上についていく
             const w = q.el.offsetWidth, h = q.el.offsetHeight;
             const bx = Math.min(W - w - 6, Math.max(6, q.b.body.position.x - w / 2));
             const by = Math.max(6, q.b.body.position.y - r - h - 10);
             q.el.style.transform = `translate(${bx}px, ${by}px)`;
+            q.el.style.visibility = '';
             q.el.style.setProperty('--tail', Math.min(w - 18, Math.max(10, q.b.body.position.x - bx - 6)) + 'px');
           }
           return true;

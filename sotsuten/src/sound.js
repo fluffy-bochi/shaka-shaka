@@ -71,10 +71,10 @@ export function initShakaSound() {
   }
 }
 
-export function playShaka(speed) {
+export function playShaka(speed, force) { // force: 回復で消えたときなど、ぶつかった音の間隔に関係なく鳴らす
   const now = performance.now();
   const cooldown = IS_IOS ? HTML_COOLDOWN : WA_COOLDOWN;
-  if (now - lastShakaPlay < cooldown) return;
+  if (!force && now - lastShakaPlay < cooldown) return;
   const v = clamp((speed - SHAKA_MIN_SPEED) / 14, 0.15, 1);
 
   if (IS_IOS) {
