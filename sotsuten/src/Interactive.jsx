@@ -78,7 +78,8 @@ export default function Interactive() {
   const sim = React.useRef(null);
   const [count0, setCount] = React.useState(0);
   const [tab, setTab] = React.useState('gauge');
-  const tabRef = React.useRef(tab); tabRef.current = tab; // 'record' のあいだは記録画面がキーを受け取る // フッターの選択（B=本棚・H=ホーム・G=ゲージ。本番は iPad のハードキーで操作）
+  const tabRef = React.useRef(tab); tabRef.current = tab;
+  const openRecordRef = React.useRef(null); openRecordRef.current = () => setTab('record'); // 'record' のあいだは記録画面がキーを受け取る // フッターの選択（B=本棚・H=ホーム・G=ゲージ。本番は iPad のハードキーで操作）
   // 来場者が数字キーで入れた今日の記録（保存しない）。過去の日はサンプルのペルソナ
   const saved0 = React.useMemo(() => loadJSON(DATA_KEY, {}), []);
   const [mine, setMine] = React.useState(saved0.mine || []);
@@ -195,7 +196,11 @@ export default function Interactive() {
     dogSay.className = 'dog-say';
     const dogName = document.createElement('div'); dogName.className = 'dog-say-name'; dogName.textContent = 'やるきーぬ';
     const dogText = document.createElement('div'); dogText.className = 'dog-say-text';
-    dogSay.appendChild(dogName); dogSay.appendChild(dogText);
+    // ウィンドウの右下に「記録する」（Enter でも開く）
+    const dogRec = document.createElement('div'); dogRec.className = 'dog-rec';
+    dogRec.innerHTML = '記録する<span class="keyhint">Enter</span>';
+    dogRec.onclick = () => openRecordRef.current && openRecordRef.current();
+    dogSay.appendChild(dogName); dogSay.appendChild(dogText); dogSay.appendChild(dogRec);
     dogSay.style.maxWidth = Math.round(W / 3) + 'px'; // 幅はセリフの長さに合わせる（最大で画面の横幅の1/3・こえたら折り返す）
     box.appendChild(dog); box.appendChild(dogSay);
     let lineI = 0;
@@ -331,8 +336,8 @@ export default function Interactive() {
     const onKey = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (tabRef.current === 'record') return; // 記録画面（Record.jsx）が受け取る
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key) && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) {
-        e.preventDefault(); setTab('record'); return; // 上下左右・Enter（物理ボタン）で記録画面を開く
+      if (e.key === 'Enter' && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) {
+        e.preventDefault(); setTab('record'); return; // Enter（やるきーぬのウィンドウの「記録する」）で記録画面を開く
       }
       const tg = e.target && e.target.tagName;
       if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT') return; // 本棚の日記を書いているとき
@@ -428,6 +433,7 @@ export default function Interactive() {
       </div>
       <button onClick={() => setOri({ ...ori, flip: !ori.flip })} aria-label="上下を逆に" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: ori.flip ? '#1b1b18' : '#fff', color: ori.flip ? '#fff' : 'inherit', cursor: 'pointer', fontSize: 16, padding: 0 }}>⟲</button>
       <button onClick={toggleFull} aria-label="フルスクリーン" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: '#fff', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={ms(0, 20)}>fullscreen</span></button>
+      <span className="keyhint" style={{ marginLeft: -6 }}>F</span>
       {!sound && <button onClick={() => setTimeout(() => setSound(soundReady()), 500)} aria-label="音を出す" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: '#fff', cursor: 'pointer', fontSize: 16, padding: 0 }}>🔇</button>}
       <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 13, fontWeight: 700 }}>{count0}</span>
       <button onClick={shake} style={ghost}>🔀 R</button>
@@ -459,7 +465,7 @@ export default function Interactive() {
   );
 
   return (
-    <div ref={outerRef} style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: '#f7f4ec' }}>
+    <div ref={outerRef} className={pc ? 'show-keys' : ''} style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: '#f7f4ec' }}>
     <div style={rootStyle}>
       {pc ? (
         <>
