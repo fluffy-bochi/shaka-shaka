@@ -18,7 +18,7 @@ export const KEY_REC = {
   9: { title: '発表' },
   0: { title: '仮眠' },
 };
-const MERGE_MS = 2 * 60000; // 同じキーを続けて押したら、この間は1つの記録にまとめる
+export const GROUP_GAP_MS = 3 * 60000; // 前に押してからこの時間がたったら、ホームで別の塊（投稿）にする
 
 const nowHm = () => {
   const t = todayStr(), ms = Date.now() - hmToTsOn(t, '00:00');
@@ -26,16 +26,21 @@ const nowHm = () => {
   return pad2(Math.floor(m / 60)) + ':' + pad2(m % 60);
 };
 
-/* 来場者の記録に1回ぶん足す（同じキーを続けて押したらまとめる） */
+/* 来場者の記録に1回ぶん足す。続けて押したぶんは1つの塊（gid）にまとめ、塊の中の同じキーは数を足す。
+   前に押してから GROUP_GAP_MS あいたら新しい塊 */
 export function addPress(list, key, glyph, n, rec) {
   const k = KEY_REC[key]; if (!k) return list;
   const d = (rec ? -1 : 1) * n, hm = nowHm(), now = Date.now();
+  const lastAt = list.reduce((a, e) => Math.max(a, e.at || 0), 0);
   const last = list[list.length - 1];
-  if (last && last.key === key && now - last.at < MERGE_MS) {
-    return [...list.slice(0, -1), { ...last, delta: last.delta + d, to: k.tweet ? last.to : hm, at: now }];
+  const gid = last && now - lastAt < GROUP_GAP_MS ? last.gid : 'g' + now;
+  const i = list.findIndex(e => e.gid === gid && e.key === key);
+  if (i >= 0) {
+    const e = list[i];
+    return [...list.slice(0, i), { ...e, delta: e.delta + d, to: hm, at: now }, ...list.slice(i + 1)];
   }
   return [...list, {
-    key, at: now, date: todayStr(), from: hm, to: k.tweet ? '' : hm, title: k.title, glyph, delta: d,
+    key, gid, at: now, date: todayStr(), from: hm, to: hm, title: k.title, glyph, delta: d,
     exp: false, ...(k.tweet ? { event: true, moodLabel: 'きもち', mindCond: k.mind } : {}),
   }];
 }
@@ -95,7 +100,10 @@ export function homeRows(entries, wakeLog, collected, d) {
     let top = es[0]; es.forEach(e => { if (cnt[e.title] > cnt[top.title]) top = e; });
     const durOf = {}; es.forEach(e => { durOf[e.title] = (durOf[e.title] || 0) + (entryMin(e) || 0); });
     let longest = es[0]; es.forEach(e => { if (durOf[e.title] > durOf[longest.title]) longest = e; });
-    const label = (es.find(e => e.postTitle) || {}).postTitle || first.moodLabel || first.plan || top.title;
+    // まとめた塊は、いちばん数の多かった記録を見出し・アイコンに（同じなら先に押したもの）
+    let big = es[0]; es.forEach(e => { if (Math.abs(e.delta || 0) > Math.abs(big.delta || 0)) big = e; });
+    if (es.length > 1) { top = big; longest = big; }
+    const label = (es.find(e => e.postTitle) || {}).postTitle || (es.length > 1 ? top.title : first.moodLabel || first.plan || top.title);
     const note = (es.find(e => e.note) || {}).note || '';
     const from = first.from || '';
     const lastEnd = es.filter(e => e.to).sort((a, b) => entryEndTs(b) - entryEndTs(a))[0];
