@@ -46,7 +46,8 @@ const DOG_LINES = [
 const DOG_LINE_MS = 7000; // ひとことを変える間隔
 const DOG_H = 0.36; // 絵の高さ（箱の幅に対して）。表情ごとに絵の縦横比がちがうので高さでそろえる
 const IDLE_MS = 5 * 60000; // この間なにも操作がなければゲージ（シャカシャカ）の画面に戻す
-const FILL_UNIT = 125; // シャカと同じ: この個数で箱がいっぱい（memory: emoji-pile-fill-rule）
+const FILL_UNIT = 100; // 卒展: 箱からやるきーぬのぶんを抜いた広さが、この個数でいっぱい（本体のシャカは125）
+const DOG_FILL = 0.55; // やるきーぬの絵が四角（高さ×幅）のうち、体で埋まっている割合のめやす
 
 /* 向き: auto＝端末の向きのまま／portrait＝縦／landscape＝横。iOS は Web から向きを固定できないので、
    選んだ向きと端末の向きが違うときは画面ごと90°回して出す。flip＝⟲で逆さに（回さないときは180°・回すときは -90°）。
@@ -139,7 +140,8 @@ export default function Interactive() {
   React.useEffect(() => {
     const box = boxRef.current; if (!box || !win.w) return undefined;
     const W = box.clientWidth, H = box.clientHeight;
-    const r = Math.sqrt((W * H) / (FILL_UNIT * Math.PI));
+    const dogArea = (W * DOG_H) * (W * DOG_H * 0.75) * DOG_FILL; // 絵の高さ×幅（だいたい高さの0.75）×体の割合
+    const r = Math.sqrt(Math.max(W * H * 0.3, W * H - dogArea) / (FILL_UNIT * Math.PI));
     // 計算は止めない（スリープなし）。たくさん積んだときのモゴモゴは、めり込み解消の反復を増やして抑える
     const engine = Matter.Engine.create({ positionIterations: 20, velocityIterations: 10 });
     // ごく小さい動き（押し合いのモゴモゴ）だけを毎ステップ弱める。計算は続けるので、落ちる・転がる・崩れる動きはそのまま
@@ -211,10 +213,10 @@ export default function Interactive() {
       const w = dog.offsetWidth || dogH * 0.7;
       const x = Math.min(W - w / 2, Math.max(w / 2, d.x)), y = Math.max(dogH, d.y);
       dog.style.transform = `translate(${x - w / 2}px, ${y - dogH}px)`;
-      // テキストウィンドウは犬のおなかのあたり（横は真ん中・箱からはみ出さない）
+      // テキストウィンドウの下のはしを犬の足もとにそろえる（横は真ん中・箱からはみ出さない）
       const bw = dogSay.offsetWidth, bh = dogSay.offsetHeight;
       const bx = (W - bw) / 2;
-      const by = Math.min(H - bh - 10, Math.max(10, y - dogH * 0.42 - bh / 2));
+      const by = Math.min(H - bh - 10, Math.max(10, y - bh));
       dogSay.style.transform = `translate(${bx}px, ${by}px)`;
     };
     s.moveDog = moveDog;
