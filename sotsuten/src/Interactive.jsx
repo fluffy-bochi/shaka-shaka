@@ -22,8 +22,10 @@ const KEYS = {
   9: { g: '🎤', n: 2 },
   0: { g: '🛏️', n: 2, rec: true },
 };
-/* 本体のシャカと同じ「硬い」物理: 跳ねない・よく噛む・沈まない・止まったら眠る */
-const BODY_OPTS = { restitution: 0.12, friction: 0.4, frictionStatic: 0.6, frictionAir: 0.012, density: 0.01, slop: 0.01, sleepThreshold: 30 };
+/* 本体のシャカと同じ「硬い」物理: 跳ねない・よく噛む・沈まない（スリープはしない） */
+const BODY_OPTS = { restitution: 0.12, friction: 0.4, frictionStatic: 0.6, frictionAir: 0.012, density: 0.01, slop: 0.01 };
+const SUBSTEPS = 2; // 1フレーム（1/60秒）を何回に分けて計算するか
+const MICRO_SPEED = 0.25, MICRO_SPIN = 0.01, MICRO_DAMP = 0.5; // この速さ未満の動きを半分にする
 const FILL_UNIT = 125; // シャカと同じ: この個数で箱がいっぱい（memory: emoji-pile-fill-rule）
 
 /* 向き: auto＝端末の向きのまま／portrait＝縦／landscape＝横。iOS は Web から向きを固定できないので、
@@ -93,8 +95,16 @@ export default function Interactive() {
     const box = boxRef.current; if (!box || !win.w) return undefined;
     const W = box.clientWidth, H = box.clientHeight;
     const r = Math.sqrt((W * H) / (FILL_UNIT * Math.PI));
-    const engine = Matter.Engine.create({ positionIterations: 8, velocityIterations: 4 });
-    engine.enableSleeping = true; // 止まった絵文字は眠らせて、たくさん積んでもモゴモゴ動き続けないように（本体のシャカと同じ）
+    // 計算は止めない（スリープなし）。たくさん積んだときのモゴモゴは、めり込み解消の反復を増やして抑える
+    const engine = Matter.Engine.create({ positionIterations: 20, velocityIterations: 10 });
+    // ごく小さい動き（押し合いのモゴモゴ）だけを毎ステップ弱める。計算は続けるので、落ちる・転がる・崩れる動きはそのまま
+    Matter.Events.on(engine, 'afterUpdate', () => {
+      engine.world.bodies.forEach(b => {
+        if (b.isStatic) return;
+        if (b.speed < MICRO_SPEED) Matter.Body.setVelocity(b, { x: b.velocity.x * MICRO_DAMP, y: b.velocity.y * MICRO_DAMP });
+        if (Math.abs(b.angularVelocity) < MICRO_SPIN) Matter.Body.setAngularVelocity(b, b.angularVelocity * MICRO_DAMP);
+      });
+    });
     engine.gravity.y = 1.4;
     const wall = (x, y, w, h) => Matter.Bodies.rectangle(x, y, w, h, { isStatic: true, friction: 0.4 });
     Matter.World.add(engine.world, [wall(W / 2, H + 50, W * 3, 100), wall(-50, H / 2, 100, H * 4), wall(W + 50, H / 2, 100, H * 4)]);
@@ -103,10 +113,10 @@ export default function Interactive() {
     sim.current = s;
 
     const pop = (x, y) => { const fx = document.createElement('div'); fx.className = 'pop-fx'; fx.style.left = x + 'px'; fx.style.top = y + 'px'; box.appendChild(fx); setTimeout(() => fx.remove(), 450); };
-    const kill = (b) => { Matter.World.remove(engine.world, b.body); s.bodies.forEach(o => Matter.Sleeping.set(o.body, false)); /* 下が消えたら上が落ちるように起こす */ b.dead = true; b.el.style.transition = 'opacity .15s'; b.el.style.opacity = '0'; setTimeout(() => b.el.remove(), 200); };
+    const kill = (b) => { Matter.World.remove(engine.world, b.body); b.dead = true; b.el.style.transition = 'opacity .15s'; b.el.style.opacity = '0'; setTimeout(() => b.el.remove(), 200); };
     const step = (t) => {
       const dt = s.last ? Math.min(50, t - s.last) : 16; s.last = t; s.acc += dt;
-      while (s.acc >= 1000 / 60) { Matter.Engine.update(engine, 1000 / 60); s.acc -= 1000 / 60; }
+      while (s.acc >= 1000 / 60) { for (let k = 0; k < SUBSTEPS; k++) Matter.Engine.update(engine, 1000 / 60 / SUBSTEPS); s.acc -= 1000 / 60; } // 刻みを細かくして積み重ねを安定させる
       // 回復: プラスに当たったら両方消える
       const hit2 = (r * 2) * (r * 2);
       for (const n of s.bodies) {
