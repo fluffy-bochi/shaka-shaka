@@ -16,7 +16,7 @@ const fab = { width: 60, height: 60, borderRadius: '50%', border: 'none', backgr
 
 /* タイムラインの投稿1件: アイコン／見出し・時刻／本文／右に疲労の合計・…。中の行動は細い行で。
    起床・就寝は体と心の調子（前回との差を矢印）。終わったものは薄く */
-function Post({ p }) {
+export function Post({ p }) {
   const fade = p.past ? 0.55 : 1;
   return (
     <div onClick={p.onTap} style={{ position: 'relative', background: '#f7f4ec', borderTop: '1px solid #bab5a7', padding: '4px 20px 10px 72px', cursor: 'pointer', userSelect: 'none' }}>
@@ -56,7 +56,7 @@ function Post({ p }) {
           </div>
         )}
       </div>
-      <button onClick={(e) => { e.stopPropagation(); p.onMenu(); }} aria-label="メニュー" style={{ position: 'absolute', right: 16, top: 2, width: 30, height: 22, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 16, letterSpacing: 1, color: '#b4b2a8', lineHeight: 1 }}>•••</button>
+      {p.onMenu && <button onClick={(e) => { e.stopPropagation(); p.onMenu(); }} aria-label="メニュー" style={{ position: 'absolute', right: 16, top: 2, width: 30, height: 22, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 16, letterSpacing: 1, color: '#b4b2a8', lineHeight: 1 }}>•••</button>}
     </div>
   );
 }
