@@ -35,7 +35,7 @@ export const MOODS = [
   { id: 'fun', g: '🎉', name: 'たのしかった' },
 ];
 
-export function sendPost({ face, mood, text }) {
+export function sendPost({ face, mood, text }) { // mood（きもち）は今は送らない（前の形の投稿も読めるよう残す）
   return addDoc(collection(db, COL), { face, mood: mood || '', text: (text || '').slice(0, TEXT_MAX), ts: serverTimestamp() });
 }
 
