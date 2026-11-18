@@ -1,7 +1,7 @@
 import React from 'react';
 import Matter from 'matter-js';
 import { appendGlyph } from './fluent';
-import { initShakaSound, attachCollisionSound, playShaka } from './sound';
+import { initShakaSound, attachCollisionSound, playShaka, soundReady } from './sound';
 import Home from './screens/Home';
 import Bookshelf from './screens/Bookshelf';
 import QRCode from 'qrcode';
@@ -75,6 +75,9 @@ export default function Interactive() {
   React.useEffect(() => { saveJSON(DATA_KEY, { mine, lastRec, bookFav, bookDiary, postSince }); }, [mine, lastRec, bookFav, bookDiary, postSince]);
   // スマホの投稿画面のQRコード（ゲージの右上）
   const [qr, setQr] = React.useState('');
+  // 音が出せるか（再読み込みのあと一度も操作がないと出せない）。出せないときだけバーに🔇
+  const [sound, setSound] = React.useState(false);
+  React.useEffect(() => { const t = setInterval(() => setSound(soundReady()), 1000); return () => clearInterval(t); }, []);
   React.useEffect(() => { QRCode.toDataURL(location.origin + '/?post', { margin: 1, width: 320 }).then(setQr).catch(() => {}); }, []);
   // しばらく操作がなければゲージの画面へ
   React.useEffect(() => {
@@ -154,7 +157,7 @@ export default function Interactive() {
     s.say = (b, text) => {
       const el = document.createElement('div');
       el.className = 'say-bubble';
-      el.textContent = text;
+      el.textContent = (text.replace(/\s+/g, ' ').match(/.{1,10}/gu) || []).join('\n'); // 10文字ごとに改行
       el.style.visibility = 'hidden'; // 最初の位置が決まるまで隠す
       box.appendChild(el);
       s.bubbles.push({ el, b, left: BUBBLE_KEEP });
@@ -345,6 +348,7 @@ export default function Interactive() {
       </div>
       <button onClick={() => setOri({ ...ori, flip: !ori.flip })} aria-label="上下を逆に" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: ori.flip ? '#1b1b18' : '#fff', color: ori.flip ? '#fff' : 'inherit', cursor: 'pointer', fontSize: 16, padding: 0 }}>⟲</button>
       <button onClick={toggleFull} aria-label="フルスクリーン" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: '#fff', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={ms(0, 20)}>fullscreen</span></button>
+      {!sound && <button onClick={() => setTimeout(() => setSound(soundReady()), 500)} aria-label="音を出す" style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #e4e1d8', background: '#fff', cursor: 'pointer', fontSize: 16, padding: 0 }}>🔇</button>}
       <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 13, fontWeight: 700 }}>{count0}</span>
       <button onClick={shake} style={ghost}>🔀 R</button>
       <button onClick={clear} style={ghost}>リセット</button>

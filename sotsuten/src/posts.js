@@ -13,7 +13,7 @@ const app = initializeApp({
 }, 'sotsuten');
 const db = getFirestore(app);
 const COL = 'sotsuten_posts';
-export const TEXT_MAX = 140;
+export const TEXT_MAX = 20; // つぶやきは20文字まで（展示の吹き出しは10文字で改行）
 
 /* 顔（1〜5）: 展示の数字キー1〜5と同じ絵文字・数 */
 export const FACES = [
