@@ -104,7 +104,7 @@ export default function Record({ onDone, onClose }) {
   const ring = (on) => ({ border: on ? '5px solid ' + LIME : '5px solid transparent', borderRadius: '50%', padding: 5, display: 'flex' });
   const circle = (size, children, bg = '#fff') => <div style={{ width: size, height: size, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>{children}</div>;
   const wrap = (children) => (
-    <div style={{ position: 'absolute', inset: 0, background: '#f7f4ec', display: 'flex', flexDirection: 'column', fontFamily: "'Zen Kaku Gothic New', system-ui, sans-serif", color: INK }}>
+    <div style={{ position: 'absolute', inset: 0, background: 'rgba(247,244,236,.62)', WebkitBackdropFilter: 'blur(14px)', backdropFilter: 'blur(14px)' /* 後ろに今のゲージをぼかして */, display: 'flex', flexDirection: 'column', fontFamily: "'Zen Kaku Gothic New', system-ui, sans-serif", color: INK }}>
       {/* 戻る（1の画面では閉じる） */}
       <div onClick={back} style={{ position: 'absolute', left: 28, top: 28, zIndex: 2, display: 'flex', alignItems: 'center', gap: 6, background: '#fff', borderRadius: 999, padding: '8px 18px 8px 10px', fontSize: 20, fontWeight: 800, cursor: 'pointer', boxShadow: '0 2px 8px rgba(27,27,24,.08)' }}>
         <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 26, lineHeight: 1 }}>chevron_left</span>{step === 1 ? 'とじる' : '戻る'}<span className="keyhint">Esc</span>
