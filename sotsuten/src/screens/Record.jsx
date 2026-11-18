@@ -17,9 +17,9 @@ export const MOODS5 = [
 const CAT_PICK = [['生活', 'house'], ['休憩', 'rest'], ['移動', 'idou'], ['勉強', 'school'], ['仕事', 'work']];
 export const REC_CATS = CAT_PICK.map(([label, id]) => ({ label, items: (CATS.find(c => c.id === id) || { items: [] }).items }));
 export const TYPES = [
-  { id: 'yuttari', name: 'ゆったり', g: '🌿', color: '#c4f000', ink: '#2f3a00', mult: 1 },
-  { id: 'hodohodo', name: 'ほどほど', g: '☀️', color: '#f0c24b', ink: '#5a4300', mult: 1.5 },
-  { id: 'michimichi', name: 'みちみち', svg: '/chara/fireball.svg', color: '#ef4b3c', ink: '#fff', mult: 2 },
+  { id: 'yuttari', name: 'ゆったり', g: '🌿', color: '#c4f000', ink: '#2f3a00', mult: 1, say: 'おやすみ上手さん発見！' },
+  { id: 'hodohodo', name: 'ほどほど', g: '☀️', color: '#f0c24b', ink: '#5a4300', mult: 1.5, say: 'がんばり上手さん発見！' },
+  { id: 'michimichi', name: 'みちみち', svg: '/chara/fireball.svg', color: '#ef4b3c', ink: '#fff', mult: 2, say: 'おつかれさまー！明日は絶対休みにすること！' },
 ];
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
 const INK = '#1b1b18', LIME = '#c4f000';
@@ -64,7 +64,7 @@ export default function Record({ onDone, onClose }) {
       const s = st.current, k = e.key;
       const move = (d) => {
         if (s.step === 1) setMood(m => Math.max(0, Math.min(4, m + d)));
-        else if (s.step === 2 && s.row === 0) { setCat(c => (c + d + REC_CATS.length) % REC_CATS.length); setAct(0); }
+        else if (s.step === 2 && s.row === 0) { setCat(c => Math.max(0, Math.min(REC_CATS.length - 1, c + d))); setAct(0); } // カテゴリは回さない（端で止まる）
         else if (s.step === 2) setAct(a => Math.max(0, Math.min(s.items.length - 1, a + d)));
         else if (s.step === 3) setType(t => Math.max(0, Math.min(2, t + d)));
       };
@@ -124,15 +124,15 @@ export default function Record({ onDone, onClose }) {
     return wrap(<>
       {title('最近した行動を教えて！')}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '12px 0' }}>{dogPic(400)}</div>
-      {/* カテゴリの段 */}
+      {/* カテゴリの段（5つとも並べたまま、選んでいるものに枠） */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: row === 0 ? 1 : 0.55 }}>
-        <Arrow dir={-1} on={row === 0} onClick={() => { setRow(0); setCat(c => (c + REC_CATS.length - 1) % REC_CATS.length); setAct(0); }} />
-        <div style={{ display: 'flex', gap: 10, overflow: 'hidden', width: 600, justifyContent: 'center' }}>
-          {[-2, -1, 0, 1, 2].map(d => { const c = (cat + d + REC_CATS.length * 3) % REC_CATS.length; return (
-            <div key={d} onClick={() => { setRow(0); setCat(c); setAct(0); }} style={{ flex: '0 0 auto', cursor: 'pointer', fontSize: 28, fontWeight: 800, padding: '8px 22px', borderRadius: 16, background: '#fff', border: d === 0 ? '4px solid ' + (row === 0 ? LIME : '#bab5a7') : '4px solid transparent', boxShadow: '0 2px 8px rgba(27,27,24,.06)', opacity: Math.abs(d) === 2 ? 0.45 : 1 }}>{REC_CATS[c].label}</div>
-          ); })}
+        <Arrow dir={-1} on={row === 0 && cat > 0} onClick={() => { setRow(0); setCat(c => Math.max(0, c - 1)); setAct(0); }} />
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          {REC_CATS.map((c, i) => (
+            <div key={c.label} onClick={() => { setRow(0); setCat(i); setAct(0); }} style={{ flex: '0 0 auto', cursor: 'pointer', fontSize: 26, fontWeight: 800, padding: '8px 18px', borderRadius: 16, background: '#fff', border: i === cat ? '4px solid ' + (row === 0 ? LIME : '#bab5a7') : '4px solid transparent', boxShadow: '0 2px 8px rgba(27,27,24,.06)' }}>{c.label}</div>
+          ))}
         </div>
-        <Arrow dir={1} on={row === 0} onClick={() => { setRow(0); setCat(c => (c + 1) % REC_CATS.length); setAct(0); }} />
+        <Arrow dir={1} on={row === 0 && cat < REC_CATS.length - 1} onClick={() => { setRow(0); setCat(c => Math.min(REC_CATS.length - 1, c + 1)); setAct(0); }} />
       </div>
       {/* 行動の段 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 22, opacity: row === 1 ? 1 : 0.55 }}>
@@ -164,21 +164,34 @@ export default function Record({ onDone, onClose }) {
     {enterBtn('決定')}
   </>);
 
-  // 4 確認
+  // 4 確認: 気分・行動・タイプを同じ大きさで（気分と行動は絵文字だけ・行動の名前は下に）。やるきーぬはタイプに合わせてひとこと
   const m = MOODS5[mood], a = items[act], t = TYPES[type];
-  const label = { fontSize: 34, fontWeight: 900, width: 150 };
+  const S = 140;
+  const label = { fontSize: 34, fontWeight: 900, width: 140 };
   return wrap(<>
     <div style={{ textAlign: 'center', marginTop: 64 }}>
       <div style={{ fontSize: 34, fontWeight: 800 }}>{now.getMonth() + 1}月{now.getDate()}日（{WD[now.getDay()]}）</div>
       <div style={{ fontFamily: "'Archivo',sans-serif", fontWeight: 800, fontSize: 118, lineHeight: 1, marginTop: 6 }}>{now.getHours()}:{String(now.getMinutes()).padStart(2, '0')}</div>
     </div>
     <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', padding: '0 40px 0 80px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 34 }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}><span style={label}>気分</span>{circle(130, <Emo e={m.g} size={88} />)}</div>
-        <div style={{ display: 'flex', alignItems: 'center' }}><span style={label}>行動</span>{circle(130, a ? <Emo e={a.glyph} size={84} /> : null)}<span style={{ marginLeft: 16, fontSize: 22, fontWeight: 800, maxWidth: 160 }}>{a ? a.name : ''}</span></div>
-        <div style={{ display: 'flex', alignItems: 'center' }}><span style={label}>タイプ</span><TypeBadge t={t} size={160} /></div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}><span style={label}>気分</span><div style={{ width: S, display: 'flex', justifyContent: 'center' }}><Emo e={m.g} size={S} /></div></div>
+        <div style={{ display: 'flex', alignItems: 'center' }}><span style={label}>行動</span>
+          <div style={{ width: S, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {a ? <Emo e={a.glyph} size={S} /> : null}
+            <div style={{ fontSize: 20, fontWeight: 800, textAlign: 'center', marginTop: 2, width: 220 }}>{a ? a.name : ''}</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center' }}><span style={label}>タイプ</span><TypeBadge t={t} size={S} /></div>
       </div>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', alignSelf: 'stretch', paddingBottom: 40, overflow: 'hidden' }}>{dogPic(420)}</div>
+      {/* やるきーぬ＋ひとこと（ゲージと同じテキストウィンドウ・下のはしを足もとに） */}
+      <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', alignSelf: 'stretch', paddingBottom: 40, overflow: 'hidden' }}>
+        {dogPic(420)}
+        <div className="dog-say" style={{ left: '50%', top: 'auto', bottom: 40, transform: 'translateX(-50%)', maxWidth: 300 }}>
+          <div className="dog-say-name">やるきーぬ</div>
+          <div className="dog-say-text">{t.say}</div>
+        </div>
+      </div>
     </div>
     {enterBtn('記録する')}
   </>);
