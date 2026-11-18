@@ -301,18 +301,29 @@ export default function Interactive() {
   const onRecordClose = React.useCallback(() => setTab('gauge'), []);
   // スマホからの投稿を受け取って、ゲージに降らせてホームに載せる（同じ投稿は1回だけ）
   const mineRef = React.useRef(mine); mineRef.current = mine;
+  // ゲージ以外の画面のときは降らせずに待たせ、ゲージに戻ったら順番に降らせる（記録はすぐホームに入れる）
+  const pendingRef = React.useRef([]);
+  const [pendingN, setPendingN] = React.useState(0);
+  const receivePost = React.useCallback((id, d, ts) => {
+    if (mineRef.current.some(e => e.gid === 'p' + id) || pendingRef.current.some(q => q.id === id)) return;
+    const dr = postDrop(d), text = (d.text || '').trim();
+    if (tabRef.current === 'gauge') fall(dr.g, dr.n, dr.rec, text);
+    else { pendingRef.current.push({ id, dr, text }); setPendingN(pendingRef.current.length); }
+    setMine(l => addPost(l, id, d, ts, dr));
+  }, [fall]);
+  React.useEffect(() => watchPostsKeep(postSince, receivePost, (e) => console.warn('[sotsuten] posts', e && e.code)), [postSince, receivePost]);
   // 確認用（URL に ?debug のときだけ）: window.__post('テキスト', 顔1〜5) でスマホの投稿が届いたのと同じ動き
   React.useEffect(() => {
     if (!new URLSearchParams(location.search).has('debug')) return undefined;
-    window.__post = (text, face = 3) => { const id = 'debug' + Date.now(), d = { face, text }; const dr = postDrop(d); fall(dr.g, dr.n, dr.rec, text); setMine(l => addPost(l, id, d, Date.now(), dr)); };
+    window.__post = (text, face = 3) => receivePost('debug' + Date.now(), { face, text }, Date.now());
     return () => { delete window.__post; };
-  }, [fall]);
-  React.useEffect(() => watchPostsKeep(postSince, (id, d, ts) => {
-    if (mineRef.current.some(e => e.gid === 'p' + id)) return;
-    const dr = postDrop(d);
-    fall(dr.g, dr.n, dr.rec, (d.text || '').trim());
-    setMine(l => addPost(l, id, d, ts, dr));
-  }, (e) => console.warn('[sotsuten] posts', e && e.code)), [postSince, fall]);
+  }, [receivePost]);
+  React.useEffect(() => {
+    if (tab !== 'gauge' || !pendingRef.current.length) return undefined;
+    const q = pendingRef.current.splice(0); setPendingN(0);
+    const ts = q.map((p, i) => setTimeout(() => fall(p.dr.g, p.dr.n, p.dr.rec, p.text), 400 + i * 900));
+    return () => ts.forEach(clearTimeout);
+  }, [tab, fall]);
 
   /* シャカシャカ: 全部の絵文字を散らす（シャカの🔀と同じ動き。箱が大きいぶん少し強め） */
   const shake = React.useCallback(() => {
@@ -403,6 +414,11 @@ export default function Interactive() {
         <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, background: '#fff', borderRadius: 14, padding: '8px 8px 6px', boxShadow: '0 2px 10px rgba(27,27,24,.12)', textAlign: 'center', pointerEvents: 'none' }}>
           <img src={qr} alt="" style={{ display: 'block', width: 112, height: 112 }} />
           <div style={{ fontSize: 11, fontWeight: 800, marginTop: 4 }}>スマホでつぶやく</div>
+        </div>
+      )}
+      {tab !== 'gauge' && pendingN > 0 && (
+        <div style={{ position: 'absolute', left: '50%', top: 16, transform: 'translateX(-50%)', zIndex: 6, display: 'flex', alignItems: 'center', gap: 10, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '10px 20px', fontSize: 15, fontWeight: 800, whiteSpace: 'nowrap', boxShadow: '0 6px 18px rgba(27,27,24,.25)', pointerEvents: 'none' }}>
+          📱 スマホのつぶやきが{pendingN}件届いています・ゲージ画面にもどると降ってきます<span className="keyhint" style={{ color: '#c4f000' }}>G</span>
         </div>
       )}
       {tab !== 'gauge' && (
