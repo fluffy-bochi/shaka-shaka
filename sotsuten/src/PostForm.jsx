@@ -13,12 +13,13 @@ export default function PostForm() {
   const [face, setFace] = React.useState(3);
   const [text, setText] = React.useState('');
   const [state, setState] = React.useState('edit'); // edit | sending | done | error
+  const [err, setErr] = React.useState('');
   const canSave = state === 'edit' && (text.trim() || face !== 3);
   const icon = FACES.find(f => f.face === face).g;
   const send = async () => {
     if (!canSave) return;
     setState('sending');
-    try { await sendPost({ face, text: text.trim() }); setState('done'); } catch (e) { setState('error'); }
+    try { await sendPost({ face, text: text.trim() }); setState('done'); } catch (e) { setErr((e && e.code) || ''); setState('error'); }
   };
 
   if (state === 'done') {
@@ -50,7 +51,7 @@ export default function PostForm() {
         <div style={{ ...mono, fontSize: 10, color: '#8a8a82', textAlign: 'right', marginTop: 4 }}>{text.length}/{TEXT_MAX}</div>
         {state === 'error' && (
           <div style={{ marginTop: 20, fontSize: 13, color: '#c0395e', fontWeight: 700 }}>
-            送れませんでした <button onClick={() => setState('edit')} style={{ marginLeft: 8, border: '1px solid #bab5a7', background: '#fcfaf3', borderRadius: 8, padding: '4px 10px', fontFamily: 'inherit', cursor: 'pointer' }}>もどる</button>
+            送れませんでした{err && <span style={{ ...mono, fontSize: 10, fontWeight: 400, marginLeft: 6 }}>{err}</span>} <button onClick={() => setState('edit')} style={{ marginLeft: 8, border: '1px solid #bab5a7', background: '#fcfaf3', borderRadius: 8, padding: '4px 10px', fontFamily: 'inherit', cursor: 'pointer' }}>もどる</button>
           </div>
         )}
       </div>
