@@ -319,8 +319,8 @@ export default function Interactive() {
       <div ref={boxRef} style={{ position: 'absolute', inset: 0, overflow: 'hidden' }} />
       {tab === 'gauge' && (
         <div style={{ position: 'absolute', left: 0, top: 0, width: pc ? bw / zoom : '100%', zoom, zIndex: 1, pointerEvents: 'none', textAlign: 'center' }}>
-          <div style={{ display: 'inline-block', marginTop: 12, background: 'rgba(255,255,255,.85)', borderRadius: 999, padding: '8px 18px', fontFamily: "'Space Mono',monospace", fontSize: 12, fontWeight: 700 }}>{formatDateShort(today)}</div>
-          <div style={{ fontFamily: "'Archivo',sans-serif", fontWeight: 800, fontSize: 68, lineHeight: 1.02, letterSpacing: '.01em', marginTop: 14, color: count0 >= 90 ? '#fff' : '#1b1b18', textShadow: count0 >= 90 ? '0 2px 10px rgba(27,27,24,.35)' : 'none', transition: 'color .3s' }}>{clock}</div>
+          <div style={{ display: 'inline-block', marginTop: 28, background: 'rgba(255,255,255,.85)', borderRadius: 999, padding: '10px 28px', fontFamily: "'Space Mono',monospace", fontSize: 26, fontWeight: 700 }}>{formatDateShort(today)}</div>
+          <div style={{ fontFamily: "'Archivo',sans-serif", fontWeight: 800, fontSize: 168, lineHeight: 1, letterSpacing: '.01em', marginTop: 10, /* iPad のロック画面くらい（本体は68） */ color: count0 >= 90 ? '#fff' : '#1b1b18', textShadow: count0 >= 90 ? '0 2px 10px rgba(27,27,24,.35)' : 'none', transition: 'color .3s' }}>{clock}</div>
         </div>
       )}
       {tab === 'gauge' && qr && (
