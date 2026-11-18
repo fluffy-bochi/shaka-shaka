@@ -32,6 +32,7 @@ const MICRO_SPEED = 0.25, MICRO_SPIN = 0.01, MICRO_DAMP = 0.5; // この速さ�
 const PILE_KEY = 'kame_sotsuten_pile', DATA_KEY = 'kame_sotsuten_data';
 const loadJSON = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } };
 const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } };
+const BUBBLE_MS = 10000; // スマホのつぶやきの吹き出しを出しておく時間
 const IDLE_MS = 5 * 60000; // この間なにも操作がなければゲージ（シャカシャカ）の画面に戻す
 const FILL_UNIT = 125; // シャカと同じ: この個数で箱がいっぱい（memory: emoji-pile-fill-rule）
 
@@ -130,7 +131,7 @@ export default function Interactive() {
     engine.gravity.y = 1.4;
     const wall = (x, y, w, h) => Matter.Bodies.rectangle(x, y, w, h, { isStatic: true, friction: 0.4 });
     Matter.World.add(engine.world, [wall(W / 2, H + 50, W * 3, 100), wall(-50, H / 2, 100, H * 4), wall(W + 50, H / 2, 100, H * 4)]);
-    const s = { engine, r, W, H, bodies: [], raf: 0, last: 0, acc: 0 };
+    const s = { engine, r, W, H, bodies: [], bubbles: [], raf: 0, last: 0, acc: 0 };
     initShakaSound(); attachCollisionSound(engine); // ぶつかった音（シャカと同じ）
     sim.current = s;
 
@@ -148,6 +149,14 @@ export default function Interactive() {
       const b = { body, el, g, rec: !!rec, at: Date.now() };
       s.bodies.push(b);
       return b;
+    };
+    // スマホのつぶやきの吹き出し（絵文字の上についていく。BUBBLE_MS で消える）
+    s.say = (b, text) => {
+      const el = document.createElement('div');
+      el.className = 'say-bubble';
+      el.textContent = text;
+      box.appendChild(el);
+      s.bubbles.push({ el, b, until: Date.now() + BUBBLE_MS });
     };
     // 山を保存（箱の大きさに対する割合で。回復の絵文字は残さない）
     s.save = () => saveJSON(PILE_KEY, s.bodies.filter(b => !b.rec && !b.dead).map(b => ({ g: b.g, x: +(b.body.position.x / W).toFixed(4), y: +(b.body.position.y / H).toFixed(4), a: +b.body.angle.toFixed(3) })));
@@ -171,20 +180,35 @@ export default function Interactive() {
         const { x, y } = b.body.position;
         b.el.style.transform = `translate(${x - r}px, ${y - r}px) rotate(${b.body.angle}rad)`;
       }
+      if (s.bubbles.length) {
+        const nowMs = Date.now();
+        s.bubbles = s.bubbles.filter(q => {
+          if (nowMs > q.until) { q.el.style.opacity = '0'; setTimeout(() => q.el.remove(), 400); return false; }
+          if (!q.b.dead) { // 回復の絵文字が消えたあとは、その場に残す
+            const w = q.el.offsetWidth, h = q.el.offsetHeight;
+            const bx = Math.min(W - w - 6, Math.max(6, q.b.body.position.x - w / 2));
+            const by = Math.max(6, q.b.body.position.y - r - h - 10);
+            q.el.style.transform = `translate(${bx}px, ${by}px)`;
+            q.el.style.setProperty('--tail', Math.min(w - 18, Math.max(10, q.b.body.position.x - bx - 6)) + 'px');
+          }
+          return true;
+        });
+      }
       s.raf = requestAnimationFrame(step);
     };
     s.raf = requestAnimationFrame(step);
     setCount(s.bodies.length);
-    return () => { s.save(); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
+    return () => { s.save(); s.bubbles.forEach(q => q.el.remove()); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
   }, [layoutKey]);
 
   // 絵文字 g を n 個、上から降らせる（数字キー・スマホの投稿）
-  const fall = React.useCallback((g, n, rec) => {
+  const fall = React.useCallback((g, n, rec, text) => {
     const s = sim.current; if (!s) return;
     for (let i = 0; i < n; i++) {
       const x = s.r + Math.random() * (s.W - s.r * 2);
       const b = s.spawn(g, x, -s.r * (1.2 + i * 2.2), (Math.random() - 0.5) * 0.6, !!rec);
       Matter.Body.setVelocity(b.body, { x: (Math.random() - 0.5) * 2, y: 2 });
+      if (i === 0 && text) s.say(b, text); // つぶやきは最初の絵文字に吹き出し
     }
     s.save();
     setCount(s.bodies.filter(b => !b.rec).length);
@@ -197,10 +221,16 @@ export default function Interactive() {
   }, [fall]);
   // スマホからの投稿を受け取って、ゲージに降らせてホームに載せる（同じ投稿は1回だけ）
   const mineRef = React.useRef(mine); mineRef.current = mine;
+  // 確認用（URL に ?debug のときだけ）: window.__post('テキスト', 顔1〜5) でスマホの投稿が届いたのと同じ動き
+  React.useEffect(() => {
+    if (!new URLSearchParams(location.search).has('debug')) return undefined;
+    window.__post = (text, face = 3) => { const id = 'debug' + Date.now(), d = { face, text }; const dr = postDrop(d); fall(dr.g, dr.n, dr.rec, text); setMine(l => addPost(l, id, d, Date.now(), dr)); };
+    return () => { delete window.__post; };
+  }, [fall]);
   React.useEffect(() => watchPosts(postSince, (id, d, ts) => {
     if (mineRef.current.some(e => e.gid === 'p' + id)) return;
     const dr = postDrop(d);
-    fall(dr.g, dr.n, dr.rec);
+    fall(dr.g, dr.n, dr.rec, (d.text || '').trim());
     setMine(l => addPost(l, id, d, ts, dr));
   }, (e) => console.warn('[sotsuten] posts', e && e.code)), [postSince, fall]);
 
