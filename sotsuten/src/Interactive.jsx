@@ -44,7 +44,7 @@ const DOG_LINES = [
   { t: 'ちょっと休もっか？', f: 'please' },
 ];
 const DOG_LINE_MS = 7000; // ひとことを変える間隔
-const DOG_H = 0.24; // 絵の高さ（箱の幅に対して）。表情ごとに絵の縦横比がちがうので高さでそろえる
+const DOG_H = 0.72; // 絵の高さ（箱の幅に対して・前の3倍）。表情ごとに絵の縦横比がちがうので高さでそろえる
 const IDLE_MS = 5 * 60000; // この間なにも操作がなければゲージ（シャカシャカ）の画面に戻す
 const FILL_UNIT = 125; // シャカと同じ: この個数で箱がいっぱい（memory: emoji-pile-fill-rule）
 
@@ -195,10 +195,12 @@ export default function Interactive() {
     const lineT = setInterval(setLine, DOG_LINE_MS);
     s.dog = { x: W / 2, y: H, ready: false };
     const moveDog = () => {
-      // いちばん上（y が小さい）の、箱の中に入っていて止まっている山の絵文字
+      // 真ん中の足もとで、いちばん上（y が小さい）の、箱の中に入っていて止まっている山の絵文字
       let top = null;
-      for (const b of s.bodies) { if (b.rec || b.dead || b.body.speed > 1.5) continue; /* 落ちている途中のは見ない */ const y = b.body.position.y; if (y > r && (!top || y < top.body.position.y)) top = b; }
-      const tx = top ? top.body.position.x : W / 2, ty = top ? top.body.position.y - r * 0.85 : H;
+      // 横はいつも画面の真ん中。足もとの幅（絵の幅の6割）にある山のいちばん上に立つ
+      const foot = (dog.offsetWidth || dogH * 0.7) * 0.3;
+      for (const b of s.bodies) { if (b.rec || b.dead || b.body.speed > 1.5) continue; /* 落ちている途中のは見ない */ const y = b.body.position.y; if (y > r && Math.abs(b.body.position.x - W / 2) < foot && (!top || y < top.body.position.y)) top = b; }
+      const tx = W / 2, ty = top ? top.body.position.y - r * 0.85 : H;
       const d = s.dog, k = d.ready ? 0.12 : 1; d.ready = true; // ゆっくり追いかけて、山のゆれでガタガたしないように
       d.x += (tx - d.x) * k; d.y += (ty - d.y) * k;
       const w = dog.offsetWidth || dogH * 0.7;
