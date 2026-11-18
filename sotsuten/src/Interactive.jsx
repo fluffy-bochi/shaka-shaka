@@ -5,7 +5,7 @@ import { initShakaSound, attachCollisionSound } from './sound';
 import Home from './screens/Home';
 import Bookshelf from './screens/Bookshelf';
 import QRCode from 'qrcode';
-import { watchPosts, postDrop } from './posts';
+import { watchPostsKeep, postDrop } from './posts';
 import { addPress, addPost, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
 import { homeLine } from './wake';
 import { strToDate } from './model';
@@ -227,7 +227,7 @@ export default function Interactive() {
     window.__post = (text, face = 3) => { const id = 'debug' + Date.now(), d = { face, text }; const dr = postDrop(d); fall(dr.g, dr.n, dr.rec, text); setMine(l => addPost(l, id, d, Date.now(), dr)); };
     return () => { delete window.__post; };
   }, [fall]);
-  React.useEffect(() => watchPosts(postSince, (id, d, ts) => {
+  React.useEffect(() => watchPostsKeep(postSince, (id, d, ts) => {
     if (mineRef.current.some(e => e.gid === 'p' + id)) return;
     const dr = postDrop(d);
     fall(dr.g, dr.n, dr.rec, (d.text || '').trim());

@@ -52,6 +52,20 @@ export function watchPosts(since, cb, onErr) {
   }, (e) => onErr && onErr(e));
 }
 
+/* 受け取りがエラーで切れたら（権限・通信）、少し待ってつなぎ直す。戻り値でやめる */
+export function watchPostsKeep(since, cb, onErr) {
+  let un = null, t = null, stop = false;
+  const start = () => {
+    un = watchPosts(since, cb, (e) => {
+      onErr && onErr(e);
+      if (un) un(); un = null;
+      if (!stop) t = setTimeout(start, 5000);
+    });
+  };
+  start();
+  return () => { stop = true; clearTimeout(t); if (un) un(); };
+}
+
 /* 投稿 → 落とす絵文字と数（回復ならマイナス） */
 export function postDrop(d) {
   const f = FACES.find(x => x.face === d.face) || FACES[2];
