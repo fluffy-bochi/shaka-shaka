@@ -1,9 +1,30 @@
 import React from 'react';
 import Emo from './fluent';
-import { FACES, TEXT_MAX, sendPost } from './posts';
+import { FACES, TEXT_MAX, sendPost, tokenTime, TOKEN_FRESH_MS } from './posts';
 import { Post } from './screens/Home';
 
 const APP_URL = 'https://shaka-shaka.vercel.app'; // ほどほどふぉーと（Webアプリ）
+const SESSION_KEY = 'kame_post_session';
+const SESSION_MS = 10 * 60000; // QRから開いてこの時間投稿しなかったら、ありがとうの画面へ
+
+/* 投稿できるか: 展示のQRコードのしるし（作った時刻入り）が新しいときだけ、新しい回を始める。
+   開いたらしるしはURLから消す（リロード・URLの共有・直リンクではもう投稿できない）。
+   回は端末に覚えておき、投稿したあと・10分たったあとはありがとうの画面 */
+function startSession() {
+  const load = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { return null; } };
+  let ses = load();
+  const tok = new URLSearchParams(location.search).get('post');
+  if (tok) {
+    const t = tokenTime(tok), now = Date.now();
+    const fresh = t != null && now - t <= TOKEN_FRESH_MS && t - now <= 2 * 60000; // スマホの時計のずれも少し見る
+    if (fresh && (!ses || ses.tok !== tok)) ses = { tok, openedAt: now, posted: null };
+    else if (!ses || ses.tok !== tok) ses = null; // 古いしるし・作り物のしるし
+    try { if (ses) localStorage.setItem(SESSION_KEY, JSON.stringify(ses)); } catch (e) { /* ignore */ }
+    try { history.replaceState(null, '', location.pathname + '?post'); } catch (e) { /* ignore */ }
+  }
+  return ses;
+}
+const saveSession = (ses) => { try { localStorage.setItem(SESSION_KEY, JSON.stringify(ses)); } catch (e) { /* ignore */ } };
 
 /* スマホの投稿画面（QRコードから開く /?post）。本体のつぶやき画面（MoodPopup）の見た目を流用し、
    顔・つぶやきだけにしたもの */
@@ -13,9 +34,17 @@ const line = { border: 'none', borderBottom: '1px solid #1b1b18', background: 't
 export default function PostForm() {
   const [face, setFace] = React.useState(3);
   const [text, setText] = React.useState('');
-  const [state, setState] = React.useState('edit'); // edit | confirm | sending | done | error
+  const [ses] = React.useState(startSession);
+  const canPost = !!ses && !ses.posted && Date.now() - ses.openedAt < SESSION_MS;
+  const [state, setState] = React.useState(canPost ? 'edit' : 'done'); // edit | confirm | sending | done | error
   const [err, setErr] = React.useState('');
-  const [posted, setPosted] = React.useState(null); // 送った投稿の見た目（送った時刻で固定）
+  const [posted, setPosted] = React.useState(ses && ses.posted); // 送った投稿の見た目（送った時刻で固定）
+  // 開いてから10分たったら、投稿していなくてもありがとうの画面へ
+  React.useEffect(() => {
+    if (!ses) return undefined;
+    const t = setInterval(() => { if (Date.now() - ses.openedAt >= SESSION_MS) setState(st => (st === 'sending' ? st : 'done')); }, 5000);
+    return () => clearInterval(t);
+  }, [ses]);
   const canSave = state === 'edit' && (text.trim() || face !== 3);
   const icon = FACES.find(f => f.face === face).g;
   const f = FACES.find(x => x.face === face);
@@ -24,17 +53,17 @@ export default function PostForm() {
   const preview = { glyph: icon, head: 'つぶやき', time: now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0'), main: text.trim(), isNote: true,
     sumText: (f.rec ? '−' : '+') + f.n };
   const send = async () => {
-    if (state !== 'confirm') return;
+    if (state !== 'confirm' || !ses || ses.posted || Date.now() - ses.openedAt >= SESSION_MS) { setState('done'); return; }
     setState('sending');
-    try { await sendPost({ face, text: text.trim() }); setPosted(preview); setState('done'); } catch (e) { setErr((e && e.code) || ''); setState('error'); }
+    try { await sendPost({ face, text: text.trim() }); setPosted(preview); saveSession({ ...ses, posted: preview }); setState('done'); } catch (e) { setErr((e && e.code) || ''); setState('error'); }
   };
 
-  // 投稿後: 上から ありがとう → その人の投稿（展示のホームと同じ見た目） → Webアプリへの誘導
+  // 投稿後: 上から ありがとう → その人の投稿（展示のホームと同じ見た目・投稿していないときはなし） → Webアプリへの誘導
   if (state === 'done') {
     return (
       <div style={{ minHeight: '100dvh', background: '#f7f4ec', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22, padding: 'calc(56px + env(safe-area-inset-top)) 16px 40px' }}>
         <div style={{ fontSize: 24, fontWeight: 900 }}>ありがとう！</div>
-        <div style={{ width: '100%', maxWidth: 420, borderTop: '1px solid #bab5a7', borderBottom: '1px solid #bab5a7' }}><Post p={posted || preview} /></div>
+        {posted && <div style={{ width: '100%', maxWidth: 420, borderTop: '1px solid #bab5a7', borderBottom: '1px solid #bab5a7' }}><Post p={posted} /></div>}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginTop: 10, background: '#fff', borderRadius: 20, padding: '20px 28px', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
           <img src="/icon/kamepace-icon-180.png" alt="" style={{ width: 64, height: 64, borderRadius: 15 }} />
           <div style={{ fontSize: 16, fontWeight: 900 }}>ほどほどふぉーと</div>

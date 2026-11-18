@@ -6,7 +6,7 @@ import { initShakaSound, attachCollisionSound, playShaka, soundReady } from './s
 import Home from './screens/Home';
 import Bookshelf from './screens/Bookshelf';
 import QRCode from 'qrcode';
-import { watchPostsKeep, postDrop } from './posts';
+import { watchPostsKeep, postDrop, makeToken } from './posts';
 import { addPress, addPost, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
 import { homeLine } from './wake';
 import { strToDate, formatDateShort, tsToHmOn } from './model';
@@ -93,7 +93,11 @@ export default function Interactive() {
   // 音が出せるか（再読み込みのあと一度も操作がないと出せない）。出せないときだけバーに🔇
   const [sound, setSound] = React.useState(false);
   React.useEffect(() => { const t = setInterval(() => setSound(soundReady()), 1000); return () => clearInterval(t); }, []);
-  React.useEffect(() => { QRCode.toDataURL(location.origin + '/?post', { margin: 1, width: 320 }).then(setQr).catch(() => {}); }, []);
+  // QRコードの中身（しるしつき）は1分ごとに作り直す。古いリンクやリロードでは投稿できない（PostForm.jsx）
+  React.useEffect(() => {
+    const mk = () => QRCode.toDataURL(location.origin + '/?post=' + makeToken(), { margin: 1, width: 320 }).then(setQr).catch(() => {});
+    mk(); const t = setInterval(mk, 60000); return () => clearInterval(t);
+  }, []);
   // しばらく操作がなければゲージの画面へ
   React.useEffect(() => {
     let last = Date.now();
