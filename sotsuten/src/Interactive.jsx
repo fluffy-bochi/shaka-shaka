@@ -44,7 +44,7 @@ const DOG_LINES = [
   { t: 'ちょっと休もっか？', f: 'please' },
 ];
 const DOG_LINE_MS = 7000; // ひとことを変える間隔
-const DOG_H = 0.72; // 絵の高さ（箱の幅に対して・前の3倍）。表情ごとに絵の縦横比がちがうので高さでそろえる
+const DOG_H = 0.36; // 絵の高さ（箱の幅に対して）。表情ごとに絵の縦横比がちがうので高さでそろえる
 const IDLE_MS = 5 * 60000; // この間なにも操作がなければゲージ（シャカシャカ）の画面に戻す
 const FILL_UNIT = 125; // シャカと同じ: この個数で箱がいっぱい（memory: emoji-pile-fill-rule）
 
@@ -186,11 +186,16 @@ export default function Interactive() {
     const dog = document.createElement('img');
     dog.className = 'dog-pic';
     Object.assign(dog.style, { height: dogH + 'px' });
+    // ふきだしはノベルゲームのテキストウィンドウ風（名前つき・犬のおなかのあたり）
     const dogSay = document.createElement('div');
     dogSay.className = 'dog-say';
+    const dogName = document.createElement('div'); dogName.className = 'dog-say-name'; dogName.textContent = 'やるきーぬ';
+    const dogText = document.createElement('div'); dogText.className = 'dog-say-text';
+    dogSay.appendChild(dogName); dogSay.appendChild(dogText);
+    dogSay.style.width = Math.round(Math.min(W * 0.8, 600)) + 'px';
     box.appendChild(dog); box.appendChild(dogSay);
     let lineI = 0;
-    const setLine = () => { const L = DOG_LINES[lineI % DOG_LINES.length]; lineI++; cutout('/chara/dog_' + L.f + '.png').then(u => { dog.src = u; dogSay.textContent = L.t; }); }; // 白い背景を抜いた絵に
+    const setLine = () => { const L = DOG_LINES[lineI % DOG_LINES.length]; lineI++; cutout('/chara/dog_' + L.f + '.png').then(u => { dog.src = u; dogText.textContent = L.t; }); }; // 白い背景を抜いた絵に
     setLine();
     const lineT = setInterval(setLine, DOG_LINE_MS);
     s.dog = { x: W / 2, y: H, ready: false };
@@ -206,12 +211,11 @@ export default function Interactive() {
       const w = dog.offsetWidth || dogH * 0.7;
       const x = Math.min(W - w / 2, Math.max(w / 2, d.x)), y = Math.max(dogH, d.y);
       dog.style.transform = `translate(${x - w / 2}px, ${y - dogH}px)`;
-      // ふきだしは頭の横（左半分にいるときは右、右半分にいるときは左）
-      const bw = dogSay.offsetWidth, bh = dogSay.offsetHeight, right = x < W / 2;
-      const bx = right ? Math.min(W - bw - 6, x + w / 2 - 4) : Math.max(6, x - w / 2 - bw + 4);
-      const by = Math.max(6, y - dogH + dogH * 0.08);
+      // テキストウィンドウは犬のおなかのあたり（横は真ん中・箱からはみ出さない）
+      const bw = dogSay.offsetWidth, bh = dogSay.offsetHeight;
+      const bx = (W - bw) / 2;
+      const by = Math.min(H - bh - 10, Math.max(10, y - dogH * 0.42 - bh / 2));
       dogSay.style.transform = `translate(${bx}px, ${by}px)`;
-      dogSay.classList.toggle('left', !right);
     };
     s.moveDog = moveDog;
     // 山を保存（箱の大きさに対する割合で。回復の絵文字は残さない）
