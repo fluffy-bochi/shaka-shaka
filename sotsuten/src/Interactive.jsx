@@ -158,7 +158,6 @@ export default function Interactive() {
       el.style.visibility = 'hidden'; // 最初の位置が決まるまで隠す
       box.appendChild(el);
       s.bubbles.push({ el, b, until: Date.now() + BUBBLE_MS });
-      if (b.rec) b.holdUntil = Date.now() + BUBBLE_MS;
     };
     // 山を保存（箱の大きさに対する割合で。回復の絵文字は残さない）
     s.save = () => saveJSON(PILE_KEY, s.bodies.filter(b => !b.rec && !b.dead).map(b => ({ g: b.g, x: +(b.body.position.x / W).toFixed(4), y: +(b.body.position.y / H).toFixed(4), a: +b.body.angle.toFixed(3) })));
@@ -174,7 +173,6 @@ export default function Interactive() {
       for (const n of s.bodies) {
         if (n.dead || !n.rec) continue;
         const p = s.bodies.find(b => !b.dead && !b.rec && (b.body.position.x - n.body.position.x) ** 2 + (b.body.position.y - n.body.position.y) ** 2 < hit2);
-        if (n.holdUntil && Date.now() < n.holdUntil) continue; // 吹き出しがついている回復の絵文字は、吹き出しが消えるまで山の上に残す
         if (p) { pop((p.body.position.x + n.body.position.x) / 2, (p.body.position.y + n.body.position.y) / 2); playShaka(12, true); kill(p); kill(n); } // 消えるときも音
         else if (Date.now() - n.at > 2500 && n.body.speed < 0.3) { playShaka(7, true); kill(n); } // 消すものがなければ、着いたら消える
       }
