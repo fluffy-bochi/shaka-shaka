@@ -27,3 +27,6 @@ button { font-family: inherit; }
 .nos { scrollbar-width: none; }
 @keyframes bubbleIn { from { opacity: .2; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes sheetUp { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
+
+/* スマホの投稿画面はスクロールできるように・文字を選べるように */
+html:has(body.post-page), body.post-page { overflow: auto; height: auto; -webkit-user-select: auto; user-select: auto; }
