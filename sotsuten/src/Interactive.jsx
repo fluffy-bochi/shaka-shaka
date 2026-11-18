@@ -8,7 +8,7 @@ import QRCode from 'qrcode';
 import { watchPostsKeep, postDrop } from './posts';
 import { addPress, addPost, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
 import { homeLine } from './wake';
-import { strToDate } from './model';
+import { strToDate, formatDateShort, tsToHmOn } from './model';
 
 /* 卒展用インタラクティブ（ほどほどふぉーと本体の IpadTest.jsx から移した単独版）。記録も保存もしない。
    キーボードの数字で絵文字を降らせる。R でシャカシャカ（展示ではモニターに映すのでジャイロは使わない）。回復（rec）はプラスの絵文字に当たると1つずつ消しあう（シャカと同じ）。 */
@@ -75,6 +75,9 @@ export default function Interactive() {
   React.useEffect(() => { saveJSON(DATA_KEY, { mine, lastRec, bookFav, bookDiary, postSince }); }, [mine, lastRec, bookFav, bookDiary, postSince]);
   // スマホの投稿画面のQRコード（ゲージの右上）
   const [qr, setQr] = React.useState('');
+  // ゲージの日付と大きい時計（本体のシャカ画面と同じ）
+  const [clock, setClock] = React.useState(() => tsToHmOn(todayStr(), Date.now()));
+  React.useEffect(() => { const t = setInterval(() => setClock(tsToHmOn(todayStr(), Date.now())), 1000); return () => clearInterval(t); }, []);
   // 音が出せるか（再読み込みのあと一度も操作がないと出せない）。出せないときだけバーに🔇
   const [sound, setSound] = React.useState(false);
   React.useEffect(() => { const t = setInterval(() => setSound(soundReady()), 1000); return () => clearInterval(t); }, []);
@@ -314,6 +317,12 @@ export default function Interactive() {
   const stage = (style) => (
     <div style={{ position: 'relative', overflow: 'hidden', background: '#f7f4ec', ...style }}>
       <div ref={boxRef} style={{ position: 'absolute', inset: 0, overflow: 'hidden' }} />
+      {tab === 'gauge' && (
+        <div style={{ position: 'absolute', left: 0, top: 0, width: pc ? bw / zoom : '100%', zoom, zIndex: 1, pointerEvents: 'none', textAlign: 'center' }}>
+          <div style={{ display: 'inline-block', marginTop: 12, background: 'rgba(255,255,255,.85)', borderRadius: 999, padding: '8px 18px', fontFamily: "'Space Mono',monospace", fontSize: 12, fontWeight: 700 }}>{formatDateShort(today)}</div>
+          <div style={{ fontFamily: "'Archivo',sans-serif", fontWeight: 800, fontSize: 68, lineHeight: 1.02, letterSpacing: '.01em', marginTop: 14, color: count0 >= 90 ? '#fff' : '#1b1b18', textShadow: count0 >= 90 ? '0 2px 10px rgba(27,27,24,.35)' : 'none', transition: 'color .3s' }}>{clock}</div>
+        </div>
+      )}
       {tab === 'gauge' && qr && (
         <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, background: '#fff', borderRadius: 14, padding: '8px 8px 6px', boxShadow: '0 2px 10px rgba(27,27,24,.12)', textAlign: 'center', pointerEvents: 'none' }}>
           <img src={qr} alt="" style={{ display: 'block', width: 112, height: 112 }} />
