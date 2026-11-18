@@ -22,6 +22,8 @@ const KEYS = {
   9: { g: '🎤', n: 2 },
   0: { g: '🛏️', n: 2, rec: true },
 };
+/* 本体のシャカと同じ「硬い」物理: 跳ねない・よく噛む・沈まない・止まったら眠る */
+const BODY_OPTS = { restitution: 0.12, friction: 0.4, frictionStatic: 0.6, frictionAir: 0.012, density: 0.01, slop: 0.01, sleepThreshold: 30 };
 const FILL_UNIT = 125; // シャカと同じ: この個数で箱がいっぱい（memory: emoji-pile-fill-rule）
 
 /* 向き: auto＝端末の向きのまま／portrait＝縦／landscape＝横。iOS は Web から向きを固定できないので、
@@ -92,6 +94,7 @@ export default function Interactive() {
     const W = box.clientWidth, H = box.clientHeight;
     const r = Math.sqrt((W * H) / (FILL_UNIT * Math.PI));
     const engine = Matter.Engine.create({ positionIterations: 8, velocityIterations: 4 });
+    engine.enableSleeping = true; // 止まった絵文字は眠らせて、たくさん積んでもモゴモゴ動き続けないように（本体のシャカと同じ）
     engine.gravity.y = 1.4;
     const wall = (x, y, w, h) => Matter.Bodies.rectangle(x, y, w, h, { isStatic: true, friction: 0.4 });
     Matter.World.add(engine.world, [wall(W / 2, H + 50, W * 3, 100), wall(-50, H / 2, 100, H * 4), wall(W + 50, H / 2, 100, H * 4)]);
@@ -100,7 +103,7 @@ export default function Interactive() {
     sim.current = s;
 
     const pop = (x, y) => { const fx = document.createElement('div'); fx.className = 'pop-fx'; fx.style.left = x + 'px'; fx.style.top = y + 'px'; box.appendChild(fx); setTimeout(() => fx.remove(), 450); };
-    const kill = (b) => { Matter.World.remove(engine.world, b.body); b.dead = true; b.el.style.transition = 'opacity .15s'; b.el.style.opacity = '0'; setTimeout(() => b.el.remove(), 200); };
+    const kill = (b) => { Matter.World.remove(engine.world, b.body); s.bodies.forEach(o => Matter.Sleeping.set(o.body, false)); /* 下が消えたら上が落ちるように起こす */ b.dead = true; b.el.style.transition = 'opacity .15s'; b.el.style.opacity = '0'; setTimeout(() => b.el.remove(), 200); };
     const step = (t) => {
       const dt = s.last ? Math.min(50, t - s.last) : 16; s.last = t; s.acc += dt;
       while (s.acc >= 1000 / 60) { Matter.Engine.update(engine, 1000 / 60); s.acc -= 1000 / 60; }
@@ -128,7 +131,7 @@ export default function Interactive() {
     const s = sim.current, box = boxRef.current, k = KEYS[key]; if (!s || !box || !k) return;
     for (let i = 0; i < k.n; i++) {
       const x = s.r + Math.random() * (s.W - s.r * 2);
-      const body = Matter.Bodies.circle(x, -s.r * (1.2 + i * 2.2), s.r * 0.92, { restitution: 0.15, friction: 0.3, density: 0.002, angle: (Math.random() - 0.5) * 0.6 });
+      const body = Matter.Bodies.circle(x, -s.r * (1.2 + i * 2.2), s.r * 0.92, { ...BODY_OPTS, angle: (Math.random() - 0.5) * 0.6 });
       if (k.rec) body.collisionFilter = { group: -1, category: 2, mask: 1 }; // 回復どうしは重ならず、山の上に当たったら1つ消す
       Matter.Body.setVelocity(body, { x: (Math.random() - 0.5) * 2, y: 2 });
       const el = document.createElement('div');
