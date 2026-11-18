@@ -4,7 +4,9 @@ import { appendGlyph } from './fluent';
 import { initShakaSound, attachCollisionSound } from './sound';
 import Home from './screens/Home';
 import Bookshelf from './screens/Bookshelf';
-import { addPress, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
+import QRCode from 'qrcode';
+import { watchPosts, postDrop } from './posts';
+import { addPress, addPost, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
 import { homeLine } from './wake';
 import { strToDate } from './model';
 
@@ -68,7 +70,11 @@ export default function Interactive() {
   const [homeDate, setHomeDate] = React.useState(null); // null＝今日
   const [bookFav, setBookFav] = React.useState(saved0.bookFav || {});
   const [bookDiary, setBookDiary] = React.useState(saved0.bookDiary || {});
-  React.useEffect(() => { saveJSON(DATA_KEY, { mine, lastRec, bookFav, bookDiary }); }, [mine, lastRec, bookFav, bookDiary]);
+  const [postSince, setPostSince] = React.useState(saved0.postSince || Date.now()); // この時刻より後のスマホの投稿を受け取る（リセットで今に）
+  React.useEffect(() => { saveJSON(DATA_KEY, { mine, lastRec, bookFav, bookDiary, postSince }); }, [mine, lastRec, bookFav, bookDiary, postSince]);
+  // スマホの投稿画面のQRコード（ゲージの右上）
+  const [qr, setQr] = React.useState('');
+  React.useEffect(() => { QRCode.toDataURL(location.origin + '/?post', { margin: 1, width: 320 }).then(setQr).catch(() => {}); }, []);
   // しばらく操作がなければゲージの画面へ
   React.useEffect(() => {
     let last = Date.now();
@@ -172,18 +178,31 @@ export default function Interactive() {
     return () => { s.save(); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
   }, [layoutKey]);
 
-  const drop = React.useCallback((key) => {
-    const s = sim.current, box = boxRef.current, k = KEYS[key]; if (!s || !box || !k) return;
-    for (let i = 0; i < k.n; i++) {
+  // 絵文字 g を n 個、上から降らせる（数字キー・スマホの投稿）
+  const fall = React.useCallback((g, n, rec) => {
+    const s = sim.current; if (!s) return;
+    for (let i = 0; i < n; i++) {
       const x = s.r + Math.random() * (s.W - s.r * 2);
-      const b = s.spawn(k.g, x, -s.r * (1.2 + i * 2.2), (Math.random() - 0.5) * 0.6, !!k.rec);
+      const b = s.spawn(g, x, -s.r * (1.2 + i * 2.2), (Math.random() - 0.5) * 0.6, !!rec);
       Matter.Body.setVelocity(b.body, { x: (Math.random() - 0.5) * 2, y: 2 });
     }
     s.save();
     setCount(s.bodies.filter(b => !b.rec).length);
-    setMine(l => addPress(l, key, k.g, k.n, !!k.rec));
-    setLastRec({ ts: Date.now(), rec: !!k.rec });
+    setLastRec({ ts: Date.now(), rec: !!rec });
   }, []);
+  const drop = React.useCallback((key) => {
+    const k = KEYS[key]; if (!k || !sim.current) return;
+    fall(k.g, k.n, k.rec);
+    setMine(l => addPress(l, key, k.g, k.n, !!k.rec));
+  }, [fall]);
+  // スマホからの投稿を受け取って、ゲージに降らせてホームに載せる（同じ投稿は1回だけ）
+  const mineRef = React.useRef(mine); mineRef.current = mine;
+  React.useEffect(() => watchPosts(postSince, (id, d, ts) => {
+    if (mineRef.current.some(e => e.gid === 'p' + id)) return;
+    const dr = postDrop(d);
+    fall(dr.g, dr.n, dr.rec);
+    setMine(l => addPost(l, id, d, ts, dr));
+  }, (e) => console.warn('[sotsuten] posts', e && e.code)), [postSince, fall]);
 
   /* シャカシャカ: 全部の絵文字を散らす（シャカの🔀と同じ動き。箱が大きいぶん少し強め） */
   const shake = React.useCallback(() => {
@@ -200,7 +219,7 @@ export default function Interactive() {
     const s = sim.current; if (!s) return;
     s.bodies.forEach(b => { Matter.World.remove(s.engine.world, b.body); b.el.remove(); });
     s.bodies = []; setCount(0); s.save();
-    setMine([]); setLastRec(null); setHomeDate(null); setBookFav({}); setBookDiary({}); // 次の来場者のために今日の記録も消す
+    setMine([]); setLastRec(null); setHomeDate(null); setBookFav({}); setBookDiary({}); setPostSince(Date.now()); // 次の来場者のために今日の記録も消す（前のスマホの投稿も受け取らない）
   };
 
   React.useEffect(() => {
@@ -259,6 +278,12 @@ export default function Interactive() {
   const stage = (style) => (
     <div style={{ position: 'relative', overflow: 'hidden', background: '#f7f4ec', ...style }}>
       <div ref={boxRef} style={{ position: 'absolute', inset: 0, overflow: 'hidden' }} />
+      {tab === 'gauge' && qr && (
+        <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, background: '#fff', borderRadius: 14, padding: '8px 8px 6px', boxShadow: '0 2px 10px rgba(27,27,24,.12)', textAlign: 'center', pointerEvents: 'none' }}>
+          <img src={qr} alt="" style={{ display: 'block', width: 112, height: 112 }} />
+          <div style={{ fontSize: 11, fontWeight: 800, marginTop: 4 }}>スマホでつぶやく</div>
+        </div>
+      )}
       {tab !== 'gauge' && (
         <div style={{ position: 'absolute', left: 0, top: 0, zIndex: 3, width: pc ? bw / zoom : '100%', height: pc ? bh / zoom : '100%', zoom, display: 'flex', flexDirection: 'column', background: '#f7f4ec' }}>
           {homeV && <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}><Home v={homeV} /></div>}

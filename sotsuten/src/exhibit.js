@@ -20,8 +20,8 @@ export const KEY_REC = {
 };
 export const GROUP_GAP_MS = 3 * 60000; // 前に押してからこの時間がたったら、ホームで別の塊（投稿）にする
 
-const nowHm = () => {
-  const t = todayStr(), ms = Date.now() - hmToTsOn(t, '00:00');
+const nowHm = (ts) => {
+  const t = todayStr(), ms = (ts || Date.now()) - hmToTsOn(t, '00:00');
   const m = Math.max(0, Math.floor(ms / 60000));
   return pad2(Math.floor(m / 60)) + ':' + pad2(m % 60);
 };
@@ -31,8 +31,9 @@ const nowHm = () => {
 export function addPress(list, key, glyph, n, rec) {
   const k = KEY_REC[key]; if (!k) return list;
   const d = (rec ? -1 : 1) * n, hm = nowHm(), now = Date.now();
-  const lastAt = list.reduce((a, e) => Math.max(a, e.at || 0), 0);
-  const last = list[list.length - 1];
+  const keys = list.filter(e => e.key !== 'post'); // スマホの投稿は数字キーの塊に入れない
+  const lastAt = keys.reduce((a, e) => Math.max(a, e.at || 0), 0);
+  const last = keys[keys.length - 1];
   const gid = last && now - lastAt < GROUP_GAP_MS ? last.gid : 'g' + now;
   const i = list.findIndex(e => e.gid === gid && e.key === key);
   if (i >= 0) {
@@ -42,6 +43,15 @@ export function addPress(list, key, glyph, n, rec) {
   return [...list, {
     key, gid, at: now, date: todayStr(), from: hm, to: hm, title: k.title, glyph, delta: d,
     exp: false, ...(k.tweet ? { event: true, moodLabel: 'きもち', mindCond: k.mind } : {}),
+  }];
+}
+
+/* スマホからのつぶやき1件を記録に（1件ずつ別の投稿。本文はコメントとして出る） */
+export function addPost(list, id, d, ts, drop) {
+  if (list.some(e => e.gid === 'p' + id)) return list;
+  return [...list, {
+    key: 'post', gid: 'p' + id, at: ts, date: todayStr(), from: nowHm(ts), to: '', title: 'つぶやき', moodLabel: 'つぶやき',
+    glyph: drop.g, delta: (drop.rec ? -1 : 1) * drop.n, note: d.text || '', event: true, mindCond: d.face, exp: false,
   }];
 }
 
