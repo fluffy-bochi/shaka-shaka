@@ -31,7 +31,7 @@ const nowHm = (ts) => {
 export function addPress(list, key, glyph, n, rec) {
   const k = KEY_REC[key]; if (!k) return list;
   const d = (rec ? -1 : 1) * n, hm = nowHm(), now = Date.now();
-  const keys = list.filter(e => e.key !== 'post'); // スマホの投稿は数字キーの塊に入れない
+  const keys = list.filter(e => e.key !== 'post' && e.key !== 'rec'); // スマホの投稿・記録画面の記録は数字キーの塊に入れない
   const lastAt = keys.reduce((a, e) => Math.max(a, e.at || 0), 0);
   const last = keys[keys.length - 1];
   const gid = last && now - lastAt < GROUP_GAP_MS ? last.gid : 'g' + now;
@@ -53,6 +53,15 @@ export function addPost(list, id, d, ts, drop) {
     key: 'post', gid: 'p' + id, at: ts, date: todayStr(), from: nowHm(ts), to: '', title: 'つぶやき', moodLabel: 'つぶやき',
     glyph: drop.g, delta: (drop.rec ? -1 : 1) * drop.n, note: d.text || '', event: true, mindCond: d.face, exp: false,
   }];
+}
+
+/* 記録画面（気分・行動・がんばりタイプ）の1回ぶんを記録に。気分と行動を1つの投稿にまとめる */
+export function addRecord(list, r, moodDrop, actDropV) {
+  const ts = Date.now(), hm = nowHm(ts), gid = 'r' + ts;
+  return [...list,
+    { key: 'rec', gid, at: ts, date: todayStr(), from: hm, to: hm, title: 'きもち', moodLabel: 'きもち', glyph: r.mood.g, delta: (moodDrop.rec ? -1 : 1) * moodDrop.n, event: true, mindCond: r.mood.face, exp: false },
+    { key: 'rec', gid, at: ts, date: todayStr(), from: hm, to: hm, title: r.act.name, glyph: r.act.glyph, delta: (actDropV.rec ? -1 : 1) * actDropV.n, exp: false, postTitle: r.act.name + '（' + r.type.name + '）' },
+  ];
 }
 
 /* サンプル（今日より前だけ）。表示に使う学年ぶんを作ってまとめる */

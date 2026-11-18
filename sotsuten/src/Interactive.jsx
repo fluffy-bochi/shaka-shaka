@@ -5,9 +5,10 @@ import { cutout } from './cutout';
 import { initShakaSound, attachCollisionSound, playShaka, soundReady } from './sound';
 import Home from './screens/Home';
 import Bookshelf from './screens/Bookshelf';
+import Record, { actDrop } from './screens/Record';
 import QRCode from 'qrcode';
 import { watchPostsKeep, postDrop, makeToken } from './posts';
-import { addPress, addPost, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
+import { addPress, addPost, addRecord, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
 import { homeLine } from './wake';
 import { strToDate, formatDateShort, tsToHmOn } from './model';
 
@@ -76,7 +77,8 @@ export default function Interactive() {
   const boxRef = React.useRef(null);
   const sim = React.useRef(null);
   const [count0, setCount] = React.useState(0);
-  const [tab, setTab] = React.useState('gauge'); // フッターの選択（B=本棚・H=ホーム・G=ゲージ。本番は iPad のハードキーで操作）
+  const [tab, setTab] = React.useState('gauge');
+  const tabRef = React.useRef(tab); tabRef.current = tab; // 'record' のあいだは記録画面がキーを受け取る // フッターの選択（B=本棚・H=ホーム・G=ゲージ。本番は iPad のハードキーで操作）
   // 来場者が数字キーで入れた今日の記録（保存しない）。過去の日はサンプルのペルソナ
   const saved0 = React.useMemo(() => loadJSON(DATA_KEY, {}), []);
   const [mine, setMine] = React.useState(saved0.mine || []);
@@ -283,6 +285,14 @@ export default function Interactive() {
     fall(k.g, k.n, k.rec);
     setMine(l => addPress(l, key, k.g, k.n, !!k.rec));
   }, [fall]);
+  // 記録画面で「記録する」→ ゲージに戻って、気分と行動の絵文字を降らせる（数はがんばりタイプで増える）
+  const onRecordDone = React.useCallback((r) => {
+    setTab('gauge');
+    const md = { g: r.mood.g, n: r.mood.n, rec: !!r.mood.rec }, ad = actDrop(r.act, r.type);
+    setTimeout(() => { fall(md.g, md.n, md.rec); setTimeout(() => fall(ad.g, ad.n, ad.rec), 350); }, 250);
+    setMine(l => addRecord(l, r, md, ad));
+  }, [fall]);
+  const onRecordClose = React.useCallback(() => setTab('gauge'), []);
   // スマホからの投稿を受け取って、ゲージに降らせてホームに載せる（同じ投稿は1回だけ）
   const mineRef = React.useRef(mine); mineRef.current = mine;
   // 確認用（URL に ?debug のときだけ）: window.__post('テキスト', 顔1〜5) でスマホの投稿が届いたのと同じ動き
@@ -320,6 +330,10 @@ export default function Interactive() {
   React.useEffect(() => {
     const onKey = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (tabRef.current === 'record') return; // 記録画面（Record.jsx）が受け取る
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key) && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) {
+        e.preventDefault(); setTab('record'); return; // 上下左右・Enter（物理ボタン）で記録画面を開く
+      }
       const tg = e.target && e.target.tagName;
       if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT') return; // 本棚の日記を書いているとき
       const nav = { KeyB: 'book', KeyH: 'home', KeyG: 'gauge' }[e.code] || { b: 'book', h: 'home', g: 'gauge' }[(e.key || '').toLowerCase()];
@@ -389,6 +403,7 @@ export default function Interactive() {
         <div style={{ position: 'absolute', left: 0, top: 0, zIndex: 3, width: pc ? bw / zoom : '100%', height: pc ? bh / zoom : '100%', zoom, display: 'flex', flexDirection: 'column', background: '#f7f4ec' }}>
           {homeV && <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}><Home v={homeV} /></div>}
           {bookV && <Bookshelf key={bookV.land ? 'land' : 'port'} v={bookV} />}
+          {tab === 'record' && <div style={{ position: 'relative', flex: 1, minHeight: 0 }}><Record onDone={onRecordDone} onClose={onRecordClose} /></div>}
         </div>
       )}
     </div>
