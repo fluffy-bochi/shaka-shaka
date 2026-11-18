@@ -71,6 +71,9 @@ export function initShakaSound() {
   }
 }
 
+/* 音を出せる状態か（ブラウザはページを開いてから一度操作があるまで音を出させない） */
+export function soundReady() { return IS_IOS ? htmlUnlocked : !!(ctx && ctx.state === 'running' && buffer); }
+
 export function playShaka(speed, force) { // force: 回復で消えたときなど、ぶつかった音の間隔に関係なく鳴らす
   const now = performance.now();
   const cooldown = IS_IOS ? HTML_COOLDOWN : WA_COOLDOWN;
@@ -87,7 +90,9 @@ export function playShaka(speed, force) { // force: 回復で消えたときな�
   }
   // Web Audio
   if (!ctx || !buffer) return;
-  if (ctx.state !== 'running') ctx.resume().catch(() => {});
+  // まだ音を出せない（ページを開いてから一度も操作がない）ときは鳴らさない。
+  // 止まったままの音に start すると、あとで操作したときにまとめて鳴ってしまうため
+  if (ctx.state !== 'running') { ctx.resume().catch(() => {}); return; }
   lastShakaPlay = now;
   if (liveCount >= WA_MAX_CONCURRENT) return;
   try {
