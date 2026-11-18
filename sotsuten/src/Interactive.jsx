@@ -220,10 +220,11 @@ export default function Interactive() {
       const w = dog.offsetWidth || dogH * 0.7;
       const x = Math.min(W - w / 2, Math.max(w / 2, d.x)), y = Math.max(dogH, d.y);
       dog.style.transform = `translate(${x - w / 2}px, ${y - dogH}px)`;
-      // テキストウィンドウの下のはしを犬の足もとにそろえる（横は真ん中・箱からはみ出さない）
+      // テキストウィンドウは犬の右上（顔にかからないように・右にはみ出すときは左上）
       const bw = dogSay.offsetWidth, bh = dogSay.offsetHeight;
-      const bx = (W - bw) / 2;
-      const by = Math.min(H - bh - 10, Math.max(10, y - bh));
+      const rightX = x + w * 0.32, leftX = x - w * 0.32 - bw;
+      const bx = rightX + bw <= W - 6 ? rightX : Math.max(6, leftX);
+      const by = Math.min(H - bh - 10, Math.max(22, y - dogH - bh * 0.15));
       dogSay.style.transform = `translate(${bx}px, ${by}px)`;
     };
     s.moveDog = moveDog;
