@@ -1,6 +1,7 @@
 import React from 'react';
 import Matter from 'matter-js';
 import { appendGlyph } from './fluent';
+import { cutout } from './cutout';
 import { initShakaSound, attachCollisionSound, playShaka, soundReady } from './sound';
 import Home from './screens/Home';
 import Bookshelf from './screens/Bookshelf';
@@ -33,6 +34,17 @@ const PILE_KEY = 'kame_sotsuten_pile', DATA_KEY = 'kame_sotsuten_data';
 const loadJSON = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } };
 const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } };
 const BUBBLE_KEEP = 3; // スマホのつぶやきの吹き出しは、このあと何回降ったら消すか（数字キー・投稿どちらも1回）
+/* ゲージの山のいちばん上にいる、やるきーぬのひとこと（順番に。face は public/chara/dog_<face>.png） */
+const DOG_LINES = [
+  { t: 'やっほー', f: 'happy' },
+  { t: '今日は何してたの？', f: 'think' },
+  { t: '今日のご飯何にする？', f: 'think' },
+  { t: 'ここで遊ぶの好きなんだー', f: 'normal' },
+  { t: 'いっぱい積もったね', f: 'ok' },
+  { t: 'ちょっと休もっか？', f: 'please' },
+];
+const DOG_LINE_MS = 7000; // ひとことを変える間隔
+const DOG_H = 0.24; // 絵の高さ（箱の幅に対して）。表情ごとに絵の縦横比がちがうので高さでそろえる
 const IDLE_MS = 5 * 60000; // この間なにも操作がなければゲージ（シャカシャカ）の画面に戻す
 const FILL_UNIT = 125; // シャカと同じ: この個数で箱がいっぱい（memory: emoji-pile-fill-rule）
 
@@ -165,6 +177,37 @@ export default function Interactive() {
       box.appendChild(el);
       s.bubbles.push({ el, b, left: BUBBLE_KEEP });
     };
+    // やるきーぬ: 山のいちばん上の絵文字の上に乗る（物理の体はなく、絵だけ）。しゃべる
+    const dogH = Math.round(W * DOG_H);
+    const dog = document.createElement('img');
+    dog.className = 'dog-pic';
+    Object.assign(dog.style, { height: dogH + 'px' });
+    const dogSay = document.createElement('div');
+    dogSay.className = 'dog-say';
+    box.appendChild(dog); box.appendChild(dogSay);
+    let lineI = 0;
+    const setLine = () => { const L = DOG_LINES[lineI % DOG_LINES.length]; lineI++; cutout('/chara/dog_' + L.f + '.png').then(u => { dog.src = u; dogSay.textContent = L.t; }); }; // 白い背景を抜いた絵に
+    setLine();
+    const lineT = setInterval(setLine, DOG_LINE_MS);
+    s.dog = { x: W / 2, y: H, ready: false };
+    const moveDog = () => {
+      // いちばん上（y が小さい）の、箱の中に入っていて止まっている山の絵文字
+      let top = null;
+      for (const b of s.bodies) { if (b.rec || b.dead || b.body.speed > 1.5) continue; /* 落ちている途中のは見ない */ const y = b.body.position.y; if (y > r && (!top || y < top.body.position.y)) top = b; }
+      const tx = top ? top.body.position.x : W / 2, ty = top ? top.body.position.y - r * 0.85 : H;
+      const d = s.dog, k = d.ready ? 0.12 : 1; d.ready = true; // ゆっくり追いかけて、山のゆれでガタガたしないように
+      d.x += (tx - d.x) * k; d.y += (ty - d.y) * k;
+      const w = dog.offsetWidth || dogH * 0.7;
+      const x = Math.min(W - w / 2, Math.max(w / 2, d.x)), y = Math.max(dogH, d.y);
+      dog.style.transform = `translate(${x - w / 2}px, ${y - dogH}px)`;
+      // ふきだしは頭の横（左半分にいるときは右、右半分にいるときは左）
+      const bw = dogSay.offsetWidth, bh = dogSay.offsetHeight, right = x < W / 2;
+      const bx = right ? Math.min(W - bw - 6, x + w / 2 - 4) : Math.max(6, x - w / 2 - bw + 4);
+      const by = Math.max(6, y - dogH + dogH * 0.08);
+      dogSay.style.transform = `translate(${bx}px, ${by}px)`;
+      dogSay.classList.toggle('left', !right);
+    };
+    s.moveDog = moveDog;
     // 山を保存（箱の大きさに対する割合で。回復の絵文字は残さない）
     s.save = () => saveJSON(PILE_KEY, s.bodies.filter(b => !b.rec && !b.dead).map(b => ({ g: b.g, x: +(b.body.position.x / W).toFixed(4), y: +(b.body.position.y / H).toFixed(4), a: +b.body.angle.toFixed(3) })));
     loadJSON(PILE_KEY, []).forEach(p => p && p.g && s.spawn(p.g, Math.min(W - r, Math.max(r, p.x * W)), p.y * H, p.a || 0, false));
@@ -187,6 +230,7 @@ export default function Interactive() {
         const { x, y } = b.body.position;
         b.el.style.transform = `translate(${x - r}px, ${y - r}px) rotate(${b.body.angle}rad)`;
       }
+      moveDog();
       if (s.bubbles.length) {
         s.bubbles = s.bubbles.filter(q => {
           if (q.left <= 0) { q.el.style.opacity = '0'; setTimeout(() => q.el.remove(), 400); return false; } // このあと BUBBLE_KEEP 回降ったら消す
@@ -205,7 +249,7 @@ export default function Interactive() {
     };
     s.raf = requestAnimationFrame(step);
     setCount(s.bodies.length);
-    return () => { s.save(); s.bubbles.forEach(q => q.el.remove()); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
+    return () => { s.save(); s.bubbles.forEach(q => q.el.remove()); dog.remove(); dogSay.remove(); clearInterval(lineT); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
   }, [layoutKey]);
 
   // 絵文字 g を n 個、上から降らせる（数字キー・スマホの投稿）
