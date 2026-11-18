@@ -19,7 +19,7 @@ const fab = { width: 60, height: 60, borderRadius: '50%', border: 'none', backgr
 export function Post({ p }) {
   const fade = p.past ? 0.55 : 1;
   return (
-    <div onClick={p.onTap} style={{ position: 'relative', background: '#f7f4ec', borderTop: '1px solid #bab5a7', padding: '4px 20px 10px 72px', cursor: 'pointer', userSelect: 'none' }}>
+    <div onClick={p.onTap} style={{ position: 'relative', background: p.noBorder ? 'transparent' : '#f7f4ec', borderTop: p.noBorder ? 'none' : '1px solid #bab5a7', padding: '4px 20px 10px 72px', cursor: 'pointer', userSelect: 'none' }}>
       <div style={{ opacity: fade }}>
         <span style={{ position: 'absolute', left: 28, top: 8 }}><Emo e={p.glyph} size={24} /></span>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, lineHeight: '20px', paddingRight: 34, whiteSpace: 'nowrap', overflow: 'hidden' }}>

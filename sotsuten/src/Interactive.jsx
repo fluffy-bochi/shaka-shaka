@@ -3,7 +3,7 @@ import Matter from 'matter-js';
 import { appendGlyph } from './fluent';
 import { cutout } from './cutout';
 import { initShakaSound, attachCollisionSound, playShaka, soundReady } from './sound';
-import Home from './screens/Home';
+import HomeEx from './screens/HomeEx'; // 卒展のホーム（Figma 卒展/ホーム）。投稿の見た目は本体の Home.jsx の Post
 import Bookshelf from './screens/Bookshelf';
 import Record, { actDrop } from './screens/Record';
 import QRCode from 'qrcode';
@@ -425,7 +425,7 @@ export default function Interactive() {
       )}
       {tab !== 'gauge' && (
         <div style={{ position: 'absolute', left: 0, top: 0, zIndex: 3, width: pc ? bw / zoom : '100%', height: pc ? bh / zoom : '100%', zoom, display: 'flex', flexDirection: 'column', background: tab === 'record' ? 'transparent' : '#f7f4ec' /* 記録中は後ろのゲージがぼけて見える */ }}>
-          {homeV && <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}><Home v={homeV} /></div>}
+          {homeV && <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}><HomeEx v={homeV} /></div>}
           {bookV && <Bookshelf key={bookV.land ? 'land' : 'port'} v={bookV} />}
           {tab === 'record' && <div style={{ position: 'relative', flex: 1, minHeight: 0 }}><Record onDone={onRecordDone} onClose={onRecordClose} /></div>}
         </div>
