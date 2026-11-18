@@ -32,7 +32,7 @@ const MICRO_SPEED = 0.25, MICRO_SPIN = 0.01, MICRO_DAMP = 0.5; // この速さ�
 const PILE_KEY = 'kame_sotsuten_pile', DATA_KEY = 'kame_sotsuten_data';
 const loadJSON = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } };
 const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } };
-const BUBBLE_MS = 10000; // スマホのつぶやきの吹き出しを出しておく時間
+const BUBBLE_KEEP = 3; // スマホのつぶやきの吹き出しは、このあと何回降ったら消すか（数字キー・投稿どちらも1回）
 const IDLE_MS = 5 * 60000; // この間なにも操作がなければゲージ（シャカシャカ）の画面に戻す
 const FILL_UNIT = 125; // シャカと同じ: この個数で箱がいっぱい（memory: emoji-pile-fill-rule）
 
@@ -150,14 +150,14 @@ export default function Interactive() {
       s.bodies.push(b);
       return b;
     };
-    // スマホのつぶやきの吹き出し（絵文字の上についていく。BUBBLE_MS で消える）
+    // スマホのつぶやきの吹き出し（絵文字の上についていく。このあと BUBBLE_KEEP 回降ったら消える）
     s.say = (b, text) => {
       const el = document.createElement('div');
       el.className = 'say-bubble';
       el.textContent = text;
       el.style.visibility = 'hidden'; // 最初の位置が決まるまで隠す
       box.appendChild(el);
-      s.bubbles.push({ el, b, until: Date.now() + BUBBLE_MS });
+      s.bubbles.push({ el, b, left: BUBBLE_KEEP });
     };
     // 山を保存（箱の大きさに対する割合で。回復の絵文字は残さない）
     s.save = () => saveJSON(PILE_KEY, s.bodies.filter(b => !b.rec && !b.dead).map(b => ({ g: b.g, x: +(b.body.position.x / W).toFixed(4), y: +(b.body.position.y / H).toFixed(4), a: +b.body.angle.toFixed(3) })));
@@ -173,8 +173,8 @@ export default function Interactive() {
       for (const n of s.bodies) {
         if (n.dead || !n.rec) continue;
         const p = s.bodies.find(b => !b.dead && !b.rec && (b.body.position.x - n.body.position.x) ** 2 + (b.body.position.y - n.body.position.y) ** 2 < hit2);
-        if (p) { pop((p.body.position.x + n.body.position.x) / 2, (p.body.position.y + n.body.position.y) / 2); playShaka(12, true); kill(p); kill(n); } // 消えるときも音
-        else if (Date.now() - n.at > 2500 && n.body.speed < 0.3) { playShaka(7, true); kill(n); } // 消すものがなければ、着いたら消える
+        if (p) { pop((p.body.position.x + n.body.position.x) / 2, (p.body.position.y + n.body.position.y) / 2); playShaka(20, true); kill(p); kill(n); } // 消えるときも音（いちばん大きく）
+        else if (Date.now() - n.at > 2500 && n.body.speed < 0.3) { playShaka(20, true); kill(n); } // 消すものがなければ、着いたら消える（このときも音）
       }
       if (s.bodies.some(b => b.dead)) { s.bodies = s.bodies.filter(b => !b.dead); setCount(s.bodies.filter(b => !b.rec).length); }
       for (const b of s.bodies) {
@@ -182,10 +182,9 @@ export default function Interactive() {
         b.el.style.transform = `translate(${x - r}px, ${y - r}px) rotate(${b.body.angle}rad)`;
       }
       if (s.bubbles.length) {
-        const nowMs = Date.now();
         s.bubbles = s.bubbles.filter(q => {
-          if (nowMs > q.until || q.b.dead) { q.el.style.opacity = '0'; setTimeout(() => q.el.remove(), 400); return false; } // 時間がきたか、絵文字が消えたら一緒に消す
-          { // いつも絵文字の真上についていく
+          if (q.left <= 0) { q.el.style.opacity = '0'; setTimeout(() => q.el.remove(), 400); return false; } // このあと BUBBLE_KEEP 回降ったら消す
+          if (!q.b.dead) { // 絵文字の真上についていく（回復で絵文字が消えたあとは、その場に残る）
             const w = q.el.offsetWidth, h = q.el.offsetHeight;
             const bx = Math.min(W - w - 6, Math.max(6, q.b.body.position.x - w / 2));
             const by = Math.max(6, q.b.body.position.y - r - h - 10);
@@ -206,6 +205,7 @@ export default function Interactive() {
   // 絵文字 g を n 個、上から降らせる（数字キー・スマホの投稿）
   const fall = React.useCallback((g, n, rec, text) => {
     const s = sim.current; if (!s) return;
+    s.bubbles.forEach(q => { q.left -= 1; }); // 前のつぶやきの吹き出しは、降るたびに残りを1つ減らす
     for (let i = 0; i < n; i++) {
       const x = s.r + Math.random() * (s.W - s.r * 2);
       const b = s.spawn(g, x, -s.r * (1.2 + i * 2.2), (Math.random() - 0.5) * 0.6, !!rec);
@@ -250,6 +250,7 @@ export default function Interactive() {
   const clear = () => {
     const s = sim.current; if (!s) return;
     s.bodies.forEach(b => { Matter.World.remove(s.engine.world, b.body); b.el.remove(); });
+    s.bubbles.forEach(q => q.el.remove()); s.bubbles = [];
     s.bodies = []; setCount(0); s.save();
     setMine([]); setLastRec(null); setHomeDate(null); setBookFav({}); setBookDiary({}); setPostSince(Date.now()); // 次の来場者のために今日の記録も消す（前のスマホの投稿も受け取らない）
   };
