@@ -48,7 +48,7 @@ export default function Record({ onDone, onClose }) {
   const [mood, setMood] = React.useState(2); // 真ん中（😐）から
   const [cat, setCat] = React.useState(0);
   const [act, setAct] = React.useState(0);
-  const [row, setRow] = React.useState(1); // 行動の画面: 0=カテゴリの段 1=行動の段
+  const [row, setRow] = React.useState(0); // 行動の画面: 0=カテゴリの段（ここから選ぶ） 1=行動の段
   const [type, setType] = React.useState(1);
   const [dog, setDog] = React.useState('');
   React.useEffect(() => { cutout('/chara/dog_normal.png').then(setDog); }, []);
@@ -56,8 +56,18 @@ export default function Record({ onDone, onClose }) {
   const now = new Date();
 
   const st = React.useRef({}); st.current = { step, mood, cat, act, row, type, items };
-  const next = () => { const s = st.current; if (s.step < 4) setStep(s.step + 1); else onDone({ mood: MOODS5[s.mood], act: s.items[s.act], type: TYPES[s.type] }); };
-  const back = () => { const s = st.current; if (s.step > 1) setStep(s.step - 1); else onClose(); };
+  const next = () => {
+    const s = st.current;
+    if (s.step === 2 && s.row === 0) { setRow(1); return; } // カテゴリで Enter → 行動のカルーセルへ（次の画面には行かない）
+    if (s.step === 1) setRow(0); // 行動の画面はカテゴリから
+    if (s.step < 4) setStep(s.step + 1); else onDone({ mood: MOODS5[s.mood], act: s.items[s.act], type: TYPES[s.type] });
+  };
+  const back = () => {
+    const s = st.current;
+    if (s.step === 2 && s.row === 1) { setRow(0); return; } // 行動のカルーセルから戻る → カテゴリへ
+    if (s.step === 3) setRow(1);
+    if (s.step > 1) setStep(s.step - 1); else onClose();
+  };
   const fnRef = React.useRef({}); fnRef.current = { next, back };
   React.useEffect(() => {
     const onKey = (e) => {
@@ -108,7 +118,7 @@ export default function Record({ onDone, onClose }) {
     <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '12px 0' }}>{dogPic(480)}</div>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 56 }}>
       <Arrow dir={-1} on={mood > 0} onClick={() => setMood(m => Math.max(0, m - 1))} />
-      {MOODS5.map((m, i) => <div key={m.face} onClick={() => setMood(i)} style={{ ...ring(i === mood), cursor: 'pointer' }}>{circle(100, <Emo e={m.g} size={i === mood ? 76 : 64} />)}</div>)}
+      {MOODS5.map((m, i) => <div key={m.face} onClick={() => setMood(i)} style={{ ...ring(i === mood), cursor: 'pointer' }}><div style={{ width: 100, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Emo e={m.g} size={i === mood ? 88 : 72} /></div></div>)}
       <Arrow dir={1} on={mood < 4} onClick={() => setMood(m => Math.min(4, m + 1))} />
     </div>
     <div style={{ marginTop: -46, marginBottom: 26 }}>{hint('← →')}</div>
@@ -184,10 +194,10 @@ export default function Record({ onDone, onClose }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center' }}><span style={label}>タイプ</span><TypeBadge t={t} size={S} /></div>
       </div>
-      {/* やるきーぬ＋ひとこと（ゲージと同じテキストウィンドウ・下のはしを足もとに） */}
-      <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', alignSelf: 'stretch', paddingBottom: 40, overflow: 'hidden' }}>
-        {dogPic(420)}
-        <div className="dog-say" style={{ left: '50%', top: 'auto', bottom: 40, transform: 'translateX(-50%)', maxWidth: 300 }}>
+      {/* やるきーぬ＋ひとこと（やるきーぬはテキストウィンドウの上に立つ） */}
+      <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', alignSelf: 'stretch', paddingBottom: 40 }}>
+        <div style={{ flex: '0 1 auto', minHeight: 0, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>{dogPic(380)}</div>
+        <div className="dog-say" style={{ position: 'relative', left: 'auto', top: 'auto', maxWidth: 300 }}>
           <div className="dog-say-name">やるきーぬ</div>
           <div className="dog-say-text">{t.say}</div>
         </div>
