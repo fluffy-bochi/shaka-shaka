@@ -26,6 +26,11 @@ const KEYS = {
 const BODY_OPTS = { restitution: 0.12, friction: 0.4, frictionStatic: 0.6, frictionAir: 0.012, density: 0.01, slop: 0.01 };
 const SUBSTEPS = 2; // 1フレーム（1/60秒）を何回に分けて計算するか
 const MICRO_SPEED = 0.25, MICRO_SPIN = 0.01, MICRO_DAMP = 0.5; // この速さ未満の動きを半分にする
+/* 卒展は1台だけで使うので、入れた絵文字と記録は端末に残す（再読み込みしても消えない・リセットで消す） */
+const PILE_KEY = 'kame_sotsuten_pile', DATA_KEY = 'kame_sotsuten_data';
+const loadJSON = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } };
+const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } };
+const IDLE_MS = 5 * 60000; // この間なにも操作がなければゲージ（シャカシャカ）の画面に戻す
 const FILL_UNIT = 125; // シャカと同じ: この個数で箱がいっぱい（memory: emoji-pile-fill-rule）
 
 /* 向き: auto＝端末の向きのまま／portrait＝縦／landscape＝横。iOS は Web から向きを固定できないので、
@@ -57,11 +62,22 @@ export default function Interactive() {
   const [count0, setCount] = React.useState(0);
   const [tab, setTab] = React.useState('gauge'); // フッターの選択（B=本棚・H=ホーム・G=ゲージ。本番は iPad のハードキーで操作）
   // 来場者が数字キーで入れた今日の記録（保存しない）。過去の日はサンプルのペルソナ
-  const [mine, setMine] = React.useState([]);
-  const [lastRec, setLastRec] = React.useState(null);
+  const saved0 = React.useMemo(() => loadJSON(DATA_KEY, {}), []);
+  const [mine, setMine] = React.useState(saved0.mine || []);
+  const [lastRec, setLastRec] = React.useState(saved0.lastRec || null);
   const [homeDate, setHomeDate] = React.useState(null); // null＝今日
-  const [bookFav, setBookFav] = React.useState({});
-  const [bookDiary, setBookDiary] = React.useState({});
+  const [bookFav, setBookFav] = React.useState(saved0.bookFav || {});
+  const [bookDiary, setBookDiary] = React.useState(saved0.bookDiary || {});
+  React.useEffect(() => { saveJSON(DATA_KEY, { mine, lastRec, bookFav, bookDiary }); }, [mine, lastRec, bookFav, bookDiary]);
+  // しばらく操作がなければゲージの画面へ
+  React.useEffect(() => {
+    let last = Date.now();
+    const on = () => { last = Date.now(); };
+    const evs = ['keydown', 'pointerdown', 'touchstart', 'wheel'];
+    evs.forEach(ev => window.addEventListener(ev, on, { passive: true }));
+    const t = setInterval(() => { if (Date.now() - last >= IDLE_MS) { setTab('gauge'); setHomeDate(null); } }, 5000);
+    return () => { evs.forEach(ev => window.removeEventListener(ev, on)); clearInterval(t); };
+  }, []);
   const [ori, setOri0] = React.useState(readOri);
   const setOri = (o) => { setOri0(o); try { localStorage.setItem(ORI_KEY, JSON.stringify(o)); } catch (e) { /* ignore */ } };
   // 外枠（テスト画面に使える場所）の大きさ。縦長か横長かで回すかを決める
@@ -113,6 +129,25 @@ export default function Interactive() {
     sim.current = s;
 
     const pop = (x, y) => { const fx = document.createElement('div'); fx.className = 'pop-fx'; fx.style.left = x + 'px'; fx.style.top = y + 'px'; box.appendChild(fx); setTimeout(() => fx.remove(), 450); };
+    // 絵文字を1つ箱に入れる（落とすとき・保存から戻すとき）
+    s.spawn = (g, x, y, angle, rec) => {
+      const body = Matter.Bodies.circle(x, y, r * 0.92, { ...BODY_OPTS, angle });
+      if (rec) body.collisionFilter = { group: -1, category: 2, mask: 1 }; // 回復どうしは重ならず、山の上に当たったら1つ消す
+      const el = document.createElement('div');
+      el.dataset.t = '1';
+      Object.assign(el.style, { position: 'absolute', left: 0, top: 0, width: r * 2 + 'px', height: r * 2 + 'px', display: 'flex', alignItems: 'center', justifyContent: 'center', willChange: 'transform', pointerEvents: 'none', fontSize: Math.round(r * 1.6) + 'px', transform: `translate(${x - r}px, ${y - r}px) rotate(${angle}rad)` });
+      appendGlyph(el, g, Math.round(r * 2));
+      box.appendChild(el);
+      Matter.World.add(engine.world, body);
+      const b = { body, el, g, rec: !!rec, at: Date.now() };
+      s.bodies.push(b);
+      return b;
+    };
+    // 山を保存（箱の大きさに対する割合で。回復の絵文字は残さない）
+    s.save = () => saveJSON(PILE_KEY, s.bodies.filter(b => !b.rec && !b.dead).map(b => ({ g: b.g, x: +(b.body.position.x / W).toFixed(4), y: +(b.body.position.y / H).toFixed(4), a: +b.body.angle.toFixed(3) })));
+    loadJSON(PILE_KEY, []).forEach(p => p && p.g && s.spawn(p.g, Math.min(W - r, Math.max(r, p.x * W)), p.y * H, p.a || 0, false));
+    const saveT = setInterval(s.save, 2000);
+    window.addEventListener('pagehide', s.save);
     const kill = (b) => { Matter.World.remove(engine.world, b.body); b.dead = true; b.el.style.transition = 'opacity .15s'; b.el.style.opacity = '0'; setTimeout(() => b.el.remove(), 200); };
     const step = (t) => {
       const dt = s.last ? Math.min(50, t - s.last) : 16; s.last = t; s.acc += dt;
@@ -133,25 +168,18 @@ export default function Interactive() {
       s.raf = requestAnimationFrame(step);
     };
     s.raf = requestAnimationFrame(step);
-    setCount(0);
-    return () => { cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
+    setCount(s.bodies.length);
+    return () => { s.save(); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
   }, [layoutKey]);
 
   const drop = React.useCallback((key) => {
     const s = sim.current, box = boxRef.current, k = KEYS[key]; if (!s || !box || !k) return;
     for (let i = 0; i < k.n; i++) {
       const x = s.r + Math.random() * (s.W - s.r * 2);
-      const body = Matter.Bodies.circle(x, -s.r * (1.2 + i * 2.2), s.r * 0.92, { ...BODY_OPTS, angle: (Math.random() - 0.5) * 0.6 });
-      if (k.rec) body.collisionFilter = { group: -1, category: 2, mask: 1 }; // 回復どうしは重ならず、山の上に当たったら1つ消す
-      Matter.Body.setVelocity(body, { x: (Math.random() - 0.5) * 2, y: 2 });
-      const el = document.createElement('div');
-      el.dataset.t = '1';
-      Object.assign(el.style, { position: 'absolute', left: 0, top: 0, width: s.r * 2 + 'px', height: s.r * 2 + 'px', display: 'flex', alignItems: 'center', justifyContent: 'center', willChange: 'transform', pointerEvents: 'none', fontSize: Math.round(s.r * 1.6) + 'px', transform: `translate(${x - s.r}px, ${-s.r * 3}px)` });
-      appendGlyph(el, k.g, Math.round(s.r * 2));
-      box.appendChild(el);
-      Matter.World.add(s.engine.world, body);
-      s.bodies.push({ body, el, rec: !!k.rec, at: Date.now() });
+      const b = s.spawn(k.g, x, -s.r * (1.2 + i * 2.2), (Math.random() - 0.5) * 0.6, !!k.rec);
+      Matter.Body.setVelocity(b.body, { x: (Math.random() - 0.5) * 2, y: 2 });
     }
+    s.save();
     setCount(s.bodies.filter(b => !b.rec).length);
     setMine(l => addPress(l, key, k.g, k.n, !!k.rec));
     setLastRec({ ts: Date.now(), rec: !!k.rec });
@@ -171,7 +199,7 @@ export default function Interactive() {
   const clear = () => {
     const s = sim.current; if (!s) return;
     s.bodies.forEach(b => { Matter.World.remove(s.engine.world, b.body); b.el.remove(); });
-    s.bodies = []; setCount(0);
+    s.bodies = []; setCount(0); s.save();
     setMine([]); setLastRec(null); setHomeDate(null); setBookFav({}); setBookDiary({}); // 次の来場者のために今日の記録も消す
   };
 
@@ -198,12 +226,15 @@ export default function Interactive() {
   const today = todayStr();
   const hd = homeDate || today;
   const sample = React.useMemo(() => sampleFor([today, shiftDate(today, -365), hd]), [today, hd]);
-  const entries = React.useMemo(() => sample.entries.concat(mine), [sample, mine]);
+  // 来場者の記録がある日は、その日のサンプルを出さない（日をまたいでも残った記録はその日の記録として本棚に並ぶ）
+  const mineDays = React.useMemo(() => new Set(mine.map(e => e.date)), [mine]);
+  const entries = React.useMemo(() => sample.entries.filter(e => !mineDays.has(e.date)).concat(mine), [sample, mine, mineDays]);
+  const balance = React.useMemo(() => { const b = { ...sample.balance }; mineDays.forEach(d => { delete b[d]; }); return b; }, [sample, mineDays]);
   const wakeLog = React.useMemo(() => Object.values(sample.wake), [sample]);
   const homeV = tab !== 'home' ? null : (() => {
     const dt = strToDate(hd);
     const noop = () => {};
-    const count = hd === today ? count0 : (sample.balance[hd] || 0);
+    const count = hd === today ? count0 : (balance[hd] || 0);
     return {
       homeDate: hd, homeIsToday: hd === today, homeNowSlot: hd === today ? slotNow() : null,
       homeDateY: dt.getFullYear(), homeDateM: dt.getMonth() + 1, homeDateD: dt.getDate(), homeDateWd: WD[dt.getDay()],
@@ -217,7 +248,7 @@ export default function Interactive() {
     };
   })();
   const bookV = tab !== 'book' ? null : {
-    land: FW > FH, bookEntries: entries, bookCollected: sample.collected, bookBeforeSleep: sample.balance,
+    land: FW > FH, bookEntries: entries, bookCollected: sample.collected, bookBeforeSleep: balance,
     bookFav: { ...sample.fav, ...bookFav }, bookDiary: { ...sample.diary, ...bookDiary },
     setBookFav: (d) => setBookFav(f => ({ ...f, [d]: !({ ...sample.fav, ...f })[d] })),
     setBookDiary: (d, val) => setBookDiary(x => ({ ...x, [d]: val })),
