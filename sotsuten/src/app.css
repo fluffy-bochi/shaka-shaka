@@ -60,3 +60,13 @@ html:has(body.post-page), body.post-page { overflow: auto; height: auto; -webkit
   font-size: 13px; font-weight: 800; letter-spacing: .06em; border-radius: 8px; padding: 4px 12px;
 }
 .dog-say-text { font-size: 19px; font-weight: 700; line-height: 1.6; min-height: 1.6em; word-break: break-all; }
+
+/* やるきーぬのウィンドウの右下の「記録する」 */
+.dog-rec {
+  display: flex; align-items: center; gap: 8px; width: max-content; margin: 10px 0 0 auto;
+  background: #c4f000; color: #2f3a00; border-radius: 999px; padding: 7px 16px;
+  font-size: 16px; font-weight: 900; pointer-events: auto; cursor: pointer;
+}
+/* ショートカットキーの表示は PC モード（.show-keys）のときだけ */
+.keyhint { display: none; font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; opacity: .65; letter-spacing: .02em; }
+.show-keys .keyhint { display: inline; }

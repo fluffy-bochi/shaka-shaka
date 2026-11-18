@@ -5,7 +5,7 @@ import { cutout } from '../cutout';
 
 /* 卒展の記録（Figma「卒展/入力モード」1〜4）。物理ボタン（キーの ↑↓←→ と Enter）だけで操作する。
    1 気分 → 2 行動（カテゴリの段と行動の段・↑↓で段を切りかえ） → 3 がんばりタイプ → 4 確認して「記録する」。
-   Backspace / Esc でひとつ前（1のときは閉じる）。記録したものは onDone に渡し、ゲージに降らせる */
+   戻るは Esc（Backspace でも）・1のときは閉じる。キーの表示（.keyhint）は PC モードのときだけ出る（app.css）。記録したものは onDone に渡し、ゲージに降らせる */
 export const MOODS5 = [
   { face: 1, g: '😫', n: 2 },
   { face: 2, g: '😟', n: 1 },
@@ -56,6 +56,9 @@ export default function Record({ onDone, onClose }) {
   const now = new Date();
 
   const st = React.useRef({}); st.current = { step, mood, cat, act, row, type, items };
+  const next = () => { const s = st.current; if (s.step < 4) setStep(s.step + 1); else onDone({ mood: MOODS5[s.mood], act: s.items[s.act], type: TYPES[s.type] }); };
+  const back = () => { const s = st.current; if (s.step > 1) setStep(s.step - 1); else onClose(); };
+  const fnRef = React.useRef({}); fnRef.current = { next, back };
   React.useEffect(() => {
     const onKey = (e) => {
       const s = st.current, k = e.key;
@@ -65,13 +68,12 @@ export default function Record({ onDone, onClose }) {
         else if (s.step === 2) setAct(a => Math.max(0, Math.min(s.items.length - 1, a + d)));
         else if (s.step === 3) setType(t => Math.max(0, Math.min(2, t + d)));
       };
+      const { next, back } = fnRef.current; // eslint-disable-line no-shadow
       if (k === 'ArrowLeft') move(-1);
       else if (k === 'ArrowRight') move(1);
       else if (k === 'ArrowUp' || k === 'ArrowDown') { if (s.step === 2) setRow(k === 'ArrowUp' ? 0 : 1); }
-      else if (k === 'Enter') {
-        if (s.step < 4) setStep(s.step + 1);
-        else onDone({ mood: MOODS5[s.mood], act: s.items[s.act], type: TYPES[s.type] });
-      } else if (k === 'Backspace' || k === 'Escape') { if (s.step > 1) setStep(s.step - 1); else onClose(); }
+      else if (k === 'Enter') next();
+      else if (k === 'Backspace' || k === 'Escape') back();
       else return;
       e.preventDefault(); e.stopPropagation();
     };
@@ -80,24 +82,36 @@ export default function Record({ onDone, onClose }) {
   }, [onDone, onClose]);
 
   const title = (t) => <div style={{ textAlign: 'center', fontSize: 34, fontWeight: 900, lineHeight: 1.35, whiteSpace: 'pre-line', marginTop: 74 }}>{t}</div>;
-  const dogPic = (h) => dog ? <img src={dog} alt="" style={{ height: h, width: 'auto', filter: 'drop-shadow(0 6px 10px rgba(27,27,24,.15))' }} /> : <div style={{ height: h }} />;
+  // やるきーぬ: 空いている高さに合わせて縮む（最大 h）
+  const dogPic = (h) => dog ? <img src={dog} alt="" style={{ height: '100%', maxHeight: h, width: 'auto', objectFit: 'contain', filter: 'drop-shadow(0 6px 10px rgba(27,27,24,.15))' }} /> : null;
   const enterBtn = (label) => (
-    <div style={{ alignSelf: 'center', marginBottom: 64, background: LIME, color: '#2f3a00', borderRadius: 999, padding: '14px 48px', fontSize: 30, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 12 }}>
-      {label}<span style={{ fontFamily: "'Space Mono',monospace", fontSize: 14, fontWeight: 700, opacity: 0.7 }}>Enter</span>
+    <div onClick={next} style={{ alignSelf: 'center', marginBottom: 64, background: LIME, color: '#2f3a00', borderRadius: 999, padding: '14px 48px', fontSize: 30, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+      {label}<span className="keyhint">Enter</span>
     </div>
   );
+  // ← → などの操作キー（PC モードだけ表示）
+  const hint = (t) => <div style={{ textAlign: 'center', marginTop: 6, height: 20 }}><span className="keyhint">{t}</span></div>;
   const ring = (on) => ({ border: on ? '5px solid ' + LIME : '5px solid transparent', borderRadius: '50%', padding: 5, display: 'flex' });
   const circle = (size, children, bg = '#fff') => <div style={{ width: size, height: size, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>{children}</div>;
-  const wrap = (children) => <div style={{ position: 'absolute', inset: 0, background: '#f7f4ec', display: 'flex', flexDirection: 'column', fontFamily: "'Zen Kaku Gothic New', system-ui, sans-serif", color: INK }}>{children}</div>;
+  const wrap = (children) => (
+    <div style={{ position: 'absolute', inset: 0, background: '#f7f4ec', display: 'flex', flexDirection: 'column', fontFamily: "'Zen Kaku Gothic New', system-ui, sans-serif", color: INK }}>
+      {/* 戻る（1の画面では閉じる） */}
+      <div onClick={back} style={{ position: 'absolute', left: 28, top: 28, zIndex: 2, display: 'flex', alignItems: 'center', gap: 6, background: '#fff', borderRadius: 999, padding: '8px 18px 8px 10px', fontSize: 20, fontWeight: 800, cursor: 'pointer', boxShadow: '0 2px 8px rgba(27,27,24,.08)' }}>
+        <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 26, lineHeight: 1 }}>chevron_left</span>{step === 1 ? 'とじる' : '戻る'}<span className="keyhint">Esc</span>
+      </div>
+      {children}
+    </div>
+  );
 
   if (step === 1) return wrap(<>
     {title('今の気分を教えて')}
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dogPic(480)}</div>
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '12px 0' }}>{dogPic(480)}</div>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 56 }}>
       <Arrow dir={-1} on={mood > 0} onClick={() => setMood(m => Math.max(0, m - 1))} />
       {MOODS5.map((m, i) => <div key={m.face} onClick={() => setMood(i)} style={{ ...ring(i === mood), cursor: 'pointer' }}>{circle(100, <Emo e={m.g} size={i === mood ? 76 : 64} />)}</div>)}
       <Arrow dir={1} on={mood < 4} onClick={() => setMood(m => Math.min(4, m + 1))} />
     </div>
+    <div style={{ marginTop: -46, marginBottom: 26 }}>{hint('← →')}</div>
     {enterBtn('決定')}
   </>);
 
@@ -109,7 +123,7 @@ export default function Record({ onDone, onClose }) {
     const sizeOf = (d) => (d === 0 ? 96 : Math.abs(d) === 1 ? 76 : Math.abs(d) === 2 ? 56 : 46);
     return wrap(<>
       {title('最近した行動を教えて！')}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dogPic(400)}</div>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '12px 0' }}>{dogPic(400)}</div>
       {/* カテゴリの段 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: row === 0 ? 1 : 0.55 }}>
         <Arrow dir={-1} on={row === 0} onClick={() => { setRow(0); setCat(c => (c + REC_CATS.length - 1) % REC_CATS.length); setAct(0); }} />
@@ -133,19 +147,20 @@ export default function Record({ onDone, onClose }) {
         <Arrow dir={1} on={row === 1 && act < items.length - 1} onClick={() => { setRow(1); setAct(a => Math.min(items.length - 1, a + 1)); }} />
       </div>
       <div style={{ textAlign: 'center', fontSize: 22, fontWeight: 800, marginTop: 8, height: 32 }}>{items[act] ? items[act].name : ''}</div>
-      <div style={{ height: 24 }} />
+      {hint('↑ ↓ 段をかえる　← → えらぶ')}
       {enterBtn('決定')}
     </>);
   }
 
   if (step === 3) return wrap(<>
     {title('最近のがんばりタイプ\n教えて！')}
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dogPic(440)}</div>
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '12px 0' }}>{dogPic(440)}</div>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 48 }}>
       <Arrow dir={-1} on={type > 0} onClick={() => setType(t => Math.max(0, t - 1))} />
       {TYPES.map((t, i) => <div key={t.id} onClick={() => setType(i)} style={{ ...ring(i === type), cursor: 'pointer' }}><TypeBadge t={t} size={i === type ? 186 : 166} /></div>)}
       <Arrow dir={1} on={type < 2} onClick={() => setType(t => Math.min(2, t + 1))} />
     </div>
+    <div style={{ marginTop: -38, marginBottom: 18 }}>{hint('← →')}</div>
     {enterBtn('決定')}
   </>);
 
@@ -163,7 +178,7 @@ export default function Record({ onDone, onClose }) {
         <div style={{ display: 'flex', alignItems: 'center' }}><span style={label}>行動</span>{circle(130, a ? <Emo e={a.glyph} size={84} /> : null)}<span style={{ marginLeft: 16, fontSize: 22, fontWeight: 800, maxWidth: 160 }}>{a ? a.name : ''}</span></div>
         <div style={{ display: 'flex', alignItems: 'center' }}><span style={label}>タイプ</span><TypeBadge t={t} size={160} /></div>
       </div>
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', alignSelf: 'stretch', paddingBottom: 40 }}>{dogPic(420)}</div>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', alignSelf: 'stretch', paddingBottom: 40, overflow: 'hidden' }}>{dogPic(420)}</div>
     </div>
     {enterBtn('記録する')}
   </>);
