@@ -79,6 +79,7 @@ export default function Interactive() {
   const [count0, setCount] = React.useState(0);
   const [tab, setTab] = React.useState('gauge');
   const tabRef = React.useRef(tab); tabRef.current = tab;
+  const frozenRef = React.useRef(false); frozenRef.current = tab === 'record';
   const openRecordRef = React.useRef(null); openRecordRef.current = () => setTab('record'); // 'record' のあいだは記録画面がキーを受け取る // フッターの選択（B=本棚・H=ホーム・G=ゲージ。本番は iPad のハードキーで操作）
   // 来場者が数字キーで入れた今日の記録（保存しない）。過去の日はサンプルのペルソナ
   const saved0 = React.useMemo(() => loadJSON(DATA_KEY, {}), []);
@@ -236,6 +237,7 @@ export default function Interactive() {
     const kill = (b) => { Matter.World.remove(engine.world, b.body); b.dead = true; b.el.style.transition = 'opacity .15s'; b.el.style.opacity = '0'; setTimeout(() => b.el.remove(), 200); };
     const step = (t) => {
       const dt = s.last ? Math.min(50, t - s.last) : 16; s.last = t; s.acc += dt;
+      if (frozenRef.current) { s.acc = 0; s.raf = requestAnimationFrame(step); return; } // 記録画面のあいだはゲージを止めておく（後ろにぼかして見せるだけ）
       while (s.acc >= 1000 / 60) { for (let k = 0; k < SUBSTEPS; k++) Matter.Engine.update(engine, 1000 / 60 / SUBSTEPS); s.acc -= 1000 / 60; } // 刻みを細かくして積み重ねを安定させる
       // 回復: プラスに当たったら両方消える
       const hit2 = (r * 2) * (r * 2);
@@ -404,7 +406,7 @@ export default function Interactive() {
   const stage = (style) => (
     <div style={{ position: 'relative', overflow: 'hidden', background: '#f7f4ec', ...style }}>
       <div ref={boxRef} style={{ position: 'absolute', inset: 0, overflow: 'hidden' }} />
-      {tab === 'gauge' && (
+      {(tab === 'gauge' || tab === 'record') && (
         <div style={{ position: 'absolute', left: 0, top: 0, width: pc ? bw / zoom : '100%', zoom, zIndex: 1, pointerEvents: 'none', textAlign: 'center' }}>
           <div style={{ display: 'inline-block', marginTop: 20, background: 'rgba(255,255,255,.85)', borderRadius: 999, padding: '9px 23px', fontFamily: "'Space Mono',monospace", fontSize: 19, fontWeight: 700 }}>{formatDateShort(today)}</div>
           <div style={{ fontFamily: "'Archivo',sans-serif", fontWeight: 800, fontSize: 118, lineHeight: 1, letterSpacing: '.01em', marginTop: 12, /* 本体(68)とロック画面くらい(168)の間 */ color: count0 >= 90 ? '#fff' : '#1b1b18', textShadow: count0 >= 90 ? '0 2px 10px rgba(27,27,24,.35)' : 'none', transition: 'color .3s' }}>{clock}</div>
@@ -422,7 +424,7 @@ export default function Interactive() {
         </div>
       )}
       {tab !== 'gauge' && (
-        <div style={{ position: 'absolute', left: 0, top: 0, zIndex: 3, width: pc ? bw / zoom : '100%', height: pc ? bh / zoom : '100%', zoom, display: 'flex', flexDirection: 'column', background: '#f7f4ec' }}>
+        <div style={{ position: 'absolute', left: 0, top: 0, zIndex: 3, width: pc ? bw / zoom : '100%', height: pc ? bh / zoom : '100%', zoom, display: 'flex', flexDirection: 'column', background: tab === 'record' ? 'transparent' : '#f7f4ec' /* 記録中は後ろのゲージがぼけて見える */ }}>
           {homeV && <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}><Home v={homeV} /></div>}
           {bookV && <Bookshelf key={bookV.land ? 'land' : 'port'} v={bookV} />}
           {tab === 'record' && <div style={{ position: 'relative', flex: 1, minHeight: 0 }}><Record onDone={onRecordDone} onClose={onRecordClose} /></div>}
