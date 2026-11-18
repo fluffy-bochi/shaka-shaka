@@ -192,7 +192,7 @@ export default function Interactive() {
     const dogName = document.createElement('div'); dogName.className = 'dog-say-name'; dogName.textContent = 'やるきーぬ';
     const dogText = document.createElement('div'); dogText.className = 'dog-say-text';
     dogSay.appendChild(dogName); dogSay.appendChild(dogText);
-    dogSay.style.width = Math.round(Math.min(W * 0.8, 600)) + 'px';
+    dogSay.style.maxWidth = Math.round(W / 3) + 'px'; // 幅はセリフの長さに合わせる（最大で画面の横幅の1/3・こえたら折り返す）
     box.appendChild(dog); box.appendChild(dogSay);
     let lineI = 0;
     const setLine = () => { const L = DOG_LINES[lineI % DOG_LINES.length]; lineI++; cutout('/chara/dog_' + L.f + '.png').then(u => { dog.src = u; dogText.textContent = L.t; }); }; // 白い背景を抜いた絵に
