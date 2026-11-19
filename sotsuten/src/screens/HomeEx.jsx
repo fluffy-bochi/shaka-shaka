@@ -1,6 +1,6 @@
 import React from 'react';
 import { Post } from './Home';
-import { cutout } from '../cutout';
+import Dog3D from '../DogModel';
 
 /* 卒展のホーム（Figma「卒展/ホーム」node 2227:1474）。
    上: 日付＋時期のひとこと（展示まであと◯日 など）・右に時刻。真ん中: 投稿の行（本体のタイムラインと同じ見た目・時間帯の区切りはなし・新しいものが上）。
@@ -27,8 +27,6 @@ export default function HomeEx({ v }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  const [dog, setDog] = React.useState('');
-  React.useEffect(() => { cutout('/chara/dog_normal.png').then(setDog); }, []);
   const [now, setNow] = React.useState(new Date());
   React.useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
 
@@ -61,7 +59,7 @@ export default function HomeEx({ v }) {
       </div>
       <div style={{ marginTop: 'auto', marginBottom: 20 }}>{chev(1, top < maxTop, down)}</div>
       {/* やるきーぬ＋テキストウィンドウ（右下・行の上にかぶさる） */}
-      {dog && <img src={dog} alt="" style={{ position: 'absolute', right: -60, bottom: 70, height: 520, width: 'auto', pointerEvents: 'none', filter: 'drop-shadow(0 6px 10px rgba(27,27,24,.15))' }} />}
+      <Dog3D wave style={{ position: 'absolute', right: 30, bottom: 90, height: 440 }} />
       <div className="dog-say" style={{ position: 'absolute', left: 64, right: 40, top: 'auto', bottom: 96, width: 'auto', maxWidth: 'none', minHeight: 140, background: 'rgba(255,255,255,.94)' /* 下の行が透けないように */ }}>
         <div className="dog-say-name">やるきーぬ</div>
         <div className="dog-say-text" style={{ fontSize: 24 }}>{v.homeComment}</div>

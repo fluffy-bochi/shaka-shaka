@@ -1,7 +1,7 @@
 import React from 'react';
 import Emo from '../fluent';
 import { CATS } from '../data';
-import { cutout } from '../cutout';
+import Dog3D from '../DogModel';
 
 /* 卒展の記録（Figma「卒展/入力モード」1〜4）。物理ボタン（キーの ↑↓←→ と Enter）だけで操作する。
    1 気分 → 2 行動（カテゴリの段と行動の段・↑↓で段を切りかえ） → 3 がんばりタイプ → 4 確認して「記録する」。
@@ -50,8 +50,6 @@ export default function Record({ onDone, onClose }) {
   const [act, setAct] = React.useState(0);
   const [row, setRow] = React.useState(0); // 行動の画面: 0=カテゴリの段（ここから選ぶ） 1=行動の段
   const [type, setType] = React.useState(1);
-  const [dog, setDog] = React.useState('');
-  React.useEffect(() => { cutout('/chara/dog_normal.png').then(setDog); }, []);
   const items = REC_CATS[cat].items;
   const now = new Date();
 
@@ -93,7 +91,7 @@ export default function Record({ onDone, onClose }) {
 
   const title = (t) => <div style={{ textAlign: 'center', fontSize: 34, fontWeight: 900, lineHeight: 1.35, whiteSpace: 'pre-line', marginTop: 74 }}>{t}</div>;
   // やるきーぬ: 空いている高さに合わせて縮む（最大 h）
-  const dogPic = (h) => dog ? <img src={dog} alt="" style={{ height: '100%', maxHeight: h, width: 'auto', objectFit: 'contain', filter: 'drop-shadow(0 6px 10px rgba(27,27,24,.15))' }} /> : null;
+  const dogPic = (h, wave = false) => <Dog3D key={wave ? 'w' : 's'} wave={wave} style={{ height: '100%', maxHeight: h }} />; // 手をふるのはまとめだけ・ほかは止めた3D
   const enterBtn = (label) => (
     <div onClick={next} style={{ alignSelf: 'center', marginBottom: 64, background: LIME, color: '#2f3a00', borderRadius: 999, padding: '14px 48px', fontSize: 30, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
       {label}<span className="keyhint">Enter</span>
@@ -196,7 +194,7 @@ export default function Record({ onDone, onClose }) {
       </div>
       {/* やるきーぬ＋ひとこと（やるきーぬはテキストウィンドウの上に立つ） */}
       <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', alignSelf: 'stretch', paddingBottom: 40 }}>
-        <div style={{ flex: '0 1 auto', minHeight: 0, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>{dogPic(380)}</div>
+        <div style={{ flex: '0 1 auto', minHeight: 0, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>{dogPic(380, true)}</div>
         <div className="dog-say" style={{ position: 'relative', left: 'auto', top: 'auto', maxWidth: 300 }}>
           <div className="dog-say-name">やるきーぬ</div>
           <div className="dog-say-text">{t.say}</div>
