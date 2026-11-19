@@ -3785,7 +3785,7 @@ export default class App extends React.Component {
     // いこいさんのセリフ・表情（みんなに反映された版）を読み、変わったら描き直す
     this._unIkoi = Ikoi.subscribe(() => { this.forceUpdate(); this.updateFlip(); });
     this._unFlip = subscribeFlip(this.updateFlip); this._unFlipEnv = watchFlipEnv(() => { setTimeout(this.updateFlip, 60); setTimeout(this.updateFlip, 400); }); this.updateFlip();
-    loadIkoi().then(d => { if (d) Ikoi.setPublished(d); }).catch(() => { /* 読めなければ serifu.js の初期値 */ });
+    ['ikoi', 'dog'].forEach(c => loadIkoi(c).then(d => { if (d) Ikoi.setPublished(d, c); }).catch(() => { /* 読めなければ serifu.js の初期値 */ })); // セリフはキャラごと
     // 研究の期間（協力者IDのアルファベットごとの収集期間）
     loadResearchConfig().then(c => { this._resCfg = c; }).catch(() => { /* 読めなければ期間の制限なし */ });
     // 保存に失敗したら知らせる（黙って失敗すると、リロードで記録が消えるまで気づけない）
@@ -5867,7 +5867,7 @@ export default class App extends React.Component {
         {v.isBed2 && <BedReview v={v} />}
         {v.isCollect && <Collect v={v} />}
         {v.isMypage && <MyPage v={v} />}
-        {v.isIkoiEdit && <IkoiEdit v={v} />}
+        {v.isIkoiEdit && <IkoiEdit key={Ikoi.getChara()} v={v} />}
         {v.isResearchAdmin && <ResearchAdmin v={v} />}
         {v.isRun && <Run v={v} />}
         {v.isTrash && <Trash v={v} />}

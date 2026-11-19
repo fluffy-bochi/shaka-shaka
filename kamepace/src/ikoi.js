@@ -1,5 +1,5 @@
-/* いこいさんのセリフ・表情の置き場。
-   初期値は serifu.js。開発者の「いこいさん編集」で変えた内容は Firestore の config/ikoi（みんなに反映）に保存され、
+/* いこいさん・やるきーぬ（犬）のセリフ・表情の置き場。キャラごとに別々に持つ（11-19〜）。
+   初期値は serifu.js（犬も最初は同じ文から）。開発者の「いこいさん編集」で変えた内容は Firestore の config/ikoi（犬は config/ikoi_dog）に保存され、
    起動時に読み込んで初期値の上に重ねる。開発者モードの端末では、反映前の下書き（localStorage）を優先して表示する。
    セリフは key ごとの配列 [{ t: 文, f: 表情key（なし=文の言葉から自動）}]。 */
 import * as S from './serifu';
@@ -108,18 +108,23 @@ export const DEFAULT_FACES = Object.fromEntries(Object.entries(S.NURSE_FACES).ma
 
 /* ---- いま使っている内容 ---- */
 // data = { lines: { key: [{t,f}] }, faces: { key: { label, src } } }（どちらも初期値との差分だけでもよい）
-let published = null, draft = null, devMode = false;
+// キャラごと（ikoi / dog）の、みんなに反映された版と、開発者の下書き
+const published = { ikoi: null, dog: null }, drafts = { ikoi: null, dog: null };
+let devMode = false;
 const subs = new Set();
-const DRAFT_KEY = 'kame_ikoi_draft', DEV_KEY = 'kame_dev';
-try { devMode = localStorage.getItem(DEV_KEY) === '1'; draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { /* ignore */ }
+const DRAFT_KEY = { ikoi: 'kame_ikoi_draft', dog: 'kame_ikoi_draft_dog' }, DEV_KEY = 'kame_dev';
+try {
+  devMode = localStorage.getItem(DEV_KEY) === '1';
+  Object.keys(DRAFT_KEY).forEach(c => { drafts[c] = JSON.parse(localStorage.getItem(DRAFT_KEY[c]) || 'null'); });
+} catch (e) { /* ignore */ }
 let cache = null; // { lines: key→[{t,f}], faces, faceOf: Map(text→f) }
 
 function build() {
-  const src = (devMode && draft) || published || {};
+  const src = (devMode && drafts[chara]) || published[chara] || {};
   const lines = {};
   Object.keys(DEFAULT_LINES).forEach(k => { lines[k] = DEFAULT_LINES[k].map(t => ({ t })); });
   Object.entries(src.lines || {}).forEach(([k, arr]) => { if (Array.isArray(arr)) lines[k] = arr.filter(x => x && typeof x.t === 'string'); });
-  const faces = { ...DEFAULT_FACES, ...(src.faces || {}) };
+  const faces = { ...defaultFaces(), ...(src.faces || {}) };
   const faceOf = new Map();
   Object.values(lines).forEach(arr => arr.forEach(x => { if (x.f && x.t) faceOf.set(x.t, x.f); }));
   cache = { lines, faces, faceOf };
@@ -128,18 +133,20 @@ function changed() { cache = null; subs.forEach(fn => fn()); }
 function cur() { if (!cache) build(); return cache; }
 
 export function subscribe(fn) { subs.add(fn); return () => subs.delete(fn); }
-export function setPublished(data) { published = data || null; changed(); }
-export function getPublished() { return published; }
+/* ch を省くと、いま選んでいるキャラ */
+export function setPublished(data, ch = chara) { published[ch] = data || null; changed(); }
+export function getPublished() { return published[chara]; }
 export function isDev() { return devMode; }
 export function setDev(on) { devMode = !!on; try { localStorage.setItem(DEV_KEY, on ? '1' : '0'); } catch (e) { /* ignore */ } changed(); }
-export function getDraft() { return draft; }
-export function setDraft(data) { draft = data || null; try { if (draft) localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); else localStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ } changed(); }
+export function getDraft() { return drafts[chara]; }
+export function setDraft(data) { const d = data || null; drafts[chara] = d; try { if (d) localStorage.setItem(DRAFT_KEY[chara], JSON.stringify(d)); else localStorage.removeItem(DRAFT_KEY[chara]); } catch (e) { /* ignore */ } changed(); }
 /* みんなに反映されている版（初期値＋config/ikoi）の全セリフ・全表情。反映前の「変更点」を出すのに使う */
 export function publishedSnapshot() {
   const lines = {};
   Object.keys(DEFAULT_LINES).forEach(k => { lines[k] = DEFAULT_LINES[k].map(t => ({ t })); });
-  Object.entries((published && published.lines) || {}).forEach(([k, arr]) => { if (Array.isArray(arr)) lines[k] = arr.filter(x => x && typeof x.t === 'string'); });
-  return { lines, faces: { ...DEFAULT_FACES, ...((published && published.faces) || {}) } };
+  const pub = published[chara];
+  Object.entries((pub && pub.lines) || {}).forEach(([k, arr]) => { if (Array.isArray(arr)) lines[k] = arr.filter(x => x && typeof x.t === 'string'); });
+  return { lines, faces: { ...defaultFaces(), ...((pub && pub.faces) || {}) } };
 }
 /* 編集のもとにする、いま表示中の全セリフ・全表情 */
 export function snapshot() { const c = cur(); return { lines: JSON.parse(JSON.stringify(c.lines)), faces: { ...c.faces } }; }
@@ -152,29 +159,22 @@ export function fill(tpl, vals) { return (tpl || '').replace(/\{([^}]+)\}/g, (m,
    そうでなければ「おすすめの文」（TPL_REST_TIP）の {休み方} に差し込む */
 export function restTip(tpl, tip) { const t = (tip || '').trim(); return /[。．.！!？?]$/.test(t) ? t : fill(tpl, { 休み方: t }); }
 export function faces() { return cur().faces; }
-export function faceSrc(key) {
-  if (chara === 'dog') { const f = DOG_FACES[key] || DOG_FACES[DOG_ALIAS[key]] || DOG_FACES.normal; return '/chara/' + encodeURIComponent(f); }
-  const f = cur().faces[key] || cur().faces.normal; return f.src;
-}
+export function faceSrc(key) { const fs = cur().faces; const f = fs[key] || (chara === 'dog' && fs[DOG_ALIAS[key]]) || fs.normal; return f.src; }
 
-/* ---- キャラクター（マイページで選ぶ・端末ごと）: いこいさん／やるきーぬ（犬）。セリフは同じで、表情の画像だけ変わる ---- */
+/* ---- キャラクター（マイページで選ぶ・端末ごと）: いこいさん／やるきーぬ（犬）。セリフも表情もキャラごと ---- */
 export const CHARAS = [{ id: 'ikoi', name: 'いこいさん' }, { id: 'dog', name: 'やるきーぬ' }];
 const CHARA_KEY = 'kame_chara';
 let chara = 'ikoi';
 try { if (localStorage.getItem(CHARA_KEY) === 'dog') chara = 'dog'; } catch (e) { /* ignore */ }
 export function getChara() { return chara; }
 export function setChara(id) { chara = id === 'dog' ? 'dog' : 'ikoi'; try { localStorage.setItem(CHARA_KEY, chara); } catch (e) { /* ignore */ } changed(); }
-/* やるきーぬの表情（public/chara/）。画像がまだない表情は DOG_ALIAS で近い表情に、それもなければ normal。
-   表情の画像が届いたら DOG_FACES に please / worry / happy / ok / think を足す */
-/* 11-19: やるきーぬは3Dモデルの正面の絵（透過PNG）に統一。表情の動きはまだないので全部同じ静止画 */
-const DOG_FACES = {
-  normal: 'dog_3d.png', // ふだん（舌を出してにこにこ）
-  please: 'dog_3d.png', // お願い（休んでほしい・やりすぎ注意）
-  worry: 'dog_3d.png', // 心配（疲れ・つらい・夜ふかし・寒い）
-  happy: 'dog_3d.png', // よろこぶ（ほめる・お祝い・おつかれさま）
-  ok: 'dog_3d.png', // OK（いい調子・のんびり）
-  think: 'dog_3d.png', // 考える（問いかけ）
-};
+/* やるきーぬの初期の表情。3Dモデル（public/models/corgi_motions.glb）の正面の絵を共通で使い、
+   3Dで表示するところ（Wake.jsx の Speaker）では表情ごとのモーションになる。画像がない表情は DOG_ALIAS で近い表情に */
+const DOG_FACE_LABELS = { normal: 'ふだん', please: 'お願い', worry: '心配', happy: 'よろこぶ', ok: 'OK', think: '考える' };
+const DOG_DEFAULT_FACES = Object.fromEntries(Object.entries(DOG_FACE_LABELS).map(([k, label]) => [k, { label, src: '/chara/dog_3d.png' }]));
+export function defaultFaces() { return chara === 'dog' ? DOG_DEFAULT_FACES : DEFAULT_FACES; }
+/* 表情 key → やるきーぬの初期の表情（normal please worry happy ok think のどれか）。追加した表情なら null */
+export function dogBaseFace(key) { if (DOG_DEFAULT_FACES[key]) return key; if (DOG_ALIAS[key]) return DOG_ALIAS[key]; return cur().faces[key] ? null : 'normal'; }
 const DOG_ALIAS = {
   please: 'please', ng: 'please', // 休んでほしい・やりすぎ注意 → お願い
   worry: 'worry', sad: 'worry', angry: 'worry', cold: 'worry', // 心配・寄りそう・夜ふかし・寒い → 心配
@@ -191,7 +191,9 @@ export function faceKeyFor(text) {
   faceOf.forEach((f, line) => { if (!fs[f] || line.length < 4) return; const i = t.indexOf(line); if (i >= 0 && i < at) { at = i; best = f; } });
   if (best) return best;
   const rule = S.FACE_RULES.find(([re]) => re.test(t));
-  return rule && fs[rule[1]] ? rule[1] : 'normal';
+  if (!rule) return 'normal';
+  if (fs[rule[1]]) return rule[1];
+  return chara === 'dog' && fs[DOG_ALIAS[rule[1]]] ? DOG_ALIAS[rule[1]] : 'normal'; // 犬は近い表情に
 }
 
 /* 表示しているセリフ（いくつかをつないだ文もある）から、元になったセリフを探す。
