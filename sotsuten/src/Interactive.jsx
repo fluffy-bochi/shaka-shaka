@@ -35,15 +35,17 @@ const PILE_KEY = 'kame_sotsuten_pile', DATA_KEY = 'kame_sotsuten_data';
 const loadJSON = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } };
 const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } };
 const BUBBLE_KEEP = 3; // スマホのつぶやきの吹き出しは、このあと何回降ったら消すか（数字キー・投稿どちらも1回）
-/* ゲージの山のいちばん上にいる、やるきーぬのひとこと（順番に） */
+/* ゲージの山のいちばん上にいる、やるきーぬのひとこと（順番に）。m はそのときのモーション（2回やって idle にもどる） */
 const DOG_LINES = [
-  { t: 'やっほー' },
-  { t: '今日は何してたの？' },
-  { t: '今日のご飯何にする？' },
-  { t: 'ここで遊ぶの好きなんだー' },
-  { t: 'いっぱい積もったね' },
-  { t: 'ちょっと休もっか？' },
+  { t: 'やっほー', m: 'wave' },
+  { t: '今日は何してたの？', m: 'think' },
+  { t: '今日のご飯何にする？', m: 'think' },
+  { t: 'ここで遊ぶの好きなんだー', m: 'happy' },
+  { t: 'いっぱい積もったね', m: 'doya' },
+  { t: 'ちょっと休もっか？', m: 'relax' },
 ];
+/* 数字キーで降らせたときのやるきーぬの反応（つかれた顔→sad・ふつう→nod・いい顔や回復→happy・ほかの行動→nod） */
+const KEY_MOTION = { '😫': 'sad', '😟': 'sad', '😐': 'nod', '🙂': 'happy', '😆': 'happy' };
 const DOG_LINE_MS = 7000; // ひとことを変える間隔
 const DOG_H = 0.36; // やるきーぬ（3D）の高さ（箱の幅に対して）
 const IDLE_MS = 5 * 60000; // この間なにも操作がなければゲージ（シャカシャカ）の画面に戻す
@@ -204,9 +206,9 @@ export default function Interactive() {
     dogSay.appendChild(dogName); dogSay.appendChild(dogText); dogSay.appendChild(dogRec);
     dogSay.style.maxWidth = Math.round(W / 3) + 'px'; // 幅はセリフの長さに合わせる（最大で画面の横幅の1/3・こえたら折り返す）
     box.appendChild(dog); box.appendChild(dogSay);
-    const unDog = mountDog(dog, { wave: true }); // 3Dで手をふる（読み込み中・失敗したときは絵）
+    const dogCtl = mountDog(dog); s.dogCtl = dogCtl; // 3D（ふだんは idle・セリフや降ってきた絵文字でモーション。読み込み中・失敗したときは絵）
     let lineI = 0;
-    const setLine = () => { const L = DOG_LINES[lineI % DOG_LINES.length]; lineI++; dogText.textContent = L.t; };
+    const setLine = () => { const L = DOG_LINES[lineI % DOG_LINES.length]; lineI++; dogText.textContent = L.t; dogCtl.play(L.m, 2); };
     setLine();
     const lineT = setInterval(setLine, DOG_LINE_MS);
     s.dog = { x: W / 2, y: H, ready: false };
@@ -217,6 +219,7 @@ export default function Interactive() {
       const foot = (dog.offsetWidth || dogH * 0.7) * 0.3;
       for (const b of s.bodies) { if (b.rec || b.dead || b.body.speed > 1.5) continue; /* 落ちている途中のは見ない */ const y = b.body.position.y; if (y > r && Math.abs(b.body.position.x - W / 2) < foot && (!top || y < top.body.position.y)) top = b; }
       const tx = W / 2, ty = top ? top.body.position.y - r * 0.85 : H;
+      if (s.dog.ready && s.dog.y - ty > r * 1.5 && !dogCtl.busy()) dogCtl.play('walk', 1); // 山が高くなって上にのぼるときは歩く
       const d = s.dog, k = d.ready ? 0.12 : 1; d.ready = true; // ゆっくり追いかけて、山のゆれでガタガたしないように
       d.x += (tx - d.x) * k; d.y += (ty - d.y) * k;
       const w = dog.offsetWidth || dogH * 0.7;
@@ -238,6 +241,7 @@ export default function Interactive() {
     const kill = (b) => { Matter.World.remove(engine.world, b.body); b.dead = true; b.el.style.transition = 'opacity .15s'; b.el.style.opacity = '0'; setTimeout(() => b.el.remove(), 200); };
     const step = (t) => {
       const dt = s.last ? Math.min(50, t - s.last) : 16; s.last = t; s.acc += dt;
+      dogCtl.pause(frozenRef.current); // 記録中はぼかした後ろの犬は動かさない（記録画面の犬だけ動く）
       if (frozenRef.current) { s.acc = 0; s.raf = requestAnimationFrame(step); return; } // 記録画面のあいだはゲージを止めておく（後ろにぼかして見せるだけ）
       while (s.acc >= 1000 / 60) { for (let k = 0; k < SUBSTEPS; k++) Matter.Engine.update(engine, 1000 / 60 / SUBSTEPS); s.acc -= 1000 / 60; } // 刻みを細かくして積み重ねを安定させる
       // 回復: プラスに当たったら両方消える
@@ -272,7 +276,7 @@ export default function Interactive() {
     };
     s.raf = requestAnimationFrame(step);
     setCount(s.bodies.length);
-    return () => { s.save(); s.bubbles.forEach(q => q.el.remove()); unDog(); dog.remove(); dogSay.remove(); clearInterval(lineT); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
+    return () => { s.save(); s.bubbles.forEach(q => q.el.remove()); dogCtl.dispose(); dog.remove(); dogSay.remove(); clearInterval(lineT); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
   }, [layoutKey]);
 
   // 絵文字 g を n 個、上から降らせる（数字キー・スマホの投稿）
@@ -285,6 +289,7 @@ export default function Interactive() {
       Matter.Body.setVelocity(b.body, { x: (Math.random() - 0.5) * 2, y: 2 });
       if (i === 0 && text) s.say(b, text); // つぶやきは最初の絵文字に吹き出し
     }
+    if (s.dogCtl) s.dogCtl.play(text ? 'happy' : KEY_MOTION[g] || (rec ? 'happy' : 'nod'), 1); // つぶやきが届いたらよろこぶ
     s.save();
     setCount(s.bodies.filter(b => !b.rec).length);
     setLastRec({ ts: Date.now(), rec: !!rec });
@@ -319,7 +324,8 @@ export default function Interactive() {
   React.useEffect(() => {
     if (!new URLSearchParams(location.search).has('debug')) return undefined;
     window.__post = (text, face = 3) => receivePost('debug' + Date.now(), { face, text }, Date.now());
-    return () => { delete window.__post; };
+    window.__dog = (name, n = 2) => sim.current && sim.current.dogCtl.play(name, n); // モーションの確認
+    return () => { delete window.__post; delete window.__dog; };
   }, [receivePost]);
   React.useEffect(() => {
     if (tab !== 'gauge' || !pendingRef.current.length) return undefined;
@@ -331,6 +337,7 @@ export default function Interactive() {
   /* シャカシャカ: 全部の絵文字を散らす（シャカの🔀と同じ動き。箱が大きいぶん少し強め） */
   const shake = React.useCallback(() => {
     const s = sim.current; if (!s) return;
+    if (s.dogCtl) s.dogCtl.play('shake', 2); // いっしょにぶるぶる
     const k = 9 * Math.sqrt(Math.max(1, s.r / 24));
     s.bodies.forEach(({ body }) => {
       Matter.Sleeping.set(body, false);

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Post } from './Home';
-import Dog3D from '../DogModel';
+import DogModel from '../DogModel';
+import { faceKeyFor } from '../ikoi';
+import { CHARA_ALIAS } from '../serifu';
 
 /* 卒展のホーム（Figma「卒展/ホーム」node 2227:1474）。
    上: 日付＋時期のひとこと（展示まであと◯日 など）・右に時刻。真ん中: 投稿の行（本体のタイムラインと同じ見た目・時間帯の区切りはなし・新しいものが上）。
@@ -8,6 +10,8 @@ import Dog3D from '../DogModel';
 const ROWS = 5; // 1画面に出す投稿の行
 const ROW_H = 166; // 行の高さ（Figma 170・枠線ぶん少し詰める）
 const POST_ZOOM = 1.55; // 本体の投稿（スマホの大きさ）を iPad の行に合わせて拡大
+/* ひとことの表情 → やるきーぬのモーション（ふつうのときは手をふる） */
+const FACE_MOTION = { normal: 'wave', happy: 'happy', worry: 'sad', please: 'relax', ok: 'nod', think: 'think' };
 
 export default function HomeEx({ v }) {
   const posts = React.useMemo(() => v.homeFeed.filter(p => !p.divider && !p.addRec).slice().reverse(), [v.homeFeed]);
@@ -30,6 +34,7 @@ export default function HomeEx({ v }) {
   const [now, setNow] = React.useState(new Date());
   React.useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
 
+  const sayAct = React.useMemo(() => { const k = faceKeyFor(v.homeComment); return { name: FACE_MOTION[CHARA_ALIAS[k] || k] || 'wave' }; }, [v.homeComment]);
   const shown = posts.slice(top, top + ROWS);
   while (shown.length < ROWS) shown.push(null); // 投稿が少ないときも行の線は出す
   const chev = (dir, on, onClick) => (
@@ -59,7 +64,7 @@ export default function HomeEx({ v }) {
       </div>
       <div style={{ marginTop: 'auto', marginBottom: 20 }}>{chev(1, top < maxTop, down)}</div>
       {/* やるきーぬ＋テキストウィンドウ（右下・行の上にかぶさる） */}
-      <Dog3D wave style={{ position: 'absolute', right: 30, bottom: 90, height: 440 }} />
+      <DogModel act={sayAct} style={{ position: 'absolute', right: 30, bottom: 90, height: 440 }} />
       <div className="dog-say" style={{ position: 'absolute', left: 64, right: 40, top: 'auto', bottom: 96, width: 'auto', maxWidth: 'none', minHeight: 140, background: 'rgba(255,255,255,.94)' /* 下の行が透けないように */ }}>
         <div className="dog-say-name">やるきーぬ</div>
         <div className="dog-say-text" style={{ fontSize: 24 }}>{v.homeComment}</div>
