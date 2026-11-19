@@ -166,13 +166,14 @@ export function getChara() { return chara; }
 export function setChara(id) { chara = id === 'dog' ? 'dog' : 'ikoi'; try { localStorage.setItem(CHARA_KEY, chara); } catch (e) { /* ignore */ } changed(); }
 /* やるきーぬの表情（public/chara/）。画像がまだない表情は DOG_ALIAS で近い表情に、それもなければ normal。
    表情の画像が届いたら DOG_FACES に please / worry / happy / ok / think を足す */
+/* 11-19: やるきーぬは3Dモデルの正面の絵（透過PNG）に統一。表情の動きはまだないので全部同じ静止画 */
 const DOG_FACES = {
-  normal: 'dog_normal.png', // ふだん（舌を出してにこにこ）
-  please: 'dog_please.png', // お願い（休んでほしい・やりすぎ注意）
-  worry: 'dog_worry.png', // 心配（疲れ・つらい・夜ふかし・寒い）
-  happy: 'dog_happy.png', // よろこぶ（ほめる・お祝い・おつかれさま）
-  ok: 'dog_ok.png', // OK（いい調子・のんびり）
-  think: 'dog_think.png', // 考える（問いかけ）
+  normal: 'dog_3d.png', // ふだん（舌を出してにこにこ）
+  please: 'dog_3d.png', // お願い（休んでほしい・やりすぎ注意）
+  worry: 'dog_3d.png', // 心配（疲れ・つらい・夜ふかし・寒い）
+  happy: 'dog_3d.png', // よろこぶ（ほめる・お祝い・おつかれさま）
+  ok: 'dog_3d.png', // OK（いい調子・のんびり）
+  think: 'dog_3d.png', // 考える（問いかけ）
 };
 const DOG_ALIAS = {
   please: 'please', ng: 'please', // 休んでほしい・やりすぎ注意 → お願い

@@ -113,13 +113,14 @@ export const TAP_ANNOY = [
    表情を変えたい／増やしたいときは、NURSE_FACES に画像ファイル名を足して、FACE_RULES に「言葉→表情」を書く。 */
 /* 卒展版はいこいさんではなく犬（コーギー）のキャラクター。画像は sotsuten/public/chara/。
    表情の画像がまだないものは CHARA_ALIAS で近い表情に、それもなければ normal にする */
+/* 11-19: やるきーぬは3Dモデルの正面の絵（透過PNG）に統一。表情の動きはまだないので全部同じ静止画 */
 export const NURSE_FACES = {
-  normal: 'dog_normal.png', // ふだん（舌を出してにこにこ）
-  please: 'dog_please.png', // お願い（休んでほしい・やりすぎ注意）
-  worry: 'dog_worry.png', // 心配（疲れ・つらい・夜ふかし・寒い）
-  happy: 'dog_happy.png', // よろこぶ（ほめる・お祝い・おつかれさま）
-  ok: 'dog_ok.png', // OK（いい調子・のんびり）
-  think: 'dog_think.png', // 考える（問いかけ）
+  normal: 'dog_3d.png', // ふだん（舌を出してにこにこ）
+  please: 'dog_3d.png', // お願い（休んでほしい・やりすぎ注意）
+  worry: 'dog_3d.png', // 心配（疲れ・つらい・夜ふかし・寒い）
+  happy: 'dog_3d.png', // よろこぶ（ほめる・お祝い・おつかれさま）
+  ok: 'dog_3d.png', // OK（いい調子・のんびり）
+  think: 'dog_3d.png', // 考える（問いかけ）
 };
 export const CHARA_ALIAS = {
   please: 'please', ng: 'please', // 休んでほしい・やりすぎ注意 → お願い

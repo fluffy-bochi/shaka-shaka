@@ -1,7 +1,7 @@
 import React from 'react';
 import Matter from 'matter-js';
 import { appendGlyph } from './fluent';
-import { cutout } from './cutout';
+import { mountDog, DOG_RATIO } from './dog3d';
 import { initShakaSound, attachCollisionSound, playShaka, soundReady } from './sound';
 import HomeEx from './screens/HomeEx'; // 卒展のホーム（Figma 卒展/ホーム）。投稿の見た目は本体の Home.jsx の Post
 import Bookshelf from './screens/Bookshelf';
@@ -35,20 +35,20 @@ const PILE_KEY = 'kame_sotsuten_pile', DATA_KEY = 'kame_sotsuten_data';
 const loadJSON = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } };
 const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } };
 const BUBBLE_KEEP = 3; // スマホのつぶやきの吹き出しは、このあと何回降ったら消すか（数字キー・投稿どちらも1回）
-/* ゲージの山のいちばん上にいる、やるきーぬのひとこと（順番に。face は public/chara/dog_<face>.png） */
+/* ゲージの山のいちばん上にいる、やるきーぬのひとこと（順番に） */
 const DOG_LINES = [
-  { t: 'やっほー', f: 'happy' },
-  { t: '今日は何してたの？', f: 'think' },
-  { t: '今日のご飯何にする？', f: 'think' },
-  { t: 'ここで遊ぶの好きなんだー', f: 'normal' },
-  { t: 'いっぱい積もったね', f: 'ok' },
-  { t: 'ちょっと休もっか？', f: 'please' },
+  { t: 'やっほー' },
+  { t: '今日は何してたの？' },
+  { t: '今日のご飯何にする？' },
+  { t: 'ここで遊ぶの好きなんだー' },
+  { t: 'いっぱい積もったね' },
+  { t: 'ちょっと休もっか？' },
 ];
 const DOG_LINE_MS = 7000; // ひとことを変える間隔
-const DOG_H = 0.36; // 絵の高さ（箱の幅に対して）。表情ごとに絵の縦横比がちがうので高さでそろえる
+const DOG_H = 0.36; // やるきーぬ（3D）の高さ（箱の幅に対して）
 const IDLE_MS = 5 * 60000; // この間なにも操作がなければゲージ（シャカシャカ）の画面に戻す
 const FILL_UNIT = 100; // 卒展: 箱からやるきーぬのぶんを抜いた広さが、この個数でいっぱい（本体のシャカは125）
-const DOG_FILL = 0.55; // やるきーぬの絵が四角（高さ×幅）のうち、体で埋まっている割合のめやす
+const DOG_FILL = 0.63; // やるきーぬが四角（高さ×幅）のうち、体で埋まっている割合のめやす
 
 /* 向き: auto＝端末の向きのまま／portrait＝縦／landscape＝横。iOS は Web から向きを固定できないので、
    選んだ向きと端末の向きが違うときは画面ごと90°回して出す。flip＝⟲で逆さに（回さないときは180°・回すときは -90°）。
@@ -144,7 +144,7 @@ export default function Interactive() {
   React.useEffect(() => {
     const box = boxRef.current; if (!box || !win.w) return undefined;
     const W = box.clientWidth, H = box.clientHeight;
-    const dogArea = (W * DOG_H) * (W * DOG_H * 0.75) * DOG_FILL; // 絵の高さ×幅（だいたい高さの0.75）×体の割合
+    const dogArea = (W * DOG_H) * (W * DOG_H * DOG_RATIO) * DOG_FILL; // 高さ×幅×体の割合
     const r = Math.sqrt(Math.max(W * H * 0.3, W * H - dogArea) / (FILL_UNIT * Math.PI));
     // 計算は止めない（スリープなし）。たくさん積んだときのモゴモゴは、めり込み解消の反復を増やして抑える
     const engine = Matter.Engine.create({ positionIterations: 20, velocityIterations: 10 });
@@ -189,9 +189,9 @@ export default function Interactive() {
     };
     // やるきーぬ: 山のいちばん上の絵文字の上に乗る（物理の体はなく、絵だけ）。しゃべる
     const dogH = Math.round(W * DOG_H);
-    const dog = document.createElement('img');
+    const dog = document.createElement('div');
     dog.className = 'dog-pic';
-    Object.assign(dog.style, { height: dogH + 'px' });
+    Object.assign(dog.style, { height: dogH + 'px', width: Math.round(dogH * DOG_RATIO) + 'px' });
     // ふきだしはノベルゲームのテキストウィンドウ風（名前つき・犬のおなかのあたり）
     const dogSay = document.createElement('div');
     dogSay.className = 'dog-say';
@@ -204,8 +204,9 @@ export default function Interactive() {
     dogSay.appendChild(dogName); dogSay.appendChild(dogText); dogSay.appendChild(dogRec);
     dogSay.style.maxWidth = Math.round(W / 3) + 'px'; // 幅はセリフの長さに合わせる（最大で画面の横幅の1/3・こえたら折り返す）
     box.appendChild(dog); box.appendChild(dogSay);
+    const unDog = mountDog(dog, { wave: true }); // 3Dで手をふる（読み込み中・失敗したときは絵）
     let lineI = 0;
-    const setLine = () => { const L = DOG_LINES[lineI % DOG_LINES.length]; lineI++; cutout('/chara/dog_' + L.f + '.png').then(u => { dog.src = u; dogText.textContent = L.t; }); }; // 白い背景を抜いた絵に
+    const setLine = () => { const L = DOG_LINES[lineI % DOG_LINES.length]; lineI++; dogText.textContent = L.t; };
     setLine();
     const lineT = setInterval(setLine, DOG_LINE_MS);
     s.dog = { x: W / 2, y: H, ready: false };
@@ -271,7 +272,7 @@ export default function Interactive() {
     };
     s.raf = requestAnimationFrame(step);
     setCount(s.bodies.length);
-    return () => { s.save(); s.bubbles.forEach(q => q.el.remove()); dog.remove(); dogSay.remove(); clearInterval(lineT); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
+    return () => { s.save(); s.bubbles.forEach(q => q.el.remove()); unDog(); dog.remove(); dogSay.remove(); clearInterval(lineT); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
   }, [layoutKey]);
 
   // 絵文字 g を n 個、上から降らせる（数字キー・スマホの投稿）
