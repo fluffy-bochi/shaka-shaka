@@ -1,7 +1,7 @@
 import React from 'react';
 import Emo from '../fluent';
 import { CATS } from '../data';
-import Dog3D from '../DogModel';
+import DogModel from '../DogModel';
 
 /* 卒展の記録（Figma「卒展/入力モード」1〜4）。物理ボタン（キーの ↑↓←→ と Enter）だけで操作する。
    1 気分 → 2 行動（カテゴリの段と行動の段・↑↓で段を切りかえ） → 3 がんばりタイプ → 4 確認して「記録する」。
@@ -21,6 +21,9 @@ export const TYPES = [
   { id: 'hodohodo', name: 'ほどほど', g: '☀️', color: '#f0c24b', ink: '#5a4300', mult: 1.5, say: 'がんばり上手さん発見！' },
   { id: 'michimichi', name: 'みちみち', svg: '/chara/fireball.svg', color: '#ef4b3c', ink: '#fff', mult: 2, say: 'おつかれさまー！明日は絶対休みにすること！' },
 ];
+/* やるきーぬのモーション: 気分を選ぶと気分に合わせて・タイプはタイプに合わせて（まとめでもくり返す） */
+const MOOD_MOTION = ['sad', 'sad', 'nod', 'happy', 'happy'];
+const TYPE_MOTION = { yuttari: 'relax', hodohodo: 'happy', michimichi: 'sad' };
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
 const INK = '#1b1b18', LIME = '#c4f000';
 
@@ -91,7 +94,9 @@ export default function Record({ onDone, onClose }) {
 
   const title = (t) => <div style={{ textAlign: 'center', fontSize: 34, fontWeight: 900, lineHeight: 1.35, whiteSpace: 'pre-line', marginTop: 74 }}>{t}</div>;
   // やるきーぬ: 空いている高さに合わせて縮む（最大 h）
-  const dogPic = (h, wave = false) => <Dog3D key={wave ? 'w' : 's'} wave={wave} style={{ height: '100%', maxHeight: h }} />; // 手をふるのはまとめだけ・ほかは止めた3D
+  const moodAct = React.useMemo(() => ({ name: MOOD_MOTION[mood] }), [mood]);
+  const typeAct = React.useMemo(() => ({ name: TYPE_MOTION[TYPES[type].id] }), [type]);
+  const dogPic = (h, base = 'idle', a = null, times = 1) => <DogModel base={base} act={a} times={times} style={{ height: '100%', maxHeight: h }} />;
   const enterBtn = (label) => (
     <div onClick={next} style={{ alignSelf: 'center', marginBottom: 64, background: LIME, color: '#2f3a00', borderRadius: 999, padding: '14px 48px', fontSize: 30, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
       {label}<span className="keyhint">Enter</span>
@@ -113,7 +118,7 @@ export default function Record({ onDone, onClose }) {
 
   if (step === 1) return wrap(<>
     {title('今の気分を教えて')}
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '12px 0' }}>{dogPic(480)}</div>
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '12px 0' }}>{dogPic(480, 'idle', moodAct)}</div>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 56 }}>
       <Arrow dir={-1} on={mood > 0} onClick={() => setMood(m => Math.max(0, m - 1))} />
       {MOODS5.map((m, i) => <div key={m.face} onClick={() => setMood(i)} style={{ ...ring(i === mood), cursor: 'pointer' }}><div style={{ width: 100, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Emo e={m.g} size={i === mood ? 88 : 72} /></div></div>)}
@@ -131,7 +136,7 @@ export default function Record({ onDone, onClose }) {
     const sizeOf = (d) => (d === 0 ? 96 : Math.abs(d) === 1 ? 76 : Math.abs(d) === 2 ? 56 : 46);
     return wrap(<>
       {title('最近した行動を教えて！')}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '12px 0' }}>{dogPic(400)}</div>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '12px 0' }}>{dogPic(400, 'think')}</div>
       {/* カテゴリの段（5つとも並べたまま、選んでいるものに枠） */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: row === 0 ? 1 : 0.55 }}>
         <Arrow dir={-1} on={row === 0 && cat > 0} onClick={() => { setRow(0); setCat(c => Math.max(0, c - 1)); setAct(0); }} />
@@ -162,7 +167,7 @@ export default function Record({ onDone, onClose }) {
 
   if (step === 3) return wrap(<>
     {title('最近のがんばりタイプ\n教えて！')}
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '12px 0' }}>{dogPic(440)}</div>
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '12px 0' }}>{dogPic(440, 'idle', typeAct)}</div>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 48 }}>
       <Arrow dir={-1} on={type > 0} onClick={() => setType(t => Math.max(0, t - 1))} />
       {TYPES.map((t, i) => <div key={t.id} onClick={() => setType(i)} style={{ ...ring(i === type), cursor: 'pointer' }}><TypeBadge t={t} size={i === type ? 186 : 166} /></div>)}
@@ -194,7 +199,7 @@ export default function Record({ onDone, onClose }) {
       </div>
       {/* やるきーぬ＋ひとこと（やるきーぬはテキストウィンドウの上に立つ） */}
       <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', alignSelf: 'stretch', paddingBottom: 40 }}>
-        <div style={{ flex: '0 1 auto', minHeight: 0, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>{dogPic(380, true)}</div>
+        <div style={{ flex: 1, minHeight: 0, maxHeight: 380, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden' }}>{dogPic(380, 'idle', typeAct, 3)}</div>
         <div className="dog-say" style={{ position: 'relative', left: 'auto', top: 'auto', maxWidth: 300 }}>
           <div className="dog-say-name">やるきーぬ</div>
           <div className="dog-say-text">{t.say}</div>
