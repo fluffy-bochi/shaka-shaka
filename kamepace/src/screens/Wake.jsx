@@ -2,6 +2,7 @@ import React from 'react';
 import { nurseSrc } from '../wake';
 import * as Ikoi from '../ikoi';
 import Emo from '../fluent';
+import DogModel from '../DogModel';
 import { GoalActButton, GoalActPicker } from './GoalAct';
 
 /* 起床後記録（ホームの睡眠カードから）: 1 入力 → シャカで🌙 → 2 昨日のふりかえり → 3 今日の予定。
@@ -176,8 +177,13 @@ export function BedCheck({ v }) {
 }
 
 /* キャラ＋吹き出し */
-export function Speaker({ text, size = 130, onTap, src: srcIn, onEdit, regular }) {
+/* やるきーぬ（犬）の表情 → 3Dのモーション（セリフが変わるたびに1回やって idle にもどる） */
+const DOG_MOTION = { normal: 'wave', happy: 'happy', worry: 'sad', please: 'relax', ok: 'nod', think: 'think' };
+export function Speaker({ text, size = 130, onTap, src: srcIn, faceKey, onEdit, regular }) {
   const src = srcIn || nurseSrc(text); // セリフに合った表情（いこいさん編集のプレビューでは表情を指定できる）
+  // やるきーぬは3D（追加した表情の画像を指定したときだけ絵）
+  const dogFace = Ikoi.getChara() === 'dog' ? Ikoi.dogBaseFace(faceKey || Ikoi.faceKeyFor(text)) : null;
+  const dogAct = React.useMemo(() => (dogFace ? { name: DOG_MOTION[dogFace] || 'wave' } : null), [text, dogFace]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 20px' }}>
       {/* 開発者モードのとき: いこいさんの左上に編集マーク（いま出ているセリフを編集） */}
@@ -186,7 +192,11 @@ export function Speaker({ text, size = 130, onTap, src: srcIn, onEdit, regular }
           <span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 17, lineHeight: 1 }}>edit</span>
         </button>
       )}
-      <img key={src} src={src} alt="" onClick={onTap} style={{ cursor: onTap ? 'pointer' : undefined, WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none', flex: '0 0 auto', width: size, height: size, objectFit: 'contain', objectPosition: 'bottom', mixBlendMode: 'multiply' }} />
+      {dogFace ? (
+        <div onClick={onTap} style={{ flex: '0 0 auto', width: size, height: size, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', cursor: onTap ? 'pointer' : undefined, WebkitTapHighlightColor: 'transparent' }}>
+          <DogModel act={dogAct} times={1} style={{ height: size }} />
+        </div>
+      ) : <img key={src} src={src} alt="" onClick={onTap} style={{ cursor: onTap ? 'pointer' : undefined, WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none', flex: '0 0 auto', width: size, height: size, objectFit: 'contain', objectPosition: 'bottom', mixBlendMode: 'multiply' }} />}
       <div key={text} onClick={onTap} style={{ position: 'relative', flex: 1, background: '#fff', borderRadius: 18, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.75, fontWeight: regular ? 400 : undefined, boxShadow: '0 2px 10px rgba(27,27,24,.06)', marginBottom: 14, animation: 'bubbleIn .18s ease-out', cursor: onTap ? 'pointer' : undefined, WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none' }}>
         {text}
         <span style={{ position: 'absolute', left: -6, bottom: 14, width: 12, height: 12, background: '#fff', transform: 'rotate(45deg)' }} />

@@ -161,9 +161,11 @@ function diffIkoi(base, next) {
   return out;
 }
 
-const customFaces = (faces) => Object.fromEntries(Object.entries(faces).filter(([k]) => !Ikoi.DEFAULT_FACES[k]));
+const customFaces = (faces) => Object.fromEntries(Object.entries(faces).filter(([k]) => !Ikoi.defaultFaces()[k]));
 
+/* 編集するのは、いま選んでいるキャラ（いこいさん／やるきーぬ）のセリフ。上の切りかえでキャラを変えると、そのキャラのセリフになる（App で key を変えて開き直す） */
 export default function IkoiEdit({ v }) {
+  const ch = Ikoi.getChara();
   const [data, setData] = React.useState(() => Ikoi.snapshot()); // 編集中の全セリフ・全表情
   // ホーム・記録画面の編集マークから来たときは、そのセリフを選んだ状態で開く
   const t0 = v.ikoiTarget, isDate0 = t0 && t0.key.startsWith('TAP_DATE:');
@@ -180,7 +182,7 @@ export default function IkoiEdit({ v }) {
   const taRefs = React.useRef([]);
   const caret = React.useRef(0);
 
-  React.useEffect(() => { loadIkoi().then(d => setHasPrev(!!(d && d.hasPrev))).catch(() => {}); }, []);
+  React.useEffect(() => { loadIkoi(ch).then(d => setHasPrev(!!(d && d.hasPrev))).catch(() => {}); }, []);
   // 編集は少し待ってから下書きに保存（アプリ全体の表示にも反映される）
   const dirty = React.useRef(false);
   React.useEffect(() => {
@@ -228,8 +230,8 @@ export default function IkoiEdit({ v }) {
   const publish = async () => {
     setConfirm(false); setBusy('反映中…');
     try {
-      await publishIkoi({ lines: data.lines, faces: customFaces(data.faces) });
-      Ikoi.setPublished(await loadIkoi()); Ikoi.setDraft(null); dirty.current = false; setHasPrev(true);
+      await publishIkoi({ lines: data.lines, faces: customFaces(data.faces) }, ch);
+      Ikoi.setPublished(await loadIkoi(ch), ch); Ikoi.setDraft(null); dirty.current = false; setHasPrev(true);
       setBusy('みんなに反映しました');
     } catch (err) { setBusy(err && err.code === 'permission-denied' ? '反映する権限がありません' : '反映できませんでした'); }
     setTimeout(() => setBusy(''), 2500);
@@ -237,7 +239,7 @@ export default function IkoiEdit({ v }) {
   const revert = async () => {
     setBusy('戻しています…');
     try {
-      await revertIkoi(); Ikoi.setPublished(await loadIkoi()); Ikoi.setDraft(null); dirty.current = false; setData(Ikoi.snapshot()); setSel(0);
+      await revertIkoi(ch); Ikoi.setPublished(await loadIkoi(ch), ch); Ikoi.setDraft(null); dirty.current = false; setData(Ikoi.snapshot()); setSel(0);
       setBusy('1つ前に戻しました');
     } catch (err) { setBusy('戻せませんでした'); }
     setTimeout(() => setBusy(''), 2500);
@@ -251,7 +253,10 @@ export default function IkoiEdit({ v }) {
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f7f4ec' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 20px 8px' }}>
         <button onClick={v.closeIkoiEdit} style={{ background: 'none', border: 'none', fontSize: 19, color: '#8a8a82', cursor: 'pointer' }}>‹</button>
-        <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>いこいさん編集</div>
+        <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>セリフ編集</div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {Ikoi.CHARAS.map(c => <button key={c.id} onClick={() => Ikoi.setChara(c.id)} style={chip(c.id === ch)}>{c.name}</button>)}
+        </div>
         <span style={{ fontSize: 11, fontWeight: 700, color: hasDraft ? '#b4645a' : '#8a8a82' }}>{hasDraft ? '下書き' : '反映済み'}</span>
       </div>
       {/* シチュエーション */}
@@ -274,7 +279,7 @@ export default function IkoiEdit({ v }) {
       </div>
       {/* プレビュー（いつもの見た目） */}
       <div style={{ padding: '8px 0 10px', borderBottom: '1px solid ' + LINE }}>
-        {preview ? <Speaker text={preview} size={group.size} src={previewSrc} /> : <div style={{ height: group.size }} />}
+        {preview ? <Speaker text={preview} size={group.size} src={previewSrc} faceKey={cur && cur.f} /> : <div style={{ height: group.size }} />}
       </div>
       {/* セリフの一覧 */}
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 16px 12px' }}>
