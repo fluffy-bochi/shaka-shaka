@@ -95,7 +95,8 @@ export function mountDog(el, { base = 'idle' } = {}) {
     };
     raf = requestAnimationFrame(tick);
   }).catch(() => { /* 絵のまま */ });
-  return {
+  const ctl = {
+    paused: () => paused,
     play(name, times) { if (api) api.play(name, times); else want.once = { name, times }; },
     setBase(name) { if (api) api.setBase(name); else want.base = name; },
     pause(b) { paused = !!b; },
@@ -104,6 +105,9 @@ export function mountDog(el, { base = 'idle' } = {}) {
       dead = true; cancelAnimationFrame(raf); if (ro) ro.disconnect();
       if (renderer) { renderer.dispose(); renderer.forceContextLoss(); }
       if (canvas) canvas.remove(); img.remove();
+      delete el.dataset.dog; el.dogCtl = null;
     },
   };
+  el.dataset.dog = '1'; el.dogCtl = ctl; // なでる（PetCursor.jsx）が見つけられるように
+  return ctl;
 }

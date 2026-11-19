@@ -70,3 +70,13 @@ html:has(body.post-page), body.post-page { overflow: auto; height: auto; -webkit
 /* ショートカットキーの表示は PC モード（.show-keys）のときだけ */
 .keyhint { display: none; font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; opacity: .65; letter-spacing: .02em; }
 .show-keys .keyhint { display: inline; }
+
+/* 卒展: カーソルの場所（大きな輪）と、やるきーぬをなでたときの手と ♥（PetCursor.jsx） */
+.pet-cursor { position: fixed; left: 0; top: 0; opacity: 0; pointer-events: none; will-change: transform; }
+.pet-cursor::before { content: ''; position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%; border: 3px solid #1b1b18; background: rgba(196,240,0,.35); box-sizing: border-box; transition: transform .15s; }
+.pet-cursor .pet-hand { position: absolute; left: -20px; top: -24px; font-size: 40px; line-height: 1; opacity: 0; transform: scale(.6); transition: opacity .12s, transform .12s; }
+.pet-cursor.petting::before { transform: scale(.4); }
+.pet-cursor.petting .pet-hand { opacity: 1; transform: scale(1); animation: petRub .5s ease-in-out infinite alternate; }
+@keyframes petRub { from { rotate: -14deg; } to { rotate: 14deg; } }
+.pet-heart { position: absolute; color: #ef6f8c; font-size: 30px; font-weight: 900; pointer-events: none; transform: translate(-50%, -50%); animation: petHeart .9s ease-out forwards; text-shadow: 0 1px 0 #fff; }
+@keyframes petHeart { from { opacity: 1; translate: 0 0; scale: .7; } to { opacity: 0; translate: 0 -70px; scale: 1.2; } }
