@@ -107,21 +107,24 @@ export function mountDog(el, { base = 'idle', wide = 1, frame = 'body' } = {}) {
     const acts = {};
     gltf.animations.forEach(c => { acts[c.name] = mixer.clipAction(c); });
     makeClips(THREE, model).forEach(c => { acts[c.name] = mixer.clipAction(c); }); // dig ball nap crawl
-    let cur = null, baseName = null, onceT = 0, oneShot = false, yaw = 0;
+    let cur = null, curAt = 0, baseName = null, onceT = 0, oneShot = false, yaw = 0;
     const go = (name, times) => {
       const a = acts[name] || acts.idle; if (!a) return;
       clearTimeout(onceT);
       a.reset(); a.setEffectiveWeight(1);
       a.setLoop(THREE.LoopRepeat, Infinity);
       if (cur && cur !== a) a.crossFadeFrom(cur, FADE, false); else a.fadeIn(cur ? 0 : 0.0001);
-      a.play(); cur = a; oneShot = !!times;
+      a.play(); cur = a; curAt = performance.now(); oneShot = !!times;
       if (times) onceT = setTimeout(() => { if (!dead && cur === a) go(baseName); }, a.getClip().duration * times * 1000 - FADE * 500);
     };
     api = {
       play: (name, times = 2) => { if (acts[name]) go(name, times); },
       busy: () => oneShot,
       turn: (a) => { yaw = a; }, // 向き（0＝正面・＋で右を向く）。少しずつまわる
-      setBase: (name) => { baseName = acts[name] ? name : 'idle'; if (!oneShot && cur !== acts[baseName]) go(baseName); }, // 1回きりのモーション中なら、終わってから
+      // 1回きりのモーション中なら、終わってから。now: 1回きりのモーションを止めてすぐ（歩き出すときなど・体の移動とずれないように）
+      setBase: (name, now) => { baseName = acts[name] ? name : 'idle'; if ((now || !oneShot) && cur !== acts[baseName]) go(baseName); },
+      // いま出ているモーションの名前と、出始めてからの秒（切りかえの途中かどうかを見る）
+      motion: () => (cur ? { name: cur.getClip().name, t: (performance.now() - curAt) / 1000 } : null),
     };
     baseName = acts[want.base] ? want.base : 'idle';
     go(baseName);
@@ -166,7 +169,8 @@ export function mountDog(el, { base = 'idle', wide = 1, frame = 'body' } = {}) {
   const ctl = {
     paused: () => paused,
     play(name, times) { if (api) api.play(name, times); else want.once = { name, times }; },
-    setBase(name) { if (api) api.setBase(name); else want.base = name; },
+    setBase(name, now) { if (api) api.setBase(name, now); else want.base = name; },
+    motion() { return api ? api.motion() : null; }, // 読み込み前・絵のときは null
     pause(b) { paused = !!b; },
     busy() { return api ? api.busy() : true; }, // 1回きりのモーション中か
     turn(a) { if (api) api.turn(a); else want.yaw = a; },
