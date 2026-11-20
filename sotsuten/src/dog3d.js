@@ -48,6 +48,29 @@ const POSES = {
       'arm.L': { r: arm(bp, 1.85 + 0.2 * q) }, 'arm.R': { r: arm(bp, 1.85 - 0.2 * q) },
       tail: { r: [0.2, 0.8 * Math.sin(t * Math.PI * 10), 0] },
       'eye.L': { s: [1.15, 1.2, 1] }, 'eye.R': { s: [1.15, 1.2, 1] }, 'eyew.L': { s: [1.15, 1.2, 1] }, 'eyew.R': { s: [1.15, 1.2, 1] } }; } },
+  /* ---- 実行中の画面（Run.jsx）で、行動に合わせて犬がする動き。runDog.js で行動から選ぶ ---- */
+  type: { dur: 0.5, f: (t) => { const q = Math.sin(t * Math.PI * 4); // パソコン: 前足でかたかた
+    return { body: { r: [0.06, 0, 0] }, head: { r: [0.2, 0.05 * q, 0] }, 'arm.L': { r: arm(0.06, 1.25 + 0.14 * q) }, 'arm.R': { r: arm(0.06, 1.25 - 0.14 * q) }, tail: { r: [0.2, 0.3 * Math.sin(t * Math.PI * 2), 0] } }; } },
+  write: { dur: 1.2, f: (t) => { const s = Math.sin(t * Math.PI * 4), c = Math.cos(t * Math.PI * 4); // 書く: 片手でくるくる
+    return { body: { r: [0.1, 0, 0.03 * s] }, head: { r: [0.28, 0.08 * Math.sin(t * Math.PI * 2), 0.06] }, 'arm.L': { r: [-0.1 - 1.15, 0, 0.1] }, 'arm.R': { r: [-0.1 - 1.15 - 0.12 * c, 0, -0.15 * s] } }; } },
+  read: { dur: 4, f: (t) => { const s = Math.sin(t * Math.PI * 2), flip = t > 0.85 ? Math.sin((t - 0.85) / 0.15 * Math.PI) : 0; // 読む: ゆっくり・ときどきページをめくる
+    return { body: { r: [0.04, 0, 0] }, head: { r: [0.22 + 0.03 * s, 0.12 * s, 0.05] }, 'arm.L': { r: arm(0.04, 1.4) }, 'arm.R': { r: [-0.04 - 1.4 - 0.4 * flip, 0, -0.5 * flip] } }; } },
+  eat: { dur: 1.0, f: (t) => { const s = Math.sin(t * Math.PI * 2), u = Math.max(0, s), d = Math.max(0, -s); // 食べる: 交互に口へ
+    return { body: { r: [0.02, 0, 0] }, head: { r: [0.08 - 0.12 * (u + d), 0, 0.04 * s] }, 'arm.L': { r: arm(0.02, 1.0 + 1.0 * u) }, 'arm.R': { r: arm(0.02, 1.0 + 1.0 * d) }, tail: { r: [0.2, 0.5 * Math.sin(t * Math.PI * 4), 0] } }; } },
+  talk: { dur: 1.6, f: (t) => { const s = Math.sin(t * Math.PI * 2), q = Math.sin(t * Math.PI * 6); // 話す: 身ぶり手ぶり・うなずく
+    return { body: { r: [0, 0.12 * s, 0] }, head: { r: [0.08 * q, 0.15 * s, 0] }, 'arm.L': { r: [-0.9 - 0.5 * Math.max(0, s), 0, 0.5 * Math.max(0, s)] }, 'arm.R': { r: [-0.9 - 0.5 * Math.max(0, -s), 0, -0.5 * Math.max(0, -s)] } }; } },
+  sweep: { dur: 1.2, f: (t) => { const s = Math.sin(t * Math.PI * 2); // 掃除: 前かがみで左右にはく
+    return { body: { r: [0.3, 0.2 * s, 0.08 * s], p: [0, -0.03, 0] }, head: { r: [0.05, -0.15 * s, 0] }, 'arm.L': { r: [-0.3 - 0.7, 0, 0.45 * s] }, 'arm.R': { r: [-0.3 - 0.7, 0, 0.45 * s] }, tail: { r: [0.2, 0.4 * s, 0] } }; } },
+  stir: { dur: 1.0, f: (t) => { const s = Math.sin(t * Math.PI * 2), c = Math.cos(t * Math.PI * 2); // 料理: なべをぐるぐる
+    return { body: { r: [0.12, 0.05 * s, 0] }, head: { r: [0.25, 0, 0.05 * s] }, 'arm.L': { r: arm(0.12, 1.1) }, 'arm.R': { r: [-0.12 - 1.1 - 0.25 * c, 0, -0.3 * s] }, tail: { r: [0.2, 0.3 * s, 0] } }; } },
+  jog: { dur: 0.5, f: (t) => { const s = Math.sin(t * Math.PI * 2), c = Math.abs(Math.cos(t * Math.PI * 2)); // 走る: 大きく腕と足をふる
+    return { body: { r: [0.15, 0, 0.05 * s], p: [0, 0.07 * c, 0] }, head: { r: [-0.1, 0, 0.04 * s] }, 'arm.L': { r: arm(0.15, 0.9 * s) }, 'arm.R': { r: arm(0.15, -0.9 * s) }, 'foot.L': { r: [-0.7 * s, 0, 0], p: [0, 0.06 * Math.max(0, s), 0] }, 'foot.R': { r: [0.7 * s, 0, 0], p: [0, 0.06 * Math.max(0, -s), 0] }, tail: { r: [0.4, 0.5 * s, 0] } }; } },
+  ride: { dur: 0.8, f: (t) => { const s = Math.sin(t * Math.PI * 2), b = Math.abs(Math.sin(t * Math.PI * 4)); // 乗る: 前足でつかまって、がたごと
+    return { body: { r: [0.05, 0, 0.04 * s], p: [0, 0.025 * b, 0] }, head: { r: [-0.05, 0.1 * s, 0.03 * s] }, 'arm.L': { r: arm(0.05, 1.35) }, 'arm.R': { r: arm(0.05, 1.35) }, 'foot.L': { r: [-0.5, 0, 0] }, 'foot.R': { r: [-0.5, 0, 0] }, tail: { r: [0.3, 0.3 * s, 0] } }; } },
+  sing: { dur: 1.4, f: (t) => { const s = Math.sin(t * Math.PI * 2), q = Math.sin(t * Math.PI * 4); // 歌う: マイクを口もとに・ゆれる
+    return { body: { r: [-0.05, 0, 0.12 * s] }, head: { r: [-0.15, 0.1 * s, 0.15 * s] }, 'arm.R': { r: [0.05 - 2.1, 0, 0.35] }, 'arm.L': { r: [0.05 - 1.2 - 0.6 * Math.max(0, q), 0, 0.5 * Math.max(0, q)] }, tail: { r: [0.3, 0.6 * s, 0] } }; } },
+  carry: { dur: 0.7, f: (t) => { const s = Math.sin(t * Math.PI * 2), c = Math.abs(Math.cos(t * Math.PI * 2)); // 運ぶ: 頭の上に持ちあげて歩く
+    return { body: { r: [-0.04, 0, 0.05 * s], p: [0, 0.03 * c, 0] }, head: { r: [-0.05, 0, 0.03 * s] }, 'arm.L': { r: arm(-0.04, 2.7) }, 'arm.R': { r: arm(-0.04, 2.7) }, 'foot.L': { r: [-0.4 * s, 0, 0] }, 'foot.R': { r: [0.4 * s, 0, 0] } }; } },
   crawl: { dur: 0.6, f: (t) => { const s = Math.sin(t * Math.PI * 2), c = Math.abs(Math.cos(t * Math.PI * 2)), bp = Q4;
     return { body: { r: [bp, 0, 0.04 * s], p: [0, 0.07 + 0.03 * c, -0.28] }, head: { r: [-bp * 0.8 + 0.05 * c, 0.06 * s, 0] },
       'arm.L': { r: arm(bp, 0.55 * s) }, 'arm.R': { r: arm(bp, -0.55 * s) },

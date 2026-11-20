@@ -195,3 +195,11 @@ body.kame-cover .app-screen { padding-right: var(--kame-rail, 56px); }
 .dog-live-tag i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: dogLiveBlink 1s steps(2, start) infinite; }
 @keyframes dogLiveBlink { to { visibility: hidden; } }
 .dog-live-telop { background: #1b1b18; color: #fff; border-radius: 0 0 14px 14px; padding: 9px 12px 10px; font-size: 16px; font-weight: 900; line-height: 1.45; min-height: 1.45em; word-break: break-all; }
+
+/* 実行中の画面のやるきーぬ（runDog.jsx）が持つ絵文字のゆれ */
+@keyframes runDogBob { from { translate: 0 0; } to { translate: 0 -4px; } }
+@keyframes runDogFloat { 0% { translate: 0 6px; opacity: 0; } 30% { opacity: 1; } 100% { translate: 8px -14px; opacity: 0; } }
+/* 実行中の画面の、絵文字／やるきーぬ の切りかえ（左右スワイプ） */
+.run-pager { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.run-pager::-webkit-scrollbar { display: none; }
+.run-pager > div { flex: 0 0 100%; scroll-snap-align: center; }

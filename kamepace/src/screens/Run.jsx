@@ -3,6 +3,7 @@ import Emo from '../fluent';
 import { FreqPop, History, HmInput } from './Pick';
 import { TaskEditPopup } from './Home';
 import { pipKind, openRunPip, usePip } from './RunPip';
+import RunDog from '../runDog';
 
 /* タスク実行（START）: いまの行動を大きく、開始時刻・いまの時刻と、経過／予定の時間のバー。
    ▶／⏸の左に 必・♡、右に りれき。その下に 全体／実施中 の アラーム（時刻）・タイマー（時間）を切り替えて設定。
@@ -162,7 +163,7 @@ export default function Run({ v }) {
       )}
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: SHEET_CLOSED + 10 }}>
         {/* いまの行動 */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 0' }}><Emo e={c.glyph} size={150} /></div>
+        <RunPager c={c} />
         <div style={{ position: 'relative', padding: '0 30px' }}>
           <div style={{ fontSize: 24, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
           <div style={{ fontSize: 12, fontWeight: 700, color: SUB, marginTop: 2 }}>{c.cat}</div>
@@ -333,6 +334,33 @@ export function MiniRun({ v }) {
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, background: '#e4e1d8', display: 'flex' }}>
         <div style={{ height: '100%', width: (over ? bar.plan : ratio) * 100 + '%', background: INK }} />
         {over && <div style={{ height: '100%', flex: 1, background: PINK }} />}
+      </div>
+    </div>
+  );
+}
+
+/* いまの行動の大きな表示: 左＝絵文字／右＝やるきーぬがその行動をしている。左右スワイプ（下の点を押しても）で切りかえ、端末に覚える */
+const RUN_VIEW_KEY = 'kame_run_view';
+function RunPager({ c }) {
+  const ref = React.useRef(null);
+  const [page, setPage] = React.useState(() => { try { return localStorage.getItem(RUN_VIEW_KEY) === 'dog' ? 1 : 0; } catch (e) { return 0; } });
+  const [seen, setSeen] = React.useState(page === 1); // やるきーぬ（3D）は一度見るまで読み込まない
+  React.useLayoutEffect(() => { const el = ref.current; if (el) el.scrollLeft = page * el.clientWidth; }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const onScroll = () => {
+    const el = ref.current; if (!el) return;
+    if (el.scrollLeft > 4) setSeen(true);
+    const p = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+    if (p !== page) { setPage(p); try { localStorage.setItem(RUN_VIEW_KEY, p ? 'dog' : 'emoji'); } catch (e) { /* ignore */ } }
+  };
+  const go = (p) => { const el = ref.current; if (el) el.scrollTo({ left: p * el.clientWidth, behavior: 'smooth' }); setSeen(true); };
+  return (
+    <div style={{ padding: '6px 0 0' }}>
+      <div ref={ref} onScroll={onScroll} className="run-pager">
+        <div style={{ display: 'flex', justifyContent: 'center' }}><Emo e={c.glyph} size={150} /></div>
+        <div style={{ height: 150, boxSizing: 'border-box', paddingTop: 20 }}>{seen && <RunDog c={c} height={122} />}</div>{/* 頭の上・足もとの絵文字がはみ出さないよう少し小さく */}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 4 }}>
+        {[0, 1].map(i => <button key={i} onClick={() => go(i)} aria-label={i ? 'やるきーぬ' : '絵文字'} style={{ width: 7, height: 7, borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: page === i ? INK : '#d8d5cb' }} />)}
       </div>
     </div>
   );
