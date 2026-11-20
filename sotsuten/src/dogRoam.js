@@ -29,6 +29,7 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
   Object.assign(el.style, { position: 'absolute', left: 0, top: 0, zIndex: 2, height: dogH + 'px', width: dogW + 'px', pointerEvents: 'none', willChange: 'transform', transformOrigin: '50% 58%' });
   box.appendChild(el);
   const ctl = mountDog(el, { wide: 1.8 });
+  ctl.roamed = true; // なでたときの反応はこちらで（PetCursor.jsx は ♥ だけ）
 
   const t0 = performance.now();
   const st = { x: W / 2, y: H, ready: false, rot: 0, spin: 0, jy: 0, jv: 0, dig: 0, face: 0, act: null, last: t0, next: t0 + 2500, off: false, offAt: 0, live: null, buried: false, wakeAt: 0, px: null, py: null };
@@ -131,6 +132,32 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
     if (m.name !== name) { ctl.setBase(name, true); return 0; }
     return Math.max(0, Math.min(1, (m.t - 0.2) / 0.35));
   };
+  /* ---- なでられる（卒展の PetCursor.jsx が ctl.petAt を入れる） ----
+     なでられているあいだはずっと喜ぶ（happy をくり返す）。長すぎると飽きてぶるぶるして歩いていく（しばらくなでても止まらない）。
+     なで終わったら、ときどきカーソルのほうを向いて「もっとなでて」（beg） */
+  const PET_BORED_MS = 9000, PET_COOL_MS = 7000;
+  let cursorX = null;
+  const onPtr = (e) => { cursorX = e.clientX; };
+  window.addEventListener('pointermove', onPtr);
+  const faceCursor = () => { // カーソルが犬の右なら右、左なら左を向く（真横ではなく少し）
+    if (cursorX == null) return;
+    const rc = el.getBoundingClientRect(), d = cursorX - (rc.left + rc.width / 2);
+    ctl.turn(Math.max(-0.7, Math.min(0.7, d / (rc.width * 1.5))));
+  };
+  const petUpdate = (now) => {
+    const on = ctl.petAt && now - ctl.petAt < 500;
+    if (st.bored && now - st.bored > PET_COOL_MS) st.bored = 0;
+    if (on && !st.bored && !st.off) {
+      if (!st.petting) { st.petting = true; st.petStart = now; if (st.act && st.act.k === 'dig') { st.dig = 0; setBuried(false); } st.act = null; st.rot = 0; face(0); ctl.setBase('happy', true); }
+      else if (now - st.petStart > PET_BORED_MS) { // 飽きた
+        st.petting = false; st.bored = now; ctl.play('shake', 1); st.force = 'walk'; st.next = now + 1100;
+      }
+    } else if (st.petting) { // なで終わった
+      st.petting = false;
+      if (Math.random() < 0.6) { st.act = { k: 'beg', until: now + rnd(2600, 4200) }; faceCursor(); ctl.setBase('beg', true); }
+      else { ctl.setBase('idle'); st.next = now + rnd(800, 1600); }
+    }
+  };
   const done = (after) => { const nap = st.act && st.act.nap; st.act = null; st.next = performance.now() + rnd(600, 1600); face(0); ctl.setBase('idle'); if (after) ctl.play(after, 1); else if (nap) ctl.play('happy', 1); };
 
   /* ---- 犬を山の後ろ（もぐる）／前に ---- */
@@ -188,13 +215,15 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
     const out = eye < 0 && !(st.act && st.act.k === 'jump');
     if (out !== st.off) { if (!st.offAt) st.offAt = now; if (now - st.offAt > (out ? OFF_MS : BACK_MS)) { st.off = out; st.offAt = 0; if (out) { showLive(); st.act = null; st.rot = 0; face(0); ctl.setBase('sad'); } else { hideLive(); st.next = now + 800; ctl.setBase('idle'); ctl.play('happy', 1); } } }
     else st.offAt = 0;
-    const petting = ctl.petAt && now - ctl.petAt < 700; // なでられているあいだは止まる
+    petUpdate(now);
+    const petting = st.petting;
     let rollY = 0;
     if (st.off) {
       // 画面の外: きゅうくつで動けない
     } else if (st.act && !petting) {
       const a = st.act;
       if (a.k === 'stay') { if (now > a.until) done(); }
+      else if (a.k === 'beg') { faceCursor(); if (now > a.until) done(); } // カーソルを見ながらおねだり
       else if (a.k === 'walk' || a.k === 'climb' || (a.k === 'throw' && a.phase === 'go')) {
         const d = a.tx - st.x, v = WALK * W * dt * gait(a.k === 'climb' ? 'crawl' : 'walk') * Math.min(1, 0.3 + Math.abs(a.tx - st.x) / (W * 0.05)); // 着く手前で少しずつ遅く
         if (Math.abs(d) <= v) {
@@ -283,7 +312,7 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
     offscreen: () => st.off, // 目が画面の外（中継中）
     /* シャカシャカ: ぴょーんと飛ばされてくるっと回る */
     jolt() { if (st.off) return; if (st.act && st.act.k === 'dig') { st.dig = 0; setBuried(false); } st.act = { k: 'jump' }; face(0); st.jv = -rnd(700, 950); st.jy = -1; st.spin = (Math.random() < 0.5 ? -1 : 1) * rnd(8, 11); },
-    busy: () => !!st.act || st.off,
-    dispose() { if (st.live) { const L = st.live; st.live = null; clearInterval(L.typeT); L.fc.dispose(); L.wrap.remove(); } if (inWorld) Matter.World.remove(engine.world, body); ctl.dispose(); el.remove(); },
+    busy: () => !!st.act || st.off || st.petting,
+    dispose() { window.removeEventListener('pointermove', onPtr); if (st.live) { const L = st.live; st.live = null; clearInterval(L.typeT); L.fc.dispose(); L.wrap.remove(); } if (inWorld) Matter.World.remove(engine.world, body); ctl.dispose(); el.remove(); },
   };
 }
