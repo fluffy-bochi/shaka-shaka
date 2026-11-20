@@ -3,30 +3,19 @@ import Matter from 'matter-js';
 import { appendGlyph } from './fluent';
 import { DOG_RATIO } from './dog3d';
 import { createDogRoam } from './dogRoam';
+import { startGamepad } from './gamepad';
 import { initShakaSound, attachCollisionSound, playShaka, soundReady } from './sound';
 import HomeEx from './screens/HomeEx'; // 卒展のホーム（Figma 卒展/ホーム）。投稿の見た目は本体の Home.jsx の Post
 import Bookshelf from './screens/Bookshelf';
 import Record, { actDrop } from './screens/Record';
 import QRCode from 'qrcode';
 import { watchPostsKeep, postDrop, makeToken } from './posts';
-import { addPress, addPost, addRecord, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
+import { addPost, addRecord, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
 import { homeLine } from './wake';
 import { strToDate, formatDateShort, tsToHmOn } from './model';
 
 /* 卒展用インタラクティブ（ほどほどふぉーと本体の IpadTest.jsx から移した単独版）。記録も保存もしない。
-   キーボードの数字で絵文字を降らせる。R でシャカシャカ（展示ではモニターに映すのでジャイロは使わない）。回復（rec）はプラスの絵文字に当たると1つずつ消しあう（シャカと同じ）。 */
-const KEYS = {
-  1: { g: '😫', n: 2 },            // つぶやき いちばん疲れている顔
-  2: { g: '😟', n: 1 },            // 2番目に疲れている顔
-  3: { g: '😐', n: 1 },            // ふつう
-  4: { g: '🙂', n: 1, rec: true }, // ちょっといい顔（回復）
-  5: { g: '😆', n: 1, rec: true }, // 最高の顔（回復）
-  6: { g: '🎨', n: 1 },
-  7: { g: '💻', n: 1 },
-  8: { g: '🍙', n: 1, rec: true },
-  9: { g: '🎤', n: 2 },
-  0: { g: '🛏️', n: 2, rec: true },
-};
+   記録画面・スマホの投稿で絵文字を降らせる（数字キーで降らせるのはやめた）。R（コントローラーは Y）でシャカシャカ（展示ではモニターに映すのでジャイロは使わない）。回復（rec）はプラスの絵文字に当たると1つずつ消しあう（シャカと同じ）。 */
 /* 本体のシャカと同じ「硬い」物理: 跳ねない・よく噛む・沈まない（スリープはしない） */
 const BODY_OPTS = { restitution: 0.12, friction: 0.4, frictionStatic: 0.6, frictionAir: 0.012, density: 0.01, slop: 0.01 };
 const SUBSTEPS = 2; // 1フレーム（1/60秒）を何回に分けて計算するか
@@ -91,6 +80,7 @@ export default function Interactive() {
   const [mine, setMine] = React.useState(saved0.mine || []);
   const [lastRec, setLastRec] = React.useState(saved0.lastRec || null);
   const [homeDate, setHomeDate] = React.useState(null); // null＝今日
+  const homeDateRef = React.useRef(homeDate); homeDateRef.current = homeDate;
   const [bookFav, setBookFav] = React.useState(saved0.bookFav || {});
   const [bookDiary, setBookDiary] = React.useState(saved0.bookDiary || {});
   const [postSince, setPostSince] = React.useState(saved0.postSince || Date.now()); // この時刻より後のスマホの投稿を受け取る（リセットで今に）
@@ -112,7 +102,7 @@ export default function Interactive() {
   React.useEffect(() => {
     let last = Date.now();
     const on = () => { last = Date.now(); };
-    const evs = ['keydown', 'pointerdown', 'touchstart', 'wheel'];
+    const evs = ['keydown', 'pointerdown', 'pointermove', 'touchstart', 'wheel']; // コントローラーのカーソル（gamepad.js）も pointermove
     evs.forEach(ev => window.addEventListener(ev, on, { passive: true }));
     const t = setInterval(() => { if (Date.now() - last >= IDLE_MS) { setTab('gauge'); setHomeDate(null); } }, 5000);
     return () => { evs.forEach(ev => window.removeEventListener(ev, on)); clearInterval(t); };
@@ -294,11 +284,6 @@ export default function Interactive() {
     setCount(s.bodies.filter(b => !b.rec).length);
     setLastRec({ ts: Date.now(), rec: !!rec });
   }, []);
-  const drop = React.useCallback((key) => {
-    const k = KEYS[key]; if (!k || !sim.current) return;
-    fall(k.g, k.n, k.rec);
-    setMine(l => addPress(l, key, k.g, k.n, !!k.rec));
-  }, [fall]);
   // 記録画面で「記録する」→ ゲージに戻って、気分と行動の絵文字を降らせる（数はがんばりタイプで増える）
   const onRecordDone = React.useCallback((r) => {
     setTab('gauge');
@@ -370,15 +355,18 @@ export default function Interactive() {
       if (nav && !e.repeat) { e.preventDefault(); setTab(nav); return; }
       if ((e.code === 'KeyF' || e.key === 'f' || e.key === 'F') && !e.repeat) { e.preventDefault(); toggleFull(); return; }
       if ((e.code === 'KeyR' || e.key === 'r' || e.key === 'R') && !e.repeat) { e.preventDefault(); shake(); return; }
-      const m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code || '');
-      const key = m ? m[1] : (/^[0-9]$/.test(e.key) ? e.key : null);
-      if (key == null) return;
-      e.preventDefault();
-      drop(key);
+      if (e.key === 'Escape' || e.key === 'Backspace') { // 戻る（コントローラーの B）: 前の日のホーム→今日／ホーム・本棚→ゲージ
+        e.preventDefault();
+        if (tabRef.current === 'home' && homeDateRef.current) setHomeDate(null);
+        else if (tabRef.current !== 'gauge') setTab('gauge');
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [drop, shake]);
+  }, [shake]);
+  // コントローラー（gamepad.js）: スティック＝カーソル・A＝決定・B＝戻る・Y＝シャカシャカ
+  const angleRef = React.useRef(0); angleRef.current = angle;
+  React.useEffect(() => startGamepad({ isRecord: () => tabRef.current === 'record', angle: () => angleRef.current }), []);
 
   /* ---- ホーム・本棚（本体の画面をそのまま使う）に渡す値 ---- */
   const today = todayStr();
@@ -470,17 +458,6 @@ export default function Interactive() {
       <button onClick={clear} style={ghost}>リセット</button>
     </div>
   );
-  // 数字キー（キーボードがないとき用）。PC モードでは上の余白の残りの高さいっぱい
-  const keys = (
-    <div style={{ position: 'relative', zIndex: 2, display: 'flex', gap: 6, flex: pc ? 1 : '0 0 auto', minHeight: 0, padding: pc ? '0 12px 10px' : (safe ? '8px 12px calc(8px + env(safe-area-inset-bottom))' : '8px 12px'), background: pc ? 'transparent' : '#fff', borderTop: pc ? 'none' : '1px solid #efece3' }}>
-      {['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map(k => (
-        <button key={k} onClick={() => drop(k)} style={{ flex: 1, height: pc ? 'auto' : 52, maxHeight: pc ? 120 : undefined, border: 'none', borderRadius: 12, background: KEYS[k].rec ? '#eef7cc' : (pc ? '#fff' : '#f1efe8'), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, cursor: 'pointer', fontFamily: 'inherit' }}>
-          <span style={{ fontSize: 18 }}>{KEYS[k].g}</span>
-          <span style={{ fontFamily: "'Space Mono',monospace", fontSize: 10, fontWeight: 700, color: '#55554e' }}>{k}</span>
-        </button>
-      ))}
-    </div>
-  );
   // フッター（本体のナビと同じ見た目。ゲージ＝シャカの画面なのでゲージが選ばれた色）
   const navIcon = Math.round(Math.max(23, Math.min(56, mBot * 0.24)));
   const navLabel = Math.round(Math.max(10, Math.min(22, mBot * 0.09)));
@@ -499,7 +476,7 @@ export default function Interactive() {
     <div style={rootStyle}>
       {pc ? (
         <>
-          <div style={{ flex: `0 0 ${mTop}px`, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#efece3' }}>{bar}{keys}</div>
+          <div style={{ flex: `0 0 ${mTop}px`, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#efece3' }}>{bar}</div>
           {stage({ flex: `0 0 ${bh}px`, width: bw, margin: '0 auto' })}
           {mBot > 0 && footer}
         </>
@@ -507,7 +484,6 @@ export default function Interactive() {
         <>
           {bar}
           {stage({ flex: 1, minHeight: 0 })}
-          {keys}
         </>
       )}
     </div>
