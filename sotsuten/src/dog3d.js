@@ -42,12 +42,11 @@ const POSES = {
       tail: { r: [0.2, 0.25 * b, 0] },
       // 目をとじる（目を横に細くつぶして、光を消す）
       'eye.L': { s: [1.1, 0.12, 1] }, 'eye.R': { s: [1.1, 0.12, 1] }, 'hl.L': { s: [0.01, 0.01, 0.01] }, 'hl.R': { s: [0.01, 0.01, 0.01] }, 'spark.L': { s: [0.01, 0.01, 0.01] }, 'spark.R': { s: [0.01, 0.01, 0.01] }, 'eyew.L': { s: [0.01, 0.01, 0.01] }, 'eyew.R': { s: [0.01, 0.01, 0.01] } }; } },
-  // beg: おすわりで前足をそろえて上げ、首をかしげて「もっとなでて」（目を少し大きく・しっぽを速くふる）
+  // beg: おすわりで前足をそろえて上げ、首をかしげて「もっとなでて」（しっぽを速くふる。目の大きさは変えない）
   beg: { dur: 1.6, f: (t) => { const s = Math.sin(t * Math.PI * 2), q = Math.sin(t * Math.PI * 8), bp = -0.12;
     return { body: { r: [bp + 0.04 * s, 0, 0.05 * s], p: [0, -0.04, 0] }, head: { r: [0.12, 0, 0.28 * s] },
       'arm.L': { r: arm(bp, 1.85 + 0.2 * q) }, 'arm.R': { r: arm(bp, 1.85 - 0.2 * q) },
-      tail: { r: [0.2, 0.8 * Math.sin(t * Math.PI * 10), 0] },
-      'eye.L': { s: [1.15, 1.2, 1] }, 'eye.R': { s: [1.15, 1.2, 1] }, 'eyew.L': { s: [1.15, 1.2, 1] }, 'eyew.R': { s: [1.15, 1.2, 1] } }; } },
+      tail: { r: [0.2, 0.8 * Math.sin(t * Math.PI * 10), 0] } }; } },
   /* ---- 実行中の画面（Run.jsx）で、行動に合わせて犬がする動き。runDog.js で行動から選ぶ ---- */
   type: { dur: 0.5, f: (t) => { const q = Math.sin(t * Math.PI * 4); // パソコン: 前足でかたかた
     return { body: { r: [0.06, 0, 0] }, head: { r: [0.2, 0.05 * q, 0] }, 'arm.L': { r: arm(0.06, 1.25 + 0.14 * q) }, 'arm.R': { r: arm(0.06, 1.25 - 0.14 * q) }, tail: { r: [0.2, 0.3 * Math.sin(t * Math.PI * 2), 0] } }; } },
@@ -107,6 +106,27 @@ function makeClips(THREE, model) {
   });
 }
 
+/* ---- 目のハイライト → しいたけ ----
+   モデルでは、ふだんのハイライト（hl）は目の前、しいたけ（spark）は頭の中に隠れていて、happy などで位置を入れかえている。
+   そのまま切りかえると途中で両方とも頭の中に入ってハイライトが消えるので、毎コマ「どれくらいしいたけか（k）」を spark の位置から求めて、
+   ハイライトを黒目の真ん中（しいたけの場所）へ動かしながら小さく、同じ場所でしいたけを大きくする（形がかわっていくように見える） */
+function eyeFixer(model, gltf) {
+  const bones = {}; model.traverse(o => { if (o.isBone) bones[o.name.replace(/[.\s]/g, '')] = o; });
+  const happy = gltf.animations.find(c => c.name === 'happy');
+  const sides = ['L', 'R'].map(S => {
+    const hl = bones['hl' + S], sp = bones['spark' + S]; if (!hl || !sp) return null;
+    const tr = happy && happy.tracks.find(t => t.name === 'spark' + S + '.position');
+    if (!tr) return null;
+    return { hl, sp, hlRest: hl.position.clone(), spIn: sp.position.clone(), spOut: hl.position.clone().set(tr.values[0], tr.values[1], tr.values[2]) };
+  }).filter(Boolean);
+  return () => sides.forEach(({ hl, sp, hlRest, spIn, spOut }) => {
+    const k = Math.max(0, Math.min(1, (sp.position.z - spIn.z) / ((spOut.z - spIn.z) || 1)));
+    const hs = hl.scale.x; // 目を閉じるモーション（relax・nap）で 0 にしているぶんはそのまま
+    hl.position.lerpVectors(hlRest, spOut, k); hl.scale.setScalar(hs * (1 - k));
+    if (k > 0.001) { sp.position.copy(spOut); sp.scale.setScalar(k); } else sp.scale.setScalar(0.001);
+  });
+}
+
 /* 返り値: { play(name, times), setBase(name), pause(bool), busy(), dispose() }。読み込み前に呼んでも、読み込み後に反映する */
 /* wide: 絵の四角より横に広くかく（横を向いたり転がったりしてもはみ出さないように。大きさは同じ）
    frame: 'face' で顔のアップ（中継のワイプ用） */
@@ -133,6 +153,7 @@ export function mountDog(el, { base = 'idle', wide = 1, frame = 'body' } = {}) {
     scene.add(model);
     model.traverse(o => { if (o.isMesh) o.frustumCulled = false; }); // 手や体を動かしたときに消えないように
     const mixer = new THREE.AnimationMixer(model);
+    const fixEyes = eyeFixer(model, gltf);
     const acts = {};
     gltf.animations.forEach(c => { acts[c.name] = mixer.clipAction(c); });
     makeClips(THREE, model).forEach(c => { acts[c.name] = mixer.clipAction(c); }); // dig ball nap crawl
@@ -159,7 +180,7 @@ export function mountDog(el, { base = 'idle', wide = 1, frame = 'body' } = {}) {
     go(baseName);
     if (want.once) api.play(want.once.name, want.once.times);
     if (want.yaw != null) { yaw = want.yaw; model.rotation.y = yaw; }
-    mixer.update(0);
+    mixer.update(0); fixEyes();
     // 正面から全身が入るように（体を動かす分すこし余白）。大きさは idle の最初のポーズで決める
     const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
     const camera = new THREE.PerspectiveCamera(20, 1, 0.01, 100);
@@ -189,7 +210,7 @@ export function mountDog(el, { base = 'idle', wide = 1, frame = 'body' } = {}) {
       acc += dt;
       if (acc < 1 / 31) return; // 30コマ/秒
       const st = Math.min(acc, 0.1);
-      mixer.update(st); acc = 0;
+      mixer.update(st); fixEyes(); acc = 0;
       model.rotation.y += (yaw - model.rotation.y) * Math.min(1, st * 7);
       draw();
     };
