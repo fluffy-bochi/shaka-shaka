@@ -3,7 +3,8 @@ import { mountDog, DOG_RATIO } from './dog3d';
 import { appendGlyph } from './fluent';
 
 /* やるきーぬがシャカシャカ（がんばりゲージ）の山の上を自由に動く。物理の体はなく、絵文字の山の上に立つだけ。
-   - うろうろ歩く・山のいちばん高いところに登る・ゴロゴロ転がる・近くの絵文字を投げる・山にもぐる
+   - うろうろ歩く（前の絵文字を蹴散らす）・四つ足で山のいちばん高いところに登る・四つ足で丸まってゴロゴロ・近くの絵文字を投げる
+     ・四つ足で前足で掘ってもぐる（掘った絵文字を後ろへ飛ばす）・四つ足で伏せて寝る（モーションは dog3d.js の dig ball nap crawl）
    - 犬にも物理の体（動かない体＝static を毎フレーム犬の場所へ動かす）があり、絵文字は犬をよける・押しのけられる・頭に乗る
    - 山が高くなって犬の目が画面の上から出たら、テレビの中継（ワイプ）で顔を映して「ねー、きゅうくつだよー！やすんでー！」
    卒展（sotsuten）とほどふぉ（kamepace）で同じファイルを使う（コピー）。
@@ -42,16 +43,50 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
     for (const b of bodies()) { const p = b.position; if (b.speed > 1.5) continue; if (Math.abs(p.x - x) < half && p.y - r * 0.85 < top) top = p.y - r * 0.85; }
     return top;
   };
-  /* 犬が立つ高さ: 足の下の絵文字と、体のすぐ横の山の高さ。頭や背中に乗っている絵文字は見ない（見ると自分で自分を持ち上げてしまう） */
+  /* 犬が立つ高さ: 足もとの何本かの列の山の高さの「真ん中」。いちばん高い絵文字に合わせると浮いて見えるので、
+     出っぱった絵文字は犬の体で押しのける（蹴散らす）。頭や背中に乗っている絵文字は見ない（見ると自分で自分を持ち上げてしまう） */
   const dogSurf = () => {
-    let top = H; const hw = BW / 2;
+    const hw = BW / 2, offs = [-hw - r * 2.5, -hw - r, -hw * 0.6, -hw * 0.2, hw * 0.2, hw * 0.6, hw + r, hw + r * 2.5];
+    const cols = offs.map(d => st.x + d), tops = cols.map(() => null);
     for (const b of bodies()) {
       const p = b.position; if (b.speed > 1.5) continue;
-      const dx = Math.abs(p.x - st.x); if (dx > hw + r * 2.5) continue;
+      const dx = Math.abs(p.x - st.x); if (dx > hw + r * 3.5) continue;
       if (dx < hw && st.ready && p.y < st.y - r * 0.5) continue; // 体の上に乗っている
-      if (p.y - r * 0.85 < top) top = p.y - r * 0.85;
+      const top = p.y - r * 0.85;
+      cols.forEach((cx, i) => { if (cx > 0 && cx < W && Math.abs(p.x - cx) < r && (tops[i] == null || top < tops[i])) tops[i] = top; });
     }
-    return top;
+    const t = tops.filter(v => v != null).sort((a, b) => a - b); // 絵文字がない列（犬の下が空いている・箱の外）は数えない
+    if (!t.length) return H;
+    return t.length % 2 ? t[(t.length - 1) / 2] : (t[t.length / 2 - 1] + t[t.length / 2]) / 2;
+  };
+  /* 歩きながら、足もとの前にある絵文字を蹴る */
+  const kickAt = new WeakMap();
+  const kick = (dir) => {
+    const now = performance.now(), hw = BW / 2, k = Math.sqrt(Math.max(1, r / 20));
+    let n = 0;
+    for (const b of bodies()) {
+      const p = b.position, dx = (p.x - st.x) * dir;
+      if (dx < hw * 0.4 || dx > hw + r * 1.6 || Math.abs(p.y - (st.y - r)) > r * 1.6) continue;
+      if (now - (kickAt.get(b) || 0) < 700) continue;
+      kickAt.set(b, now);
+      Matter.Sleeping.set(b, false);
+      Matter.Body.setVelocity(b, { x: dir * rnd(3, 6) * k, y: -rnd(4, 8) * k });
+      Matter.Body.setAngularVelocity(b, dir * rnd(0.1, 0.3));
+      n++;
+    }
+    if (n) wake();
+  };
+  /* 前足で掘った絵文字を、後ろへぽいっと飛ばす */
+  const scoop = (dir) => {
+    const hw = BW / 2, k = Math.sqrt(Math.max(1, r / 20));
+    const near = bodies().filter(b => { const dx = (b.position.x - st.x) * dir; return dx > -hw * 0.2 && dx < hw + r * 2 && Math.abs(b.position.y - st.y) < r * 2.5; });
+    if (!near.length) return;
+    const b = near[Math.floor(Math.random() * near.length)];
+    Matter.Sleeping.set(b, false);
+    Matter.Body.setPosition(b, { x: b.position.x, y: b.position.y - r * 0.4 });
+    Matter.Body.setVelocity(b, { x: -dir * rnd(3.5, 6.5) * k, y: -rnd(7, 11) * k });
+    Matter.Body.setAngularVelocity(b, -dir * rnd(0.2, 0.4));
+    wake();
   };
   const clampX = (x) => Math.min(W - dogW / 2, Math.max(dogW / 2, x));
   const face = (dir) => { st.face = dir; ctl.turn(dir * 0.95); }; // 横を向く（真横だと顔が見えないので斜め）
@@ -60,9 +95,10 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
     const now = performance.now();
     const deep = H - dogSurf(); // 足もとの山の深さ
     st.rot = 0; // 転がっている途中でほかの動きに切りかわったとき
-    const choice = st.force || pickW([['stay', 2], ['walk', 3], ['climb', 2], ['roll', 1.6], ['throw', bodies().length ? 1.8 : 0], ['dig', deep > dogH * 0.55 ? 1.4 : 0]]);
+    const choice = st.force || pickW([['stay', 1.6], ['walk', 3], ['climb', 2], ['roll', 1.6], ['throw', bodies().length ? 1.8 : 0], ['dig', deep > dogH * 0.55 ? 1.6 : 0], ['nap', 1]]);
     st.force = null;
     if (choice === 'stay') { st.act = { k: 'stay', until: now + rnd(2500, 5000) }; face(0); ctl.setBase('idle'); return; }
+    if (choice === 'nap') { st.act = { k: 'stay', until: now + rnd(6000, 10000), nap: true }; face(rnd(-0.5, 0.5)); ctl.setBase('nap'); return; } // 四つ足のまま伏せて寝る
     if (choice === 'walk' || choice === 'climb') {
       let tx = clampX(rnd(dogW / 2, W - dogW / 2));
       if (choice === 'climb') { // 山のいちばん高いところへ
@@ -70,13 +106,13 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
         if (best) tx = clampX(best.position.x);
       }
       if (Math.abs(tx - st.x) < W * 0.08) tx = clampX(st.x + (st.x < W / 2 ? 1 : -1) * W * 0.25);
-      st.act = { k: choice, tx }; face(tx > st.x ? 1 : -1); ctl.setBase('walk');
+      st.act = { k: choice, tx }; face(tx > st.x ? 1 : -1); ctl.setBase(choice === 'climb' ? 'crawl' : 'walk'); // 登るときは四つ足
       return;
     }
     if (choice === 'roll') {
       const dir = st.x < W * 0.35 ? 1 : st.x > W * 0.65 ? -1 : (Math.random() < 0.5 ? -1 : 1);
       const tx = clampX(st.x + dir * rnd(0.22, 0.4) * W);
-      st.act = { k: 'roll', tx, dir }; face(0); ctl.setBase('relax');
+      st.act = { k: 'roll', tx, dir }; face(0); ctl.setBase('ball'); // 四つ足のまま丸まって転がる
       return;
     }
     if (choice === 'throw') { // 近くの山の上のほうの絵文字をつかんで、ぽーんと投げる
@@ -87,9 +123,9 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
       st.act = { k: 'throw', tgt, dir, tx: clampX(tgt.position.x - dir * dogW * 0.35), phase: 'go' }; face(dir); ctl.setBase('walk');
       return;
     }
-    if (choice === 'dig') { st.act = { k: 'dig', phase: 'down', t0: now, baseY: st.y }; face(0); ctl.setBase('idle'); ctl.play('shake', 2); }
+    if (choice === 'dig') { const dir = Math.random() < 0.5 ? -1 : 1; st.act = { k: 'dig', phase: 'down', t0: now, baseY: st.y, dir, scoopAt: 0 }; face(dir); ctl.setBase('dig'); } // 横を向いて、四つ足で前足で掘る
   };
-  const done = (after) => { st.act = null; st.next = performance.now() + rnd(600, 1600); face(0); ctl.setBase('idle'); if (after) ctl.play(after, 1); };
+  const done = (after) => { const nap = st.act && st.act.nap; st.act = null; st.next = performance.now() + rnd(600, 1600); face(0); ctl.setBase('idle'); if (after) ctl.play(after, 1); else if (nap) ctl.play('happy', 1); };
 
   /* ---- 犬を山の後ろ（もぐる）／前に ---- */
   const setBuried = (b) => {
@@ -159,7 +195,7 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
           st.x = a.tx;
           if (a.k === 'throw') { a.phase = 'throw'; a.t0 = now; face(a.dir * 0.6); ctl.setBase('idle'); ctl.play('wave', 1); }
           else done(a.k === 'climb' ? 'doya' : null);
-        } else st.x += Math.sign(d) * v;
+        } else { st.x += Math.sign(d) * v; kick(Math.sign(d)); } // 歩きながら前の絵文字を蹴散らす
       } else if (a.k === 'throw') {
         if (!a.thrown && now - a.t0 > 450) { // 手をふりあげたところで投げる
           a.thrown = true;
@@ -188,15 +224,17 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
       } else if (a.k === 'dig') {
         const t = now - a.t0;
         st.y = a.baseY; // もぐっているあいだは、もぐり始めた高さから下へ（押しのけた絵文字で持ち上がらない）
+        const DEEP = 0.55, DOWN = 2400;
+        if (a.phase !== 'up' && (a.phase === 'down' || t < 1200) && now - a.scoopAt > 260) { a.scoopAt = now; scoop(a.dir); } // 掘った絵文字を後ろへ
         if (a.phase === 'down') {
-          if (t > 250) setBuried(true);
-          st.dig = Math.min(0.75, t / 1600 * 0.75);
-          if (t > 1600) { a.phase = 'in'; a.t0 = now; }
-        } else if (a.phase === 'in') { // もぐったまま、顔だけ出してきょろきょろ
-          if (!a.look) { a.look = true; face(-1); setTimeout(() => face(1), 900); setTimeout(() => face(0), 1800); }
-          if (t > 2600) { a.phase = 'up'; a.t0 = now; ctl.play('happy', 1); }
+          if (t > 300) setBuried(true);
+          st.dig = Math.min(DEEP, t / DOWN * DEEP);
+          if (t > DOWN) { a.phase = 'in'; a.t0 = now; }
+        } else if (a.phase === 'in') { // 掘り終わったら、顔を出してきょろきょろ
+          if (t > 1200 && !a.look) { a.look = true; ctl.setBase('idle'); face(-1); setTimeout(() => face(1), 800); setTimeout(() => face(0), 1600); }
+          if (t > 3300) { a.phase = 'up'; a.t0 = now; ctl.play('happy', 1); }
         } else {
-          st.dig = Math.max(0, 0.75 - t / 900 * 0.75);
+          st.dig = Math.max(0, DEEP - t / 900 * DEEP);
           if (t > 900) { st.dig = 0; setBuried(false); done(); }
         }
       }
