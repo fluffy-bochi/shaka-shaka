@@ -13,6 +13,7 @@ export const LIVE_LINE = 'ねー、きゅうくつだよー！やすんでー！
 const WALK = 0.17; // 歩く速さ（箱の幅/秒）
 const ROLL = 0.26; // 転がる速さ（箱の幅/秒）
 const EYE = 0.7; // 目の高さ（足もとから・犬の高さに対して）
+const NEAR_FULL = 0.7; // 山の絵文字が箱の広さのこれだけを埋めていないときは中継を出さない（降ってきた絵文字が頭に乗っただけ・山の一部が高いだけで出ないように）
 const OFF_MS = 300, BACK_MS = 600; // 目が画面の外に出て／もどって、これだけたったら中継を出す／しまう
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pickW = (list) => { let t = Math.random() * list.reduce((a, x) => a + x[1], 0); for (const x of list) { t -= x[1]; if (t <= 0) return x[0]; } return list[0][0]; };
@@ -41,7 +42,7 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
   /* x の場所の山の上（立つ高さ）。落ちている途中のは見ない */
   const surf = (x, half) => {
     let top = H;
-    for (const b of bodies()) { const p = b.position; if (b.speed > 1.5) continue; if (Math.abs(p.x - x) < half && p.y - r * 0.85 < top) top = p.y - r * 0.85; }
+    for (const b of bodies()) { const p = b.position; if (b.speed > 1.5 || p.y < r) continue; if (Math.abs(p.x - x) < half && p.y - r * 0.85 < top) top = p.y - r * 0.85; }
     return top;
   };
   /* 犬が立つ高さ: 足もとの何本かの列の山の高さの「真ん中」。いちばん高い絵文字に合わせると浮いて見えるので、
@@ -50,7 +51,7 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
     const hw = BW / 2, offs = [-hw - r * 2.5, -hw - r, -hw * 0.6, -hw * 0.2, hw * 0.2, hw * 0.6, hw + r, hw + r * 2.5];
     const cols = offs.map(d => st.x + d), tops = cols.map(() => null);
     for (const b of bodies()) {
-      const p = b.position; if (b.speed > 1.5) continue;
+      const p = b.position; if (b.speed > 1.5 || p.y < r) continue; // 落ちてくるところ（出たばかりで速さ0・箱の上）は数えない
       const dx = Math.abs(p.x - st.x); if (dx > hw + r * 3.5) continue;
       if (dx < hw && st.ready && p.y < st.y - r * 0.5) continue; // 体の上に乗っている
       const top = p.y - r * 0.85;
@@ -212,7 +213,7 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
     if (!active) { if (st.live) hideLive(); st.off = false; st.offAt = 0; return place(); }
     // 目が画面の上から出たら中継（出ているあいだずっと）。もどったらしまう
     const eye = st.y + dogH * st.dig * 0.85 + st.jy - dogH * EYE;
-    const out = eye < 0 && !(st.act && st.act.k === 'jump');
+    const out = eye < 0 && !(st.act && st.act.k === 'jump') && pile().length * Math.PI * r * r / (W * H) >= NEAR_FULL;
     if (out !== st.off) { if (!st.offAt) st.offAt = now; if (now - st.offAt > (out ? OFF_MS : BACK_MS)) { st.off = out; st.offAt = 0; if (out) { showLive(); st.act = null; st.rot = 0; face(0); ctl.setBase('sad'); } else { hideLive(); st.next = now + 800; ctl.setBase('idle'); ctl.play('happy', 1); } } }
     else st.offAt = 0;
     petUpdate(now);
