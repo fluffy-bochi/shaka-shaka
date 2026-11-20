@@ -1,7 +1,8 @@
 import React from 'react';
 import Matter from 'matter-js';
 import { appendGlyph } from './fluent';
-import { mountDog, DOG_RATIO } from './dog3d';
+import { DOG_RATIO } from './dog3d';
+import { createDogRoam } from './dogRoam';
 import { initShakaSound, attachCollisionSound, playShaka, soundReady } from './sound';
 import HomeEx from './screens/HomeEx'; // 卒展のホーム（Figma 卒展/ホーム）。投稿の見た目は本体の Home.jsx の Post
 import Bookshelf from './screens/Bookshelf';
@@ -46,6 +47,8 @@ const DOG_LINES = [
 ];
 /* 数字キーで降らせたときのやるきーぬの反応（つかれた顔→sad・ふつう→nod・いい顔や回復→happy・ほかの行動→nod） */
 const KEY_MOTION = { '😫': 'sad', '😟': 'sad', '😐': 'nod', '🙂': 'happy', '😆': 'happy' };
+/* 満杯に近いときのひとこと（中継のほかに、ウィンドウでも） */
+const FULL_LINES = ['きゅうくつだよー', 'うもれちゃう…', 'ちょっと休もっか？'];
 const DOG_LINE_MS = 7000; // ひとことを変える間隔
 const DOG_H = 0.36; // やるきーぬ（3D）の高さ（箱の幅に対して）
 const IDLE_MS = 5 * 60000; // この間なにも操作がなければゲージ（シャカシャカ）の画面に戻す
@@ -189,12 +192,9 @@ export default function Interactive() {
       box.appendChild(el);
       s.bubbles.push({ el, b, left: BUBBLE_KEEP });
     };
-    // やるきーぬ: 山のいちばん上の絵文字の上に乗る（物理の体はなく、絵だけ）。しゃべる
+    // やるきーぬ: 山の上を自由に動く（歩く・登る・転がる・投げる・もぐる・満杯に近いと中継）。物理の体はなく絵だけ。しゃべる
     const dogH = Math.round(W * DOG_H);
-    const dog = document.createElement('div');
-    dog.className = 'dog-pic';
-    Object.assign(dog.style, { height: dogH + 'px', width: Math.round(dogH * DOG_RATIO) + 'px' });
-    // ふきだしはノベルゲームのテキストウィンドウ風（名前つき・犬のおなかのあたり）
+    // ふきだしはノベルゲームのテキストウィンドウ風（名前つき・犬の右上）
     const dogSay = document.createElement('div');
     dogSay.className = 'dog-say';
     const dogName = document.createElement('div'); dogName.className = 'dog-say-name'; dogName.textContent = 'やるきーぬ';
@@ -205,26 +205,27 @@ export default function Interactive() {
     dogRec.onclick = () => openRecordRef.current && openRecordRef.current();
     dogSay.appendChild(dogName); dogSay.appendChild(dogText); dogSay.appendChild(dogRec);
     dogSay.style.maxWidth = Math.round(W / 3) + 'px'; // 幅はセリフの長さに合わせる（最大で画面の横幅の1/3・こえたら折り返す）
-    box.appendChild(dog); box.appendChild(dogSay);
-    const dogCtl = mountDog(dog); s.dogCtl = dogCtl; // 3D（ふだんは idle・セリフや降ってきた絵文字でモーション。読み込み中・失敗したときは絵）
+    box.appendChild(dogSay);
+    const solid = () => s.bodies.filter(b => !b.rec && !b.dead);
+    const roam = createDogRoam({
+      box, W, H, r, dogH,
+      pile: () => solid().map(b => b.body),
+      glyphs: () => solid().slice(-30).map(b => b.g),
+      fill: () => solid().length / FILL_UNIT,
+      liveTop: Math.round((pc ? W / IPAD_CSS_W : 1) * 205), // 時計の下
+      canAct: () => !frozenRef.current && tabRef.current === 'gauge',
+    });
+    const dogCtl = roam.ctl; s.dogCtl = dogCtl; s.roam = roam; // 3D（ふだんは idle・セリフや降ってきた絵文字でモーション。読み込み中・失敗したときは絵）
     let lineI = 0;
-    const setLine = () => { const L = DOG_LINES[lineI % DOG_LINES.length]; lineI++; dogText.textContent = L.t; dogCtl.play(L.m, 2); };
+    const setLine = () => {
+      if (solid().length / FILL_UNIT >= 0.85) { dogText.textContent = FULL_LINES[lineI++ % FULL_LINES.length]; return; }
+      const L = DOG_LINES[lineI % DOG_LINES.length]; lineI++; dogText.textContent = L.t;
+      if (!roam.busy()) dogCtl.play(L.m, 2); // 動きまわっているあいだはモーションをじゃましない
+    };
     setLine();
     const lineT = setInterval(setLine, DOG_LINE_MS);
-    s.dog = { x: W / 2, y: H, ready: false };
     const moveDog = () => {
-      // 真ん中の足もとで、いちばん上（y が小さい）の、箱の中に入っていて止まっている山の絵文字
-      let top = null;
-      // 横はいつも画面の真ん中。足もとの幅（絵の幅の6割）にある山のいちばん上に立つ
-      const foot = (dog.offsetWidth || dogH * 0.7) * 0.3;
-      for (const b of s.bodies) { if (b.rec || b.dead || b.body.speed > 1.5) continue; /* 落ちている途中のは見ない */ const y = b.body.position.y; if (y > r && Math.abs(b.body.position.x - W / 2) < foot && (!top || y < top.body.position.y)) top = b; }
-      const tx = W / 2, ty = top ? top.body.position.y - r * 0.85 : H;
-      if (s.dog.ready && s.dog.y - ty > r * 1.5 && !dogCtl.busy()) dogCtl.play('walk', 1); // 山が高くなって上にのぼるときは歩く
-      const d = s.dog, k = d.ready ? 0.12 : 1; d.ready = true; // ゆっくり追いかけて、山のゆれでガタガたしないように
-      d.x += (tx - d.x) * k; d.y += (ty - d.y) * k;
-      const w = dog.offsetWidth || dogH * 0.7;
-      const x = Math.min(W - w / 2, Math.max(w / 2, d.x)), y = Math.max(dogH, d.y);
-      dog.style.transform = `translate(${x - w / 2}px, ${y - dogH}px)`;
+      const { x, y, w } = roam.update();
       // テキストウィンドウは犬の右上（顔にかからないように・右にはみ出すときは左上）
       const bw = dogSay.offsetWidth, bh = dogSay.offsetHeight;
       const rightX = x + w * 0.32, leftX = x - w * 0.32 - bw;
@@ -242,7 +243,7 @@ export default function Interactive() {
     const step = (t) => {
       const dt = s.last ? Math.min(50, t - s.last) : 16; s.last = t; s.acc += dt;
       dogCtl.pause(frozenRef.current); // 記録中はぼかした後ろの犬は動かさない（記録画面の犬だけ動く）
-      if (frozenRef.current) { s.acc = 0; s.raf = requestAnimationFrame(step); return; } // 記録画面のあいだはゲージを止めておく（後ろにぼかして見せるだけ）
+      if (frozenRef.current) { s.acc = 0; moveDog(); s.raf = requestAnimationFrame(step); return; } // 記録画面のあいだはゲージを止めておく（後ろにぼかして見せるだけ）
       while (s.acc >= 1000 / 60) { for (let k = 0; k < SUBSTEPS; k++) Matter.Engine.update(engine, 1000 / 60 / SUBSTEPS); s.acc -= 1000 / 60; } // 刻みを細かくして積み重ねを安定させる
       // 回復: プラスに当たったら両方消える
       const hit2 = (r * 2) * (r * 2);
@@ -276,7 +277,7 @@ export default function Interactive() {
     };
     s.raf = requestAnimationFrame(step);
     setCount(s.bodies.length);
-    return () => { s.save(); s.bubbles.forEach(q => q.el.remove()); dogCtl.dispose(); dog.remove(); dogSay.remove(); clearInterval(lineT); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
+    return () => { s.save(); s.bubbles.forEach(q => q.el.remove()); roam.dispose(); dogSay.remove(); clearInterval(lineT); clearInterval(saveT); window.removeEventListener('pagehide', s.save); cancelAnimationFrame(s.raf); Matter.World.clear(engine.world); Matter.Engine.clear(engine); box.querySelectorAll('[data-t]').forEach(e => e.remove()); sim.current = null; };
   }, [layoutKey]);
 
   // 絵文字 g を n 個、上から降らせる（数字キー・スマホの投稿）
@@ -289,7 +290,8 @@ export default function Interactive() {
       Matter.Body.setVelocity(b.body, { x: (Math.random() - 0.5) * 2, y: 2 });
       if (i === 0 && text) s.say(b, text); // つぶやきは最初の絵文字に吹き出し
     }
-    if (s.dogCtl) s.dogCtl.play(text ? 'happy' : KEY_MOTION[g] || (rec ? 'happy' : 'nod'), 1); // つぶやきが届いたらよろこぶ
+    if (s.dogCtl && !s.roam.busy()) s.dogCtl.play(text ? 'happy' : KEY_MOTION[g] || (rec ? 'happy' : 'nod'), 1); // つぶやきが届いたらよろこぶ
+    if (s.roam) setTimeout(() => s.roam && s.roam.poke(), 900); // 満杯なら中継
     s.save();
     setCount(s.bodies.filter(b => !b.rec).length);
     setLastRec({ ts: Date.now(), rec: !!rec });
@@ -325,8 +327,9 @@ export default function Interactive() {
     if (!new URLSearchParams(location.search).has('debug')) return undefined;
     window.__post = (text, face = 3) => receivePost('debug' + Date.now(), { face, text }, Date.now());
     window.__dog = (name, n = 2) => sim.current && sim.current.dogCtl.play(name, n); // モーションの確認
-    return () => { delete window.__post; delete window.__dog; };
-  }, [receivePost]);
+    window.__fill = (n = 90, g = '💻') => { for (let i = 0; i < n; i++) setTimeout(() => fall(g, 1, false), i * 40); }; // 満杯の確認
+    return () => { delete window.__post; delete window.__dog; delete window.__fill; };
+  }, [receivePost, fall]);
   React.useEffect(() => {
     if (tab !== 'gauge' || !pendingRef.current.length) return undefined;
     const q = pendingRef.current.splice(0); setPendingN(0);
@@ -338,6 +341,7 @@ export default function Interactive() {
   const shake = React.useCallback(() => {
     const s = sim.current; if (!s) return;
     if (s.dogCtl) s.dogCtl.play('shake', 2); // いっしょにぶるぶる
+    if (s.roam) s.roam.jolt(); // ぴょーんと飛ばされる
     const k = 9 * Math.sqrt(Math.max(1, s.r / 24));
     s.bodies.forEach(({ body }) => {
       Matter.Sleeping.set(body, false);

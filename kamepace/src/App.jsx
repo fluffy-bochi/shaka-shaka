@@ -31,6 +31,7 @@ import { getFlip, setFlip, subscribeFlip, computeFlip, computeTablet, watchFlipE
 import IkoiEdit from './screens/IkoiEdit';
 import { initShakaSound, attachCollisionSound } from './sound';
 import { appendGlyph } from './fluent';
+import { createDogRoam } from './dogRoam';
 import Home from './screens/Home';
 import Record from './screens/Record';
 import { WakeCheck, WakeReview, WakePlan, BedCheck, BedReview } from './screens/Wake';
@@ -4004,6 +4005,7 @@ export default class App extends React.Component {
     this._running = true;
     if (newCount > 0) { clearTimeout(this._newT); this._newT = setTimeout(() => this.clearNewFlags(), 2600); }
     this._startLoop();
+    this._mountDogRoam(el, W, H, r);
     // 保留中のマイナス絵文字（回復記録・予定の進行分）を降らせる
     if (this._pendingNeg && this._pendingNeg.length) {
       const pend = this._pendingNeg.splice(0);
@@ -4018,6 +4020,24 @@ export default class App extends React.Component {
     // 固定モードなら落下が落ち着いてから演算を止める（絵文字は積もったまま静止）
     clearTimeout(this._settleT);
     if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
+  }
+  /* キャラがやるきーぬのとき、シャカの山の上を自由に動く（歩く・登る・転がる・投げる・もぐる・満杯に近いと中継）。dogRoam.js */
+  _mountDogRoam(el, W, H, r) {
+    if (this._dogRoam) { this._dogRoam.dispose(); this._dogRoam = null; }
+    if (Ikoi.getChara() !== 'dog') return;
+    const solid = () => (this.bodies || []).filter(b => !b.gray && !b.hidden && !b.simHit);
+    this._dogRoam = createDogRoam({
+      box: el, W, H, r, dogH: Math.round(Math.min(W * 0.36, H * 0.24)),
+      pile: () => solid().map(b => b.body),
+      glyphs: () => solid().slice(-30).map(b => b.glyph),
+      fill: () => solid().length / 125, // calcR の FILL_UNIT と同じ
+      wake: () => { // 投げた・もぐった絵文字を動かすため、止めた物理を動かし直して、落ち着いたらまた止める
+        this.resumeMotion(); clearTimeout(this._settleT);
+        if (!this.state.homeMotion && !this.state.gyroMode) this._settleT = setTimeout(() => this._maybeFreeze(), 2000);
+      },
+      liveTop: 150, // 時計の下
+      canAct: () => this.isShakaView() && this.state.dayOffset === 0 && !this.state.predictOpen,
+    });
   }
   _startLoop() {
     this._phys = true;
@@ -4039,6 +4059,7 @@ export default class App extends React.Component {
         });
         this.checkNegativeCollisions();
       }
+      if (this._dogRoam) this._dogRoam.update();
       this._raf = requestAnimationFrame(loop);
     };
     this._raf = requestAnimationFrame(loop);
@@ -4443,6 +4464,7 @@ export default class App extends React.Component {
     if (this.engine) this._savePileLayout(); // 画面を離れるときの形を覚えておく
     this._phys = false; this._running = false; clearTimeout(this._settleT);
     if (this._raf) cancelAnimationFrame(this._raf);
+    if (this._dogRoam) { this._dogRoam.dispose(); this._dogRoam = null; }
     if (this.runner) Matter.Runner.stop(this.runner);
     if (this.engine) { Matter.World.clear(this.engine.world); Matter.Engine.clear(this.engine); }
     if (this.bodies) this.bodies.forEach(({ el }) => el.remove());
@@ -4468,6 +4490,7 @@ export default class App extends React.Component {
     if (this.state.tutorial === 6 && !this.state.tutFlags.shaken) this.set({ tutFlags: { ...this.state.tutFlags, shaken: true } });
     this.enableMotion(); // 🔀タップ＝ユーザー操作のタイミングでセンサー許可を取る（iOS）
     this.shakeImpulse(9); // ボタンは軽めに（強すぎると絵文字が蓋まで飛びすぎる）
+    if (this._dogRoam) { this._dogRoam.ctl.play('shake', 2); this._dogRoam.jolt(); } // やるきーぬもぴょーん
   };
 
   /* ---- スマホの加速度センサーで振る（旧本番 enableMotion/onMotion を移植） ---- */

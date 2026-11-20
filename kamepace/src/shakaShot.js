@@ -49,7 +49,7 @@ export async function shakaBlob({ date, clock, clockWhite }) {
   // 絵文字（箱の直下の<div>。消える途中の演出 pop-fx は除く）
   const items = [];
   for (const d of box.children) {
-    if (d.classList.contains('pop-fx')) continue;
+    if (d.classList.contains('pop-fx') || d.dataset.noshot) continue; // やるきーぬと中継は入れない
     const img = d.querySelector('img');
     const text = img ? null : (d.textContent || '').trim();
     if (!img && !text) continue;
