@@ -42,6 +42,12 @@ const POSES = {
       tail: { r: [0.2, 0.25 * b, 0] },
       // 目をとじる（目を横に細くつぶして、光を消す）
       'eye.L': { s: [1.1, 0.12, 1] }, 'eye.R': { s: [1.1, 0.12, 1] }, 'hl.L': { s: [0.01, 0.01, 0.01] }, 'hl.R': { s: [0.01, 0.01, 0.01] }, 'spark.L': { s: [0.01, 0.01, 0.01] }, 'spark.R': { s: [0.01, 0.01, 0.01] }, 'eyew.L': { s: [0.01, 0.01, 0.01] }, 'eyew.R': { s: [0.01, 0.01, 0.01] } }; } },
+  // beg: おすわりで前足をそろえて上げ、首をかしげて「もっとなでて」（目を少し大きく・しっぽを速くふる）
+  beg: { dur: 1.6, f: (t) => { const s = Math.sin(t * Math.PI * 2), q = Math.sin(t * Math.PI * 8), bp = -0.12;
+    return { body: { r: [bp + 0.04 * s, 0, 0.05 * s], p: [0, -0.04, 0] }, head: { r: [0.12, 0, 0.28 * s] },
+      'arm.L': { r: arm(bp, 1.85 + 0.2 * q) }, 'arm.R': { r: arm(bp, 1.85 - 0.2 * q) },
+      tail: { r: [0.2, 0.8 * Math.sin(t * Math.PI * 10), 0] },
+      'eye.L': { s: [1.15, 1.2, 1] }, 'eye.R': { s: [1.15, 1.2, 1] }, 'eyew.L': { s: [1.15, 1.2, 1] }, 'eyew.R': { s: [1.15, 1.2, 1] } }; } },
   crawl: { dur: 0.6, f: (t) => { const s = Math.sin(t * Math.PI * 2), c = Math.abs(Math.cos(t * Math.PI * 2)), bp = Q4;
     return { body: { r: [bp, 0, 0.04 * s], p: [0, 0.07 + 0.03 * c, -0.28] }, head: { r: [-bp * 0.8 + 0.05 * c, 0.06 * s, 0] },
       'arm.L': { r: arm(bp, 0.55 * s) }, 'arm.R': { r: arm(bp, -0.55 * s) },
