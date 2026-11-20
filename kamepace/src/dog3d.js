@@ -20,7 +20,9 @@ function loadModel() {
 }
 
 /* 返り値: { play(name, times), setBase(name), pause(bool), busy(), dispose() }。読み込み前に呼んでも、読み込み後に反映する */
-export function mountDog(el, { base = 'idle' } = {}) {
+/* wide: 絵の四角より横に広くかく（横を向いたり転がったりしてもはみ出さないように。大きさは同じ）
+   frame: 'face' で顔のアップ（中継のワイプ用） */
+export function mountDog(el, { base = 'idle', wide = 1, frame = 'body' } = {}) {
   const img = document.createElement('img');
   img.src = DOG_PNG; img.alt = '';
   Object.assign(img.style, { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center bottom' });
@@ -34,7 +36,7 @@ export function mountDog(el, { base = 'idle' } = {}) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setClearColor(0x000000, 0);
     canvas = renderer.domElement;
-    Object.assign(canvas.style, { position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0 });
+    Object.assign(canvas.style, { position: 'absolute', top: 0, left: (-(wide - 1) / 2 * 100) + '%', width: wide * 100 + '%', height: '100%', opacity: 0 });
     el.appendChild(canvas);
     const scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight(0xffffff, 0xd8cfc0, 2.2));
@@ -45,7 +47,7 @@ export function mountDog(el, { base = 'idle' } = {}) {
     const mixer = new THREE.AnimationMixer(model);
     const acts = {};
     gltf.animations.forEach(c => { acts[c.name] = mixer.clipAction(c); });
-    let cur = null, baseName = null, onceT = 0, oneShot = false;
+    let cur = null, baseName = null, onceT = 0, oneShot = false, yaw = 0;
     const go = (name, times) => {
       const a = acts[name] || acts.idle; if (!a) return;
       clearTimeout(onceT);
@@ -58,6 +60,7 @@ export function mountDog(el, { base = 'idle' } = {}) {
     api = {
       play: (name, times = 2) => { if (acts[name]) go(name, times); },
       busy: () => oneShot,
+      turn: (a) => { yaw = a; }, // 向き（0＝正面・＋で右を向く）。少しずつまわる
       setBase: (name) => { baseName = acts[name] ? name : 'idle'; if (!oneShot && cur !== acts[baseName]) go(baseName); }, // 1回きりのモーション中なら、終わってから
     };
     baseName = acts[want.base] ? want.base : 'idle';
@@ -69,12 +72,14 @@ export function mountDog(el, { base = 'idle' } = {}) {
     const camera = new THREE.PerspectiveCamera(20, 1, 0.01, 100);
     const fit = () => {
       const w = el.clientWidth || 1, h = el.clientHeight || 1;
-      renderer.setSize(w, h, false);
-      camera.aspect = w / h;
-      const vh = Math.max(size.y * 1.06, (size.x * 1.2) / camera.aspect); // 縦か横、はみ出しそうなほうに合わせる
+      renderer.setSize(w * wide, h, false);
+      camera.aspect = (w * wide) / h;
+      // 縦か横、はみ出しそうなほうに合わせる（横は絵の四角の幅で決める＝wide でも大きさは同じ）。顔のアップは頭のあたり
+      const vh = frame === 'face' ? size.y * 0.66 : Math.max(size.y * 1.06, (size.x * 1.2) / (w / h));
+      const cy = frame === 'face' ? c.y + size.y * 0.04 : c.y;
       const dist = vh / 2 / Math.tan((camera.fov * Math.PI) / 360) + size.z / 2;
-      camera.position.set(c.x, c.y, c.z + dist);
-      camera.lookAt(c.x, c.y, c.z);
+      camera.position.set(c.x, cy, c.z + dist);
+      camera.lookAt(c.x, cy, c.z);
       camera.updateProjectionMatrix();
     };
     fit();
@@ -90,20 +95,27 @@ export function mountDog(el, { base = 'idle' } = {}) {
       if (paused) return;
       acc += dt;
       if (acc < 1 / 31) return; // 30コマ/秒
-      mixer.update(Math.min(acc, 0.1)); acc = 0;
+      const st = Math.min(acc, 0.1);
+      mixer.update(st); acc = 0;
+      model.rotation.y += (yaw - model.rotation.y) * Math.min(1, st * 7);
       draw();
     };
     raf = requestAnimationFrame(tick);
   }).catch(() => { /* 絵のまま */ });
-  return {
+  const ctl = {
+    paused: () => paused,
     play(name, times) { if (api) api.play(name, times); else want.once = { name, times }; },
     setBase(name) { if (api) api.setBase(name); else want.base = name; },
     pause(b) { paused = !!b; },
     busy() { return api ? api.busy() : true; }, // 1回きりのモーション中か
+    turn(a) { if (api) api.turn(a); },
     dispose() {
       dead = true; cancelAnimationFrame(raf); if (ro) ro.disconnect();
       if (renderer) { renderer.dispose(); renderer.forceContextLoss(); }
       if (canvas) canvas.remove(); img.remove();
+      delete el.dataset.dog; el.dogCtl = null;
     },
   };
+  el.dataset.dog = '1'; el.dogCtl = ctl; // なでる（PetCursor.jsx）が見つけられるように
+  return ctl;
 }

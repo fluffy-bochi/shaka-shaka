@@ -36,6 +36,7 @@ export default function PetCursor() {
       el.classList.toggle('petting', !!dog);
       if (!dog) { rub = 0; rubH = 0; return; }
       rub += d; rubH += d;
+      dog.petAt = performance.now(); // なでられているあいだ、やるきーぬは歩きまわらない（dogRoam.js）
       if (rubH > RUB_HEART) { rubH = 0; heart(x, y); }
       const now = performance.now();
       if (rub > RUB_HAPPY && now - lastPet > PET_GAP_MS && !dog.busy()) { dog.play('happy', 1); lastPet = now; rub = 0; }
