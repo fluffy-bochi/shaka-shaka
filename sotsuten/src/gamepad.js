@@ -30,9 +30,10 @@ export function startGamepad({ isRecord, angle }) {
   };
   const click = () => {
     const p = pos(), t = document.elementFromPoint(p.x, p.y);
-    if (!t || !clickable(t)) return;
+    if (!t) return;
     const o = { clientX: p.x, clientY: p.y, bubbles: true, cancelable: true, pointerType: 'mouse', button: 0 };
-    t.dispatchEvent(new PointerEvent('pointerdown', o));
+    t.dispatchEvent(new PointerEvent('pointerdown', o)); // やるきーぬをタッチ（dogRoam.js）
+    if (!clickable(t)) return;
     t.dispatchEvent(new MouseEvent('mousedown', o));
     t.dispatchEvent(new PointerEvent('pointerup', o));
     t.dispatchEvent(new MouseEvent('mouseup', o));
