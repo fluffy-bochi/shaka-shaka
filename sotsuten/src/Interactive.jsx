@@ -47,7 +47,7 @@ const DOG_LINES = [
 ];
 /* 数字キーで降らせたときのやるきーぬの反応（つかれた顔→sad・ふつう→nod・いい顔や回復→happy・ほかの行動→nod） */
 const KEY_MOTION = { '😫': 'sad', '😟': 'sad', '😐': 'nod', '🙂': 'happy', '😆': 'happy' };
-/* 満杯に近いときのひとこと（中継のほかに、ウィンドウでも） */
+/* 山が高くなって目が画面の外に出たとき（中継のあいだ）のひとこと */
 const FULL_LINES = ['きゅうくつだよー', 'うもれちゃう…', 'ちょっと休もっか？'];
 const DOG_LINE_MS = 7000; // ひとことを変える間隔
 const DOG_H = 0.36; // やるきーぬ（3D）の高さ（箱の幅に対して）
@@ -208,17 +208,16 @@ export default function Interactive() {
     box.appendChild(dogSay);
     const solid = () => s.bodies.filter(b => !b.rec && !b.dead);
     const roam = createDogRoam({
-      box, W, H, r, dogH,
+      box, engine, W, H, r, dogH,
       pile: () => solid().map(b => b.body),
       glyphs: () => solid().slice(-30).map(b => b.g),
-      fill: () => solid().length / FILL_UNIT,
       liveTop: Math.round((pc ? W / IPAD_CSS_W : 1) * 205), // 時計の下
       canAct: () => !frozenRef.current && tabRef.current === 'gauge',
     });
     const dogCtl = roam.ctl; s.dogCtl = dogCtl; s.roam = roam; // 3D（ふだんは idle・セリフや降ってきた絵文字でモーション。読み込み中・失敗したときは絵）
     let lineI = 0;
     const setLine = () => {
-      if (solid().length / FILL_UNIT >= 0.85) { dogText.textContent = FULL_LINES[lineI++ % FULL_LINES.length]; return; }
+      if (roam.offscreen()) { dogText.textContent = FULL_LINES[lineI++ % FULL_LINES.length]; return; }
       const L = DOG_LINES[lineI % DOG_LINES.length]; lineI++; dogText.textContent = L.t;
       if (!roam.busy()) dogCtl.play(L.m, 2); // 動きまわっているあいだはモーションをじゃましない
     };
@@ -291,7 +290,6 @@ export default function Interactive() {
       if (i === 0 && text) s.say(b, text); // つぶやきは最初の絵文字に吹き出し
     }
     if (s.dogCtl && !s.roam.busy()) s.dogCtl.play(text ? 'happy' : KEY_MOTION[g] || (rec ? 'happy' : 'nod'), 1); // つぶやきが届いたらよろこぶ
-    if (s.roam) setTimeout(() => s.roam && s.roam.poke(), 900); // 満杯なら中継
     s.save();
     setCount(s.bodies.filter(b => !b.rec).length);
     setLastRec({ ts: Date.now(), rec: !!rec });
@@ -327,8 +325,9 @@ export default function Interactive() {
     if (!new URLSearchParams(location.search).has('debug')) return undefined;
     window.__post = (text, face = 3) => receivePost('debug' + Date.now(), { face, text }, Date.now());
     window.__dog = (name, n = 2) => sim.current && sim.current.dogCtl.play(name, n); // モーションの確認
+    window.__act = (k) => sim.current && sim.current.roam.force(k); // やるきーぬの動きの確認
     window.__fill = (n = 90, g = '💻') => { for (let i = 0; i < n; i++) setTimeout(() => fall(g, 1, false), i * 40); }; // 満杯の確認
-    return () => { delete window.__post; delete window.__dog; delete window.__fill; };
+    return () => { delete window.__post; delete window.__dog; delete window.__fill; delete window.__act; };
   }, [receivePost, fall]);
   React.useEffect(() => {
     if (tab !== 'gauge' || !pendingRef.current.length) return undefined;
