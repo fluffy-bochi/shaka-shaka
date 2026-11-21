@@ -2763,8 +2763,14 @@ export default class App extends React.Component {
     return f > 0 ? 'work' : f < 0 ? 'rest' : null;
   }
   // いまの休憩が長い休憩か（every セットごと。n＝いま終えたセット）
-  pomoLong(p) { const e = p.every || 3; return p.phase === 'rest' && (p.n || 1) % e === 0; }
+  pomoLong(p) { const e = p.every || 4; return p.phase === 'rest' && (p.n || 1) % e === 0; }
   pomoMin(p) { return p.phase === 'work' ? p.work : this.pomoLong(p) ? (p.long || 15) : p.rest; }
+  // 作業・休憩・長い休憩の分と、何セットごとに長い休憩か（実行中の設定 → 端末に覚えた設定 → 初期値）
+  pomoConf(r) {
+    let saved = {}; try { saved = JSON.parse(localStorage.getItem('kame_pomo') || '{}') || {}; } catch (e) { /* ignore */ }
+    const p = (r && r.pomo) || {};
+    return { work: p.work || saved.work || 25, rest: p.rest || saved.rest || 5, long: p.long || saved.long || 15, every: p.every || saved.every || 4 };
+  }
   pomoMs(r, now) { const at = (r.pomo && r.pomo.at) || 0; return r.segs.reduce((a, x) => a + Math.max(0, (x.b == null ? now : x.b) - Math.max(x.a, at)), 0); }
   // phase に合う行を、いまの行の次から順にさがす（なければ -1）
   pomoRow(r, phase) {
@@ -2781,8 +2787,7 @@ export default class App extends React.Component {
   setPomo = (patch) => {
     const r = this.state.run; if (!r) return;
     const now = Date.now(), p0 = r.pomo || {};
-    let saved = {}; try { saved = JSON.parse(localStorage.getItem('kame_pomo') || '{}') || {}; } catch (e) { /* ignore */ }
-    const p = { work: saved.work || 25, rest: saved.rest || 5, long: saved.long || 15, every: saved.every || 3, ...p0, ...patch };
+    const p = { ...this.pomoConf(r), ...p0, ...patch };
     let r2 = r;
     if (patch.on && !p0.on) { // オンにしたとき: いまの行動が回復なら休憩から、それ以外は作業から
       p.phase = this.pomoKind(r.items[r.cur]) === 'rest' ? 'rest' : 'work'; p.at = now; p.n = 1;
@@ -2829,7 +2834,7 @@ export default class App extends React.Component {
     const po = r.pomo && r.pomo.on ? r.pomo : null;
     if (po) { // ポモドーロ中は実施中のタイマー・アラームのかわりに、作業／休憩の時間で知らせる
       const pm = this.pomoMin(po), lim = pm * 60000, k = 'pomo:' + po.at;
-      const nextLong = po.phase === 'work' && (po.n || 1) % (po.every || 3) === 0;
+      const nextLong = po.phase === 'work' && (po.n || 1) % (po.every || 4) === 0;
       if (!fired[k] && this.pomoMs(r, now) >= lim) hits.push([k, 'pomo', po.phase === 'work' ? '作業おわり' : '休憩おわり', po.phase === 'work' ? (po.n || 1) + 'セット目の作業' + this.fmtMin(pm) + 'がおわりました' + (nextLong ? '。つぎは長い休憩です' : '') : (this.pomoLong(po) ? '長い休憩' : '休憩') + this.fmtMin(pm) + 'がおわりました']);
     }
     const lap = cur && !po ? this.runLapNow(r, cur.uid, now) : null;
@@ -2874,7 +2879,7 @@ export default class App extends React.Component {
     const po = r.pomo && r.pomo.on ? r.pomo : null;
     return {
       name: r.name, running: r.segs.some(s => s.b == null), now,
-      pomo: po ? { on: true, phase: po.phase, long: po.long || 15, every: po.every || 3, isLong: this.pomoLong(po), n: po.n || 1, work: po.work, rest: po.rest, at: po.at, segs: r.segs, planMs: this.pomoMin(po) * 60000 } : { on: false },
+      pomo: po ? { ...this.pomoConf(r), on: true, phase: po.phase, isLong: this.pomoLong(po), n: po.n || 1, at: po.at, segs: r.segs, planMs: this.pomoMin(po) * 60000 } : { ...this.pomoConf(r), on: false },
       alarm: { all: { mode: al.all.mode, at: al.all.at || '', min: al.all.min || 0 }, cur: { mode: al.cur.mode, at: al.cur.at || '', min: al.cur.none ? 0 : (cur.min || 30) } },
       // 実施中に時間を設定していない（タイマー空・アラーム時刻なし）とき、シークバーは常にいっぱい
       curNoTime: al.cur.mode === 'timer' ? !!al.cur.none : !al.cur.at,
