@@ -87,7 +87,7 @@ export default function Run({ v }) {
   const laps = lapsOf(c.segs, now);
   // 一覧は行動ごとではなく、リスト全部のラップを時間の順に（番号は行動の名前ごとに数える）
   const allLaps = (() => {
-    const xs = []; (r.rows || []).forEach(x => lapsOf(x.segs, now).forEach(L => xs.push({ ...L, name: x.name, on: x.on })));
+    const xs = []; (r.rows || []).forEach(x => lapsOf(x.segs, now).forEach(L => xs.push({ ...L, name: x.name, on: x.on, min: x.lapMin ? x.lapMin(L.a) : null })));
     xs.sort((p, q) => p.a - q.a);
     const n = {}; xs.forEach(L => { n[L.name] = (n[L.name] || 0) + 1; L.no = n[L.name]; });
     return xs.reverse();
@@ -219,7 +219,8 @@ export default function Run({ v }) {
                   <span style={{ flex: '0 1 auto', minWidth: 0, fontSize: 12.5, fontWeight: 800, color: L.on ? INK : SUB, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{L.name}{L.no}</span>
                   <span style={{ flex: '0 0 auto', fontSize: 11, fontWeight: 700, color: MUTED, ...mono }}>{hm(L.a)}〜</span>
                   <span style={{ flex: 1 }} />
-                  <span style={{ flex: '0 0 auto', fontSize: 15, fontWeight: 800, color: L.open && r.running ? '#7a9a00' : INK, ...mono }}>{mmss(L.ms)}</span>
+                  <span style={{ flex: '0 0 auto', fontSize: 15, fontWeight: 800, color: L.open && r.running ? '#7a9a00' : (!r.curNoTime && r.alarm.cur.mode === 'timer' && L.min && L.ms > L.min * 60000 ? PINK : INK), ...mono }}>{mmss(L.ms)}</span>
+                  {!r.curNoTime && r.alarm.cur.mode === 'timer' && L.min ? <span style={{ flex: '0 0 auto', fontSize: 11, fontWeight: 700, color: MUTED, ...mono }}>/{mmss(L.min * 60000)}</span> : null}
                 </div>
               ))}
             </div>

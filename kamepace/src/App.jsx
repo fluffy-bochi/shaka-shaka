@@ -2653,6 +2653,20 @@ export default class App extends React.Component {
     ss.forEach((s, i) => { if (i === 0 || s.lap) { a = s.a; ms = 0; } ms += (s.b == null ? now : s.b) - s.a; });
     return { a, ms };
   }
+  /* ラップ（セット）ごとの実施中タイマーの分。run.lapMin[uid:ラップの始まり] に決めた分、
+     決めていないラップは同じ行動の前のラップの分を引き継ぐ（最初は行動の予定 items.min） */
+  lapMinOf(r, uid, lapA) {
+    const it = r.items.find(x => x.uid === uid), lm = r.lapMin || {};
+    let m = (it && it.min) || 30;
+    const ss = r.segs.filter(s => s.uid === uid);
+    for (let i = 0; i < ss.length; i++) {
+      if (i !== 0 && !ss[i].lap) continue;
+      const v = lm[uid + ':' + ss[i].a]; if (v > 0) m = v;
+      if (ss[i].a === lapA) break;
+    }
+    return m;
+  }
+  curLapMin(r, now) { const cur = r.items[r.cur]; if (!cur) return 30; const lap = this.runLapNow(r, cur.uid, now); return lap.a == null ? (cur.min || 30) : this.lapMinOf(r, cur.uid, lap.a); }
   runMs(r, uid, now) { return r.segs.filter(s => s.uid === uid).reduce((a, s) => a + ((s.b == null ? now : s.b) - s.a), 0); }
   /* 実行中の行動は、記録する前から実行した時間に合わせて降らせる（食事 −8/時なら 7分30秒ごとに1個）。
      run.drip[uid] = 降らせた個数（プラスの行動は＋、回復は−）。プラスは山に入り（pileSource）、
@@ -2751,13 +2765,19 @@ export default class App extends React.Component {
     const r = this.state.run; if (!r) return;
     let items = r.items;
     // 実施中タイマー: 0（空）＝時間なし。1分以上なら、いまの行動の予定時間にする
-    if (which === 'cur' && patch.min != null && patch.min > 0) { items = r.items.map((x, i) => (i === r.cur ? { ...x, min: patch.min } : x)); }
+    // ラップ（セット）が始まっていればそのラップの分として持つ。まだ始めていない行動は、その行動の予定時間にする
+    let lapMin = r.lapMin;
+    if (which === 'cur' && patch.min != null && patch.min > 0) {
+      const cu = r.items[r.cur], lap = cu ? this.runLapNow(r, cu.uid, Date.now()) : { a: null };
+      if (lap.a != null) lapMin = { ...(r.lapMin || {}), [cu.uid + ':' + lap.a]: patch.min };
+      else items = r.items.map((x, i) => (i === r.cur ? { ...x, min: patch.min } : x));
+    }
     const { min, ...rest } = patch;
     if (which === 'cur' && min != null) rest.none = !(min > 0);
     const a0 = r.alarm || {};
     const al = { all: { mode: 'timer', at: '', min: 0, ...(a0.all || {}) }, cur: { mode: 'timer', at: '', ...(a0.cur || {}) } };
     al[which] = { ...al[which], ...(which === 'all' && min != null ? { min } : null), ...rest };
-    this.setRun({ ...r, items, alarm: al });
+    this.setRun({ ...r, items, alarm: al, ...(lapMin ? { lapMin } : null) });
   };
   // 時刻（HH:MM）→ 実行開始より後のその時刻
   runAtTs(r, at) { let t = this.hmToTs(at); if (t < (r.startAt || 0) - 60000) t += 86400000; return t; }
@@ -2770,7 +2790,8 @@ export default class App extends React.Component {
     // 実施中はラップごと: タイマーはいまのラップの時間で測り、アラームはいまのラップが始まった後の時刻だけ鳴らす（ラップが変わるとまた鳴る）
     const lap = cur ? this.runLapNow(r, cur.uid, now) : null;
     if (cur && lap && lap.a != null && a.cur && a.cur.mode === 'alarm' && a.cur.at) { const t = this.runAtTs(r, a.cur.at), k = 'curA:' + cur.uid + ':' + lap.a + ':' + a.cur.at; if (!fired[k] && t >= lap.a && now >= t) hits.push([k, 'cur', '実施中アラーム', cur.name + '・' + a.cur.at + ' になりました']); }
-    if (cur && lap && lap.a != null && a.cur && a.cur.mode === 'timer' && !a.cur.none && cur.min > 0) { const k = 'curT:' + cur.uid + ':' + lap.a + ':' + cur.min; if (!fired[k] && lap.ms >= cur.min * 60000) hits.push([k, 'cur', '実施中タイマー', cur.name + 'の' + this.fmtMin(cur.min) + 'がたちました']); }
+    const lm = lap && lap.a != null ? this.lapMinOf(r, cur.uid, lap.a) : 0;
+    if (cur && lap && lap.a != null && a.cur && a.cur.mode === 'timer' && !a.cur.none && lm > 0) { const k = 'curT:' + cur.uid + ':' + lap.a + ':' + lm; if (!fired[k] && lap.ms >= lm * 60000) hits.push([k, 'cur', '実施中タイマー', cur.name + 'の' + this.fmtMin(lm) + 'がたちました']); }
     if (!hits.length) return;
     const f = { ...fired }; hits.forEach(([k]) => { f[k] = true; });
     this.setRun({ ...r, fired: f });
@@ -2807,9 +2828,10 @@ export default class App extends React.Component {
     // アラーム設定は、古い実行中データや片方だけ保存されたものでも読めるように初期値で埋める（欠けていると画面全体が描けなくなる）
     const al0 = r.alarm || {};
     const al = { all: { mode: 'timer', at: '', min: 0, ...(al0.all || {}) }, cur: { mode: 'timer', at: '', ...(al0.cur || {}) } };
+    const lapMin = this.curLapMin(r, now); // いまのラップ（セット）の分
     return {
       name: r.name, running: r.segs.some(s => s.b == null), now,
-      alarm: { all: { mode: al.all.mode, at: al.all.at || '', min: al.all.min || 0 }, cur: { mode: al.cur.mode, at: al.cur.at || '', min: al.cur.none ? 0 : (cur.min || 30) } },
+      alarm: { all: { mode: al.all.mode, at: al.all.at || '', min: al.all.min || 0 }, cur: { mode: al.cur.mode, at: al.cur.at || '', min: al.cur.none ? 0 : lapMin } },
       // 実施中に時間を設定していない（タイマー空・アラーム時刻なし）とき、シークバーは常にいっぱい
       curNoTime: al.cur.mode === 'timer' ? !!al.cur.none : !al.cur.at,
       // 実施中がアラーム（時刻）のとき、その時刻（シークバーの終わりに使う）
@@ -2818,8 +2840,8 @@ export default class App extends React.Component {
       cur: { name: cur.name, glyph: cur.glyph, cat: cat ? cat.name : (r.name || ''), color: cat ? cat.color : '#8a8a82', segs: r.segs.filter(s => s.uid === cur.uid),
         // 必・♡・りれき（行動カードと同じ）
         req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(cur.name, kind, val),
-        history: (ym) => this.actHistory(cur.name, ym), goal: (st.actGoals || {})[normTitle(cur.name)] || 0, onGoal: () => this.cycleActGoal(cur.name), startAt: first ? first.a : null, ms: this.runMs(r, cur.uid, now), planMs: (cur.min || 30) * 60000 },
-      rows: r.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), on: i === r.cur, ms: this.runMs(r, li.uid, now), segs: r.segs.filter(s => s.uid === li.uid),
+        history: (ym) => this.actHistory(cur.name, ym), goal: (st.actGoals || {})[normTitle(cur.name)] || 0, onGoal: () => this.cycleActGoal(cur.name), startAt: first ? first.a : null, ms: this.runMs(r, cur.uid, now), planMs: lapMin * 60000 },
+      rows: r.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), on: i === r.cur, ms: this.runMs(r, li.uid, now), segs: r.segs.filter(s => s.uid === li.uid), lapMin: (a) => this.lapMinOf(r, li.uid, a),
         onTap: () => this.runSelect(i), onUp: () => this.runMove(li.uid, -1), onDown: () => this.runMove(li.uid, 1), onRemove: () => this.runRemove(li.uid), onCopy: () => this.runCopy(li.uid) })),
     };
   }
