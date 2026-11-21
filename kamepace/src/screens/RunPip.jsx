@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import Emo, { fluentSrc } from '../fluent';
-import { barOf, msOf, mmss, hm, PINK } from './Run';
+import { barOf, curOf, mmss, hm, PINK } from './Run';
 
 /* 実行中のピクチャーインピクチャ（実行中のときだけ）。
    - PC（Document Picture-in-Picture がある Chrome/Edge）: Z Flip のサブディスプレイくらいの正方形の小窓に、
@@ -98,7 +98,7 @@ function Square({ v, win }) {
     return () => { clearInterval(t); win.removeEventListener('resize', on); };
   }, [win]);
   const r = v.run; if (!r) return null;
-  const now = Date.now(), c = { ...r.cur, ms: msOf(r.cur.segs, now) }, bar = barOf(r, c, now), ratio = bar.ratio, over = bar.over;
+  const now = Date.now(), c = curOf(r, now), bar = barOf(r, c, now), ratio = bar.ratio, over = bar.over;
   const z = Math.max(0.5, Math.min(win.innerWidth / SQ_W, win.innerHeight / SQ_H)); // 小窓の大きさに合わせて全体を拡大縮小
   const round = { border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
   return (
@@ -163,7 +163,7 @@ function drawCard(cv, v, redraw) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#f7f4ec'; ctx.fillRect(0, 0, CW, CH);
   if (!r) return;
-  const now = Date.now(), c = { ...r.cur, ms: msOf(r.cur.segs, now) }, bar = barOf(r, c, now), over = bar.over;
+  const now = Date.now(), c = curOf(r, now), bar = barOf(r, c, now), over = bar.over;
   const font = (w, px, mono) => `${w} ${px}px ${mono ? '"Space Mono", ui-monospace, monospace' : '"Zen Kaku Gothic New", system-ui, sans-serif'}`;
   ctx.fillStyle = c.color || '#ccc';
   ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(70, 0); ctx.lineTo(0, 70); ctx.closePath(); ctx.fill();

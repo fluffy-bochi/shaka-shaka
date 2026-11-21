@@ -19,6 +19,7 @@ export const msOf = (segs, now) => (segs || []).reduce((a, s) => a + ((s.b == nu
 /* シークバー: 実施中がアラーム（時刻）なら開始→その時刻を時計で、タイマーなら予定時間を実施時間で。endTs＝終わる時刻（タイマーは いま＋残り） */
 // 時間が過ぎたら延長: バー全体を経過時間に広げ、予定ぶん（plan）までを黒、そこから先（延長）をピンクにする
 export function barOf(r, c, now) {
+  if (c.pomo) { const over = c.ms > c.planMs; return { total: c.planMs, endTs: now + (c.planMs - c.ms), over, ratio: over ? 1 : Math.min(1, c.ms / c.planMs), plan: over ? c.planMs / c.ms : 1, extra: over ? c.ms - c.planMs : 0 }; } // ポモドーロ: いまの作業／休憩の時間
   if (r.curNoTime) return { none: true, total: 0, endTs: null, over: false, ratio: 1, plan: 1, extra: 0 }; // 時間なし: いっぱい
   let total, el, endTs;
   if (r.curAlarmTs && c.startAt) { total = Math.max(60000, r.curAlarmTs - c.startAt); el = Math.max(0, now - c.startAt); endTs = r.curAlarmTs; }
@@ -30,6 +31,13 @@ export function barOf(r, c, now) {
   return { total, endTs, over, ratio: over ? 1 : Math.min(1, el / total), plan: over ? total / el : 1, extra: over ? el - total : 0 };
 }
 export const PINK = '#ff5fa2';
+/* いまの行動の表示用の値。ポモドーロ中は、いまの作業／休憩が始まってから実行した時間をバーに出す */
+export const pomoMsOf = (segs, at, now) => (segs || []).reduce((a, s) => a + Math.max(0, (s.b == null ? now : s.b) - Math.max(s.a, at)), 0);
+export function curOf(r, now) {
+  const c = { ...r.cur, ms: msOf(r.cur.segs, now) };
+  if (r.pomo && r.pomo.on) return { ...c, ms: pomoMsOf(r.pomo.segs, r.pomo.at, now), startAt: r.pomo.at, planMs: r.pomo.planMs, pomo: true };
+  return c;
+}
 /* ラップ: 最初の区間と lap: true の区間から新しいラップ。一時停止→再開はおなじラップのまま。
    at＝そのラップまでの経過（実施時間）、a＝始まった時刻 */
 export function lapsOf(segs, now) {
@@ -43,6 +51,51 @@ export function lapsOf(segs, now) {
   return out;
 }
 export const mmss = (t) => { const s = Math.max(0, Math.floor(t / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; };
+
+/* 分だけの入力（入力中は空にしてもよい。1分以上のときだけ反映） */
+function MinBox({ value, onChange }) {
+  const [d, setD] = React.useState(null);
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+      <input type="text" inputMode="numeric" value={d != null ? d : String(value)} aria-label="分"
+        onChange={(e) => { const t = e.target.value.replace(/\D/g, '').slice(0, 3); setD(t); const n = parseInt(t, 10); if (n > 0) onChange(n); }}
+        onBlur={() => setD(null)}
+        style={{ width: 46, height: 34, boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 8, background: '#fff', textAlign: 'center', fontSize: 16, fontWeight: 800, color: INK, padding: 0, ...mono }} />
+      <span style={{ fontSize: 11.5, fontWeight: 700, color: SUB }}>分</span>
+    </span>
+  );
+}
+
+/* ポモドーロ: オン／オフ。オンのときは 作業・休憩の分と、いま作業中か休憩中か（押すと切りかえ） */
+function PomoRow({ p, v }) {
+  const seg = (on) => ({ border: 'none', borderRadius: 999, padding: '4px 10px', fontSize: 11, fontWeight: 800, cursor: 'pointer', background: on ? INK : 'transparent', color: on ? '#fff' : SUB, fontFamily: 'inherit' });
+  const line = { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 4px', borderBottom: '1px solid ' + INK };
+  return (
+    <>
+      <div style={line}>
+        <span style={{ fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap' }}>ポモドーロ</span>
+        {p.on && <span style={{ fontSize: 11.5, fontWeight: 800, color: p.phase === 'work' ? INK : '#7a9a00', whiteSpace: 'nowrap' }}>{p.phase === 'work' ? '作業中' : '休憩中'}・{p.n}セット目</span>}
+        <span style={{ flex: 1 }} />
+        <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2 }}>
+          <button onClick={() => v.setPomo({ on: false })} style={seg(!p.on)}>オフ</button>
+          <button onClick={() => v.setPomo({ on: true })} style={seg(p.on)}>オン</button>
+        </div>
+      </div>
+      {p.on && (
+        <div style={line}>
+          {[['work', '作業'], ['rest', '休憩']].map(([k, n]) => (
+            <React.Fragment key={k}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: p.phase === k ? INK : MUTED, whiteSpace: 'nowrap' }}>{n}</span>
+              <MinBox value={p[k]} onChange={(m) => v.setPomo({ [k]: m })} />
+              {k === 'work' && <span style={{ flex: 1 }} />}
+            </React.Fragment>
+          ))}
+          <button onClick={v.pomoNext} style={{ border: 'none', borderRadius: 999, background: p.phase === 'work' ? LIME : INK, color: p.phase === 'work' ? LIME_INK : '#fff', fontSize: 11.5, fontWeight: 900, padding: '7px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', marginLeft: 4 }}>{p.phase === 'work' ? '休憩へ' : '作業へ'}</button>
+        </div>
+      )}
+    </>
+  );
+}
 
 /* アラーム／タイマーの1行: [全体｜実施中] [アラーム|タイマー] ……… [時刻 or 分] */
 function AlarmRow({ label, a, onMode, onAt, onMin, top }) {
@@ -80,7 +133,7 @@ export default function Run({ v }) {
   React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
   if (!r) return null;
   const now = Date.now();
-  const c = { ...r.cur, ms: msOf(r.cur.segs, now) }; // 毎秒の再描画で「いま」から計算し直す
+  const c = curOf(r, now); // 毎秒の再描画で「いま」から計算し直す
   // シークバーの終わりは実施中のアラームに合わせる: アラーム＝その時刻まで（時計で進む）、タイマー＝予定時間（実施時間で進む）
   const bar = barOf(r, c, now);
   const over = bar.over, ratio = bar.ratio;
@@ -93,7 +146,7 @@ export default function Run({ v }) {
     return xs.reverse();
   })();
   // バーの区切りの点: タイマー（時間なし）は実施時間、アラームは時計の時刻で位置を出す
-  const lapPos = laps.slice(1).map(L => {
+  const lapPos = c.pomo ? [] : laps.slice(1).map(L => {
     if (bar.none) return c.ms ? L.at / c.ms : 0;
     if (r.curAlarmTs && c.startAt) return (L.a - c.startAt) / Math.max(bar.total, now - c.startAt);
     return L.at / Math.max(bar.total, c.ms);
@@ -210,7 +263,8 @@ export default function Run({ v }) {
           )}
           {/* 全体／実施中 の アラーム・タイマー */}
           <AlarmRow label="全体" a={r.alarm.all} top onMode={(m) => v.setRunAlarm('all', { mode: m })} onAt={(t) => v.setRunAlarm('all', { at: t })} onMin={(n) => v.setRunAlarm('all', { min: n })} />
-          <AlarmRow label="実施中" a={r.alarm.cur} onMode={(m) => v.setRunAlarm('cur', { mode: m })} onAt={(t) => v.setRunAlarm('cur', { at: t })} onMin={(n) => v.setRunAlarm('cur', { min: n })} />
+          {!r.pomo.on && <AlarmRow label="実施中" a={r.alarm.cur} onMode={(m) => v.setRunAlarm('cur', { mode: m })} onAt={(t) => v.setRunAlarm('cur', { at: t })} onMin={(n) => v.setRunAlarm('cur', { min: n })} />}
+          <PomoRow p={r.pomo} v={v} />
           {/* ラップ: リスト全部を新しいものを上に（休憩3・作業2・休憩2…） */}
           {allLaps.length > 1 && (
             <div style={{ padding: '6px 4px 0' }}>
@@ -284,7 +338,7 @@ export default function Run({ v }) {
         {listOpen && tab === 'list' && (
           <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 12px' }}>
             {r.rows.map((x0, i) => { const x = { ...x0, ms: msOf(x0.segs, now) }; return (
-              <div key={x.uid} style={{ display: 'flex', alignItems: 'center', gap: 2, height: 44, background: x.on ? '#fff' : '#f3f0e8', borderRadius: 10, padding: '0 4px 0 6px', marginBottom: 6, boxShadow: x.on ? 'inset 0 0 0 2px ' + INK : 'none' }}>
+              <div key={x.uid} style={{ display: 'flex', alignItems: 'center', gap: 2, height: 44, background: x.on ? '#fff' : '#f3f0e8', borderRadius: 10, padding: '0 4px 0 6px', marginBottom: 6, boxShadow: x.on ? 'inset 0 0 0 2px ' + INK : 'none', opacity: x.off && !x.on ? 0.4 : 1 }}>
                 <div onClick={x.onTap} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: '100%', cursor: 'pointer' }}>
                   <span style={{ flex: '0 0 auto' }}><Emo e={x.glyph} size={28} /></span>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -319,7 +373,7 @@ export function MiniRun({ v }) {
   const [, tick] = React.useState(0);
   React.useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
   if (!r) return null;
-  const now = Date.now(), c = { ...r.cur, ms: msOf(r.cur.segs, now) }, bar = barOf(r, c, now), ratio = bar.ratio, over = bar.over;
+  const now = Date.now(), c = curOf(r, now), bar = barOf(r, c, now), ratio = bar.ratio, over = bar.over;
   return (
     <div onClick={v.goRun} style={{ position: 'relative', flex: '0 0 auto', height: 60, margin: '0 8px 6px', background: '#fff', borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 10px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(27,27,24,.14)', WebkitTapHighlightColor: 'transparent', zIndex: 3 }}>
       <span style={{ position: 'absolute', left: 0, top: 0, width: 47, height: 47, background: c.color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
