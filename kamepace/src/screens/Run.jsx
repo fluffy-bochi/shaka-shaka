@@ -4,6 +4,7 @@ import { FreqPop, History, HmInput } from './Pick';
 import { TaskEditPopup } from './Home';
 import { pipKind, openRunPip, usePip } from './RunPip';
 import RunDog from '../runDog';
+import * as Ikoi from '../ikoi';
 
 /* タスク実行（START）: いまの行動を大きく、開始時刻・いまの時刻と、経過／予定の時間のバー。
    ▶／⏸の左に 必・♡、右に りれき。その下に 全体／実施中 の アラーム（時刻）・タイマー（時間）を切り替えて設定。
@@ -217,7 +218,7 @@ export default function Run({ v }) {
       )}
       <div className="nos" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: SHEET_CLOSED + 10 }}>
         {/* いまの行動 */}
-        <RunPager c={c} />
+        <RunPager c={c} v={v} />
         <div style={{ position: 'relative', padding: '0 30px' }}>
           <div style={{ fontSize: 24, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
           <div style={{ fontSize: 12, fontWeight: 700, color: SUB, marginTop: 2 }}>{c.cat}</div>
@@ -396,8 +397,13 @@ export function MiniRun({ v }) {
 
 /* いまの行動の大きな表示: 左＝絵文字／右＝やるきーぬがその行動をしている。左右スワイプ（下の点を押しても）で切りかえ、端末に覚える */
 const RUN_VIEW_KEY = 'kame_run_view';
-function RunPager({ c }) {
+const RUN_DOG_H = 220; // 実行中のやるきーぬの高さ（2026-11-21 150→220）
+function RunPager({ c, v }) {
   const ref = React.useRef(null);
+  // PC（机）: やるきーぬのページを見ると、シャカの犬が左へ出ていき、少しあとでここに右から歩いて入ってくる。
+  // walk＝'wait'（まだいない）→'in'（入ってくる）→'here'
+  const desk = Ikoi.isDesk();
+  const [walk, setWalk] = React.useState('wait');
   const [page, setPage] = React.useState(() => { try { return localStorage.getItem(RUN_VIEW_KEY) === 'dog' ? 1 : 0; } catch (e) { return 0; } });
   const [seen, setSeen] = React.useState(page === 1); // やるきーぬ（3D）は一度見るまで読み込まない
   React.useLayoutEffect(() => { const el = ref.current; if (el) el.scrollLeft = page * el.clientWidth; }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -408,11 +414,24 @@ function RunPager({ c }) {
     if (p !== page) { setPage(p); try { localStorage.setItem(RUN_VIEW_KEY, p ? 'dog' : 'emoji'); } catch (e) { /* ignore */ } }
   };
   const go = (p) => { const el = ref.current; if (el) el.scrollTo({ left: p * el.clientWidth, behavior: 'smooth' }); setSeen(true); };
+  const showDog = page === 1;
+  React.useEffect(() => {
+    if (!desk) return undefined;
+    if (v && v.setRunDogShown) v.setRunDogShown(showDog);
+    if (!showDog) { setWalk('wait'); return undefined; }
+    setWalk('wait');
+    const t1 = setTimeout(() => setWalk('in'), 1100), t2 = setTimeout(() => setWalk('here'), 1100 + 1700);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [showDog, desk]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => () => { if (v && v.setRunDogShown) v.setRunDogShown(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const dogStyle = !desk ? null : { transform: walk === 'wait' ? 'translateX(110%)' : 'translateX(0)', transition: walk === 'in' ? 'transform 1.7s linear' : 'none' };
   return (
     <div style={{ padding: '6px 0 0' }}>
       <div ref={ref} onScroll={onScroll} className="run-pager">
-        <div style={{ display: 'flex', justifyContent: 'center' }}><Emo e={c.glyph} size={150} /></div>
-        <div style={{ height: 150, boxSizing: 'border-box' }}>{seen && <RunDog c={c} height={150} />}</div>{/* 頭の上・足もとの絵文字がはみ出さないよう少し小さく */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: RUN_DOG_H }}><Emo e={c.glyph} size={150} /></div>
+        <div style={{ height: RUN_DOG_H, boxSizing: 'border-box', overflow: 'hidden' }}>
+          {seen && <div style={dogStyle}><RunDog c={c} height={RUN_DOG_H} walkIn={desk && walk !== 'here'} /></div>}
+        </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 4 }}>
         {[0, 1].map(i => <button key={i} onClick={() => go(i)} aria-label={i ? 'やるきーぬ' : '絵文字'} style={{ width: 7, height: 7, borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: page === i ? INK : '#d8d5cb' }} />)}
