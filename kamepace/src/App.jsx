@@ -4178,7 +4178,7 @@ export default class App extends React.Component {
     if (Ikoi.getChara() !== 'dog') return;
     const solid = () => (this.bodies || []).filter(b => !b.gray && !b.hidden && !b.simHit);
     this._dogRoam = createDogRoam({
-      box: el, engine: this.engine, W, H, r, dogH: Math.round(Math.min(W * 0.36, H * 0.24)),
+      box: el, engine: this.engine, W, H, r, dogH: Math.round(Math.min(W * 0.54, H * 0.34)), // 2026-11-21: 中継の顔くらい大きく（前は 0.36・0.24）
       pile: () => solid().map(b => b.body),
       glyphs: () => solid().slice(-30).map(b => b.glyph),
       wake: () => { // 投げた・もぐった絵文字を動かすため、止めた物理を動かし直して、落ち着いたらまた止める
