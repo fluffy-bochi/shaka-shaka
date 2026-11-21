@@ -53,7 +53,7 @@ export function lapsOf(segs, now) {
 export const mmss = (t) => { const s = Math.max(0, Math.floor(t / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; };
 
 /* 分だけの入力（入力中は空にしてもよい。1分以上のときだけ反映） */
-function MinBox({ value, onChange }) {
+function MinBox({ value, onChange, unit = '分' }) {
   const [d, setD] = React.useState(null);
   return (
     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
@@ -61,7 +61,7 @@ function MinBox({ value, onChange }) {
         onChange={(e) => { const t = e.target.value.replace(/\D/g, '').slice(0, 3); setD(t); const n = parseInt(t, 10); if (n > 0) onChange(n); }}
         onBlur={() => setD(null)}
         style={{ width: 46, height: 34, boxSizing: 'border-box', border: '1.5px solid #e4e1d8', borderRadius: 8, background: '#fff', textAlign: 'center', fontSize: 16, fontWeight: 800, color: INK, padding: 0, ...mono }} />
-      <span style={{ fontSize: 11.5, fontWeight: 700, color: SUB }}>分</span>
+      <span style={{ fontSize: 11.5, fontWeight: 700, color: SUB, whiteSpace: 'nowrap' }}>{unit}</span>
     </span>
   );
 }
@@ -74,7 +74,7 @@ function PomoCheck({ p, v }) {
         <span style={{ width: 20, height: 20, boxSizing: 'border-box', borderRadius: 5, border: p.on ? 'none' : '2px solid #bab5a7', background: p.on ? INK : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', ...ms(16, '#fff', true) }}>{p.on ? 'check' : ''}</span>
         <span style={{ fontSize: 14, fontWeight: 800 }}>ポモドーロ</span>
       </button>
-      {p.on && <span style={{ fontSize: 11.5, fontWeight: 800, color: p.phase === 'work' ? INK : '#7a9a00', whiteSpace: 'nowrap' }}>{p.phase === 'work' ? '作業中' : '休憩中'}・{p.n}セット目</span>}
+      {p.on && <span style={{ fontSize: 11.5, fontWeight: 800, color: p.phase === 'work' ? INK : '#7a9a00', whiteSpace: 'nowrap' }}>{p.phase === 'work' ? '作業中' : p.isLong ? '長い休憩中' : '休憩中'}・{p.n}セット目</span>}
     </div>
   );
 }
@@ -82,17 +82,27 @@ function PomoCheck({ p, v }) {
 /* ポモドーロがオンのとき（実施中の行のかわり）: 作業・休憩の分と「休憩へ／作業へ」 */
 function PomoRow({ p, v }) {
   if (!p.on) return null;
+  const line = { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 4px', borderBottom: '1px solid ' + INK };
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 4px', borderBottom: '1px solid ' + INK }}>
+    <>
+    <div style={line}>
       {[['work', '作業'], ['rest', '休憩']].map(([k, n]) => (
         <React.Fragment key={k}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: p.phase === k ? INK : MUTED, whiteSpace: 'nowrap' }}>{n}</span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: p.phase === k && !(k === 'rest' && p.isLong) ? INK : MUTED, whiteSpace: 'nowrap' }}>{n}</span>
           <MinBox value={p[k]} onChange={(m) => v.setPomo({ [k]: m })} />
           {k === 'work' && <span style={{ flex: 1 }} />}
         </React.Fragment>
       ))}
       <button onClick={v.pomoNext} style={{ border: 'none', borderRadius: 999, background: p.phase === 'work' ? LIME : INK, color: p.phase === 'work' ? LIME_INK : '#fff', fontSize: 11.5, fontWeight: 900, padding: '7px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', marginLeft: 4 }}>{p.phase === 'work' ? '休憩へ' : '作業へ'}</button>
     </div>
+    {/* 長い休憩: every セットごと */}
+    <div style={line}>
+      <span style={{ fontSize: 13, fontWeight: 800, color: p.isLong ? INK : MUTED, whiteSpace: 'nowrap' }}>長い休憩</span>
+      <MinBox value={p.long} onChange={(m) => v.setPomo({ long: m })} />
+      <span style={{ flex: 1 }} />
+      <MinBox value={p.every} unit="セットごと" onChange={(m) => v.setPomo({ every: m })} />
+    </div>
+    </>
   );
 }
 
