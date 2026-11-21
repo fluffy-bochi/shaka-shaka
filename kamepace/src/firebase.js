@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, doc, getDoc, getDocFromServer, setDoc,
-  collection, query, where, getDocs, Timestamp, writeBatch, deleteDoc, updateDoc, runTransaction,
+  collection, query, where, getDocs, Timestamp, writeBatch, deleteDoc, updateDoc, runTransaction, onSnapshot,
 } from 'firebase/firestore';
 import { serialize } from './model';
 
@@ -139,6 +139,36 @@ let saveTimer = null, saveChain = Promise.resolve();
 // （端末ごとに時計がずれるので、大小ではなく同じかどうかで見る）
 let lastStamp = 0;
 const stampOf = (snap) => (snap.exists() ? (snap.data().updatedAt || 0) : 0);
+const myStamps = new Set(); // この端末が書いた版
+
+/* 2026-11-21 デバイス間同期: ほかの端末が保存したら知らせる（本体の版が、この端末が読んだ／書いたものと違うとき）。
+   日のドキュメントは本体と同じトランザクションで書かれるので、本体だけ見ればよい */
+export function watchCloud(cb) {
+  if (!auth.currentUser) return () => {};
+  return onSnapshot(userDoc(), (snap) => {
+    if (!snap.exists() || snap.metadata.hasPendingWrites) return;
+    const s = stampOf(snap);
+    if (s === lastStamp || myStamps.has(s)) return;
+    cb();
+  }, (e) => console.warn('[kamepace] watch failed', e));
+}
+
+/* 実行中（START したもの）の同期: users/{uid}/apps/kamepace_run に { run（JSON の文字列）, at, dev }。
+   本体の保存とは分ける（実行中は何度も変わるので、記録の保存を重くしない・ぶつけない） */
+const runRef = () => doc(db, 'users', auth.currentUser.uid, 'apps', 'kamepace_run');
+export function saveRunDoc(run, dev) {
+  if (!auth.currentUser) return Promise.resolve();
+  return setDoc(runRef(), { run: run ? JSON.stringify(run) : null, at: Date.now(), dev }).catch(e => console.warn('[kamepace] run save failed', e));
+}
+export function watchRun(cb) {
+  if (!auth.currentUser) return () => {};
+  return onSnapshot(runRef(), (snap) => {
+    if (!snap.exists() || snap.metadata.hasPendingWrites) return;
+    const d = snap.data();
+    let run = null; try { run = d.run ? JSON.parse(d.run) : null; } catch (e) { return; }
+    cb(run, d.dev, d.at || 0);
+  }, (e) => console.warn('[kamepace] run watch failed', e));
+}
 // 保存に失敗したときの知らせ先（画面にトーストを出す）。黙って失敗すると、リロードで記録が消えるまで気づけない
 let onSaveError = null;
 export function setSaveErrorHandler(fn) { onSaveError = fn; }
@@ -175,6 +205,7 @@ async function writeSave(st, seq) {
   };
   let data;
   try { data = serialize(st); } catch (err) { fail(err); return; }
+  myStamps.add(data.updatedAt || 0); // 自分の保存の知らせで読み込み直さない
   const conflict = async () => {
     // ほかの端末の版（日のドキュメントもふくめて全部）を読んで、まぜてもらう
     try { const theirs = await readAll(true); if (theirs) onConflict(theirs); } catch (e) { fail(e); }

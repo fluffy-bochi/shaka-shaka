@@ -23,7 +23,7 @@ const pickW = (list) => { let t = Math.random() * list.reduce((a, x) => a + x[1]
    engine: Matter のエンジン（犬の体を入れる）・glyphs(): 山の絵文字の文字（中継の背景に使う）
    wake(): 絵文字を動かしたあとに呼ぶ（ほどふぉは止めた物理を動かし直す）
    liveTop: 中継を出す高さ（箱の上から）・canAct(): false のあいだは止まる（記録中など） */
-export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () => [], wake = () => {}, liveTop = 150, canAct = () => true }) {
+export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () => [], wake = () => {}, liveTop = 150, canAct = () => true, onTapped = null }) {
   const dogW = Math.round(dogH * DOG_RATIO);
   const el = document.createElement('div');
   el.className = 'dog-pic'; el.dataset.noshot = '1'; // シャカの共有画像（shakaShot.js）には入れない
@@ -215,6 +215,7 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
     if (!(x > rc.left + rc.width * 0.15 && x < rc.right - rc.width * 0.15 && y > rc.top + rc.height * 0.08 && y < rc.bottom - rc.height * 0.04)) return;
     const now = performance.now();
     st.taps = now - (st.tapAt || 0) < 3000 ? (st.taps || 0) + 1 : 1; st.tapAt = now;
+    if (onTapped) onTapped();
     const a = st.act;
     if (a && a.k === 'jump') return; // 跳んでいるあいだはそのまま
     if (a && a.k === 'dig') { st.dig = 0; setBuried(false); }

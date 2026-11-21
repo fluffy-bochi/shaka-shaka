@@ -16,7 +16,7 @@ import {
 } from './model';
 import {
   watchAuth, loginGoogle, loginEmail, signupEmail, logout, loginCode, codeOfEmail, auth,
-  cloudSave, cloudSavePassive, hasUnsaved, takeUnsavedBackup, setSaveErrorHandler, setConflictHandler, cloudIsNewer, loadUserData, fetchGoogleData, disconnectGoogle, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, startOwnGcalLink, fetchOwnGcal, completeScheduleTask, completeDailyTask, jpError,
+  cloudSave, cloudSavePassive, hasUnsaved, takeUnsavedBackup, setSaveErrorHandler, setConflictHandler, cloudIsNewer, watchCloud, saveRunDoc, watchRun, loadUserData, fetchGoogleData, disconnectGoogle, fetchScheduleEvents, fetchScheduleTasks, fetchDailyTasks, startOwnGcalLink, fetchOwnGcal, completeScheduleTask, completeDailyTask, jpError,
   loadIkoi, researchJoin, researchPutDays, researchStop, researchDelete, loadResearchConfig,
 } from './firebase';
 import { summarizeDays, researchDates } from './research';
@@ -1931,7 +1931,11 @@ export default class App extends React.Component {
   // シャカの山が見えているか（折っている時はホームでも上にシャカ）
   isFoldSplit(s = this.state) { return !!(this._flip && this._flip.kind === 'fold') && ['home', 'shaka'].includes(s.screen); }
   get _foldSplit() { return this.isFoldSplit(); }
-  isShakaView(s = this.state) { return s.screen === 'shaka' || (s.screen === 'home' && this.isFoldSplit(s)); }
+  isShakaView(s = this.state) { return s.screen === 'shaka' || (s.screen === 'home' && this.isFoldSplit(s)) || (this.isDesk(s) && s.screen !== 'collect'); }
+  /* PC の横画面（机）: 本棚・行動選択・実行中・ホーム・シャカを横に並べる。マウスで使う横長の画面（幅1200px以上）だけ */
+  isDesk(s = this.state) { return !!this._desk && !['onboard', 'cycle', 'ipadTest'].includes(s.screen); }
+  // 机の画面で、横に並べる画面（それ以外の画面は上に重ねて出す）
+  isDeskBase(s = this.state) { return ['home', 'shaka', 'bookshelf', 'record', 'run'].includes(s.screen); }
   updateFlip = () => {
     const f = computeFlip(Ikoi.isDev());
     const prev = this._flip || {};
@@ -1943,6 +1947,10 @@ export default class App extends React.Component {
     b.toggle('kame-tablet', tb.on); b.toggle('kame-tablet-land', tb.on && tb.land);
     const tbChanged = prevTb.on !== tb.on || prevTb.land !== tb.land;
     b.toggle('kame-cover', f.kind === 'cover'); b.toggle('kame-fold', f.kind === 'fold');
+    let fine = false; try { fine = window.matchMedia('(pointer: fine)').matches; } catch (e) { /* ignore */ }
+    const desk = !tb.on && f.kind !== 'cover' && f.kind !== 'fold' && fine && window.innerWidth >= 1200 && window.innerWidth > window.innerHeight;
+    const deskChanged = !!this._desk !== desk;
+    this._desk = desk; b.toggle('kame-desk', desk); Ikoi.setDesk(desk);
     document.documentElement.style.setProperty('--kame-rail', (getFlip().railW || 56) + 'px');
     document.documentElement.style.setProperty('--kame-zoom', String(f.zoom || 1));
     const changed = tbChanged || prev.kind !== f.kind || prev.foldTop !== f.foldTop || prev.foldBottom !== f.foldBottom || prev.zoom !== f.zoom || prev.split !== f.split || this._flipNavKey !== JSON.stringify(getFlip());
@@ -1950,7 +1958,10 @@ export default class App extends React.Component {
     // サブのまま画面の高さだけ変わった時も、古い大きさの箱のままにしない
     const caseEl = f.kind === 'cover' && this.engine ? document.getElementById('shakacase') : null;
     const caseChanged = !!caseEl && (() => { const c = this.caseSize(caseEl); return Math.abs(c.width - this._caseW) > 2 || Math.abs(c.height - this._caseH) > 2; })();
-    if (changed || caseChanged) {
+    // 机の画面: 窓の大きさや並べる画面の数が変わってシャカの箱の大きさが変わったら作り直す
+    const deskEl = this._desk && this.engine ? document.getElementById('shakacase') : null;
+    const deskCase = !!deskEl && (() => { const c = this.caseSize(deskEl); return Math.abs(c.width - this._caseW) > 2 || Math.abs(c.height - this._caseH) > 2; })();
+    if (changed || caseChanged || deskChanged || deskCase) {
       // 山の箱の大きさが変わるので作り直す（次の tick で新しい大きさで始まる）
       if (this.engine) { this._pileLayout = null; this.stopPhysics(); }
       this.forceUpdate();
@@ -2574,7 +2585,53 @@ export default class App extends React.Component {
   /* ================= タスク実行（START） =================
      run = { items: リストの行と同じ形, cur: いまの行, segs: [{ uid, a, b }]（行ごとの実行区間・b=null は実行中）, name, fromList }。
      ⏸で区間を閉じ、▶で開く。行を選ぶと区間を切り替える。「記録」で各行の区間を時刻モードの確認画面へ。 */
-  setRun(run) { this.set({ run }); try { if (run) localStorage.setItem('kame_run', JSON.stringify(run)); else localStorage.removeItem('kame_run'); } catch (e) { /* ignore */ } }
+  setRun(run) { this.set({ run }); try { if (run) localStorage.setItem('kame_run', JSON.stringify(run)); else localStorage.removeItem('kame_run'); } catch (e) { /* ignore */ } this.pushRun(run); }
+  /* ---- デバイス間同期（2026-11-21） ----
+     実行中: 行動・区間・タイマー・ポモドーロなど（runCore）をクラウドの apps/kamepace_run に送り、ほかの端末の変更を受け取る。
+     降らせた数（drip・negHit・newPos）と鳴らしたか（fired）は端末ごと（山は端末ごとなので） */
+  devId() { if (!this._dev) { try { this._dev = localStorage.getItem('kame_dev_id'); if (!this._dev) { this._dev = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); localStorage.setItem('kame_dev_id', this._dev); } } catch (e) { this._dev = 'd' + Math.random().toString(36).slice(2); } } return this._dev; }
+  runCore(run) { if (!run) return null; const { drip, negHit, newPos, fired, ...core } = run; return core; } // eslint-disable-line no-unused-vars
+  pushRun(run) {
+    if (!this.state.user) return;
+    const j = JSON.stringify(this.runCore(run));
+    if (j === this._runSent) return;
+    this._runSent = j;
+    clearTimeout(this._runPushT);
+    this._runPushT = setTimeout(() => saveRunDoc(this.runCore(this.state.run), this.devId()), 400);
+  }
+  onRemoteRun = (run, dev, at) => {
+    if (dev === this.devId()) return;
+    const j = JSON.stringify(run);
+    if (j === this._runSent) return;
+    // この端末で、クラウドの版より後に始めた実行があれば、古い版で消さずにこちらを送る（開いていなかった端末の古い「終わり」など）
+    const local = this.state.run;
+    if (local && local.startAt && at && local.startAt > at && (!run || run.startAt !== local.startAt)) { this._runSent = null; this.pushRun(local); return; }
+    this._runSent = j;
+    const merged = run ? { ...run, drip: (local && local.drip) || {}, negHit: (local && local.negHit) || 0, newPos: (local && local.newPos) || 0, fired: (local && local.fired) || {} } : null;
+    this.set({ run: merged, ...(!merged && this.state.screen === 'run' ? { screen: 'home' } : null) });
+    try { if (merged) localStorage.setItem('kame_run', JSON.stringify(merged)); else localStorage.removeItem('kame_run'); } catch (e) { /* ignore */ }
+  };
+  // 記録など: ほかの端末が保存したら、入力の途中でない画面のときに読み込み直す（途中なら、終わってから）
+  startSync() {
+    this.stopSync();
+    this._unCloud = watchCloud(() => { this._remotePending = true; this.applyRemote(); });
+    this._unRun = watchRun(this.onRemoteRun);
+  }
+  stopSync() { if (this._unCloud) this._unCloud(); if (this._unRun) this._unRun(); this._unCloud = this._unRun = null; this._remotePending = false; }
+  syncSafe() {
+    const st = this.state, sc = st.screen;
+    if (['shaka', 'home', 'mypage', 'bookshelf', 'run'].includes(sc)) return true;
+    return sc === 'record' && !st.searchStep && this.isDesk(); // 机の画面では行動選択の一覧のときも
+  }
+  applyRemote() {
+    clearTimeout(this._remoteT);
+    this._remoteT = setTimeout(() => {
+      if (!this._remotePending || !this.state.user) return;
+      if (hasUnsaved() || !this.syncSafe()) { this._remoteT = setTimeout(() => this.applyRemote(), 3000); return; } // 保存中はぶつかったときにまぜるので待つ
+      this._remotePending = false;
+      this.loadCloud(true);
+    }, 1200);
+  }
   startRun = (items, name, fromList) => {
     if (!items.length) return;
     const now = Date.now();
@@ -2767,7 +2824,8 @@ export default class App extends React.Component {
   pomoMin(p) { return p.phase === 'work' ? p.work : this.pomoLong(p) ? (p.long || 15) : p.rest; }
   // 作業・休憩・長い休憩の分と、何セットごとに長い休憩か（実行中の設定 → 端末に覚えた設定 → 初期値）
   pomoConf(r) {
-    let saved = {}; try { saved = JSON.parse(localStorage.getItem('kame_pomo') || '{}') || {}; } catch (e) { /* ignore */ }
+    let saved = (this.state.prefs || {}).pomo || {}; // アカウントに保存（ほかの端末でも同じ）。前の版の端末の値も読む
+    if (!saved.work) { try { saved = JSON.parse(localStorage.getItem('kame_pomo') || '{}') || {}; } catch (e) { /* ignore */ } }
     const p = (r && r.pomo) || {};
     return { work: p.work || saved.work || 25, rest: p.rest || saved.rest || 5, long: p.long || saved.long || 15, every: p.every || saved.every || 4 };
   }
@@ -2793,7 +2851,12 @@ export default class App extends React.Component {
       p.phase = this.pomoKind(r.items[r.cur]) === 'rest' ? 'rest' : 'work'; p.at = now; p.n = 1;
       if (this.pomoKind(r.items[r.cur]) !== p.phase) { const i = this.pomoRow(r, p.phase); if (i >= 0) r2 = this.runSwitched(r, i, now); }
     }
-    if (patch.work || patch.rest || patch.long || patch.every) { try { localStorage.setItem('kame_pomo', JSON.stringify({ work: p.work, rest: p.rest, long: p.long, every: p.every })); } catch (e) { /* ignore */ } }
+    if (patch.work || patch.rest || patch.long || patch.every) {
+      const conf = { work: p.work, rest: p.rest, long: p.long, every: p.every };
+      try { localStorage.setItem('kame_pomo', JSON.stringify(conf)); } catch (e) { /* ignore */ }
+      this.set({ prefs: { ...(this.state.prefs || {}), pomo: conf } });
+      clearTimeout(this._pomoSaveT); this._pomoSaveT = setTimeout(() => this.save(), 1500);
+    }
     this.setRun({ ...r2, pomo: p });
   };
   /* 作業⇄休憩を切りかえる。合う行動がリストになければ、止めて行動の追加へ */
@@ -3881,7 +3944,7 @@ export default class App extends React.Component {
     setSaveErrorHandler(() => { clearTimeout(this._saveErrT); this._saveErrT = setTimeout(() => this.toast('保存できませんでした。通信を確かめてください'), 300); });
     this._unwatch = watchAuth((user) => {
       this.set({ user, authOpen: false, authPass: '' });
-      if (user) this.loadCloud(); else this.loadGuest();
+      if (user) { this.loadCloud().then(() => this.startSync()); } else { this.stopSync(); this.loadGuest(); }
     });
     this._tick = setInterval(() => {
       const shakaEl = document.getElementById('shakacase');
@@ -3891,7 +3954,8 @@ export default class App extends React.Component {
         // データ読込前(booted false)に空の山で始めない。また空エンジンのまま固定されたら作り直す
         if (shakaEl && this.state.booted) {
           const emptyButShould = this.engine && (!this.bodies || this.bodies.length === 0) && this.pileCount() > 0;
-          if (!this.engine || emptyButShould) { if (this.engine) this.stopPhysics(); this.startPhysics(shakaEl); }
+          const deskResized = this._desk && this.engine && (() => { const c = this.caseSize(shakaEl); return Math.abs(c.width - this._caseW) > 2 || Math.abs(c.height - this._caseH) > 2; })();
+          if (!this.engine || emptyButShould || deskResized) { if (this.engine) this.stopPhysics(); this.startPhysics(shakaEl); }
         }
         if (this.collectEngine) this.stopCollectPhysics();
       } else if (this.state.screen === 'collect') {
@@ -4123,7 +4187,29 @@ export default class App extends React.Component {
       },
       liveTop: 150, // 時計の下
       canAct: () => this.isShakaView() && this.state.dayOffset === 0 && !this.state.predictOpen,
+      onTapped: () => { if (this._desk) this.tapCharacter(); }, // 机の画面: なでると（タッチすると）ホームのひとことが変わる
     });
+    // 机の画面: やるきーぬがホームのひとことをしゃべる（犬の右上の吹き出し）
+    if (this._dogSay) { this._dogSay.remove(); this._dogSay = null; }
+    if (this._desk) {
+      const say = document.createElement('div');
+      say.className = 'dog-say'; say.dataset.noshot = '1';
+      say.style.maxWidth = Math.round(W * 0.62) + 'px';
+      el.appendChild(say);
+      this._dogSay = say; this._dogSayT = null; this._dogSayW = W; this._dogSayH = H;
+    }
+  }
+  // 吹き出しを犬の右上に（右にはみ出すときは左上）。セリフが変わったら入れかえる
+  _moveDogSay(p) {
+    const say = this._dogSay; if (!say || !p) return;
+    const t = this._dogLine || '';
+    if (say._t !== t) { say._t = t; say.textContent = t; say.style.display = t ? '' : 'none'; say.style.animation = 'none'; void say.offsetWidth; say.style.animation = 'bubbleIn .18s ease-out'; }
+    if (!t) return;
+    const W = this._dogSayW, H = this._dogSayH, bw = say.offsetWidth, bh = say.offsetHeight;
+    const rightX = p.x + p.w * 0.3, leftX = p.x - p.w * 0.3 - bw;
+    const bx = p.off ? (W - bw) / 2 : rightX + bw <= W - 6 ? rightX : Math.max(6, leftX);
+    const by = p.off ? 150 : Math.min(H - bh - 10, Math.max(130, p.y - p.h - bh * 0.1));
+    say.style.transform = `translate(${Math.round(bx)}px, ${Math.round(by)}px)`;
   }
   _startLoop() {
     this._phys = true;
@@ -4145,7 +4231,7 @@ export default class App extends React.Component {
         });
         this.checkNegativeCollisions();
       }
-      if (this._dogRoam) this._dogRoam.update();
+      if (this._dogRoam) { const p = this._dogRoam.update(); if (this._dogSay) this._moveDogSay(p); }
       this._raf = requestAnimationFrame(loop);
     };
     this._raf = requestAnimationFrame(loop);
@@ -4551,6 +4637,7 @@ export default class App extends React.Component {
     this._phys = false; this._running = false; clearTimeout(this._settleT);
     if (this._raf) cancelAnimationFrame(this._raf);
     if (this._dogRoam) { this._dogRoam.dispose(); this._dogRoam = null; }
+    if (this._dogSay) { this._dogSay.remove(); this._dogSay = null; }
     if (this.runner) Matter.Runner.stop(this.runner);
     if (this.engine) { Matter.World.clear(this.engine.world); Matter.Engine.clear(this.engine); }
     if (this.bodies) this.bodies.forEach(({ el }) => el.remove());
@@ -5505,13 +5592,14 @@ export default class App extends React.Component {
     return {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
       isHome: (st.screen === 'home' || this.isFoldSplit(st)), isRecord: st.screen === 'record',
+      desk: this.isDesk(st), deskBase: this.isDesk(st) && this.isDeskBase(st), deskMenu: !!st.deskMenu, toggleDeskMenu: () => this.set({ deskMenu: !st.deskMenu }),
       isWake: ['wake1', 'wake2', 'wake3'].includes(st.screen), isWake1: st.screen === 'wake1', isWake2: st.screen === 'wake2', isWake3: st.screen === 'wake3',
       isBed1: st.screen === 'bed1', isBed2: st.screen === 'bed2', isBed: ['bed1', 'bed2'].includes(st.screen),
       bedDraft: st.bedDraft, setBedDraft: this.setBedDraft, finishBed1: this.finishBed1, goBed: this.goBed, goBed2: this.goBed2,
       bedFlow: st.bedFlow && st.screen === 'shaka', backBed: () => this.set({ screen: 'shaka' }), wakeRecs: st.screen === 'bed2' ? this.chartData([st.bedDay || this.bedDay()]) : null /* 夜はその日のぶんだけ */, bed: st.screen === 'bed2' ? this.bedVals() : null,
       // 日曜の夜の就寝記録: 最後に今週の週間レポートへ
       bedWeekKey: st.screen === 'bed2' && strToDate(st.bedDay || this.bedDay()).getDay() === 0 ? weekMonday(st.bedDay || this.bedDay()) : null,
-      homeComment: (st.screen === 'home' || this.isFoldSplit(st)) ? (st.tapLine || (() => {
+      homeComment: (st.screen === 'home' || this.isFoldSplit(st) || this.isDesk(st)) ? (st.tapLine || (() => {
         const d = this.homeDateStr(), nowHm = this.tsToHm(Date.now());
         const next = sortEntries(st.entries.filter(e => e.date === d && this.isPlanLike(e) && e.from && (d !== todayStr() || e.from > nowHm)))[0];
         const timed = d === todayStr() ? this.timeOfDayLine() : '';
@@ -5551,7 +5639,7 @@ export default class App extends React.Component {
       foldSplit: this.isFoldSplit(st), flipKind: (this._flip && this._flip.kind) || null, flip: this._flip || {},
       flipCfg: getFlip(), setFlip, tabletOn: !!(this._tablet && this._tablet.on),
       isIpadTest: st.screen === 'ipadTest', goIpadTest: () => this.set({ screen: 'ipadTest' }), closeIpadTest: () => this.set({ screen: 'mypage' }), coverNav: this._flip && this._flip.kind === 'cover' ? getFlip() : null, coverSplit: !!(this._flip && this._flip.kind === 'cover' && this._flip.split),
-      shakaBottom: this.isFoldSplit(st) ? 0 : this.navH(),
+      shakaBottom: this.isFoldSplit(st) || this.isDesk(st) ? 0 : this.navH(),
       shakaRight: this._flip && this._flip.kind === 'cover' ? (getFlip().railW || 56) : 0, // サブ: 右端の縦ナビの下に山を入れない
       editIkoiLine: this.editIkoiLine, ikoiTarget: st.ikoiTarget, closeIkoiEdit: this.closeIkoiEdit,
       isIkoiEdit: st.screen === 'ikoiEdit', devMode: Ikoi.isDev(), goIkoiEdit: this.goIkoiEdit, tapDevSecret: this.tapDevSecret,
@@ -5564,7 +5652,7 @@ export default class App extends React.Component {
       weekWeather: st.screen === 'weekReport' && st.weekReportKey ? this.weatherOn([0, 1, 2, 3, 4, 5, 6].map(i => shiftDate(st.weekReportKey, i))) : null,
       weekReportFrom: st.weekReportFrom, closeWeekReport: this.closeWeekReport, setWeekEval: this.setWeekEval,
       openWeekReport: this.openWeekReport, setWeekGoalAct: this.setWeekGoalAct,
-      goalActCats: ['weekReport', 'home', 'wake3'].includes(st.screen) ? this.goalActCats() : [],
+      goalActCats: ['weekReport', 'home', 'wake3'].includes(st.screen) || this.isDesk(st) ? this.goalActCats() : [],
       isSlotTimes: st.screen === 'slotTimes', isCatsManage: st.screen === 'catsManage',
       isTemplates: st.screen === 'templates', isSensitivity: st.screen === 'sensitivity',
       isHelp: st.screen === 'help', helpPersona: st.helpPersona || 0,
@@ -5616,7 +5704,7 @@ export default class App extends React.Component {
       homeDate: this.homeDateStr(),
       homeIsToday: this.homeDateStr() === todayStr(),
       homeNowSlot: this.homeDateStr() === todayStr() ? this.slotNow() : null,
-      homeFeed: (st.screen === 'home' || this.isFoldSplit(st)) ? this.homePosts().rows : [], openRecordNow: () => this.openRecord(this.slotNow()),
+      homeFeed: (st.screen === 'home' || this.isFoldSplit(st) || this.isDesk(st)) ? this.homePosts().rows : [], openRecordNow: () => this.openRecord(this.slotNow()),
       homeDateY: strToDate(this.homeDateStr()).getFullYear(),
       homeDateM: strToDate(this.homeDateStr()).getMonth() + 1,
       homeDateD: strToDate(this.homeDateStr()).getDate(),
@@ -5953,45 +6041,9 @@ export default class App extends React.Component {
     };
   }
 
-  render() {
-    const v = this.renderVals(), st0 = this.state;
-    return (
-      <div className="app-screen" ref={this._screenRef} style={{ background: v.screenBg, ...(v.isBookshelf ? { maxWidth: 'none' } : null) }}>
-        {/* status bar spacer（本棚の横向きでは詰める＝下の kame-book-land ルール） */}
-        <div className={'app-status-spacer' + (v.showCats || v.isRun ? ' tight' : '')} style={{ flex: '0 0 auto', zIndex: 5 }} />
-        {v.isOnboard && <Onboard v={v} />}
-        {v.isCycle && <Cycle v={v} />}
-        {!v.isOnboard && <>
-        {v.foldSplit ? <>
-          {/* 縦に折っている時: 折り目より上にシャカ、下にタイムライン */}
-          <div ref={this._shakaPaneRef} style={{ position: 'relative', flex: '0 0 auto', height: 'calc(' + v.flip.foldTop + 'px - env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}><Shaka v={v} /></div>
-          <div style={{ flex: '0 0 auto', height: Math.max(0, v.flip.foldBottom - v.flip.foldTop), background: '#f7f4ec' }} />
-          <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}><Home v={v} /></div>
-        </> : <>
-          {v.isHome && <Home v={v} />}
-          {v.isShaka && <Shaka v={v} />}
-        </>}
-        {v.isRecord && <Record v={v} />}
-        {v.isWake1 && <WakeCheck v={v} />}
-        {v.isWake2 && <WakeReview v={v} />}
-        {v.isWake3 && <WakePlan v={v} />}
-        {v.isBed1 && <BedCheck v={v} />}
-        {v.isBed2 && <BedReview v={v} />}
-        {v.isCollect && <Collect v={v} />}
-        {v.isMypage && <MyPage v={v} />}
-        {v.isIkoiEdit && <IkoiEdit key={Ikoi.getChara()} v={v} />}
-        {v.isResearchAdmin && <ResearchAdmin v={v} />}
-        {v.isRun && <Run v={v} />}
-        {v.isTrash && <Trash v={v} />}
-        {v.isBuffLog && <BuffLog v={v} />}
-        {v.isSlotTimes && <SlotTimes v={v} />}
-        {v.isCatsManage && <CatsManage v={v} />}
-        {v.isTemplates && <Templates v={v} />}
-        {v.isSensitivity && <Sensitivity v={v} />}
-        {v.isHelp && <Help v={v} />}
-        {v.isBookshelf && <Bookshelf v={v} />}
-        {v.isIpadTest && <IpadTest v={v} />}
-        {v.isWeekReport && v.weekReport && <WeekReport v={v} />}
+  /* 画面の上に重ねるもの（チュートリアル・確認・トースト・アラームなど）。ふつうの画面と机の画面で共通 */
+  renderModals(v, st0) {
+    return (<>
         {v.tutorial > 0 && <Tutorial v={v} />}
         {v.symAdjustOpen && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 11, background: 'rgba(27,27,24,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}>
@@ -6046,6 +6098,98 @@ export default class App extends React.Component {
             </div>
           </div>
         )}
+    </>);
+  }
+  /* PC の横画面（机）: 本棚・行動選択・実行中・ホーム・シャカを横に並べる。マイページなどは ☰ から、上に重ねて出す */
+  renderDesk(v, st0) {
+    const col = (key, node, extra) => <div key={key} className={'desk-col desk-' + key} style={extra}>{node}</div>;
+    const over = !v.deskBase; // 横に並べない画面（マイページ・起床/就寝の記録・週間レポートなど）
+    return (<>
+      <div className="desk-row">
+        <div className="desk-rail">
+          <button onClick={v.toggleDeskMenu} aria-label="メニュー" className="desk-burger"><span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 26, color: '#1b1b18' }}>{v.deskMenu ? 'close' : 'menu'}</span></button>
+          {v.deskMenu && <>
+            <div onClick={v.toggleDeskMenu} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+            <div className="desk-menu">
+              <button onClick={() => { this.set({ deskMenu: false }); v.goMypage(); }}><span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20 }}>person</span>マイページ</button>
+            </div>
+          </>}
+        </div>
+        {col('book', <Bookshelf v={v} />)}
+        {v.isRecord && col('record', <Record v={v} />, { background: '#fff' })}
+        {v.run && col('run', <Run v={{ ...v, isRun: true }} />)}
+        {col('home', <Home v={v} />)}
+        {col('shaka', <Shaka v={v} />)}
+      </div>
+      {over && (
+        <div className="desk-over" onClick={() => { if (v.isMypage) v.goHome(); }}>
+          <div className="desk-panel" onClick={(e) => e.stopPropagation()}>
+            {v.isWake1 && <WakeCheck v={v} />}
+            {v.isWake2 && <WakeReview v={v} />}
+            {v.isWake3 && <WakePlan v={v} />}
+            {v.isBed1 && <BedCheck v={v} />}
+            {v.isBed2 && <BedReview v={v} />}
+            {v.isCollect && <Collect v={v} />}
+            {v.isMypage && <MyPage v={v} />}
+            {v.isIkoiEdit && <IkoiEdit key={Ikoi.getChara()} v={v} />}
+            {v.isResearchAdmin && <ResearchAdmin v={v} />}
+            {v.isTrash && <Trash v={v} />}
+            {v.isBuffLog && <BuffLog v={v} />}
+            {v.isSlotTimes && <SlotTimes v={v} />}
+            {v.isCatsManage && <CatsManage v={v} />}
+            {v.isTemplates && <Templates v={v} />}
+            {v.isSensitivity && <Sensitivity v={v} />}
+            {v.isHelp && <Help v={v} />}
+            {v.isWeekReport && v.weekReport && <WeekReport v={v} />}
+          </div>
+        </div>
+      )}
+      {this.renderModals(v, st0)}
+      <RunPip v={v} />
+    </>);
+  }
+  render() {
+    const v = this.renderVals(), st0 = this.state;
+    this._dogLine = v.desk ? v.homeComment : ''; // 机の画面: シャカのやるきーぬがしゃべる
+    return (
+      <div className="app-screen" ref={this._screenRef} style={{ background: v.screenBg, ...(v.isBookshelf ? { maxWidth: 'none' } : null) }}>
+        {/* status bar spacer（本棚の横向きでは詰める＝下の kame-book-land ルール） */}
+        <div className={'app-status-spacer' + (v.showCats || v.isRun ? ' tight' : '')} style={{ flex: '0 0 auto', zIndex: 5 }} />
+        {v.isOnboard && <Onboard v={v} />}
+        {v.isCycle && <Cycle v={v} />}
+        {!v.isOnboard && v.desk && this.renderDesk(v, st0)}
+        {!v.isOnboard && !v.desk && <>
+        {v.foldSplit ? <>
+          {/* 縦に折っている時: 折り目より上にシャカ、下にタイムライン */}
+          <div ref={this._shakaPaneRef} style={{ position: 'relative', flex: '0 0 auto', height: 'calc(' + v.flip.foldTop + 'px - env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}><Shaka v={v} /></div>
+          <div style={{ flex: '0 0 auto', height: Math.max(0, v.flip.foldBottom - v.flip.foldTop), background: '#f7f4ec' }} />
+          <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}><Home v={v} /></div>
+        </> : <>
+          {v.isHome && <Home v={v} />}
+          {v.isShaka && <Shaka v={v} />}
+        </>}
+        {v.isRecord && <Record v={v} />}
+        {v.isWake1 && <WakeCheck v={v} />}
+        {v.isWake2 && <WakeReview v={v} />}
+        {v.isWake3 && <WakePlan v={v} />}
+        {v.isBed1 && <BedCheck v={v} />}
+        {v.isBed2 && <BedReview v={v} />}
+        {v.isCollect && <Collect v={v} />}
+        {v.isMypage && <MyPage v={v} />}
+        {v.isIkoiEdit && <IkoiEdit key={Ikoi.getChara()} v={v} />}
+        {v.isResearchAdmin && <ResearchAdmin v={v} />}
+        {v.isRun && <Run v={v} />}
+        {v.isTrash && <Trash v={v} />}
+        {v.isBuffLog && <BuffLog v={v} />}
+        {v.isSlotTimes && <SlotTimes v={v} />}
+        {v.isCatsManage && <CatsManage v={v} />}
+        {v.isTemplates && <Templates v={v} />}
+        {v.isSensitivity && <Sensitivity v={v} />}
+        {v.isHelp && <Help v={v} />}
+        {v.isBookshelf && <Bookshelf v={v} />}
+        {v.isIpadTest && <IpadTest v={v} />}
+        {v.isWeekReport && v.weekReport && <WeekReport v={v} />}
+        {this.renderModals(v, st0)}
         {/* 実施中のバー（ホーム・行動選択画面の下） */}
         {v.run && !v.isRun && (v.isHome || v.isPickScreen) && <MiniRun v={v} />}
         {/* 実行中のピクチャーインピクチャ（開いていないときは何も出さない） */}
