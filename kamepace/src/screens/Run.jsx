@@ -67,33 +67,32 @@ function MinBox({ value, onChange }) {
 }
 
 /* ポモドーロ: オン／オフ。オンのときは 作業・休憩の分と、いま作業中か休憩中か（押すと切りかえ） */
-function PomoRow({ p, v }) {
-  const seg = (on) => ({ border: 'none', borderRadius: 999, padding: '4px 10px', fontSize: 11, fontWeight: 800, cursor: 'pointer', background: on ? INK : 'transparent', color: on ? '#fff' : SUB, fontFamily: 'inherit' });
-  const line = { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 4px', borderBottom: '1px solid ' + INK };
+function PomoCheck({ p, v }) {
   return (
-    <>
-      <div style={line}>
-        <span style={{ fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap' }}>ポモドーロ</span>
-        {p.on && <span style={{ fontSize: 11.5, fontWeight: 800, color: p.phase === 'work' ? INK : '#7a9a00', whiteSpace: 'nowrap' }}>{p.phase === 'work' ? '作業中' : '休憩中'}・{p.n}セット目</span>}
-        <span style={{ flex: 1 }} />
-        <div style={{ display: 'flex', background: '#efece3', borderRadius: 999, padding: 2 }}>
-          <button onClick={() => v.setPomo({ on: false })} style={seg(!p.on)}>オフ</button>
-          <button onClick={() => v.setPomo({ on: true })} style={seg(p.on)}>オン</button>
-        </div>
-      </div>
-      {p.on && (
-        <div style={line}>
-          {[['work', '作業'], ['rest', '休憩']].map(([k, n]) => (
-            <React.Fragment key={k}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: p.phase === k ? INK : MUTED, whiteSpace: 'nowrap' }}>{n}</span>
-              <MinBox value={p[k]} onChange={(m) => v.setPomo({ [k]: m })} />
-              {k === 'work' && <span style={{ flex: 1 }} />}
-            </React.Fragment>
-          ))}
-          <button onClick={v.pomoNext} style={{ border: 'none', borderRadius: 999, background: p.phase === 'work' ? LIME : INK, color: p.phase === 'work' ? LIME_INK : '#fff', fontSize: 11.5, fontWeight: 900, padding: '7px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', marginLeft: 4 }}>{p.phase === 'work' ? '休憩へ' : '作業へ'}</button>
-        </div>
-      )}
-    </>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 4px 10px' }}>
+      <button onClick={() => v.setPomo({ on: !p.on })} role="checkbox" aria-checked={p.on} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', color: INK }}>
+        <span style={{ width: 20, height: 20, boxSizing: 'border-box', borderRadius: 5, border: p.on ? 'none' : '2px solid #bab5a7', background: p.on ? INK : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', ...ms(16, '#fff', true) }}>{p.on ? 'check' : ''}</span>
+        <span style={{ fontSize: 14, fontWeight: 800 }}>ポモドーロ</span>
+      </button>
+      {p.on && <span style={{ fontSize: 11.5, fontWeight: 800, color: p.phase === 'work' ? INK : '#7a9a00', whiteSpace: 'nowrap' }}>{p.phase === 'work' ? '作業中' : '休憩中'}・{p.n}セット目</span>}
+    </div>
+  );
+}
+
+/* ポモドーロがオンのとき（実施中の行のかわり）: 作業・休憩の分と「休憩へ／作業へ」 */
+function PomoRow({ p, v }) {
+  if (!p.on) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 4px', borderBottom: '1px solid ' + INK }}>
+      {[['work', '作業'], ['rest', '休憩']].map(([k, n]) => (
+        <React.Fragment key={k}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: p.phase === k ? INK : MUTED, whiteSpace: 'nowrap' }}>{n}</span>
+          <MinBox value={p[k]} onChange={(m) => v.setPomo({ [k]: m })} />
+          {k === 'work' && <span style={{ flex: 1 }} />}
+        </React.Fragment>
+      ))}
+      <button onClick={v.pomoNext} style={{ border: 'none', borderRadius: 999, background: p.phase === 'work' ? LIME : INK, color: p.phase === 'work' ? LIME_INK : '#fff', fontSize: 11.5, fontWeight: 900, padding: '7px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', marginLeft: 4 }}>{p.phase === 'work' ? '休憩へ' : '作業へ'}</button>
+    </div>
   );
 }
 
@@ -240,7 +239,7 @@ export default function Run({ v }) {
             {!bar.none && !over && ratio < 0.8 && <span style={{ position: 'absolute', right: 0 }}>{mmss(bar.total)}</span>}
           </div>
           {/* 必・♡ ｜ ▶ ｜ りれき */}
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)', alignItems: 'center', margin: '10px 0 36px' }}>{/* 下のアラームとの間はFigmaくらいあける */}
+          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)', alignItems: 'center', margin: '10px 0 22px' }}>{/* 下のポモドーロ・アラームとの間 */}
             {/* 必・♡ は左端、ラップは ▶／⏸ から少し離して左の列の右端に（止めているときは押せない） */}
             <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 4, paddingRight: 'clamp(8px, 5vw, 20px)' }}>
               <button onClick={() => setPop(pop === 'req' ? null : 'req')} aria-label="生活必須行動" style={chip(!!c.req)}>必</button>
@@ -262,6 +261,7 @@ export default function Run({ v }) {
             </div>
           )}
           {/* 全体／実施中 の アラーム・タイマー */}
+          <PomoCheck p={r.pomo} v={v} />
           <AlarmRow label="全体" a={r.alarm.all} top onMode={(m) => v.setRunAlarm('all', { mode: m })} onAt={(t) => v.setRunAlarm('all', { at: t })} onMin={(n) => v.setRunAlarm('all', { min: n })} />
           {!r.pomo.on && <AlarmRow label="実施中" a={r.alarm.cur} onMode={(m) => v.setRunAlarm('cur', { mode: m })} onAt={(t) => v.setRunAlarm('cur', { at: t })} onMin={(n) => v.setRunAlarm('cur', { min: n })} />}
           <PomoRow p={r.pomo} v={v} />
