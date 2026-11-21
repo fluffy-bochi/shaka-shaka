@@ -247,3 +247,10 @@ body.kame-desk-dragging, body.kame-desk-dragging * { cursor: grabbing !important
 .desk-stowed-l { font-size: 9px; font-weight: 800; color: #55554e; white-space: nowrap; }
 .desk-rail-hint { margin-top: auto; margin-bottom: 14px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 9.5px; font-weight: 800; color: #55554e; }
 .desk-ghost { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; display: flex; align-items: center; gap: 6px; background: #1b1b18; color: #fff; border-radius: 999px; padding: 7px 14px 7px 10px; font-size: 13px; font-weight: 800; box-shadow: 0 10px 26px rgba(27,27,24,.3); }
+
+/* 実行中のやるきーぬを大きく表示 */
+.run-dog-full-btn { position: absolute; right: 8px; top: 6px; z-index: 3; width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(255,255,255,.75); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.run-dog-full { position: absolute; inset: 0; z-index: 60; background: #f7f4ec; display: flex; align-items: center; justify-content: center; overflow: hidden; animation: runDogFullIn .25s ease-out; }
+.run-dog-full.page { position: fixed; z-index: 9000; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.run-dog-full-x { position: absolute; right: 14px; top: calc(14px + env(safe-area-inset-top)); width: 44px; height: 44px; border-radius: 50%; border: none; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.15); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+@keyframes runDogFullIn { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }

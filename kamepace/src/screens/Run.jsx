@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import Emo from '../fluent';
 import { FreqPop, History, HmInput } from './Pick';
 import { TaskEditPopup } from './Home';
@@ -395,6 +396,29 @@ export function MiniRun({ v }) {
   );
 }
 
+/* やるきーぬの大きな表示。PC（机）は実行中の列の中に、ほかは画面全体に重ねる。×・Esc・背景を押すと閉じる */
+function RunDogFull({ c, anchor, desk, onClose }) {
+  const host = (desk && anchor && anchor.closest('.desk-col')) || document.body;
+  const box = React.useRef(null);
+  const [sz, setSz] = React.useState(null);
+  React.useLayoutEffect(() => {
+    const el = box.current; if (!el) return undefined;
+    const upd = () => { const r = el.getBoundingClientRect(); setSz({ w: r.width, h: r.height }); };
+    upd();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(upd) : null;
+    if (ro) ro.observe(el);
+    const key = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', key);
+    return () => { if (ro) ro.disconnect(); window.removeEventListener('keydown', key); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const h = sz ? Math.round(Math.min(sz.h * 0.85, sz.w * 1.45)) : 0;
+  return createPortal(
+    <div ref={box} className={'run-dog-full' + (host === document.body ? ' page' : '')} onClick={onClose}>
+      {h > 0 && <div onClick={e => e.stopPropagation()}><RunDog c={c} height={h} /></div>}
+      <button onClick={onClose} aria-label="閉じる" className="run-dog-full-x"><span style={ms(24, INK)}>close_fullscreen</span></button>
+    </div>, host);
+}
+
 /* いまの行動の大きな表示: 左＝絵文字／右＝やるきーぬがその行動をしている。左右スワイプ（下の点を押しても）で切りかえ、端末に覚える */
 const RUN_VIEW_KEY = 'kame_run_view';
 const RUN_DOG_H = 220; // 実行中のやるきーぬの高さ（2026-11-21 150→220）
@@ -424,15 +448,20 @@ function RunPager({ c, v }) {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [showDog, desk]); // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => () => { if (v && v.setRunDogShown) v.setRunDogShown(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // やるきーぬを大きく表示（スマホ＝画面いっぱい・PC＝実行中の画面いっぱい）
+  const [full, setFull] = React.useState(false);
+  React.useEffect(() => { if (!showDog) setFull(false); }, [showDog]);
   const dogStyle = !desk ? null : { transform: walk === 'wait' ? 'translateX(110%)' : 'translateX(0)', transition: walk === 'in' ? 'transform 1.7s linear' : 'none' };
   return (
     <div style={{ padding: '6px 0 0' }}>
       <div ref={ref} onScroll={onScroll} className="run-pager">
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: RUN_DOG_H }}><Emo e={c.glyph} size={150} /></div>
-        <div style={{ height: RUN_DOG_H, boxSizing: 'border-box', overflow: 'hidden' }}>
-          {seen && <div style={dogStyle}><RunDog c={c} height={RUN_DOG_H} walkIn={desk && walk !== 'here'} /></div>}
+        <div style={{ position: 'relative', height: RUN_DOG_H, boxSizing: 'border-box', overflow: 'hidden' }}>
+          {seen && !full && <div style={dogStyle}><RunDog c={c} height={RUN_DOG_H} walkIn={desk && walk !== 'here'} /></div>}
+          {showDog && !full && <button onClick={() => setFull(true)} aria-label="大きく表示" className="run-dog-full-btn"><span style={ms(20, SUB)}>open_in_full</span></button>}
         </div>
       </div>
+      {full && <RunDogFull c={c} anchor={ref.current} desk={desk} onClose={() => setFull(false)} />}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 4 }}>
         {[0, 1].map(i => <button key={i} onClick={() => go(i)} aria-label={i ? 'やるきーぬ' : '絵文字'} style={{ width: 7, height: 7, borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: page === i ? INK : '#d8d5cb' }} />)}
       </div>
