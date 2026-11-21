@@ -33,7 +33,7 @@ function smoothPath(pts) {
 
 /* ① がんばりタイプ: 上にその日のタイプ、下に1日の中のゆったり・ほどほど・みちみちの割合（積み上げ棒） */
 function Types({ r, v }) {
-  const BH = 120;
+  const BH = 120, ww = v.weekWeather && v.weekWeather.some(Boolean) ? v.weekWeather : null; // 天気（地域を選んでいるとき）
   return (
     <div style={card}>
       <div style={ttl}>がんばりタイプ</div>
@@ -47,7 +47,7 @@ function Types({ r, v }) {
         </div>
       )}
       <div style={{ display: 'flex', gap: 6 }}>
-        {r.days.map(d => {
+        {r.days.map((d, i) => {
           const z = d.zone, tot = z.yuttari + z.hodohodo + z.michimichi;
           return (
             <div key={d.d} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -64,6 +64,13 @@ function Types({ r, v }) {
               </div>
               <div style={{ marginTop: 5, fontSize: 11.5, fontWeight: 800, color: d.today ? LIME_INK : INK, background: d.today ? LIME : 'transparent', borderRadius: 6, padding: '0 5px' }}>{d.wd}</div>
               <div style={{ ...mono, fontSize: 8.5, color: '#8a8a82' }}>{d.md}</div>
+              {ww && (ww[i] ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 4, lineHeight: 1.25 }}>
+                  <Emo e={ww[i].glyph} size={18} />
+                  <span style={{ ...mono, fontSize: 9, fontWeight: 700, color: '#e0603a', marginTop: 2 }}>{ww[i].max}°</span>
+                  <span style={{ ...mono, fontSize: 9, fontWeight: 700, color: '#3a7bd5' }}>{ww[i].min}°</span>
+                </div>
+              ) : <div style={{ height: 48 }} />)}
             </div>
           );
         })}
