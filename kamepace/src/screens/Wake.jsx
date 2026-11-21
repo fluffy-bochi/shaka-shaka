@@ -217,8 +217,8 @@ export function Speaker({ text, size = 130, onTap, src: srcIn, faceKey, onEdit, 
         </button>
       )}
       {dogFace ? (
-        <div onClick={onTap} style={{ flex: '0 0 auto', width: size, height: size, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', cursor: onTap ? 'pointer' : undefined, WebkitTapHighlightColor: 'transparent' }}>
-          <DogModel act={dogAct} times={1} style={{ height: size }} />
+        <div onClick={onTap} style={{ flex: '0 0 auto', width: Math.round(size * 1.1), height: Math.round(size * 1.35), display: 'flex', justifyContent: 'center', alignItems: 'flex-end', cursor: onTap ? 'pointer' : undefined, WebkitTapHighlightColor: 'transparent' }}>
+          <DogModel act={dogAct} times={1} style={{ height: Math.round(size * 1.35), flex: '0 0 auto' }} />{/* やるきーぬは少し大きく（2026-11-21） */}
         </div>
       ) : <img key={src} src={src} alt="" onClick={onTap} style={{ cursor: onTap ? 'pointer' : undefined, WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none', flex: '0 0 auto', width: size, height: size, objectFit: 'contain', objectPosition: 'bottom', mixBlendMode: 'multiply' }} />}
       <div key={text} onClick={onTap} style={{ position: 'relative', flex: 1, background: '#fff', borderRadius: 18, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.75, fontWeight: regular ? 400 : undefined, boxShadow: '0 2px 10px rgba(27,27,24,.06)', marginBottom: 14, animation: 'bubbleIn .18s ease-out', cursor: onTap ? 'pointer' : undefined, WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none' }}>

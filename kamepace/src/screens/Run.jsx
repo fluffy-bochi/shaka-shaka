@@ -412,7 +412,7 @@ function RunPager({ c }) {
     <div style={{ padding: '6px 0 0' }}>
       <div ref={ref} onScroll={onScroll} className="run-pager">
         <div style={{ display: 'flex', justifyContent: 'center' }}><Emo e={c.glyph} size={150} /></div>
-        <div style={{ height: 150, boxSizing: 'border-box', paddingTop: 20 }}>{seen && <RunDog c={c} height={122} />}</div>{/* 頭の上・足もとの絵文字がはみ出さないよう少し小さく */}
+        <div style={{ height: 150, boxSizing: 'border-box' }}>{seen && <RunDog c={c} height={150} />}</div>{/* 頭の上・足もとの絵文字がはみ出さないよう少し小さく */}
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 4 }}>
         {[0, 1].map(i => <button key={i} onClick={() => go(i)} aria-label={i ? 'やるきーぬ' : '絵文字'} style={{ width: 7, height: 7, borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: page === i ? INK : '#d8d5cb' }} />)}
