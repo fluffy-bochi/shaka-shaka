@@ -76,7 +76,7 @@ function RecordRow({ g, children, style }) {
   const cancel = () => { clearTimeout(timer.current); };
   const onClick = () => { if (fired.current) { fired.current = false; return; } g.onTap && g.onTap(); };
   return (
-    <div
+    <div data-ownlong=""
       onClick={onClick}
       onMouseDown={start} onMouseUp={cancel} onMouseLeave={cancel}
       onTouchStart={start} onTouchEnd={cancel} onTouchMove={cancel}
