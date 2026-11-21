@@ -199,6 +199,14 @@ export function Speaker({ text, size = 130, onTap, src: srcIn, faceKey, onEdit, 
   const src = srcIn || nurseSrc(text); // セリフに合った表情（いこいさん編集のプレビューでは表情を指定できる）
   // やるきーぬは3D（追加した表情の画像を指定したときだけ絵）
   const dogFace = Ikoi.getChara() === 'dog' ? Ikoi.dogBaseFace(faceKey || Ikoi.faceKeyFor(text)) : null;
+  // PC の横画面（机）: やるきーぬはシャカにずっといるので、ここは吹き出しだけ
+  if (dogFace && Ikoi.isDesk()) {
+    return (
+      <div style={{ padding: '0 20px' }}>
+        <div key={text} onClick={onTap} style={{ background: '#fff', borderRadius: 18, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.75, fontWeight: regular ? 400 : undefined, boxShadow: '0 2px 10px rgba(27,27,24,.06)', marginBottom: 14, animation: 'bubbleIn .18s ease-out', cursor: onTap ? 'pointer' : undefined }}>{text}</div>
+      </div>
+    );
+  }
   const dogAct = React.useMemo(() => (dogFace ? { name: DOG_MOTION[dogFace] || 'wave' } : null), [text, dogFace]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 20px' }}>

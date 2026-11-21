@@ -202,3 +202,33 @@ body.kame-cover .app-screen { padding-right: var(--kame-rail, 56px); }
 .run-pager { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
 .run-pager::-webkit-scrollbar { display: none; }
 .run-pager > div { flex: 0 0 100%; scroll-snap-align: center; }
+
+/* ===== PC の横画面（机）: 本棚・行動選択・実行中・ホーム・シャカを横に並べる（App.renderDesk） ===== */
+body.kame-desk .app-screen { max-width: none; }
+@media (min-width: 768px) and (min-height: 600px) {
+  body.kame-desk .shell { padding: 0; }
+  body.kame-desk .shell-head, body.kame-desk .shell-side { display: none; }
+  body.kame-desk .phone { width: 100vw; padding: 0; border-radius: 0; background: none; box-shadow: none; }
+  body.kame-desk .phone .app-screen { width: 100vw; height: var(--app-vh, 100dvh); border-radius: 0; }
+}
+body.kame-desk { background: #e9e6dc; }
+body.kame-desk .app-status-spacer { height: 0; }
+.desk-row { flex: 1; min-height: 0; display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden; }
+.desk-col { position: relative; flex: 1 1 0; min-width: 300px; display: flex; flex-direction: column; overflow: hidden; background: #f7f4ec; border-right: 1px solid #dcd8cc; }
+.desk-col.desk-shaka { flex: 0 0 clamp(360px, 27vw, 480px); border-right: none; }
+.desk-col.desk-book { flex: 1.1 1 0; }
+.desk-rail { position: relative; flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; padding-top: 10px; background: #fff; border-right: 1px solid #dcd8cc; z-index: 41; }
+.desk-burger { width: 40px; height: 40px; border: none; border-radius: 10px; background: #efece3; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.desk-menu { position: absolute; left: 56px; top: 10px; z-index: 41; min-width: 180px; background: #fff; border-radius: 14px; padding: 6px; box-shadow: 0 12px 32px rgba(27,27,24,.22); }
+.desk-menu button { display: flex; align-items: center; gap: 10px; width: 100%; border: none; background: none; border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 800; color: #1b1b18; cursor: pointer; font-family: inherit; text-align: left; }
+.desk-menu button:hover { background: #f3f0e8; }
+.desk-over { position: absolute; inset: 0; z-index: 30; background: rgba(27,27,24,.42); display: flex; align-items: center; justify-content: center; }
+.desk-panel { position: relative; width: 430px; max-width: calc(100vw - 40px); height: calc(100% - 48px); display: flex; flex-direction: column; overflow: hidden; border-radius: 22px; background: #f7f4ec; box-shadow: 0 24px 60px rgba(27,27,24,.35); }
+/* やるきーぬのふきだし（シャカの犬の右上） */
+.dog-say {
+  position: absolute; left: 0; top: 0; z-index: 3; box-sizing: border-box; width: max-content; min-width: 120px;
+  background: rgba(255,255,255,.9); color: #1b1b18; border: 2px solid #1b1b18; border-radius: 14px;
+  padding: 10px 14px; font-size: 13.5px; font-weight: 700; line-height: 1.65; word-break: break-all;
+  box-shadow: 0 6px 18px rgba(27,27,24,.16); pointer-events: none; will-change: transform;
+}
+.desk-col.desk-run { min-width: 350px; }

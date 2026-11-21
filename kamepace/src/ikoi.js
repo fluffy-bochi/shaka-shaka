@@ -163,10 +163,15 @@ export function faceSrc(key) { const fs = cur().faces; const f = fs[key] || (cha
 
 /* ---- キャラクター（マイページで選ぶ・端末ごと）: いこいさん／やるきーぬ（犬）。セリフも表情もキャラごと ---- */
 export const CHARAS = [{ id: 'ikoi', name: 'いこいさん' }, { id: 'dog', name: 'やるきーぬ' }];
-const CHARA_KEY = 'kame_chara';
-let chara = 'ikoi';
-try { if (localStorage.getItem(CHARA_KEY) === 'dog') chara = 'dog'; } catch (e) { /* ignore */ }
+// 2026-11-21: やるきーぬを基本に。前の選択（kame_chara）は使わず、新しいキーでいこいさんを選んだ端末だけいこいさん
+const CHARA_KEY = 'kame_chara2';
+let chara = 'dog';
+try { if (localStorage.getItem(CHARA_KEY) === 'ikoi') chara = 'ikoi'; } catch (e) { /* ignore */ }
 export function getChara() { return chara; }
+/* PC の横画面（机）: やるきーぬはシャカにだけいて、ほかの画面のキャラは出さない（セリフは吹き出しだけ） */
+let desk = false;
+export function setDesk(on) { if (desk !== !!on) { desk = !!on; changed(); } }
+export function isDesk() { return desk; }
 export function setChara(id) { chara = id === 'dog' ? 'dog' : 'ikoi'; try { localStorage.setItem(CHARA_KEY, chara); } catch (e) { /* ignore */ } changed(); }
 /* やるきーぬの初期の表情。3Dモデル（public/models/corgi_motions.glb）の正面の絵を共通で使い、
    3Dで表示するところ（Wake.jsx の Speaker）では表情ごとのモーションになる。画像がない表情は DOG_ALIAS で近い表情に */
