@@ -53,6 +53,7 @@ import Tutorial from './screens/Tutorial';
 import Onboard from './screens/Onboard';
 import Cycle from './screens/Cycle';
 import Bookshelf from './screens/Bookshelf';
+import Desk from './screens/Desk';
 import IpadTest from './screens/IpadTest';
 import { buildAcademicYear, academicYearOf } from './sample';
 
@@ -3950,11 +3951,18 @@ export default class App extends React.Component {
       const shakaEl = document.getElementById('shakacase');
       const collectStack = document.getElementById('collectstack');
       const collectScroll = document.getElementById('collectscroll');
-      if (this.isShakaView()) {
+      if (this.isShakaView() && this._desk && !shakaEl) { if (this.engine) this.stopPhysics(); } // 机でシャカをしまっている
+      else if (this.isShakaView()) {
         // データ読込前(booted false)に空の山で始めない。また空エンジンのまま固定されたら作り直す
         if (shakaEl && this.state.booted) {
           const emptyButShould = this.engine && (!this.bodies || this.bodies.length === 0) && this.pileCount() > 0;
-          const deskResized = this._desk && this.engine && (() => { const c = this.caseSize(shakaEl); return Math.abs(c.width - this._caseW) > 2 || Math.abs(c.height - this._caseH) > 2; })();
+          // 机: シャカの幅が変わったら、変わり終わってから（0.4秒同じなら）作り直す（幅をドラッグしているあいだは作り直さない）
+          const deskResized = this._desk && this.engine && (() => {
+            const c = this.caseSize(shakaEl), k = Math.round(c.width) + 'x' + Math.round(c.height);
+            if (Math.abs(c.width - this._caseW) <= 2 && Math.abs(c.height - this._caseH) <= 2) { this._deskSz = null; return false; }
+            if (!this._deskSz || this._deskSz.k !== k) { this._deskSz = { k, t: Date.now() }; return false; }
+            return Date.now() - this._deskSz.t > 400;
+          })();
           if (!this.engine || emptyButShould || deskResized) { if (this.engine) this.stopPhysics(); this.startPhysics(shakaEl); }
         }
         if (this.collectEngine) this.stopCollectPhysics();
@@ -6049,6 +6057,23 @@ export default class App extends React.Component {
     };
   }
 
+  /* アラーム・タイマーが鳴ったとき（どの画面でも。PC の横画面では実行中の画面の中に） */
+  renderRunAlarm(v) {
+    if (!v.runAlarm) return null;
+    return (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(27,27,24,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }}>
+            <div style={{ width: '100%', background: '#fff', borderRadius: 22, padding: '20px 20px 18px', textAlign: 'center', boxShadow: '0 24px 60px rgba(27,27,24,.35)' }}>
+              <div style={{ fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 40, color: '#1b1b18', lineHeight: 1 }}>alarm</div>
+              <div style={{ fontSize: 16, fontWeight: 900, marginTop: 8 }}>{v.runAlarm.title}</div>
+              <div style={{ fontSize: 13, color: '#55554e', marginTop: 6, lineHeight: 1.6 }}>{v.runAlarm.msg}</div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <button onClick={v.closeRunAlarm} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 800, fontSize: 14, padding: '12px 0', cursor: 'pointer' }}>OK</button>
+                {v.runAlarm.next && <button onClick={v.runAlarmNext} style={{ flex: 1.4, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 900, fontSize: 14, padding: '12px 0', cursor: 'pointer' }}>{v.runAlarm.nextLabel || '次へ'}</button>}
+              </div>
+            </div>
+          </div>
+        );
+  }
   /* 画面の上に重ねるもの（チュートリアル・確認・トースト・アラームなど）。ふつうの画面と机の画面で共通 */
   renderModals(v, st0) {
     return (<>
@@ -6092,43 +6117,30 @@ export default class App extends React.Component {
             </div>
           </div>
         )}
-        {/* アラーム・タイマーが鳴ったとき（どの画面でも） */}
-        {v.runAlarm && (
-          <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(27,27,24,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }}>
-            <div style={{ width: '100%', background: '#fff', borderRadius: 22, padding: '20px 20px 18px', textAlign: 'center', boxShadow: '0 24px 60px rgba(27,27,24,.35)' }}>
-              <div style={{ fontFamily: 'Material Symbols Rounded', fontVariationSettings: "'FILL' 1", fontSize: 40, color: '#1b1b18', lineHeight: 1 }}>alarm</div>
-              <div style={{ fontSize: 16, fontWeight: 900, marginTop: 8 }}>{v.runAlarm.title}</div>
-              <div style={{ fontSize: 13, color: '#55554e', marginTop: 6, lineHeight: 1.6 }}>{v.runAlarm.msg}</div>
-              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                <button onClick={v.closeRunAlarm} style={{ flex: 1, border: '2px solid #e4e1d8', borderRadius: 13, background: '#fff', color: '#55554e', fontWeight: 800, fontSize: 14, padding: '12px 0', cursor: 'pointer' }}>OK</button>
-                {v.runAlarm.next && <button onClick={v.runAlarmNext} style={{ flex: 1.4, border: 'none', borderRadius: 13, background: '#c4f000', color: '#2f3a00', fontWeight: 900, fontSize: 14, padding: '12px 0', cursor: 'pointer' }}>{v.runAlarm.nextLabel || '次へ'}</button>}
-              </div>
-            </div>
-          </div>
-        )}
+        {!v.desk && this.renderRunAlarm(v)}
     </>);
   }
   /* PC の横画面（机）: 本棚・行動選択・実行中・ホーム・シャカを横に並べる。マイページなどは ☰ から、上に重ねて出す */
   renderDesk(v, st0) {
-    const col = (key, node, extra) => <div key={key} className={'desk-col desk-' + key} style={extra}>{node}</div>;
     const over = !v.deskBase; // 横に並べない画面（マイページ・起床/就寝の記録・週間レポートなど）
-    return (<>
-      <div className="desk-row">
-        <div className="desk-rail">
-          <button onClick={v.toggleDeskMenu} aria-label="メニュー" className="desk-burger"><span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 26, color: '#1b1b18' }}>{v.deskMenu ? 'close' : 'menu'}</span></button>
-          {v.deskMenu && <>
-            <div onClick={v.toggleDeskMenu} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-            <div className="desk-menu">
-              <button onClick={() => { this.set({ deskMenu: false }); v.goMypage(); }}><span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20 }}>person</span>マイページ</button>
-            </div>
-          </>}
+    const railTop = (<>
+      <button onClick={v.toggleDeskMenu} aria-label="メニュー" className="desk-burger"><span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 26, color: '#1b1b18' }}>{v.deskMenu ? 'close' : 'menu'}</span></button>
+      {v.deskMenu && <>
+        <div onClick={v.toggleDeskMenu} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+        <div className="desk-menu">
+          <button onClick={() => { this.set({ deskMenu: false }); v.goMypage(); }}><span style={{ fontFamily: 'Material Symbols Rounded', fontSize: 20 }}>person</span>マイページ</button>
         </div>
-        {col('book', <Bookshelf v={v} />)}
-        {v.isRecord && col('record', <Record v={v} />, { background: '#fff' })}
-        {v.run && col('run', <Run v={{ ...v, isRun: true }} />)}
-        {col('home', <Home v={v} />)}
-        {col('shaka', <Shaka v={v} />)}
-      </div>
+      </>}
+    </>);
+    const cols = [
+      { key: 'book', label: '本棚', icon: 'auto_stories', avail: true, node: <Bookshelf v={v} /> },
+      { key: 'record', label: '行動選択', icon: 'edit_note', avail: v.isRecord, node: v.isRecord ? <Record v={v} /> : null, style: { background: '#fff' } },
+      { key: 'run', label: '実行中', icon: 'timer', avail: !!v.run, node: v.run ? <Run v={{ ...v, isRun: true }} /> : null },
+      { key: 'home', label: 'ホーム', icon: 'home', avail: true, node: <Home v={v} /> },
+      { key: 'shaka', label: 'シャカ', icon: 'blur_on', avail: true, node: <Shaka v={v} /> },
+    ];
+    return (<>
+      <Desk cols={cols} railTop={railTop} runAlarm={this.renderRunAlarm(v)} />
       {over && (
         <div className="desk-over" onClick={() => { if (v.isMypage) v.goHome(); }}>
           <div className="desk-panel" onClick={(e) => e.stopPropagation()}>
