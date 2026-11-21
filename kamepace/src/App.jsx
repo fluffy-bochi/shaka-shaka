@@ -38,6 +38,7 @@ import { WakeCheck, WakeReview, WakePlan, BedCheck, BedReview } from './screens/
 import { predictUnits, pastHide, consumedToday } from './predict';
 import { daySummary, reviewLine, planLine, homeLine, tapLine } from './wake';
 import { buildWeek } from './weekly';
+import * as Weather from './weather';
 import WeekReport from './screens/WeekReport';
 import { TAP_ANNOY_FROM, TAP_ANNOY_WINDOW_SEC } from './serifu';
 import Shaka from './screens/Shaka';
@@ -1057,6 +1058,21 @@ export default class App extends React.Component {
   };
   cancelCycle = () => this.set({ cycForm: null, screen: this.state.cycFromOnboard ? 'onboard' : 'mypage' });
   disableCycle = () => { this.set({ cycle: { ...(this.state.cycle || {}), enabled: false }, cycForm: null, screen: 'mypage' }); this.save(); };
+
+  /* 天気（マイページで選んだ地域）。足りない日は取りに行き、取れたら描き直す */
+  setWeatherArea = (id) => {
+    const prefs = { ...(this.state.prefs || {}) };
+    if (id) prefs.weatherArea = id; else delete prefs.weatherArea;
+    this.set({ prefs });
+    this.save();
+  };
+  weatherOn = (dates) => {
+    const id = (this.state.prefs || {}).weatherArea;
+    if (!id) return null;
+    Weather.ensure(id, dates, this._weatherDone);
+    return dates.map(d => Weather.get(id, d));
+  };
+  _weatherDone = () => { if (!this._unmounted) this.forceUpdate(); };
 
   setPref = (name, val) => {
     const k = normTitle(name);
@@ -5458,6 +5474,7 @@ export default class App extends React.Component {
         const n = rs ? Math.round((d - strToDate(rs)) / 86400000) + 1 : firsts.length ? Math.round((d - strToDate(firsts[0])) / 86400000) + 1 : 1;
         return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + '日月火水木金土'[d.getDay()] + '曜日 ' + Math.max(1, n) + '日目';
       })(),
+      wakeWeather: (st.screen.startsWith('wake') || st.screen.startsWith('bed')) ? (this.weatherOn([st.screen.startsWith('bed') ? (st.bedTarget || st.bedDay || this.bedDay()) : this.wakeTargetDay()]) || [])[0] || null : null,
       isShaka: this.isShakaView(st), isMypage: st.screen === 'mypage',
       // Galaxy Z Flip 用（開発者モードだけ）
       foldSplit: this.isFoldSplit(st), flipKind: (this._flip && this._flip.kind) || null, flip: this._flip || {},
@@ -5473,6 +5490,7 @@ export default class App extends React.Component {
       isBookshelf: st.screen === 'bookshelf',
       isWeekReport: st.screen === 'weekReport',
       weekReport: st.screen === 'weekReport' && st.weekReportKey ? buildWeek(st, st.weekReportKey, { wakeOn: (d) => this.wakeOn(d), items: this.allItems(), today: todayStr() }) : null,
+      weekWeather: st.screen === 'weekReport' && st.weekReportKey ? this.weatherOn([0, 1, 2, 3, 4, 5, 6].map(i => shiftDate(st.weekReportKey, i))) : null,
       weekReportFrom: st.weekReportFrom, closeWeekReport: this.closeWeekReport, setWeekEval: this.setWeekEval,
       openWeekReport: this.openWeekReport, setWeekGoalAct: this.setWeekGoalAct,
       goalActCats: ['weekReport', 'home', 'wake3'].includes(st.screen) ? this.goalActCats() : [],
@@ -5649,6 +5667,7 @@ export default class App extends React.Component {
       sensSub: '体×' + (st.bodyFatCoef || 1).toFixed(2) + ' ・ 心×' + (st.mindFatCoef || 1).toFixed(2),
       goSlotTimes: this.goSlotTimes, goCatsManage: this.goCatsManage,
       goTemplates: this.goTemplates, goSensitivity: this.goSensitivity,
+      weatherArea: (st.prefs || {}).weatherArea || '', weatherAreas: Weather.AREAS, setWeatherArea: this.setWeatherArea,
       catPalette: st.catPalette, setCatSoft: () => this.setCatPalette('soft'), setCatVivid: () => this.setCatPalette('vivid'),
       chara: Ikoi.getChara(), charas: Ikoi.CHARAS, setChara: (id) => Ikoi.setChara(id), // ホームなどのキャラクター（いこいさん／やるきーぬ）
       homeMotion: st.homeMotion, setMotionFixed: () => this.setMotion(false), setMotionMove: () => this.setMotion(true),

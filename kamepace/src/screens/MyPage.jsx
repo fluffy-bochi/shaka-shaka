@@ -273,6 +273,18 @@ export default function MyPage({ v }) {
             </div>
           </div>
           <div style={row(true)}>
+            <span style={{ fontSize: 16 }}>🌤️</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14 }}>天気の地域</div>
+              <div style={{ ...mono, fontSize: 10.5, color: '#8a8a82', marginTop: 1 }}>天気: Open-Meteo.com</div>
+            </div>
+            <select value={v.weatherArea} onChange={(e) => v.setWeatherArea(e.target.value)} aria-label="天気の地域"
+              style={{ flex: '0 0 auto', border: 'none', borderRadius: 10, background: '#efece3', padding: '7px 10px', fontSize: 13, fontWeight: 700, color: '#1b1b18', fontFamily: 'inherit' }}>
+              <option value="">表示しない</option>
+              {v.weatherAreas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </div>
+          <div style={row(true)}>
             <span style={{ fontSize: 16 }}>🎨</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14 }}>カテゴリの色</div>

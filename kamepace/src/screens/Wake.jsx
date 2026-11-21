@@ -20,7 +20,23 @@ const btnMain = (on = true) => ({ flex: 1, border: 'none', borderRadius: 16, bac
 const btnSub = { flex: '0 0 34%', border: '2px solid #e4e1d8', borderRadius: 16, background: '#fff', color: '#55554e', fontWeight: 700, fontSize: 16, padding: '15px 0', cursor: 'pointer' };
 
 function Head({ v }) {
-  return <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, padding: '16px 20px 10px' }}>{v.wakeHeader}</div>;
+  return (
+    <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, padding: '16px 20px 10px' }}>
+      {v.wakeHeader}
+      {v.wakeWeather && <Weather w={v.wakeWeather} />}
+    </div>
+  );
+}
+
+/* 天気: 晴れ・曇り・雨・雪と最高／最低気温（マイページで地域を選んだときだけ） */
+export function Weather({ w, size = 18, style }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4, fontSize: 12.5, fontWeight: 700, color: '#55554e', ...style }}>
+      {w.glyph && <Emo e={w.glyph} size={size} />}
+      <span>{w.name}</span>
+      {w.max != null && <span style={mono}><span style={{ color: '#e0603a' }}>{w.max}°</span> / <span style={{ color: '#3a7bd5' }}>{w.min}°</span></span>}
+    </div>
+  );
 }
 
 /* 詳細の中の「いまの調子」（バフ・デバフ）: なし／軽い／ふつう／強い */
