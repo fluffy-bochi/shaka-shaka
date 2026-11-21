@@ -4189,6 +4189,7 @@ export default class App extends React.Component {
       canAct: () => this.isShakaView() && this.state.dayOffset === 0 && !this.state.predictOpen,
       onTapped: () => { if (this._desk) this.tapCharacter(); }, // 机の画面: なでると（タッチすると）ホームのひとことが変わる
     });
+    if (this._dogAway && this._desk) this._dogRoam.away(true, true); // 実行中の画面に行っているあいだは、作り直してもいないまま
     // 机の画面: やるきーぬがホームのひとことをしゃべる（犬の右上の吹き出し）
     if (this._dogSay) { this._dogSay.remove(); this._dogSay = null; }
     if (this._desk) {
@@ -4199,11 +4200,18 @@ export default class App extends React.Component {
       this._dogSay = say; this._dogSayT = null; this._dogSayW = W; this._dogSayH = H;
     }
   }
+  /* PC: 実行中の画面でやるきーぬを見せるあいだ、シャカの犬は左へ出ていく（もどったら左から入ってくる） */
+  setRunDogShown = (on) => {
+    const a = !!on && !!this._desk;
+    if (a === !!this._dogAway) return;
+    this._dogAway = a;
+    if (this._dogRoam) this._dogRoam.away(a);
+  };
   // 吹き出しを犬の右上に（右にはみ出すときは左上）。セリフが変わったら入れかえる
   _moveDogSay(p) {
     const say = this._dogSay; if (!say || !p) return;
-    const t = this._dogLine || '';
-    if (say._t !== t) { say._t = t; say.textContent = t; say.style.display = t ? '' : 'none'; say.style.animation = 'none'; void say.offsetWidth; say.style.animation = 'bubbleIn .18s ease-out'; }
+    const t = p.gone || p.moving ? '' : (this._dogLine || ''); // 出入りの途中はしゃべらない
+    if (say._t !== t) { say._t = t; say.textContent = t; say.style.display = t ? '' : 'none'; if (t) { say.style.animation = 'none'; void say.offsetWidth; say.style.animation = 'bubbleIn .18s ease-out'; } }
     if (!t) return;
     const W = this._dogSayW, H = this._dogSayH, bw = say.offsetWidth, bh = say.offsetHeight;
     const rightX = p.x + p.w * 0.3, leftX = p.x - p.w * 0.3 - bw;
@@ -5592,7 +5600,7 @@ export default class App extends React.Component {
     return {
       screenBg: st.screen === 'record' ? '#ffffff' : '#f7f4ec',
       isHome: (st.screen === 'home' || this.isFoldSplit(st)), isRecord: st.screen === 'record',
-      desk: this.isDesk(st), deskBase: this.isDesk(st) && this.isDeskBase(st), deskMenu: !!st.deskMenu, toggleDeskMenu: () => this.set({ deskMenu: !st.deskMenu }),
+      setRunDogShown: this.setRunDogShown, desk: this.isDesk(st), deskBase: this.isDesk(st) && this.isDeskBase(st), deskMenu: !!st.deskMenu, toggleDeskMenu: () => this.set({ deskMenu: !st.deskMenu }),
       isWake: ['wake1', 'wake2', 'wake3'].includes(st.screen), isWake1: st.screen === 'wake1', isWake2: st.screen === 'wake2', isWake3: st.screen === 'wake3',
       isBed1: st.screen === 'bed1', isBed2: st.screen === 'bed2', isBed: ['bed1', 'bed2'].includes(st.screen),
       bedDraft: st.bedDraft, setBedDraft: this.setBedDraft, finishBed1: this.finishBed1, goBed: this.goBed, goBed2: this.goBed2,

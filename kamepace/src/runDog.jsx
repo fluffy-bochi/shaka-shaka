@@ -37,15 +37,16 @@ const PROP = {
   above: { left: '82%', top: '4%', size: 0.24, z: 2, anim: 'runDogFloat 2.4s ease-in-out infinite' },
 };
 
-export default function RunDog({ c, height = 170 }) {
+export default function RunDog({ c, height = 170, walkIn = false }) {
   const d = runDogOf(c);
   const P = PROP[d.prop];
   const sz = P ? Math.round(height * P.size) : 0;
   return (
     <div style={{ height, display: 'flex', justifyContent: 'center' }}>
       <div style={{ position: 'relative', height }}>
-        <div style={{ position: 'relative', zIndex: 1 }}><DogModel base={d.m} style={{ height }} /></div>
-        {P && (
+        {/* walkIn: PCで右から歩いて入ってくるあいだは、左を向いて歩く（小道具は持たない） */}
+        <div style={{ position: 'relative', zIndex: 1 }}><DogModel base={walkIn ? 'walk' : d.m} turn={walkIn ? -0.95 : 0} style={{ height }} /></div>
+        {P && !walkIn && (
           <div style={{ position: 'absolute', left: P.left, top: P.top, bottom: P.bottom, zIndex: P.z, transform: 'translateX(-50%)', pointerEvents: 'none' }}>
             <div style={{ animation: P.anim }}><Emo e={d.g} size={sz} /></div>
           </div>

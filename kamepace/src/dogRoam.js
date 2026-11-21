@@ -229,6 +229,23 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
   /* ---- 毎フレーム ---- */
   const update = () => {
     const now = performance.now(), dt = Math.min(0.05, (now - st.last) / 1000); st.last = now;
+    // 出かけている（PCで実行中の画面に行っている）: 何もしない・見せない
+    if (st.gone) return { x: -dogW, y: st.y, w: dogW, h: dogH, gone: true };
+    // 左へ歩いて出ていく／左から歩いて入ってくる（PC: 実行中の画面へ行き来する）
+    if (st.act && (st.act.k === 'leave' || st.act.k === 'enter')) {
+      const a = st.act, dir = a.k === 'leave' ? -1 : 1;
+      if (st.live) hideLive(); st.off = false;
+      const v = WALK * 1.5 * W * dt * gait('walk');
+      st.x += dir * v;
+      const ty = dogSurf(); if (!st.ready) { st.y = ty; st.ready = true; } else st.y += (ty - st.y) * Math.min(1, dt * 7);
+      if (a.k === 'leave' && st.x < -dogW * 0.6) {
+        st.gone = true; st.act = null; el.style.display = 'none';
+        if (inWorld) { Matter.World.remove(engine.world, body); inWorld = false; }
+        return { x: -dogW, y: st.y, w: dogW, h: dogH, gone: true };
+      }
+      if (a.k === 'enter' && st.x >= a.tx) { st.x = a.tx; done('wave'); }
+      return { ...place(true), moving: true };
+    }
     const active = canAct();
     if (!active) { if (st.live) hideLive(); st.off = false; st.offAt = 0; return place(); }
     // 目が画面の上から出たら中継（出ているあいだずっと）。もどったらしまう
@@ -312,8 +329,8 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
     st.rollY = rollY;
     return place();
   };
-  const place = () => {
-    const x = clampX(st.x);
+  const place = (free) => {
+    const x = free ? st.x : clampX(st.x); // 出入りのときは箱の外まで
     const y = Math.min(H + dogH * 0.2, st.y + dogH * st.dig * 0.85 + (st.rollY || 0)) + st.jy;
     el.style.transform = `translate(${x - dogW / 2}px, ${y - dogH}px)` + (st.rot ? ` rotate(${st.rot}rad)` : '');
     // 物理の体も同じ場所へ。動いたら近くの眠っている絵文字を起こす（起こさないと押しのけられない）
@@ -329,7 +346,7 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
         if (now - st.wakeAt > 400) { st.wakeAt = now; wake(); }
       }
     }
-    return { x, y, w: dogW, h: dogH, buried: st.buried, dig: st.dig, live: !!st.live, off: st.off, busy: !!st.act };
+    return { x, y, w: dogW, h: dogH, buried: st.buried, dig: st.dig, live: !!st.live, off: st.off, busy: !!st.act, gone: false };
   };
 
   return {
@@ -339,6 +356,20 @@ export function createDogRoam({ box, engine, W, H, r, dogH, pile, glyphs = () =>
     /* シャカシャカ: ぴょーんと飛ばされてくるっと回る */
     jolt() { if (st.off) return; if (st.act && st.act.k === 'dig') { st.dig = 0; setBuried(false); } st.act = { k: 'jump' }; face(0); st.jv = -rnd(700, 950); st.jy = -1; st.spin = (Math.random() < 0.5 ? -1 : 1) * rnd(8, 11); },
     busy: () => !!st.act || st.off || st.petting,
+    /* PC: 実行中の画面でやるきーぬを見せるあいだは、左へ歩いて出ていく（now＝すぐ消える）。もどるときは左から歩いて入ってくる */
+    away(on, now) {
+      if (on) {
+        if (st.gone || (st.act && st.act.k === 'leave')) return;
+        if (st.act && st.act.k === 'dig') { st.dig = 0; setBuried(false); }
+        st.jy = 0; st.jv = 0; st.rot = 0; st.petting = false;
+        if (now) { st.gone = true; st.act = null; el.style.display = 'none'; if (inWorld) { Matter.World.remove(engine.world, body); inWorld = false; } return; }
+        st.act = { k: 'leave' }; face(-1); ctl.setBase('walk', true);
+      } else {
+        if (!st.gone) { if (st.act && st.act.k === 'leave') { st.act = { k: 'enter', tx: Math.max(st.x, W * 0.28) }; face(1); } return; } // 出ていく途中なら引き返す
+        st.gone = false; el.style.display = ''; st.x = -dogW * 0.6; st.ready = false;
+        st.act = { k: 'enter', tx: W * 0.28 }; face(1); ctl.setBase('walk', true);
+      }
+    },
     dispose() { window.removeEventListener('pointermove', onPtr); window.removeEventListener('pointerdown', onTap); if (st.live) { const L = st.live; st.live = null; clearInterval(L.typeT); L.fc.dispose(); L.wrap.remove(); } if (inWorld) Matter.World.remove(engine.world, body); ctl.dispose(); el.remove(); },
   };
 }
