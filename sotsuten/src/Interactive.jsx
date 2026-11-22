@@ -9,7 +9,7 @@ import HomeEx from './screens/HomeEx'; // 卒展のホーム（Figma 卒展/ホ�
 import Bookshelf from './screens/Bookshelf';
 import Record, { actDrop } from './screens/Record';
 import QRCode from 'qrcode';
-import { watchPostsKeep, postDrop, makeToken } from './posts';
+import { watchPostsKeep, postDrop, makeToken, nfcCode } from './posts';
 import { addPost, addRecord, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
 import { homeLine } from './wake';
 import { strToDate, formatDateShort, tsToHmOn } from './model';
@@ -89,7 +89,8 @@ export default function Interactive() {
   const [qr, setQr] = React.useState('');
   // ゲージの日付と大きい時計（本体のシャカ画面と同じ）
   const [clock, setClock] = React.useState(() => tsToHmOn(todayStr(), Date.now()));
-  React.useEffect(() => { const t = setInterval(() => setClock(tsToHmOn(todayStr(), Date.now())), 1000); return () => clearInterval(t); }, []);
+  const [nfc, setNfc] = React.useState(() => nfcCode()); // NFCタグから開いたスマホに入れてもらうあいことば（1分ごと）
+  React.useEffect(() => { const t = setInterval(() => { setClock(tsToHmOn(todayStr(), Date.now())); setNfc(nfcCode()); }, 1000); return () => clearInterval(t); }, []);
   // 音が出せるか（再読み込みのあと一度も操作がないと出せない）。出せないときだけバーに🔇
   const [sound, setSound] = React.useState(false);
   React.useEffect(() => { const t = setInterval(() => setSound(soundReady()), 1000); return () => clearInterval(t); }, []);
@@ -415,6 +416,8 @@ export default function Interactive() {
         <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, background: '#fff', borderRadius: 14, padding: '8px 8px 6px', boxShadow: '0 2px 10px rgba(27,27,24,.12)', textAlign: 'center', pointerEvents: 'none' }}>
           <img src={qr} alt="" style={{ display: 'block', width: 112, height: 112 }} />
           <div style={{ fontSize: 11, fontWeight: 800, marginTop: 4 }}>スマホでつぶやく</div>
+          <div style={{ fontSize: 10, fontWeight: 800, marginTop: 6, color: '#55554e' }}>あいことば</div>
+          <div style={{ fontFamily: "'Space Mono',monospace", fontSize: 24, fontWeight: 700, lineHeight: 1.1, letterSpacing: '.12em' }}>{nfc}</div>
         </div>
       )}
       {tab !== 'gauge' && pendingN > 0 && (
