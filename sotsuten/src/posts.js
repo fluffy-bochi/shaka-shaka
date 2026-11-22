@@ -83,6 +83,17 @@ export function tokenTime(tok) {
   return Number.isFinite(sec) ? sec * 1000 : null;
 }
 
+/* NFCタグ用のあいことば: 展示の画面に1分ごとに変わる3桁を出し、タグから開いたスマホで入れてもらう（画面を見ている人だけが投稿できる） */
+export const NFC_PERIOD_MS = 60000;
+export function nfcCode(at = Date.now()) {
+  let h = (Math.floor(at / NFC_PERIOD_MS) ^ TK) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0; h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0; h = (h ^ (h >>> 16)) >>> 0;
+  return String(h % 1000).padStart(3, '0');
+}
+export function nfcCodeOk(code, now = Date.now()) { // 今・1つ前・1つ後（時計のずれ）まで
+  return [-1, 0, 1].some(k => nfcCode(now + k * NFC_PERIOD_MS) === code);
+}
+
 /* 投稿 → 落とす絵文字と数（回復ならマイナス） */
 export function postDrop(d) {
   const f = FACES.find(x => x.face === d.face) || FACES[2];
