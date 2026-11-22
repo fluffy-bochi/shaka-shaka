@@ -6,6 +6,7 @@ import { Post } from './screens/Home';
 const APP_URL = 'https://shaka-shaka.vercel.app'; // ほどほどふぉーと（Webアプリ）
 const SESSION_KEY = 'kame_post_session';
 const SESSION_MS = 10 * 60000; // QRから開いてこの時間投稿しなかったら、ありがとうの画面へ
+const NFC_TOKEN = 'nfc'; // 展示のNFCタグに書くURL: /?post=nfc
 
 /* 投稿できるか: 展示のQRコードのしるし（作った時刻入り）が新しいときだけ、新しい回を始める。
    開いたらしるしはURLから消す（リロード・URLの共有・直リンクではもう投稿できない）。
@@ -14,7 +15,12 @@ function startSession() {
   const load = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { return null; } };
   let ses = load();
   const tok = new URLSearchParams(location.search).get('post');
-  if (tok) {
+  if (tok === NFC_TOKEN) { // NFCタグ（URLは変わらない）: タッチするたびに新しい回。ただし開いて10分以内は前の回のまま（連打で何回も投稿しない）
+    const now = Date.now();
+    if (!ses || ses.tok !== NFC_TOKEN || now - ses.openedAt >= SESSION_MS) ses = { tok, openedAt: now, posted: null };
+    try { localStorage.setItem(SESSION_KEY, JSON.stringify(ses)); } catch (e) { /* ignore */ }
+    try { history.replaceState(null, '', location.pathname + '?post'); } catch (e) { /* ignore */ }
+  } else if (tok) {
     const t = tokenTime(tok), now = Date.now();
     const fresh = t != null && now - t <= TOKEN_FRESH_MS && t - now <= 2 * 60000; // スマホの時計のずれも少し見る
     if (fresh && (!ses || ses.tok !== tok)) ses = { tok, openedAt: now, posted: null };
