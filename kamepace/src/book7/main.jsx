@@ -31,6 +31,9 @@ CATS.forEach(c => c.items.forEach(it => {
   (NAMES[it.glyph] = NAMES[it.glyph] || []).includes(it.name) || NAMES[it.glyph].push(it.name);
   if (FH[it.glyph] == null) FH[it.glyph] = it.fh;
 }));
+// がんばりタイプ（アプリの起床後の記録と同じ区切り：0〜40 ゆったり／41〜80 ほどほど／81〜 みちみち）。ここでは置いた個数で決める
+const TYPES = [{ name: 'ゆったり', glyph: '🌿', color: '#4f9a5a' }, { name: 'ほどほど', glyph: '☀️', color: '#c58b00' }, { name: 'みちみち', glyph: '🔥', color: '#e0402a' }];
+const typeOf = (n) => TYPES[n <= 40 ? 0 : n <= 80 ? 1 : 2];
 const nameOf = (g) => (NAMES[g] || []).join('・');
 
 const loadSaved = () => {
@@ -38,7 +41,7 @@ const loadSaved = () => {
     const x = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (x && Array.isArray(x.days) && x.days.length === 7) return x;
   } catch (e) { /* ignore */ }
-  return { page: { w: 90, h: 160 }, days: DAYS.map(() => []) };
+  return { page: { w: 90, h: 160 }, days: DAYS.map(() => []), memo: DAYS.map(() => '') };
 };
 
 /* ---- 1日ぶんの箱（物理はかんたんに：床と左右の壁だけ。上は空いていて、あふれた分は箱の外に積もって見えない） ---- */
@@ -103,7 +106,7 @@ function useBoxSize(page) {
   const calc = () => {
     const availW = window.innerWidth - 300 - 24 * 2 - 12 * 6;
     let w = availW / 7, h = w * page.h / page.w;
-    const maxH = window.innerHeight - 150;
+    const maxH = window.innerHeight - 290; // 下にタイプとメモ
     if (h > maxH) { h = maxH; w = h * page.w / page.h; }
     return { w: Math.floor(w), h: Math.floor(h) };
   };
@@ -135,6 +138,8 @@ function App() {
   const [mode, setMode] = React.useState('add'); // add | del
   const [extra, setExtra] = React.useState('');
   const [ver, setVer] = React.useState(0);
+  const [memo, setMemo] = React.useState(() => DAYS.map((_, i) => (saved.current.memo || [])[i] || ''));
+  const memoRef = React.useRef(memo); memoRef.current = memo;
   const sz = useBoxSize(page);
   const boxEls = React.useRef([]);
   const boxes = React.useRef([]);
@@ -144,7 +149,7 @@ function App() {
 
   const save = () => {
     if (!boxes.current.length) return;
-    saved.current = { page, days: boxes.current.map(b => b.dump()) };
+    saved.current = { page, days: boxes.current.map(b => b.dump()), memo: memoRef.current };
     try { localStorage.setItem(KEY, JSON.stringify(saved.current)); } catch (e) { /* ignore */ }
   };
 
@@ -164,7 +169,7 @@ function App() {
     const iv = setInterval(save, 1000);
     return () => { cancelAnimationFrame(raf); clearInterval(iv); save(); };
   }, [sz.w, sz.h]); // eslint-disable-line react-hooks/exhaustive-deps
-  React.useEffect(() => { save(); }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { save(); }, [page, memo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onBoxDown = (i) => (e) => {
     const b = boxes.current[i]; if (!b) return;
@@ -195,6 +200,8 @@ function App() {
     ...glyphs.map(g => [g, nameOf(g), ...counts.map(m => m[g] || 0), total(g)]),
     ['合計', '', ...dayTotal, all],
     ['満杯(125)に対する割合', '', ...dayTotal.map(n => Math.round(n / FILL * 100) + '%'), ''],
+    ['タイプ', '', ...dayTotal.map(n => typeOf(n).name), ''],
+    ['メモ', '', ...memo, ''],
   ]);
   const csvPlace = () => {
     const rows = [['曜日', '絵文字', '行動', '中心x(mm)', '中心y(mm・上から)', '直径(mm)', '回転(度)', 'ページ内']];
@@ -299,6 +306,11 @@ function App() {
               </div>
               <div ref={el => { boxEls.current[i] = el; }} className={'b7-box' + (mode === 'del' ? ' del' : '')} onPointerDown={onBoxDown(i)} onContextMenu={onCtx(i)}
                 style={{ position: 'relative', width: sz.w, height: sz.h, background: '#fbfaf5', border: '1px solid #cfcabb', borderRadius: 6, overflow: 'hidden', cursor: mode === 'add' ? 'copy' : 'default', userSelect: 'none', touchAction: 'none' }} />
+              {(() => { const t = typeOf(dayTotal[i] || 0); return (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 6, fontSize: 13, fontWeight: 900, color: t.color }}><Emo e={t.glyph} size={20} />{t.name}</div>
+              ); })()}
+              <textarea value={memo[i]} onChange={e => { const v = e.target.value; setMemo(m => m.map((x, k) => (k === i ? v : x))); }} placeholder="メモ"
+                style={{ width: '100%', height: 90, marginTop: 6, padding: '6px 8px', fontSize: 12.5, lineHeight: 1.5, fontFamily: 'inherit', border: '1px solid #d8d5cb', borderRadius: 6, background: '#fff', resize: 'vertical' }} />
             </div>
           ))}
         </div>
