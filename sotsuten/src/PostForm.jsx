@@ -1,13 +1,12 @@
 import React from 'react';
 import Emo from './fluent';
-import { FACES, TEXT_MAX, sendPost, tokenTime, TOKEN_FRESH_MS, nfcCodeOk } from './posts';
+import { FACES, TEXT_MAX, sendPost, tokenTime, TOKEN_FRESH_MS, NFC_KEY_LABEL } from './posts';
 import { Post } from './screens/Home';
 
 const APP_URL = 'https://shaka-shaka.vercel.app'; // ほどほどふぉーと（Webアプリ）
 const SESSION_KEY = 'kame_post_session';
 const SESSION_MS = 10 * 60000; // QRから開いてこの時間投稿しなかったら、ありがとうの画面へ
-const NFC_TOKEN = 'nfc'; // 展示のNFCタグに書くURL: /?post=nfc（開いたら展示の画面の3桁＝あいことばを入れる）
-const NFC_MISS_MAX = 3; // あいことばをこの回数まちがえたら、ありがとうの画面へ
+const NFC_TOKEN = 'nfc'; // 展示のNFCタグに書くURL: /?post=nfc（投稿は展示でキーを押したときだけ降る＝会場の外からは出ない）
 
 /* 投稿できるか: 展示のQRコードのしるし（作った時刻入り）が新しいときだけ、新しい回を始める。
    開いたらしるしはURLから消す（リロード・URLの共有・直リンクではもう投稿できない）。
@@ -18,7 +17,7 @@ function startSession() {
   const tok = new URLSearchParams(location.search).get('post');
   if (tok === NFC_TOKEN) { // NFCタグ（URLは変わらない）: タッチするたびに新しい回。ただし開いて10分以内は前の回のまま（連打で何回も投稿しない）
     const now = Date.now();
-    if (!ses || ses.tok !== NFC_TOKEN || now - ses.openedAt >= SESSION_MS) ses = { tok, openedAt: now, posted: null, nfc: true, ok: false, miss: 0 };
+    if (!ses || ses.tok !== NFC_TOKEN || now - ses.openedAt >= SESSION_MS) ses = { tok, openedAt: now, posted: null, nfc: true };
     try { localStorage.setItem(SESSION_KEY, JSON.stringify(ses)); } catch (e) { /* ignore */ }
     try { history.replaceState(null, '', location.pathname + '?post'); } catch (e) { /* ignore */ }
   } else if (tok) {
@@ -41,18 +40,9 @@ const line = { border: 'none', borderBottom: '1px solid #1b1b18', background: 't
 export default function PostForm() {
   const [face, setFace] = React.useState(3);
   const [text, setText] = React.useState('');
-  const [ses, setSes] = React.useState(startSession);
-  const canPost = !!ses && !ses.posted && Date.now() - ses.openedAt < SESSION_MS && !(ses.nfc && ses.miss >= NFC_MISS_MAX);
-  const [state, setState] = React.useState(canPost ? (ses.nfc && !ses.ok ? 'code' : 'edit') : 'done'); // code（NFC のあいことば）| edit …
-  const [code, setCode] = React.useState('');
-  const [codeBad, setCodeBad] = React.useState(false);
-  const onCode = (v) => {
-    v = v.replace(/\D/g, '').slice(0, 3); setCode(v); setCodeBad(false);
-    if (v.length < 3) return;
-    if (nfcCodeOk(v)) { const n = { ...ses, ok: true }; setSes(n); saveSession(n); setState('edit'); return; }
-    const n = { ...ses, miss: (ses.miss || 0) + 1 }; setSes(n); saveSession(n); setCode(''); setCodeBad(true);
-    if (n.miss >= NFC_MISS_MAX) setState('done');
-  }; // edit | confirm | sending | done | error
+  const [ses] = React.useState(startSession);
+  const canPost = !!ses && !ses.posted && Date.now() - ses.openedAt < SESSION_MS;
+  const [state, setState] = React.useState(canPost ? 'edit' : 'done'); // edit | confirm | sending | done | error // edit | confirm | sending | done | error
   const [err, setErr] = React.useState('');
   const [posted, setPosted] = React.useState(ses && ses.posted); // 送った投稿の見た目（送った時刻で固定）
   // 開いてから10分たったら、投稿していなくてもありがとうの画面へ
@@ -71,26 +61,16 @@ export default function PostForm() {
   const send = async () => {
     if (state !== 'confirm' || !ses || ses.posted || Date.now() - ses.openedAt >= SESSION_MS) { setState('done'); return; }
     setState('sending');
-    try { await sendPost({ face, text: text.trim() }); setPosted(preview); saveSession({ ...ses, posted: preview }); setState('done'); } catch (e) { setErr((e && e.code) || ''); setState('error'); }
+    try { await sendPost({ face, text: text.trim(), nfc: !!ses.nfc }); const pv = { ...preview, nfc: !!ses.nfc }; setPosted(pv); saveSession({ ...ses, posted: pv }); setState('done'); } catch (e) { setErr((e && e.code) || ''); setState('error'); }
   };
 
-  // NFCタグから開いたとき: 展示の画面の3桁を入れる
-  if (state === 'code') {
-    return (
-      <div style={{ minHeight: '100dvh', background: '#f7f4ec', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, padding: 'calc(72px + env(safe-area-inset-top)) 16px 40px' }}>
-        <div style={{ fontSize: 17, fontWeight: 900 }}>画面のあいことば</div>
-        <input value={code} onChange={(e) => onCode(e.target.value)} inputMode="numeric" pattern="[0-9]*" autoComplete="one-time-code" autoFocus maxLength={3}
-          style={{ ...line, width: 150, textAlign: 'center', fontSize: 44, fontWeight: 800, letterSpacing: '.3em', ...mono, borderBottom: '2px solid ' + (codeBad ? '#c0395e' : '#1b1b18') }} />
-        {codeBad && <div style={{ fontSize: 13, fontWeight: 700, color: '#c0395e' }}>ちがうみたい</div>}
-      </div>
-    );
-  }
   // 投稿後: 上から ありがとう → その人の投稿（展示のホームと同じ見た目・投稿していないときはなし） → Webアプリへの誘導
   if (state === 'done') {
     return (
       <div style={{ minHeight: '100dvh', background: '#f7f4ec', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22, padding: 'calc(56px + env(safe-area-inset-top)) 16px 40px' }}>
         <div style={{ fontSize: 24, fontWeight: 900 }}>ありがとう！</div>
         {posted && <div style={{ width: '100%', maxWidth: 420, borderTop: '1px solid #bab5a7', borderBottom: '1px solid #bab5a7' }}><Post p={posted} /></div>}
+        {posted && posted.nfc && <div style={{ fontSize: 15, fontWeight: 800, textAlign: 'center' }}>展示の<span style={{ background: '#c4f000', borderRadius: 6, padding: '2px 8px', margin: '0 4px' }}>{NFC_KEY_LABEL}</span>を押すと降ってくるよ</div>}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginTop: 10, background: '#fff', borderRadius: 20, padding: '20px 28px', boxShadow: '0 2px 10px rgba(27,27,24,.06)' }}>
           <img src="/icon/kamepace-icon-180.png" alt="" style={{ width: 64, height: 64, borderRadius: 15 }} />
           <div style={{ fontSize: 16, fontWeight: 900 }}>ほどほどふぉーと</div>
