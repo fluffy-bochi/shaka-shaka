@@ -35,8 +35,11 @@ export const MOODS = [
   { id: 'fun', g: '🎉', name: 'たのしかった' },
 ];
 
-export function sendPost({ face, mood, text }) { // mood（きもち）は今は送らない（前の形の投稿も読めるよう残す）
-  return addDoc(collection(db, COL), { face, mood: mood || '', text: (text || '').slice(0, TEXT_MAX), ts: serverTimestamp() });
+export const NFC_MOOD = 'nfc'; // NFCタグからの投稿のしるし（ルールで弾かれないよう、使っていない mood の欄に入れる）
+export const NFC_KEY_LABEL = 'スペースキー'; // 展示で受け取るキー（Interactive.jsx の Space）
+export const NFC_WAIT_MS = 5 * 60000; // NFCからの投稿は展示で受け取るまで待たせる。これより古いものは出さない
+export function sendPost({ face, mood, text, nfc }) { // mood（きもち）は今は送らない（前の形の投稿も読めるよう残す）
+  return addDoc(collection(db, COL), { face, mood: nfc ? NFC_MOOD : (mood || ''), text: (text || '').slice(0, TEXT_MAX), ts: serverTimestamp() });
 }
 
 /* since（ミリ秒）より後の投稿を受け取る。cb(id, data, tsMs) は新しい投稿ごと */
@@ -81,17 +84,6 @@ export function tokenTime(tok) {
   if (sum36(body) !== tok.slice(-1)) return null;
   const sec = parseInt(body.slice(0, -4), 36) ^ TK;
   return Number.isFinite(sec) ? sec * 1000 : null;
-}
-
-/* NFCタグ用のあいことば: 展示の画面に1分ごとに変わる3桁を出し、タグから開いたスマホで入れてもらう（画面を見ている人だけが投稿できる） */
-export const NFC_PERIOD_MS = 60000;
-export function nfcCode(at = Date.now()) {
-  let h = (Math.floor(at / NFC_PERIOD_MS) ^ TK) >>> 0;
-  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0; h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0; h = (h ^ (h >>> 16)) >>> 0;
-  return String(h % 1000).padStart(3, '0');
-}
-export function nfcCodeOk(code, now = Date.now()) { // 今・1つ前・1つ後（時計のずれ）まで
-  return [-1, 0, 1].some(k => nfcCode(now + k * NFC_PERIOD_MS) === code);
 }
 
 /* 投稿 → 落とす絵文字と数（回復ならマイナス） */

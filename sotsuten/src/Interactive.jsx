@@ -9,7 +9,7 @@ import HomeEx from './screens/HomeEx'; // 卒展のホーム（Figma 卒展/ホ�
 import Bookshelf from './screens/Bookshelf';
 import Record, { actDrop } from './screens/Record';
 import QRCode from 'qrcode';
-import { watchPostsKeep, postDrop, makeToken, nfcCode } from './posts';
+import { watchPostsKeep, postDrop, makeToken, NFC_MOOD, NFC_WAIT_MS } from './posts';
 import { addPost, addRecord, sampleFor, homeRows, slotNow, todayStr, shiftDate, WD, exhibitDayLabel } from './exhibit';
 import { homeLine } from './wake';
 import { strToDate, formatDateShort, tsToHmOn } from './model';
@@ -89,8 +89,7 @@ export default function Interactive() {
   const [qr, setQr] = React.useState('');
   // ゲージの日付と大きい時計（本体のシャカ画面と同じ）
   const [clock, setClock] = React.useState(() => tsToHmOn(todayStr(), Date.now()));
-  const [nfc, setNfc] = React.useState(() => nfcCode()); // NFCタグから開いたスマホに入れてもらうあいことば（1分ごと）
-  React.useEffect(() => { const t = setInterval(() => { setClock(tsToHmOn(todayStr(), Date.now())); setNfc(nfcCode()); }, 1000); return () => clearInterval(t); }, []);
+  React.useEffect(() => { const t = setInterval(() => setClock(tsToHmOn(todayStr(), Date.now())), 1000); return () => clearInterval(t); }, []);
   // 音が出せるか（再読み込みのあと一度も操作がないと出せない）。出せないときだけバーに🔇
   const [sound, setSound] = React.useState(false);
   React.useEffect(() => { const t = setInterval(() => setSound(soundReady()), 1000); return () => clearInterval(t); }, []);
@@ -298,18 +297,42 @@ export default function Interactive() {
   // ゲージ以外の画面のときは降らせずに待たせ、ゲージに戻ったら順番に降らせる（記録はすぐホームに入れる）
   const pendingRef = React.useRef([]);
   const [pendingN, setPendingN] = React.useState(0);
-  const receivePost = React.useCallback((id, d, ts) => {
+  // NFCタグからの投稿（mood=nfc）は、展示で受け取るキー（Space・PCはボタンも）を押すまで待たせる＝会場の外からの投稿は出ない。
+  // 押したときに待っているもの（NFC_WAIT_MS 以内）を全部受け取る。先に押していたら、30秒以内に届いたものはそのまま受け取る
+  const nfcWaitRef = React.useRef([]);
+  const nfcArmRef = React.useRef(0);
+  const [nfcN, setNfcN] = React.useState(0);
+  const receivePost = React.useCallback((id, d, ts, accepted) => {
     if (mineRef.current.some(e => e.gid === 'p' + id) || pendingRef.current.some(q => q.id === id)) return;
+    if (d.mood === NFC_MOOD && !accepted) {
+      if (Date.now() - ts > NFC_WAIT_MS || nfcWaitRef.current.some(q => q.id === id)) return;
+      if (Date.now() >= nfcArmRef.current) { nfcWaitRef.current.push({ id, d, ts, at: Date.now() }); setNfcN(nfcWaitRef.current.length); return; }
+    }
     const dr = postDrop(d), text = (d.text || '').trim();
     if (tabRef.current === 'gauge') fall(dr.g, dr.n, dr.rec, text);
     else { pendingRef.current.push({ id, dr, text }); setPendingN(pendingRef.current.length); }
     setMine(l => addPost(l, id, d, ts, dr));
   }, [fall]);
+  const acceptNfc = React.useCallback(() => {
+    const now = Date.now();
+    const q = nfcWaitRef.current.splice(0).filter(p => now - p.at <= NFC_WAIT_MS);
+    setNfcN(0);
+    if (!q.length) { nfcArmRef.current = now + 30000; return; }
+    q.forEach((p, i) => setTimeout(() => receivePost(p.id, p.d, p.ts, true), i * 900));
+  }, [receivePost]);
+  const acceptNfcRef = React.useRef(acceptNfc); acceptNfcRef.current = acceptNfc;
+  React.useEffect(() => { // 待ちすぎたものは捨てる
+    const t = setInterval(() => {
+      const now = Date.now(), l = nfcWaitRef.current, k = l.filter(p => now - p.at <= NFC_WAIT_MS);
+      if (k.length !== l.length) { nfcWaitRef.current = k; setNfcN(k.length); }
+    }, 10000);
+    return () => clearInterval(t);
+  }, []);
   React.useEffect(() => watchPostsKeep(postSince, receivePost, (e) => console.warn('[sotsuten] posts', e && e.code)), [postSince, receivePost]);
   // 確認用（URL に ?debug のときだけ）: window.__post('テキスト', 顔1〜5) でスマホの投稿が届いたのと同じ動き
   React.useEffect(() => {
     if (!new URLSearchParams(location.search).has('debug')) return undefined;
-    window.__post = (text, face = 3) => receivePost('debug' + Date.now(), { face, text }, Date.now());
+    window.__post = (text, face = 3, nfc = false) => receivePost('debug' + Date.now(), { face, text, mood: nfc ? NFC_MOOD : '' }, Date.now());
     window.__dog = (name, n = 2) => sim.current && sim.current.dogCtl.play(name, n); // モーションの確認
     window.__act = (k) => sim.current && sim.current.roam.force(k); // やるきーぬの動きの確認
     window.__fill = (n = 90, g = '💻') => { for (let i = 0; i < n; i++) setTimeout(() => fall(g, 1, false), i * 40); }; // 満杯の確認
@@ -340,6 +363,7 @@ export default function Interactive() {
     s.bodies.forEach(b => { Matter.World.remove(s.engine.world, b.body); b.el.remove(); });
     s.bubbles.forEach(q => q.el.remove()); s.bubbles = [];
     s.bodies = []; setCount(0); s.save();
+    nfcWaitRef.current = []; setNfcN(0); nfcArmRef.current = 0;
     setMine([]); setLastRec(null); setHomeDate(null); setBookFav({}); setBookDiary({}); setPostSince(Date.now()); // 次の来場者のために今日の記録も消す（前のスマホの投稿も受け取らない）
   };
 
@@ -356,6 +380,7 @@ export default function Interactive() {
       if (nav && !e.repeat) { e.preventDefault(); setTab(nav); return; }
       if ((e.code === 'KeyF' || e.key === 'f' || e.key === 'F') && !e.repeat) { e.preventDefault(); toggleFull(); return; }
       if ((e.code === 'KeyR' || e.key === 'r' || e.key === 'R') && !e.repeat) { e.preventDefault(); shake(); return; }
+      if ((e.code === 'Space' || e.key === ' ') && !e.repeat) { e.preventDefault(); acceptNfcRef.current(); return; } // NFCからの投稿を受け取る
       if (e.key === 'Escape' || e.key === 'Backspace') { // 戻る（コントローラーの B）: 前の日のホーム→今日／ホーム・本棚→ゲージ
         e.preventDefault();
         if (tabRef.current === 'home' && homeDateRef.current) setHomeDate(null);
@@ -416,9 +441,12 @@ export default function Interactive() {
         <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, background: '#fff', borderRadius: 14, padding: '8px 8px 6px', boxShadow: '0 2px 10px rgba(27,27,24,.12)', textAlign: 'center', pointerEvents: 'none' }}>
           <img src={qr} alt="" style={{ display: 'block', width: 112, height: 112 }} />
           <div style={{ fontSize: 11, fontWeight: 800, marginTop: 4 }}>スマホでつぶやく</div>
-          <div style={{ fontSize: 10, fontWeight: 800, marginTop: 6, color: '#55554e' }}>あいことば</div>
-          <div style={{ fontFamily: "'Space Mono',monospace", fontSize: 24, fontWeight: 700, lineHeight: 1.1, letterSpacing: '.12em' }}>{nfc}</div>
         </div>
+      )}
+      {pc && tab !== 'record' && (
+        <button onClick={(e) => { e.currentTarget.blur(); acceptNfc(); }} style={{ position: 'absolute', top: tab === 'gauge' && qr ? 178 : 12, right: 12, zIndex: 6, display: 'flex', alignItems: 'center', gap: 8, border: 'none', borderRadius: 999, background: nfcN ? '#1b1b18' : '#fff', color: nfcN ? '#fff' : '#1b1b18', padding: '8px 14px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', boxShadow: '0 2px 10px rgba(27,27,24,.12)' }}>
+          📱 受け取る{nfcN > 0 && <span style={{ background: '#c4f000', color: '#2f3a00', borderRadius: 999, minWidth: 20, padding: '0 6px', fontSize: 12 }}>{nfcN}</span>}<span className="keyhint">Space</span>
+        </button>
       )}
       {tab !== 'gauge' && pendingN > 0 && (
         <div style={{ position: 'absolute', left: '50%', top: 16, transform: 'translateX(-50%)', zIndex: 6, display: 'flex', alignItems: 'center', gap: 10, background: '#1b1b18', color: '#fff', borderRadius: 999, padding: '10px 20px', fontSize: 15, fontWeight: 800, whiteSpace: 'nowrap', boxShadow: '0 6px 18px rgba(27,27,24,.25)', pointerEvents: 'none' }}>
