@@ -22,8 +22,12 @@ const RULES = [
   [/風呂|入浴|シャワー|休憩|休む|のんびり|テレビ|動画|ゴロゴロ|昼休み|身支度|洗顔|歯/, 'relax', 'front'],
   [/考|悩|計画|予定を立て/, 'think', 'front'],
 ];
+/* 本の絵文字の行動（書く行動はのぞく）は、椅子にすわって本を読む（モデルに入っている本と椅子を出す・readbook） */
+const BOOK_GLYPH = /📖|📚|📕|📗|📘|📙|📓|📔|📒|📑|🔖|📰|🗞/u;
+const WRITE_NAME = /書く|書き|レポート|日記/;
 export function runDogOf(c) {
   const s = [c.name, c.cat].filter(Boolean).join(' ');
+  if (BOOK_GLYPH.test(c.glyph || '') && !WRITE_NAME.test(c.name || '')) return { m: 'readbook', prop: 'none', g: c.glyph };
   for (const [re, m, prop, g] of RULES) if (re.test(s)) return { m, prop, g: g || c.glyph };
   return { m: 'happy', prop: 'front', g: c.glyph };
 }
