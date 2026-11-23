@@ -1,5 +1,5 @@
 /* やるきーぬの3Dモデル（public/models/corgi_motions.glb）を el の中に表示する。
-   モーション: doya happy idle nod relax sad shake think walk wave
+   モーション: doya happy idle nod relax sad shake think walk wave readbook（椅子で本を読む・本と椅子もモデルに入っている）
    - いつもは base（ふだんは idle）をくり返し、play(name) でそのモーションを何回かやってから base にもどる
    - 背景は透明・カメラは正面に固定（さわっても回らない）
    - 読み込み中・失敗したとき・WebGL が使えないときは透過PNG（dog_3d.png）を出しておく
@@ -75,10 +75,17 @@ const POSES = {
       'arm.L': { r: arm(bp, 0.55 * s) }, 'arm.R': { r: arm(bp, -0.55 * s) },
       'foot.L': { r: [-0.5 * s, 0, 0] }, 'foot.R': { r: [0.5 * s, 0, 0] }, tail: { r: [0.3, 0.5 * s, 0] } }; } },
 };
-function makeClips(THREE, model) {
+function makeClips(THREE, model, gltf) {
   const bones = []; model.traverse(o => { if (o.isBone) bones.push(o); });
   const key = (n) => n.replace(/[.\s]/g, ''); // three.js は名前の「.」を消す（arm.L → armL）
   const rest = Object.fromEntries(bones.map(b => [b.name, { q: b.quaternion.clone(), p: b.position.clone(), s: b.scale.clone() }]));
+  // まぶた（lid）は休みの姿勢だと目の上にまつげが出るので、idle の最初の形（開き切って頭の中に隠れた形）をもとにする
+  const idle = gltf.animations.find(c => c.name === 'idle');
+  bones.forEach(b => {
+    if (!/^lid[LR]$/.test(key(b.name)) || !idle) return;
+    const t = idle.tracks.find(t => t.name === b.name + '.quaternion');
+    if (t) rest[b.name].q.set(t.values[0], t.values[1], t.values[2], t.values[3]);
+  });
   const qd = new THREE.Quaternion(), e = new THREE.Euler();
   return Object.entries(POSES).map(([name, { dur, f }]) => {
     const N = 24, times = [], tr = {};
@@ -156,7 +163,11 @@ export function mountDog(el, { base = 'idle', wide = 1, frame = 'body' } = {}) {
     const fixEyes = eyeFixer(model, gltf);
     const acts = {};
     gltf.animations.forEach(c => { acts[c.name] = mixer.clipAction(c); });
-    makeClips(THREE, model).forEach(c => { acts[c.name] = mixer.clipAction(c); }); // dig ball nap crawl
+    makeClips(THREE, model, gltf).forEach(c => { acts[c.name] = mixer.clipAction(c); }); // dig ball nap crawl
+    // 本と椅子（readbook のときだけ出す）。ほかのモーションでは隠す
+    const props = []; model.traverse(o => { if (/^(book_rig|chair)$/.test(o.name)) props.push(o); });
+    props.forEach(p => { p.visible = false; });
+    let readK = 0; // readbook の出ぐあい（0〜1）。すわって椅子のぶん背が高くなるので、そのぶん小さくして枠に入れる
     let cur = null, curAt = 0, baseName = null, onceT = 0, oneShot = false, yaw = 0;
     const go = (name, times) => {
       const a = acts[name] || acts.idle; if (!a) return;
@@ -181,8 +192,18 @@ export function mountDog(el, { base = 'idle', wide = 1, frame = 'body' } = {}) {
     if (want.once) api.play(want.once.name, want.once.times);
     if (want.yaw != null) { yaw = want.yaw; model.rotation.y = yaw; }
     mixer.update(0); fixEyes();
-    // 正面から全身が入るように（体を動かす分すこし余白）。大きさは idle の最初のポーズで決める
+    // 正面から全身が入るように（体を動かす分すこし余白）。大きさは idle の最初のポーズで決める（本と椅子は入れない）
+    const parents = props.map(p => p.parent); props.forEach(p => p.parent && p.parent.remove(p));
     const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+    props.forEach((p, i) => parents[i] && parents[i].add(p));
+    const READ_S = 3.11 / 3.534; // idle の高さ ÷ 椅子にすわった読書の高さ（Blender で測った値）
+    const propsTick = (st) => {
+      const want = cur && cur.getClip().name === 'readbook' ? 1 : 0;
+      readK += (want - readK) * Math.min(1, st * 6);
+      const s = 1 + (READ_S - 1) * readK; model.scale.setScalar(s);
+      const show = readK > 0.5; props.forEach(p => { p.visible = show; });
+    };
+    propsTick(1);
     const camera = new THREE.PerspectiveCamera(20, 1, 0.01, 100);
     const fit = () => {
       const w = el.clientWidth || 1, h = el.clientHeight || 1;
@@ -210,7 +231,7 @@ export function mountDog(el, { base = 'idle', wide = 1, frame = 'body' } = {}) {
       acc += dt;
       if (acc < 1 / 31) return; // 30コマ/秒
       const st = Math.min(acc, 0.1);
-      mixer.update(st); fixEyes(); acc = 0;
+      mixer.update(st); fixEyes(); propsTick(st); acc = 0;
       model.rotation.y += (yaw - model.rotation.y) * Math.min(1, st * 7);
       draw();
     };
