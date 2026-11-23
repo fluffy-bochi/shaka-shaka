@@ -119,6 +119,30 @@ function AlarmRow({ label, a, onMode, onAt, onMin, top }) {
   );
 }
 
+/* 回数（筋トレなど）: いまのセット（ラップ）の回数を −／＋ と直接入力で。2セット目からは合計と内訳も */
+function RepsCounter({ p }) {
+  const n = p.sets[p.idx] || 0;
+  const done = p.sets.slice(0, p.idx + 1).map(x => x || 0);
+  const total = done.reduce((a, x) => a + x, 0);
+  const btn = { width: 44, height: 44, borderRadius: '50%', border: 'none', background: '#efece3', color: INK, fontSize: 24, fontWeight: 900, cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' };
+  return (
+    <div style={{ margin: '-8px 0 20px', textAlign: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+        <button onClick={() => p.onAdd(-1)} aria-label="1回へらす" style={{ ...btn, opacity: n > 0 ? 1 : 0.35 }}>−</button>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+          <input value={n} onChange={(e) => p.onSet(e.target.value.replace(/\D/g, ''))} onFocus={(e) => e.target.select()} inputMode="numeric" pattern="[0-9]*" aria-label="回数"
+            style={{ width: 84, border: 'none', borderBottom: '2px solid ' + INK, background: 'transparent', outline: 'none', textAlign: 'center', fontSize: 34, fontWeight: 900, color: INK, padding: 0, ...mono }} />
+          <span style={{ fontSize: 14, fontWeight: 800 }}>回</span>
+        </div>
+        <button onClick={() => p.onAdd(1)} aria-label="1回ふやす" style={{ ...btn, background: LIME, color: LIME_INK }}>＋</button>
+      </div>
+      {p.idx > 0 && (
+        <div style={{ marginTop: 8, fontSize: 11.5, fontWeight: 700, color: SUB, ...mono }}>{p.idx + 1}セット目・合計 {total}回（{done.join('・')}）</div>
+      )}
+    </div>
+  );
+}
+
 export default function Run({ v }) {
   const r = v.run;
   const [, tick] = React.useState(0);
@@ -143,7 +167,7 @@ export default function Run({ v }) {
   const laps = lapsOf(c.segs, now);
   // 一覧は行動ごとではなく、リスト全部のラップを時間の順に（番号は行動の名前ごとに数える）
   const allLaps = (() => {
-    const xs = []; (r.rows || []).forEach(x => lapsOf(x.segs, now).forEach(L => xs.push({ ...L, name: x.name, on: x.on })));
+    const xs = []; (r.rows || []).forEach(x => lapsOf(x.segs, now).forEach((L, k) => xs.push({ ...L, name: x.name, on: x.on, reps: (x.reps || [])[k] || 0 })));
     xs.sort((p, q) => p.a - q.a);
     const n = {}; xs.forEach(L => { n[L.name] = (n[L.name] || 0) + 1; L.no = n[L.name]; });
     return xs.reverse();
@@ -249,7 +273,7 @@ export default function Run({ v }) {
               <button onClick={() => setPop(pop === 'req' ? null : 'req')} aria-label="生活必須行動" style={chip(!!c.req)}>必</button>
               <button onClick={() => setPop(pop === 'fav' ? null : 'fav')} aria-label="やりたいこと" style={chip(!!c.fav)}><span style={ms(15, c.fav ? '#fff' : INK, true)}>favorite</span></button>
               <span style={{ flex: 1, margin: '0 -2px' }} />
-              <button onClick={v.runLap} disabled={!r.running} style={{ flex: '0 0 auto', width: 36, height: 36, borderRadius: '50%', border: 'none', background: '#efece3', color: INK, fontSize: 10, fontWeight: 900, padding: 0, whiteSpace: 'nowrap', fontFamily: 'inherit', opacity: r.running ? 1 : 0.35, cursor: r.running ? 'pointer' : 'default' }}>ラップ</button>
+              <button onClick={v.runLap} disabled={!r.running} style={{ flex: '0 0 auto', width: 36, height: 36, borderRadius: '50%', border: 'none', background: '#efece3', color: INK, fontSize: 10, fontWeight: 900, padding: 0, whiteSpace: 'nowrap', fontFamily: 'inherit', opacity: r.running ? 1 : 0.35, cursor: r.running ? 'pointer' : 'default' }}>{c.reps && c.reps.on && !c.pomo ? 'セット' : 'ラップ'}</button>
             </div>
             <button onClick={v.runToggle} aria-label={r.running ? '一時停止' : '再開'} style={{ width: 60, height: 60, borderRadius: '50%', border: 'none', background: r.running ? INK : LIME, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, boxShadow: '0 6px 16px rgba(27,27,24,.2)' }}>
               <span style={ms(38, r.running ? '#fff' : LIME_INK, true)}>{r.running ? 'pause' : 'play_arrow'}</span>
@@ -258,6 +282,7 @@ export default function Run({ v }) {
               <button onClick={() => { setPop(null); setHist(true); }} style={{ ...chip(false), fontSize: 11.5, fontWeight: 800, gap: 3, padding: '0 12px' }}>りれき<span style={ms(16, INK)}>calendar_month</span></button>
             </div>
           </div>
+          {c.reps && c.reps.on && <RepsCounter p={c.reps} />}
           {pop && (
             <div style={{ position: 'relative', height: 120, margin: '-6px -8px 0' }}>
               <FreqPop key={pop} label={pop === 'req' ? '生活必須行動' : 'やりたいこと'} value={c[pop]}
@@ -276,6 +301,7 @@ export default function Run({ v }) {
                   <span style={{ flex: '0 1 auto', minWidth: 0, fontSize: 12.5, fontWeight: 800, color: L.on ? INK : SUB, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{L.name}{L.no}</span>
                   <span style={{ flex: '0 0 auto', fontSize: 11, fontWeight: 700, color: MUTED, ...mono }}>{hm(L.a)}〜</span>
                   <span style={{ flex: 1 }} />
+                  {L.reps > 0 && <span style={{ flex: '0 0 auto', fontSize: 13, fontWeight: 800, color: SUB, ...mono }}>{L.reps}回</span>}
                   <span style={{ flex: '0 0 auto', fontSize: 15, fontWeight: 800, color: L.open && r.running ? '#7a9a00' : INK, ...mono }}>{mmss(L.ms)}</span>
                 </div>
               ))}

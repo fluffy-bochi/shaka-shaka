@@ -283,7 +283,7 @@ export default class App extends React.Component {
       templates: s.templates, sortMode: s.sortMode, consumed: s.consumed, sampleDay: s.sampleDay,
       customCats: s.customCats, customPlans: s.customPlans, customActions: s.customActions,
       customItems: s.customItems,
-      prefs: s.prefs, actGoals: s.actGoals, actFreq: s.actFreq, research: s.research, actEdits: s.actEdits, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
+      prefs: s.prefs, actGoals: s.actGoals, actReps: s.actReps, actFreq: s.actFreq, research: s.research, actEdits: s.actEdits, slotHours: s.slotHours, hiddenCats: s.hiddenCats, hiddenActs: s.hiddenActs,
       onboardDone: s.onboardDone, profile: s.profile, lastMins: s.lastMins, activeBuffs: s.activeBuffs, buffLog: s.buffLog, cycle: s.cycle, lastBuffCheck: s.lastBuffCheck, wakeLog: s.wakeLog, bedLog: s.bedLog, mainScreen: s.mainScreen, screenTime: s.screenTime,
       bodyFatCoef: s.bodyFatCoef, mindFatCoef: s.mindFatCoef,
       bodyRecCoef: s.bodyRecCoef, mindRecCoef: s.mindRecCoef,
@@ -577,7 +577,7 @@ export default class App extends React.Component {
     const patch = { actEdits: ed };
     if (name !== old) {
       const mv = (obj) => { const o = { ...(obj || {}) }, a = normTitle(old), b = normTitle(name); if (o[a] != null && o[b] == null) { o[b] = o[a]; } delete o[a]; return o; };
-      patch.prefs = mv(this.state.prefs); patch.actFreq = mv(this.state.actFreq); patch.actGoals = mv(this.state.actGoals);
+      patch.prefs = mv(this.state.prefs); patch.actFreq = mv(this.state.actFreq); patch.actGoals = mv(this.state.actGoals); patch.actReps = mv(this.state.actReps);
     }
     this.set(patch); this.save();
     this.toast('「' + name + '」を保存しました');
@@ -1088,16 +1088,17 @@ export default class App extends React.Component {
     const k = normTitle(name), days = {}, today = todayStr();
     const alias = new Set(prevNames.map(normTitle)); // 編集で名前を変えた行動は、前の名前の記録も数える
     const keyOf = (t) => { const n = normTitle(RENAMED_ACTS[(t || '').trim()] || t); return alias.has(n) ? k : n; }; // 旧名の記録も新名で数える
-    let count = 0, total = 0, timed = 0;
+    let count = 0, total = 0, timed = 0, reps = 0;
     const toM = (hm) => { const [h, m] = (hm || '').split(':').map(Number); return h * 60 + (m || 0); };
     (this.state.entries || []).forEach(e => {
       if (e.exp || e.wakeAdd || !e.date || e.date.slice(0, 7) !== ym || e.date > today || keyOf(e.title) !== k) return; // 未来の日は数えない
       if (e.planned && !(e.dropped > 0)) return; // まだ来ていない予定は数えない
       const d = Number(e.date.slice(8, 10));
       days[d] = (days[d] || 0) + 1; count++;
+      if (e.reps > 0) reps += e.reps;
       if (e.from && e.to) { let m = toM(e.to) - toM(e.from); if (m <= 0) m += 1440; total += m; timed++; }
     });
-    return { days, count, totalMin: total, avgMin: timed ? Math.round(total / timed) : 0 };
+    return { days, count, totalMin: total, avgMin: timed ? Math.round(total / timed) : 0, reps };
   }
   /* 生活必須行動（req）・やりたいこと（fav）の頻度。val=null で解除 */
   setActFreq = (name, kind, val) => {
@@ -1114,6 +1115,33 @@ export default class App extends React.Component {
     const n = (g[k] || 0) + 1;
     if (n > 7) delete g[k]; else g[k] = n;
     this.set({ actGoals: g }); this.save();
+  };
+  /* 回数も記録するか: 自分で切りかえた値（actReps）→ 行動の初期値（筋トレなど reps: true） */
+  repsOn(name, it) {
+    const k = normTitle(name); if (!k) return false;
+    const v = (this.state.actReps || {})[k];
+    if (v != null) return !!v;
+    const t = it || this.allItems().find(x => normTitle(x.name) === k);
+    return !!(t && t.reps);
+  }
+  toggleActReps = (name) => {
+    const k = normTitle(name); if (!k) return;
+    this.set({ actReps: { ...(this.state.actReps || {}), [k]: !this.repsOn(name) } }); this.save();
+  };
+  /* 実行中の回数: run.reps[uid] = セット（ラップ）ごとの回数。いまのセット＝その行動のラップの数−1 */
+  runSetIdx(r, uid) { let n = 0; r.segs.filter(s => s.uid === uid).forEach((s, i) => { if (i === 0 || s.lap) n++; }); return Math.max(0, n - 1); }
+  runRepsSet = (n) => {
+    const r = this.state.run; if (!r) return;
+    const uid = (r.items[r.cur] || r.items[0]).uid, i = this.runSetIdx(r, uid);
+    const sets = [...((r.reps || {})[uid] || [])];
+    while (sets.length <= i) sets.push(0);
+    sets[i] = Math.max(0, Math.min(9999, Math.round(Number(n) || 0)));
+    this.setRun({ ...r, reps: { ...(r.reps || {}), [uid]: sets } });
+  };
+  runRepsAdd = (d) => {
+    const r = this.state.run; if (!r) return;
+    const uid = (r.items[r.cur] || r.items[0]).uid, i = this.runSetIdx(r, uid);
+    this.runRepsSet((((r.reps || {})[uid] || [])[i] || 0) + d);
   };
   intensitySummary(item) {
     const qs = this.intensityQuestions(item);
@@ -1389,6 +1417,11 @@ export default class App extends React.Component {
   openMore = (kwIndex, kw) => this.set({ searchStep: 'more', moreKw: { i: kwIndex, kw }, moreFilter: 0 });
   closeMore = () => this.set({ searchStep: 'results' });
   setMoreFilter = (f) => this.set({ moreFilter: f });
+  /* 記録の画面で回数を変える（セットごとの内訳は、合計を手で変えたら消す） */
+  setCartReps = (idx, n) => {
+    const v = Math.max(0, Math.min(9999, Math.round(Number(n) || 0)));
+    this.set({ searchCart: (this.state.searchCart || []).map((it, i) => { if (i !== idx) return it; const { sets, ...rest } = it; return { ...rest, reps: v }; }) }); // eslint-disable-line no-unused-vars
+  };
   removeSearchItem = (id) => {
     const cart = this.state.searchCart.filter(x => x.id !== id);
     const mins = cart.map(c => c.defMin || 30);
@@ -1528,7 +1561,9 @@ export default class App extends React.Component {
       return e;
     };
     const newEntries = [];
+    const firstIdx = []; // 行動ごとの最初の記録（回数をつける）
     items.forEach((t, i) => {
+      firstIdx[i] = newEntries.length;
       // mylifecore由来のタスクと同名なら「その日1件に累計」する（複数の時間帯も合算）
       const taskKey = this.mylifeTaskKeyFor(t.name, recDate);
       if (timeMode) {
@@ -1578,6 +1613,11 @@ export default class App extends React.Component {
         if (isFuture) { e.planned = true; e.dropped = 0; e._new = false; }
         newEntries.push(e); learnMin[i] = min;
       }
+    });
+    // 回数（回数も記録する行動だけ）: その行動の最初の記録に。時刻モードで区間が分かれても1つ
+    items.forEach((t, i) => {
+      const e = newEntries[firstIdx[i]];
+      if (e && t.reps > 0 && this.repsOn(t.name)) { e.reps = t.reps; if (t.sets && t.sets.length > 1) e.sets = t.sets; }
     });
     // mylifecoreタスクの累計: 同じ taskKey の既存記録があれば時間を合算して1件に更新（古いぶんは消す）
     baseEntries = this.mergeTaskCumulative(baseEntries, newEntries, recDate, now, isToday, timeMode);
@@ -1844,12 +1884,12 @@ export default class App extends React.Component {
       return {
         cond: isTweet && (first.cond != null || first.mindCond != null || first.temp != null) ? condOf({ ts: entryStartTs(first), cond: first.cond, mood: first.mindCond, temp: first.temp }) : null,
         key: k, sortHm: from, slot: this.slotOf(first),
-        glyph: entryGlyph(longest), head: label, time: hmText(from) + (!isTweet && to && to !== from ? '〜' + hmText(to) : ''), main: note, isNote: !!note, // タイトルはいつも時刻の左。本文はコメントだけ
+        glyph: entryGlyph(longest), head: label + (es.length === 1 && es[0].reps > 0 ? ' ' + es[0].reps + '回' : ''), time: hmText(from) + (!isTweet && to && to !== from ? '〜' + hmText(to) : ''), main: note, isNote: !!note, // タイトルはいつも時刻の左。本文はコメントだけ
         sumText: frame || (isTweet && !sum) ? '' : sg(sum), planned: es.some(e => e.planned),
         frameHint: frame ? 'タップして行動を入れる' : '',
         items: es.length > 1 ? es.map(e => {
           const f = freq[normTitle(e.title)] || {};
-          return { glyph: entryGlyph(e), name: e.title, sumText: sg(e.delta || 0), color: colorOf[e.title] || '#d8d5cb', req: !!f.req, fav: !!f.fav };
+          return { glyph: entryGlyph(e), name: e.title + (e.reps > 0 ? ' ' + e.reps + '回' : ''), sumText: sg(e.delta || 0), color: colorOf[e.title] || '#d8d5cb', req: !!f.req, fav: !!f.fav };
         }) : [],
         onTap: () => (isTweet ? this.openMoodEdit(list[0].i) : frame ? this.openFrameFill({ ...g, isPlan: true }) : this.openEditFlow(g)),
         onMenu: () => this.openRecMenu(isTweet ? { ...g, tweetIdx: list[0].i } : g),
@@ -2771,7 +2811,9 @@ export default class App extends React.Component {
       // 終わりは「記録」を押した時刻のまま。1分に満たないときは始まりを前にずらして1分にする（終わりを後ろにずらさない）
       const ranges = ss.map(s => ({ from: hmOf(Math.min(s.a, s.b - 60000)), to: hmOf(s.b) }));
       const min = Math.max(1, Math.round(ss.reduce((a, s) => a + (s.b - s.a), 0) / 60000));
-      return { ...c, defMin: min, ranges };
+      const sets = ((r.reps || {})[done[i].uid] || []).filter(n => n > 0);
+      const reps = sets.reduce((a, n) => a + n, 0);
+      return { ...c, defMin: min, ranges, ...(reps ? { reps, ...(sets.length > 1 ? { sets } : {}) } : {}) };
     });
     const all = segs.filter(s => s.b - s.a >= 1000);
     const start = Math.min(...all.map(s => s.a)), end = Math.max(...all.map(s => s.b));
@@ -2953,8 +2995,9 @@ export default class App extends React.Component {
       cur: { name: cur.name, glyph: cur.glyph, cat: cat ? cat.name : (r.name || ''), color: cat ? cat.color : '#8a8a82', segs: r.segs.filter(s => s.uid === cur.uid),
         // 必・♡・りれき（行動カードと同じ）
         req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(cur.name, kind, val),
-        history: (ym) => this.actHistory(cur.name, ym), goal: (st.actGoals || {})[normTitle(cur.name)] || 0, onGoal: () => this.cycleActGoal(cur.name), startAt: first ? first.a : null, ms: this.runMs(r, cur.uid, now), planMs: (cur.min || 30) * 60000 },
-      rows: r.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, minText: this.fmtMin(li.min), on: i === r.cur, ms: this.runMs(r, li.uid, now), segs: r.segs.filter(s => s.uid === li.uid), off: !!(po && this.pomoKind(li) !== po.phase),
+        history: (ym) => this.actHistory(cur.name, ym), goal: (st.actGoals || {})[normTitle(cur.name)] || 0, onGoal: () => this.cycleActGoal(cur.name), startAt: first ? first.a : null, ms: this.runMs(r, cur.uid, now), planMs: (cur.min || 30) * 60000,
+        repsOn: this.repsOn(cur.name, it), reps: { on: this.repsOn(cur.name, it), sets: (r.reps || {})[cur.uid] || [], idx: this.runSetIdx(r, cur.uid), onAdd: this.runRepsAdd, onSet: this.runRepsSet } },
+      rows: r.items.map((li, i) => ({ ...li, ...this.listItemVals(li), it: undefined, reps: (r.reps || {})[li.uid] || [], minText: this.fmtMin(li.min), on: i === r.cur, ms: this.runMs(r, li.uid, now), segs: r.segs.filter(s => s.uid === li.uid), off: !!(po && this.pomoKind(li) !== po.phase),
         onTap: () => this.runSelect(i), onUp: () => this.runMove(li.uid, -1), onDown: () => this.runMove(li.uid, 1), onRemove: () => this.runRemove(li.uid), onCopy: () => this.runCopy(li.uid) })),
     };
   }
@@ -3087,6 +3130,7 @@ export default class App extends React.Component {
       const it = { id: 'sce' + Date.now() + k, name: e.title, glyph: entryGlyph(e), fh, defMin: min, kw: [e.act, e.title].filter(Boolean), picks: [] };
       if (e.plan) it.plan = e.plan;
       if (e.after) it.after = min ? (e.after * 60 / min) : e.after;
+      if (e.reps > 0) { it.reps = e.reps; if (e.sets && e.sets.length > 1) it.sets = e.sets; }
       // 時刻編集: 元の記録の開始→終了を範囲として引き継ぐ
       if (anyPlanned) it.ranges = [{ from: e.from || '09:00', to: e.to || this.addHm(e.from || '09:00', min) }];
       // 症状: つらさ(level)を強度チップで再編集できるよう引き継ぐ
@@ -5352,7 +5396,7 @@ export default class App extends React.Component {
             const fq = (st.actFreq || {})[normTitle(t.name)] || {};
             const mk = (pf) => this.actFatParts(t, pf === 'normal' ? null : pf);
             return { hidden: hiddenActs0.has(normTitle(t.name)), onToggleHide: () => this.toggleActHidden(t.name),
-              key: 'act:' + t.id + (t.alsoIn ? '@' + c.id : ''), kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onRec: startWith(t, 'end'), onPlan: startWith(t, 'start'), onRun: () => this.startRun([this.listItemFromAct(t)], ''), editVals: { ...this.actEditVals(t), cat: t.homeCat || c.id, also: ((st.actEdits || {})[t.id] || {}).also || [] }, onEdit: (vals) => this.editAct(t.id, vals), onReset: t.edited ? () => this.resetAct(t.id) : null, onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym, t.prevNames), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name),
+              key: 'act:' + t.id + (t.alsoIn ? '@' + c.id : ''), kind: 'act', name: t.name, glyph: t.glyph, ...mk(pref), pref, prefParts: { dislike: mk('dislike'), normal: mk('normal'), like: mk('like') }, onPref: (val) => this.setPref(t.name, val), onStart: startWith(t), onRec: startWith(t, 'end'), onPlan: startWith(t, 'start'), onRun: () => this.startRun([this.listItemFromAct(t)], ''), editVals: { ...this.actEditVals(t), cat: t.homeCat || c.id, also: ((st.actEdits || {})[t.id] || {}).also || [] }, onEdit: (vals) => this.editAct(t.id, vals), onReset: t.edited ? () => this.resetAct(t.id) : null, onList: () => this.addToList(t), history: (ym) => this.actHistory(t.name, ym, t.prevNames), goal: (st.actGoals || {})[normTitle(t.name)] || 0, onGoal: () => this.cycleActGoal(t.name), repsOn: this.repsOn(t.name, t), onToggleReps: () => this.toggleActReps(t.name),
               // 生活必須行動・やりたいこと（両方あるときの目標は生活必須行動の頻度）
               req: fq.req || null, fav: fq.fav || null, freq: fq.req || fq.fav || null, onFreq: (kind, val) => this.setActFreq(t.name, kind, val) };
           }),
@@ -5413,6 +5457,7 @@ export default class App extends React.Component {
         hasIntensity: this.intensityQuestions(it).length > 0,
         pref: (st.prefs || {})[normTitle(it.name)] || 'normal', onPref: (val) => this.setPref(it.name, val),
         req: !!((st.actFreq || {})[normTitle(it.name)] || {}).req, fav: !!((st.actFreq || {})[normTitle(it.name)] || {}).fav,
+        repsOn: this.repsOn(it.name), reps: it.reps || 0, sets: it.sets && it.sets.length > 1 ? it.sets : null, onReps: (n) => this.setCartReps(idx, n),
       };
     });
     // 投稿のタイトルの初期値: 予定/テンプレ名 → いちばん多かった行動（ほかにもあれば「など」）
