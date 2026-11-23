@@ -286,6 +286,16 @@ function Confirm({ v }) {
                   {r.hasIntensity && <button onClick={r.onIntensity} style={{ border: '1px solid #1b1b18', background: '#fcfaf3', borderRadius: 14, padding: '3px 9px', fontSize: 11, fontWeight: 700, color: '#1b1b18', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{r.intensityText}</button>}
                   {!a.timeMode && a.minText && <span style={{ marginLeft: 'auto' }}><HmInput value={a.rawMin} onChange={(n) => n > 0 && a.onSetMin(n)} size={13} /></span>}
                 </div>
+                {r.repsOn && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, paddingLeft: 26 }}>
+                    <span style={{ fontSize: 12, color: '#55554e', marginRight: 2 }}>回数</span>
+                    <button onClick={() => r.onReps(r.reps - 1)} aria-label="1回へらす" style={sm}>−</button>
+                    <input value={r.reps} onChange={(e) => r.onReps(e.target.value.replace(/\D/g, ''))} onFocus={(e) => e.target.select()} inputMode="numeric" pattern="[0-9]*" aria-label="回数" style={{ ...timeIn, width: 64 }} />
+                    <button onClick={() => r.onReps(r.reps + 1)} aria-label="1回ふやす" style={sm}>＋</button>
+                    <span style={{ fontSize: 12, fontWeight: 700 }}>回</span>
+                    {r.sets && <span style={{ ...mono, fontSize: 11, color: '#8a8a82', marginLeft: 4 }}>{r.sets.join('・')}</span>}
+                  </div>
+                )}
                 {a.timeMode && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, paddingLeft: 26 }}>
                     {a.ranges.map((rg, ri) => (

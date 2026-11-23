@@ -99,6 +99,7 @@ export function serialize(st) {
     customActions: st.customActions || [],
     customItems: st.customItems || {},
     prefs: st.prefs || {},
+    actReps: st.actReps || {}, // 回数も記録するか { normTitle: true/false }（行動の reps の初期値を上書き）
     actGoals: st.actGoals || {}, // 行動ごとの目標頻度 { normTitle: 週あたり回数 }（旧・頻度が未設定のときだけ使う）
     research: st.research || null,
     actEdits: st.actEdits || {}, // 行動の編集 { 行動id: { name, body, mind, defMin, recover, prevNames: [] } }（最初からある行動にも上書きで効く） // 研究への協力 { on, code, since }（協力者IDで匿名の集計を送る）
@@ -170,6 +171,7 @@ export function deserialize(data) {
     customItems: (data.customItems && typeof data.customItems === 'object') ? data.customItems : {},
     prefs: (data.prefs && typeof data.prefs === 'object') ? data.prefs : {},
     actGoals: (data.actGoals && typeof data.actGoals === 'object') ? data.actGoals : {},
+    actReps: (data.actReps && typeof data.actReps === 'object') ? data.actReps : {},
     actFreq: (data.actFreq && typeof data.actFreq === 'object') ? data.actFreq : {},
     research: (data.research && typeof data.research === 'object') ? data.research : null,
     actEdits: (data.actEdits && typeof data.actEdits === 'object') ? data.actEdits : {},
@@ -211,7 +213,7 @@ export function freshState() {
   return {
     entries: [], tasks: [], sortMode: false,
     collected: [], collectedSeen: 0, templates: {}, consumed: 0, sampleDay: null,
-    customCats: [], customPlans: [], customActions: [], customItems: {}, prefs: {}, actGoals: {}, actFreq: {}, research: null, actEdits: {},
+    customCats: [], customPlans: [], customActions: [], customItems: {}, prefs: {}, actGoals: {}, actReps: {}, actFreq: {}, research: null, actEdits: {},
     slotHours: null, hiddenCats: [], hiddenActs: [],
     onboardDone: false, profile: null, lastMins: {}, activeBuffs: [], buffLog: [], cycle: null, lastBuffCheck: null, wakeLog: [], bedLog: [], mainScreen: null,
     bodyFatCoef: 1, mindFatCoef: 1, bodyRecCoef: 1, mindRecCoef: 1, calibLog: [], actCal: {}, calibUndo: null, calibAnchor: null,

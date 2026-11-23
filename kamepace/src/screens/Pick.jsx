@@ -205,6 +205,7 @@ export function History({ it, cat, onClose, closeX }) { // closeX: 右上を↩�
         )}
         <div style={stat}><span style={lab}>合計</span><span style={{ ...val, fontSize: h.totalMin >= 60 ? 11 : 13 }}>{fmtMin(h.totalMin)}</span></div>
         <div style={stat}><span style={lab}>平均</span><span style={{ ...val, fontSize: h.avgMin >= 60 ? 11 : 13 }}>{h.avgMin ? fmtMin(h.avgMin) : '—'}</span></div>
+        {it.repsOn && <div style={stat}><span style={lab}>合計回数</span><span style={{ ...val, fontSize: h.reps >= 1000 ? 11 : 13 }}>{h.reps}回</span></div>}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, fontSize: 8.5, fontWeight: 700, textAlign: 'center', color: '#8a8a82', marginBottom: 2 }}>
         {['月', '火', '水', '木', '金', '土', '日'].map((w, i) => <span key={w} style={{ color: i === 5 ? '#5b8fd4' : i === 6 ? '#d9534f' : undefined }}>{w}</span>)}
@@ -308,6 +309,7 @@ function Card({ row, cat, v, hist, setHist, editReq, onMoved, fit }) {
               <button onClick={() => setPop(pop === 'req' ? null : 'req')} aria-label="生活必須行動" style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 900, background: it.req ? INK : chip.background, color: it.req ? '#fff' : INK }}>必</button>
               <button onClick={() => setPop(pop === 'fav' ? null : 'fav')} aria-label="やりたいこと" style={{ ...chip, border: 'none', cursor: 'pointer', background: it.fav ? INK : chip.background }}><span style={ms(14, it.fav ? '#fff' : INK, true)}>favorite</span></button>
               <button onClick={() => flip(true)} style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>りれき<span style={ms(14, INK)}>calendar_month</span></button>
+              <button onClick={it.onToggleReps} aria-label="回数も記録" style={{ ...chip, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: it.repsOn ? INK : chip.background, color: it.repsOn ? '#fff' : INK }}>回数</button>
             </div>
           )}
           {it.kind === 'plan' && it.meta && <div style={{ fontSize: 12, color: '#55554e', fontWeight: 700, marginTop: 6 }}>{it.meta}</div>}

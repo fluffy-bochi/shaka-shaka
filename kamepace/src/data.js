@@ -133,6 +133,7 @@ export const CATS = [
     act('lightex', '🤸', 'sports_gymnastics', '軽い運動', 3, 1, 20, { kw: ['運動', '軽い運動', '体操', 'エクササイズ'] }),
     act('running', '🏃', 'directions_run', 'ランニング', 10, 2, 30, { kw: ['運動', 'ランニング', 'ジョギング', '走る'] }),
     act('swimming', '🏊', 'pool', '水泳', 11, 2, 45, { kw: ['運動', '水泳', 'プール', '泳ぐ'] }),
+    act('strength', '💪', 'fitness_center', '筋トレ', 9, 2, 20, { reps: true, kw: ['運動', '筋トレ', 'トレーニング', '腹筋', '腕立て', 'スクワット'] }), // reps: はじめから回数も記録する
   ] },
   { id: 'rest', icon: 'self_improvement', color: '#7a9a00', glyph: '☕', name: '休憩・回復', sub: 'お茶・入浴・昼寝・趣味 ・ −回復', items: [
     act('rest', '☕', 'local_cafe', '休憩・コーヒー', 2, 5, 15, { recover: true, kw: ['休憩', 'お茶', 'カフェ', 'コーヒー', '休む'] }),
