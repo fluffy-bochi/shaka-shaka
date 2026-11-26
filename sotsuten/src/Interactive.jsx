@@ -4,6 +4,7 @@ import { appendGlyph } from './fluent';
 import { DOG_RATIO } from './dog3d';
 import { createDogRoam } from './dogRoam';
 import { startGamepad } from './gamepad';
+import { startEsp32 } from './esp32ws';
 import { initShakaSound, attachCollisionSound, playShaka, soundReady } from './sound';
 import HomeEx from './screens/HomeEx'; // 卒展のホーム（Figma 卒展/ホーム）。投稿の見た目は本体の Home.jsx の Post
 import Bookshelf from './screens/Bookshelf';
@@ -393,6 +394,7 @@ export default function Interactive() {
   // コントローラー（gamepad.js）: スティック＝カーソル・A＝決定・B＝戻る・Y＝シャカシャカ
   const angleRef = React.useRef(0); angleRef.current = angle;
   React.useEffect(() => startGamepad({ isRecord: () => tabRef.current === 'record', angle: () => angleRef.current }), []);
+  React.useEffect(() => startEsp32(), []); // ESP32（Wi-Fi）のボタン: B1＝R・B4＝Enter・上下左右＝カーソル（esp32ws.js）
 
   /* ---- ホーム・本棚（本体の画面をそのまま使う）に渡す値 ---- */
   const today = todayStr();
