@@ -96,6 +96,7 @@ export default function Interactive() {
   React.useEffect(() => { const t = setInterval(() => setSound(soundReady()), 1000); return () => clearInterval(t); }, []);
   // QRコードの中身（しるしつき）は1分ごとに作り直す。古いリンクやリロードでは投稿できない（PostForm.jsx）
   React.useEffect(() => {
+    if (__ESP32__) return undefined; // ESP32 版はインターネットがないのでスマホの投稿（QR）は出さない
     const mk = () => QRCode.toDataURL(location.origin + '/?post=' + makeToken(), { margin: 1, width: 320 }).then(setQr).catch(() => {});
     mk(); const t = setInterval(mk, 60000); return () => clearInterval(t);
   }, []);
