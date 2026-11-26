@@ -1,15 +1,20 @@
 /* 卒展: ESP32（Wi-Fi＋WebSocket）のボタンで操作する。
    ESP32 から {"type":"button","id":"B1","state":"down"|"up"} が届いたら、キーを押した／離したのと同じ事件（keydown / keyup）を window に送る。
    画面の側は今までのキー操作のまま（gamepad.js の I/J/K/L＝カーソル、Interactive.jsx の R・Enter）。
-     B1＝R（シャカシャカ）／B4＝Enter（記録する・決定）／UP・DOWN・LEFT・RIGHT＝I・K・J・L（カーソル。記録画面では ↑↓←→）
+     B1＝R（シャカシャカ）／B2＝B（本棚）／B3＝G（ゲージ）／B4＝Enter（記録する・決定）／B5＝Esc（戻る）／B6＝H（ホーム）
+     UP・DOWN・LEFT・RIGHT＝I・K・J・L（カーソル。記録画面では ↑↓←→）
    つなぐ先: ?esp32=192.168.4.1 で開くと使いはじめる（端末に覚える）。?esp32=off でやめる。ESP32 から配信されたページなら自動。
    https のページからは ws:// につなげない（混在コンテンツ）ので、http で配信すること。
    ESP32 のスケッチ: ~/Documents/4th/卒業研究/展示/工作/esp32_input_test/
    実機なしの確認: 開発ツールのコンソールで esp32.down('B1') / esp32.up('B1') */
 
 const MAP = {
-  B1: { key: 'r', code: 'KeyR' },
-  B4: { key: 'Enter', code: 'Enter' },
+  B1: { key: 'r', code: 'KeyR' }, // IO4
+  B2: { key: 'b', code: 'KeyB' }, // IO25 本棚
+  B3: { key: 'g', code: 'KeyG' }, // IO26 ゲージ
+  B4: { key: 'Enter', code: 'Enter' }, // IO27
+  B5: { key: 'Escape', code: 'Escape' }, // IO32 戻る
+  B6: { key: 'h', code: 'KeyH' }, // IO33 ホーム
   UP: { key: 'i', code: 'KeyI' },
   DOWN: { key: 'k', code: 'KeyK' },
   LEFT: { key: 'j', code: 'KeyJ' },
