@@ -49,12 +49,24 @@ const DOG_FILL = 0.63; // やるきーぬが四角（高さ×幅）のうち、�
    選んだ向きと端末の向きが違うときは画面ごと90°回して出す。flip＝⟲で逆さに（回さないときは180°・回すときは -90°）。
    モニターや iPad の置き方（上下逆の縦など）に合わせる */
 const ORI_KEY = 'kame_ipadtest_ori';
+// iPad（iPadOS の Safari は Mac のふりをするので、タッチの数で見分ける）と ESP32 版は、上のボタン類（テスト用のヘッダー）を出さず、いつも iPad 表示
+const IS_IPAD = typeof navigator !== 'undefined' && (/iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1));
+const NO_BAR = __ESP32__ || IS_IPAD;
 const readOri = () => {
+  let o = { mode: 'auto', flip: false, pc: false };
   try {
-    const o = JSON.parse(localStorage.getItem(ORI_KEY) || 'null');
-    if (o && o.mode) return { mode: o.mode, flip: o.flip != null ? !!o.flip : o.dir === -90, pc: !!o.pc }; // 前の形（dir 90/-90）も読む
+    const s = JSON.parse(localStorage.getItem(ORI_KEY) || 'null');
+    if (s && s.mode) o = { mode: s.mode, flip: s.flip != null ? !!s.flip : s.dir === -90, pc: !!s.pc }; // 前の形（dir 90/-90）も読む
   } catch (e) { /* ignore */ }
-  return { mode: 'auto', flip: false, pc: false };
+  // ヘッダーがないときの向きの変え方: ?ori=auto|portrait|landscape ・ ?flip=1|0（端末に覚える）
+  try {
+    const q = new URLSearchParams(location.search);
+    if (['auto', 'portrait', 'landscape'].includes(q.get('ori'))) o.mode = q.get('ori');
+    if (q.has('flip')) o.flip = q.get('flip') === '1';
+    if (q.has('ori') || q.has('flip')) localStorage.setItem(ORI_KEY, JSON.stringify(o));
+  } catch (e) { /* ignore */ }
+  if (NO_BAR) o.pc = false;
+  return o;
 };
 /* PC モード: 本番の iPad の縦横比（縦 3:4）の箱を画面の真ん中に。上の余白にボタン類、下の余白にフッター */
 const IPAD_RATIO = 4 / 3;
@@ -516,7 +528,7 @@ export default function Interactive() {
         </>
       ) : (
         <>
-          {bar}
+          {NO_BAR ? (safe && <div style={{ flex: '0 0 auto', height: 'env(safe-area-inset-top)' }} />) : bar}
           {stage({ flex: 1, minHeight: 0 })}
         </>
       )}
