@@ -58,12 +58,15 @@ export function startGamepad({ isRecord, angle }) {
     t.dispatchEvent(new MouseEvent('mouseup', o));
     t.dispatchEvent(new MouseEvent('click', o));
   };
-  // 見えている向き（画面）→ アプリの中の向き（回しているぶんを戻す）
+  // スティックの向き＝見ている人から見た向き＝回したアプリの中の向き。↑↓←→ はそのまま
   const arrowOf = (sx, sy) => {
-    const a = -(angle() || 0) * Math.PI / 180;
-    const x = sx * Math.cos(a) - sy * Math.sin(a), y = sx * Math.sin(a) + sy * Math.cos(a);
-    if (Math.abs(x) > Math.abs(y)) return x < 0 ? 'ArrowLeft' : 'ArrowRight';
-    return y < 0 ? 'ArrowUp' : 'ArrowDown';
+    if (Math.abs(sx) > Math.abs(sy)) return sx < 0 ? 'ArrowLeft' : 'ArrowRight';
+    return sy < 0 ? 'ArrowUp' : 'ArrowDown';
+  };
+  // カーソルは画面（回す前）の座標で動くので、アプリを回している角度ぶん回す（回していると上下が左右になっていた）
+  const toScreen = (x, y) => {
+    const a = (angle() || 0) * Math.PI / 180;
+    return [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
   };
   const loop = (now) => {
     raf = requestAnimationFrame(loop);
@@ -96,7 +99,8 @@ export function startGamepad({ isRecord, angle }) {
     // カーソル（記録画面いがい）
     if (!rec && mag > DEAD) {
       const k = Math.pow((mag - DEAD) / (1 - DEAD), 2) * SPEED * Math.min(innerWidth, innerHeight) * dt / mag;
-      const p = pos(); move(p.x + lx * k, p.y + ly * k);
+      const [dx, dy] = toScreen(lx * k, ly * k);
+      const p = pos(); move(p.x + dx, p.y + dy);
     }
     if (down(BTN.A) || kClick) { if (rec) key('Enter'); else click(); }
     kClick = false;
