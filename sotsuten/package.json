@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:esp32": "node scripts/build-esp32.mjs"
   },
   "dependencies": {
     "firebase": "^12.19.0",
@@ -18,6 +19,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "sharp": "^0.33.5",
     "vite": "^6.0.0"
   }
 }

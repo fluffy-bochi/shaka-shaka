@@ -1,4 +1,5 @@
 import React from 'react';
+import { fluentFile } from './esp32/fluentName';
 
 /* Microsoft Fluent UI Emoji (3D) https://github.com/microsoft/fluentui-emoji
    シャカで振る絵文字を3D画像に置き換える。マップに無い/読み込めない絵文字は
@@ -250,7 +251,9 @@ EMOJI_CATALOG.forEach(e => { if (e.path && !FLUENT_MAP[e.g]) FLUENT_MAP[e.g] = e
 
 export function fluentSrc(glyph) {
   const p = FLUENT_MAP[glyph];
-  return p ? FLUENT_BASE + encodeURI(p) : null;
+  if (!p) return null;
+  if (__ESP32__) return '/f/' + fluentFile(p) + '.webp'; // ESP32 版は中に入れた WebP（scripts/build-esp32.mjs）
+  return FLUENT_BASE + encodeURI(p);
 }
 
 /* 物理ボディ用のDOMヘルパ。読み込み失敗時は絵文字テキストに戻す */
