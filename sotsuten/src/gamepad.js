@@ -3,14 +3,14 @@
    記録画面（行動選択）のあいだは、スティックも ↑↓←→ になり A＝決定（Enter）。
    ボタンの番号はブラウザの「standard」配置（位置で決まる: 下0・右1・左2・上3）→ 任天堂の A＝右・B＝下・Y＝左。
    キーやマウスの操作と同じ事件（keydown / pointermove / click）を作って送るので、画面の側は今までのキー操作のまま
-   ESP32 の手作りコントローラー（Bluetooth キーボードとしてつなぐ）: I/J/K/L＝スティック（上/左/下/右・押している間カーソルが動く）／O＝A（クリック）
+   ESP32 の手作りコントローラー（Bluetooth キーボードとしてつなぐ）: W/A/S/D＝スティック（上/左/下/右・押している間カーソルが動く）／O＝A（クリック）
    ESP32 のスケッチ: ~/Documents/Arduino/sotsuten_controller/sotsuten_controller.ino */
 const BTN = { B: 0, A: 1, Y: 2, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 const DEAD = 0.18; // スティックの遊び
 const SPEED = 1.1; // いちばん倒したときのカーソルの速さ（画面の短いほう ÷ 秒）
 const REPEAT0 = 380, REPEAT = 140;
-const KEY_STICK = { KeyI: [0, -1], KeyK: [0, 1], KeyJ: [-1, 0], KeyL: [1, 0] }; // ESP32 のジョイスティック
-// ESP32 のジョイスティック（キー I/J/K/L）の速さ（画面の短いほう ÷ 秒）。押しはじめは KEY_V0 → KEY_RAMP 秒かけて KEY_V1 まで
+const KEY_STICK = { KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] }; // PC のキーボード・ESP32 のジョイスティック（11-27 I/J/K/L から W/A/S/D に）
+// ESP32 のジョイスティック（キー W/A/S/D）の速さ（画面の短いほう ÷ 秒）。押しはじめは KEY_V0 → KEY_RAMP 秒かけて KEY_V1 まで
 // 11-27: 最高速が速すぎて止めにくい → 0.165→1.1 から 0.08→0.45 に（iPad の短い辺 約820pt で 約65→370pt/秒）
 const KEY_V0 = 0.08, KEY_V1 = 0.45, KEY_RAMP = 1.2;
 
@@ -28,7 +28,7 @@ const clickable = (el) => {
 export function startGamepad({ isRecord, angle }) {
   let raf = 0, last = 0, prev = {}, cur = null, rep = { dir: null, at: 0 };
   const held = {}, tap = {}; let heldAt = 0, kClick = false; // ESP32 のキー（押しているキー・押しはじめた時刻・O を押した）
-  const codeOf = (e) => e.code || ({ i: 'KeyI', j: 'KeyJ', k: 'KeyK', l: 'KeyL', o: 'KeyO' })[(e.key || '').toLowerCase()];
+  const codeOf = (e) => e.code || ({ w: 'KeyW', a: 'KeyA', s: 'KeyS', d: 'KeyD', o: 'KeyO' })[(e.key || '').toLowerCase()];
   const typing = (e) => e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || '');
   const onKeyDown = (e) => {
     const c = codeOf(e);
