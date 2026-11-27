@@ -10,7 +10,9 @@ const DEAD = 0.18; // スティックの遊び
 const SPEED = 1.1; // いちばん倒したときのカーソルの速さ（画面の短いほう ÷ 秒）
 const REPEAT0 = 380, REPEAT = 140;
 const KEY_STICK = { KeyI: [0, -1], KeyK: [0, 1], KeyJ: [-1, 0], KeyL: [1, 0] }; // ESP32 のジョイスティック
-const KEY_RAMP = 0.6; // キーのスティックは、押しはじめはゆっくり→この秒数で最高速（細かく合わせられるように） // ↑↓←→ を押しっぱなしにしたときの、くり返しまでの時間と間隔（ms）
+// ESP32 のジョイスティック（キー I/J/K/L）の速さ（画面の短いほう ÷ 秒）。押しはじめは KEY_V0 → KEY_RAMP 秒かけて KEY_V1 まで
+// 11-27: 最高速が速すぎて止めにくい → 0.165→1.1 から 0.08→0.45 に（iPad の短い辺 約820pt で 約65→370pt/秒）
+const KEY_V0 = 0.08, KEY_V1 = 0.45, KEY_RAMP = 1.2;
 
 const key = (k, code) => {
   window.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: code || k, bubbles: true, cancelable: true }));
@@ -85,9 +87,11 @@ export function startGamepad({ isRecord, angle }) {
     let lx = gp ? gp.axes[0] || 0 : 0, ly = gp ? gp.axes[1] || 0 : 0;
     const rx = gp ? gp.axes[2] || 0 : 0, ry = gp ? gp.axes[3] || 0 : 0;
     if (Math.hypot(rx, ry) > Math.hypot(lx, ly)) { lx = rx; ly = ry; }
-    if (keyStick) { // ESP32: 倒している向きに、押しはじめはゆっくり→だんだん速く
-      const f = Math.min(1, 0.5 + 0.5 * (now - heldAt) / 1000 / KEY_RAMP), n = Math.hypot(kx, ky);
-      lx = kx / n * f; ly = ky / n * f;
+    let keySpeed = 0;
+    if (keyStick) { // ESP32: 倒している向きに、押しはじめはゆっくり→だんだん速く（なめらかに）
+      const t = Math.min(1, (now - heldAt) / 1000 / KEY_RAMP), e = t * t * (3 - 2 * t), n = Math.hypot(kx, ky);
+      keySpeed = KEY_V0 + (KEY_V1 - KEY_V0) * e;
+      lx = kx / n; ly = ky / n;
     }
     const mag = Math.hypot(lx, ly);
     // ↑↓←→: 十字キー（いつでも）・記録画面ではスティックも
@@ -98,7 +102,8 @@ export function startGamepad({ isRecord, angle }) {
     else if (dir && now >= rep.at) { rep.at = now + REPEAT; key(dir); }
     // カーソル（記録画面いがい）
     if (!rec && mag > DEAD) {
-      const k = Math.pow((mag - DEAD) / (1 - DEAD), 2) * SPEED * Math.min(innerWidth, innerHeight) * dt / mag;
+      const v = keyStick ? keySpeed : Math.pow((mag - DEAD) / (1 - DEAD), 2) * SPEED; // ゲームコントローラーは倒した量で
+      const k = v * Math.min(innerWidth, innerHeight) * dt / mag;
       const [dx, dy] = toScreen(lx * k, ly * k);
       const p = pos(); move(p.x + dx, p.y + dy);
     }
